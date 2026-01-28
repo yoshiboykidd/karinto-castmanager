@@ -34,19 +34,21 @@ def scrape_and_sync():
             time_match = re.search(r'(\d{2}:\d{2})-(\d{2}:\d{2})', item.get_text())
             if not time_match: continue
             
+            # 名簿からIDを取得
             res = supabase.table("cast_members").select("login_id").eq("hp_display_name", hp_name).execute()
             
             if res.data:
                 login_id = res.data[0]['login_id']
-                # ここが修正ポイント：on_conflictを追加
-                supabase.table("shifts").upsert({
+                # ここが重要：on_conflict="login_id,shift_date" を必ず含める
+                data = {
                     "login_id": login_id,
                     "hp_display_name": hp_name,
                     "shift_date": db_date_str,
                     "start_time": time_match.group(1),
                     "end_time": time_match.group(2)
-                }, on_conflict="login_id,shift_date").execute()
-                print(f"  ✅ {hp_name} 同期完了")
+                }
+                supabase.table("shifts").upsert(data, on_conflict="login_id,shift_date").execute()
+                print(f"  ✅ {hp_name} ({db_date_str}) 同期完了")
 
 if __name__ == "__main__":
     scrape_and_sync()
