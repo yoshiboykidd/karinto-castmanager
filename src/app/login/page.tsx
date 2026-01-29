@@ -15,36 +15,15 @@ export default function LoginPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ));
 
-const handleLogin = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
 
-  const email = castId.includes('@') ? castId : `${castId}@karinto-internal.com`;
-
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: email,
-    password: password,
-  });
-
-  if (error) {
-    alert('IDまたはパスワードが違います');
-    setLoading(false);
-  } else {
-    // ✨ ここで自動振り分け！
-    // 管理者のメールアドレスだった場合は /admin へ、それ以外は / へ
-    if (email === "admin@karinto-internal.com") {
-      router.push('/admin');
-    } else {
-      router.push('/');
-    }
-    router.refresh();
-  }
-};
-
-    // ✨ 魔法の1行：@が含まれていなければ、自動でドメインを補完する
+    // 1. IDの形式を整える (@が含まれなければ自動補完)
     const email = castId.includes('@') ? castId : `${castId}@karinto-internal.com`;
 
-    const { error } = await supabase.auth.signInWithPassword({
+    // 2. Supabaseでログイン実行
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: email,
       password: password,
     });
@@ -53,8 +32,16 @@ const handleLogin = async (e: React.FormEvent) => {
       alert('IDまたはパスワードが違います');
       setLoading(false);
     } else {
-      // ログイン成功したらトップへ
-      router.push('/');
+      // 3. ✨ ログイン成功後の「自動振り分け」
+      if (email === "admin@karinto-internal.com") {
+        // 管理者の場合は管理画面へ直行！
+        router.push('/admin');
+      } else {
+        // キャストの場合はホーム画面へ直行！
+        router.push('/');
+      }
+      
+      // 画面の状態を最新にする
       router.refresh();
     }
   };
@@ -71,11 +58,11 @@ const handleLogin = async (e: React.FormEvent) => {
           <div>
             <label className="text-[10px] font-black text-gray-400 ml-4 mb-1 block uppercase tracking-widest">User ID</label>
             <input
-              type="text" // ✨ 数字のみ(numeric)からテキストに変更して admin も打てるように
+              type="text"
               placeholder="IDを入力"
               value={castId}
               onChange={(e) => setCastId(e.target.value)}
-              className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-200 font-bold text-gray-700 transition-all"
+              className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-200 font-bold text-gray-700 transition-all placeholder:text-gray-300"
               required
             />
           </div>
@@ -87,7 +74,7 @@ const handleLogin = async (e: React.FormEvent) => {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-200 font-bold text-gray-700 transition-all"
+              className="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-200 font-bold text-gray-700 transition-all placeholder:text-gray-300"
               required
             />
           </div>
