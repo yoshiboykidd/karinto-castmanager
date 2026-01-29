@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
-// ↓ カレンダーへのパス。もしこれでもエラーなら後述のチェックを！
 import DashboardCalendar from '../components/DashboardCalendar';
 
 interface Shift {
@@ -15,7 +14,6 @@ interface Shift {
 export default function HomePage() {
   const router = useRouter();
   
-  // 💡 エラーの原因だった server.ts を使わず、ここで直接 Supabase を準備します
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -23,6 +21,9 @@ export default function HomePage() {
 
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // 🚀 【修正1】選択された日付を管理する「箱」を用意します
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
   useEffect(() => {
     async function fetchData() {
@@ -45,7 +46,6 @@ export default function HomePage() {
     fetchData();
   }, [router, supabase.auth]);
 
-  // 🚀 出勤数と時間の集計
   const summary = shifts.reduce((acc, shift) => {
     acc.totalCount += 1;
     if (shift.start_time && shift.end_time) {
@@ -61,28 +61,35 @@ export default function HomePage() {
 
   const displayHours = Math.round(summary.totalHours * 10) / 10;
 
-  if (loading) return <div className="p-10 text-center text-pink-400 font-bold">読み込み中...</div>;
+  if (loading) return <div className="p-10 text-center text-pink-400 font-bold italic">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-[#fff5f8] pb-24 p-4 text-gray-800">
+    <div className="min-h-screen bg-[#fff5f8] pb-24 p-4 text-gray-800 font-sans">
       <div className="max-w-md mx-auto space-y-4">
         
+        {/* 集計ヘッダー */}
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-pink-100">
           <p className="text-2xl font-black mb-4 tracking-tight">マイページ</p>
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-pink-50 p-3 rounded-2xl border border-pink-100 text-center">
-              <p className="text-[10px] text-pink-400 font-bold mb-1 uppercase">Shifts</p>
-              <p className="text-2xl font-black text-pink-600">{summary.totalCount}<span className="text-xs ml-1">日</span></p>
+            <div className="bg-pink-50 p-4 rounded-2xl border border-pink-100 text-center">
+              <p className="text-[10px] text-pink-400 font-bold mb-1 uppercase tracking-widest text-left">Shifts</p>
+              <p className="text-2xl font-black text-pink-600">{summary.totalCount}<span className="text-sm ml-1">日</span></p>
             </div>
-            <div className="bg-pink-50 p-3 rounded-2xl border border-pink-100 text-center">
-              <p className="text-[10px] text-pink-400 font-bold mb-1 uppercase">Hours</p>
-              <p className="text-2xl font-black text-pink-600">{displayHours}<span className="text-xs ml-1">h</span></p>
+            <div className="bg-pink-50 p-4 rounded-2xl border border-pink-100 text-center">
+              <p className="text-[10px] text-pink-400 font-bold mb-1 uppercase tracking-widest text-left">Hours</p>
+              <p className="text-2xl font-black text-pink-600">{displayHours}<span className="text-sm ml-1">h</span></p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-2 rounded-3xl shadow-sm border border-pink-100">
-          <DashboardCalendar shifts={shifts} />
+        {/* カレンダー本体 */}
+        <div className="bg-white p-2 rounded-3xl shadow-sm border border-pink-100 overflow-hidden">
+          {/* 🚀 【修正2】エラーが出ていた場所に、必要なデータを全て渡します */}
+          <DashboardCalendar 
+            shifts={shifts} 
+            selectedDate={selectedDate} 
+            onSelect={setSelectedDate} 
+          />
         </div>
 
       </div>
