@@ -99,164 +99,157 @@ export default function Page() {
     }
   };
 
-  if (loading) return <div className="min-h-screen bg-[#FFF5F7] flex items-center justify-center text-pink-400 font-bold animate-pulse">読み込み中...</div>;
+  if (loading) return <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center text-pink-300 font-bold animate-pulse">読み込み中...</div>;
 
   const selectedShift = shifts.find(s => selectedDate && s.shift_date === format(selectedDate, 'yyyy-MM-dd'));
 
   return (
-    <div className="min-h-screen bg-[#FFF6F8] text-gray-800 pb-32 font-sans">
-      {/* ヘッダー：余白を調整しスッキリと */}
-      <header className="bg-white px-6 pt-12 pb-6 rounded-b-3xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex justify-between items-end">
+    <div className="min-h-screen bg-[#FFF9FA] text-gray-700 pb-32 font-sans">
+      {/* ヘッダー */}
+      <header className="bg-white px-6 pt-12 pb-6 rounded-b-[40px] shadow-[0_2px_15px_rgba(0,0,0,0.02)] flex justify-between items-end">
         <div>
-          <p className="text-pink-400 text-xs font-bold tracking-wider mb-1">Cast Home</p>
-          <h1 className="text-2xl font-extrabold text-gray-800 tracking-tight">
+          <p className="text-pink-300 text-[10px] font-black tracking-[0.2em] mb-1 uppercase">お疲れ様です🌸</p>
+          <h1 className="text-2xl font-black text-gray-800">
             {castProfile?.display_name || 'キャスト'}
-            <span className="text-sm font-bold ml-2 text-gray-400">さん</span>
+            <span className="text-sm font-bold ml-1 text-gray-400">さん</span>
           </h1>
         </div>
         {castProfile?.login_id === "admin" && (
-          <button onClick={() => router.push('/admin')} className="bg-gray-800 text-white text-[10px] px-4 py-2 rounded-full font-bold shadow-sm active:scale-95 transition-all">⚙️ 管理画面</button>
+          <button onClick={() => router.push('/admin')} className="bg-gray-100 text-gray-400 text-[9px] px-3 py-1.5 rounded-full font-bold active:bg-gray-200 transition-all">⚙️ 管理</button>
         )}
       </header>
 
-      <main className="px-5 mt-6 space-y-5">
+      <main className="px-5 mt-6 space-y-6">
         
-        {/* 💰 今月の報酬サマリー：バランスを整え、高級感のあるグラデーションに */}
-        <section className="bg-gradient-to-br from-pink-400 via-rose-400 to-pink-500 rounded-3xl p-5 text-white shadow-lg shadow-pink-200/50 relative overflow-hidden">
-          <div className="relative z-10">
-            <div className="flex justify-between items-center mb-3 opacity-90">
-              <p className="text-xs font-bold uppercase tracking-widest">{format(new Date(), 'MMMM')} Total</p>
-              <span className="bg-white/20 text-[10px] px-3 py-0.5 rounded-full font-bold">今月の集計</span>
+        {/* 💰 合計枠：淡いパステルピンクに変更 */}
+        <section className="bg-[#FFE9ED] rounded-[32px] p-6 shadow-sm border border-white">
+          <div className="flex justify-between items-center mb-4">
+            <p className="text-[10px] font-black text-pink-400 uppercase tracking-widest">Monthly Earnings</p>
+            <span className="bg-white/60 text-[9px] text-pink-400 px-3 py-1 rounded-full font-bold shadow-sm">今月の集計</span>
+          </div>
+          <p className="text-4xl font-black text-pink-500 tracking-tighter mb-5">
+            <span className="text-xl mr-1 font-bold">¥</span>{monthlyTotals.amount.toLocaleString()}
+          </p>
+          <div className="flex justify-between items-center bg-white/40 rounded-2xl p-4 backdrop-blur-sm border border-white/50">
+            <div className="text-center flex-1 border-r border-pink-100">
+              <p className="text-[9px] font-bold text-pink-300 mb-1 tracking-tighter">F (ﾌﾘｰ)</p>
+              <p className="text-lg font-black text-pink-500">{monthlyTotals.f}<span className="text-[10px] ml-0.5">本</span></p>
             </div>
-            {/* 金額のフォントサイズを調整し、通貨記号とのバランスを改善 */}
-            <p className="text-4xl font-extrabold tracking-tight mb-5 flex items-baseline">
-              <span className="text-2xl mr-1">¥</span>
-              {monthlyTotals.amount.toLocaleString()}
-            </p>
-            {/* 内訳の視認性を向上 */}
-            <div className="flex justify-between items-center bg-white/15 rounded-2xl p-3 backdrop-blur-md">
-              <div className="text-center flex-1 border-r border-white/20">
-                <p className="text-[10px] font-bold opacity-80 mb-1">FREE</p>
-                <p className="text-xl font-extrabold">{monthlyTotals.f}<span className="text-xs ml-1 font-bold">本</span></p>
-              </div>
-              <div className="text-center flex-1 border-r border-white/20">
-                <p className="text-[10px] font-bold opacity-80 mb-1">初指名</p>
-                <p className="text-xl font-extrabold">{monthlyTotals.first}<span className="text-xs ml-1 font-bold">本</span></p>
-              </div>
-              <div className="text-center flex-1">
-                <p className="text-[10px] font-bold opacity-80 mb-1">本指名</p>
-                <p className="text-xl font-extrabold">{monthlyTotals.main}<span className="text-xs ml-1 font-bold">本</span></p>
-              </div>
+            <div className="text-center flex-1 border-r border-pink-100">
+              <p className="text-[9px] font-bold text-pink-300 mb-1 tracking-tighter">初指名</p>
+              <p className="text-lg font-black text-pink-500">{monthlyTotals.first}<span className="text-[10px] ml-0.5">本</span></p>
+            </div>
+            <div className="text-center flex-1">
+              <p className="text-[9px] font-bold text-pink-300 mb-1 tracking-tighter">本指名</p>
+              <p className="text-lg font-black text-pink-500">{monthlyTotals.main}<span className="text-[10px] ml-0.5">本</span></p>
             </div>
           </div>
-          {/* 装飾的な背景円 */}
-          <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
         </section>
 
-        {/* お知らせ：シンプルに */}
-        <section className="bg-white rounded-3xl overflow-hidden shadow-sm border border-pink-50/50">
-          <div className="divide-y divide-gray-50">
+        {/* お知らせ：より控えめに */}
+        <section className="bg-white rounded-2xl overflow-hidden border border-pink-50 shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
+          <div className="divide-y divide-pink-50">
             {newsList.map((news) => (
-              <div key={news.id} className="p-4 text-left flex items-center space-x-3 active:bg-gray-50 transition-colors">
-                <span className="text-[9px] text-gray-400 font-bold shrink-0">{format(parseISO(news.created_at), 'MM/dd')}</span>
-                <p className="text-sm font-medium text-gray-600 truncate">{news.content}</p>
+              <div key={news.id} className="p-3 text-left flex items-center space-x-3">
+                <span className="text-[8px] text-pink-200 font-bold">{format(parseISO(news.created_at), 'MM/dd')}</span>
+                <p className="text-xs font-bold text-gray-400 truncate">{news.content}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* カレンダー */}
-        <section className="bg-white p-3 rounded-3xl shadow-sm border border-pink-50/50">
+        <section className="bg-white p-3 rounded-[32px] shadow-sm border border-pink-50">
           <DashboardCalendar shifts={shifts} selectedDate={selectedDate} onSelect={setSelectedDate} />
         </section>
 
-        {/* 📅 日付詳細エリア */}
-        <div className="space-y-5">
-          {/* シフト時間表示：高さを抑えてスッキリと */}
-          <section className="bg-gradient-to-r from-pink-400 to-rose-400 p-4 rounded-3xl text-white shadow-md shadow-pink-100">
-            <div className="flex justify-between items-center mb-2 opacity-90">
-              <h3 className="text-md font-bold">
+        {/* 📅 【統合枠】日付詳細 ＋ 入力フォーム */}
+        <section className="bg-white rounded-[32px] shadow-lg border border-pink-50 overflow-hidden">
+          {/* 枠の上部：日付とシフト時間 */}
+          <div className="bg-[#FFF5F6] p-5 border-b border-pink-50">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-md font-black text-gray-700">
                 {selectedDate ? format(selectedDate, 'M月d日 (eee)', { locale: ja }) : '日付を選択'}
               </h3>
-              <span className="text-xs font-bold tracking-wider opacity-80">SCHEDULE</span>
+              <span className={`text-[10px] px-3 py-1 rounded-full font-bold shadow-sm ${selectedShift ? 'bg-pink-400 text-white' : 'bg-gray-200 text-gray-400'}`}>
+                {selectedShift ? '出勤' : '休み'}
+              </span>
             </div>
-            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 text-center">
+            <div className="text-center py-2">
               {selectedShift ? (
-                <p className="text-2xl font-extrabold tracking-tight">
-                  {selectedShift.start_time} <span className="text-sm mx-1 font-light">〜</span> {selectedShift.end_time}
+                <p className="text-2xl font-black text-pink-400 tracking-tighter">
+                  {selectedShift.start_time} <span className="text-sm mx-2 font-normal text-pink-200">〜</span> {selectedShift.end_time}
                 </p>
               ) : (
-                <p className="text-sm font-medium opacity-90">お休み 🌙</p>
+                <p className="text-sm font-bold text-gray-300 italic">OFF 🌙</p>
               )}
             </div>
-          </section>
+          </div>
 
-          {/* 実績入力フォーム：入力欄のゴツさを解消 */}
-          {selectedShift && (
-            <section className="bg-white p-5 rounded-3xl shadow-lg border border-pink-100/50 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex items-center mb-4">
-                <h3 className="text-sm font-bold text-gray-700">✍️ 本日の実績を入力</h3>
-              </div>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  {[
-                    { label: 'FREE', key: 'f' },
-                    { label: '初指名', key: 'first' },
-                    { label: '本指名', key: 'main' }
-                  ].map((item) => (
-                    <div key={item.key} className="space-y-2 text-center">
-                      <label className="text-[10px] font-bold text-gray-400 block">{item.label}</label>
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        placeholder="0"
-                        value={editReward[item.key as keyof typeof editReward]}
-                        onChange={e => setEditReward({...editReward, [item.key]: e.target.value})}
-                        className="w-full text-center py-2 bg-pink-50/30 rounded-xl font-bold text-lg text-pink-600 border border-pink-100 focus:outline-none focus:ring-2 focus:ring-pink-200 focus:bg-white transition-all placeholder:text-gray-300"
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                <div className="pt-2">
-                  <label className="text-[10px] font-bold text-gray-400 text-center block mb-2">本日のお給料 (円)</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-300 font-bold">¥</span>
+          {/* 枠の下部：入力フォーム（出勤時のみ） */}
+          {selectedShift ? (
+            <div className="p-6 space-y-6 bg-white">
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'F (ﾌﾘｰ)', key: 'f' },
+                  { label: '初指名', key: 'first' },
+                  { label: '本指名', key: 'main' }
+                ].map((item) => (
+                  <div key={item.key} className="space-y-1.5 text-center">
+                    <label className="text-[9px] font-black text-gray-300 block tracking-tighter">{item.label}</label>
                     <input
                       type="number"
                       inputMode="numeric"
                       placeholder="0"
-                      value={editReward.amount}
-                      onChange={e => setEditReward({...editReward, amount: e.target.value})}
-                      className="w-full text-center py-3 pl-8 bg-pink-50/50 rounded-2xl font-extrabold text-2xl text-pink-600 border border-pink-100 focus:outline-none focus:ring-2 focus:ring-pink-300 focus:bg-white transition-all placeholder:text-pink-200"
+                      value={editReward[item.key as keyof typeof editReward]}
+                      onChange={e => setEditReward({...editReward, [item.key]: e.target.value})}
+                      className="w-full text-center py-3 bg-[#FAFAFA] rounded-xl font-black text-pink-400 border border-gray-100 focus:outline-none focus:ring-2 focus:ring-pink-100 transition-all placeholder:text-gray-200"
                     />
                   </div>
-                </div>
-
-                <button onClick={handleSaveReward} className="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-3.5 rounded-2xl shadow-md active:scale-95 transition-all text-sm">
-                  実績を保存する
-                </button>
+                ))}
               </div>
-            </section>
+
+              <div>
+                <label className="text-[9px] font-black text-gray-300 text-center block mb-2 tracking-widest">本日のお給料 (円)</label>
+                <div className="relative">
+                  <span className="absolute left-6 top-1/2 -translate-y-1/2 text-pink-100 text-xl font-black">¥</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="0"
+                    value={editReward.amount}
+                    onChange={e => setEditReward({...editReward, amount: e.target.value})}
+                    className="w-full text-center py-5 bg-[#FAFAFA] rounded-2xl font-black text-3xl text-pink-500 border border-gray-100 focus:outline-none focus:ring-2 focus:ring-pink-100 transition-all placeholder:text-pink-100"
+                  />
+                </div>
+              </div>
+
+              <button onClick={handleSaveReward} className="w-full bg-pink-400 hover:bg-pink-500 text-white font-black py-4 rounded-2xl shadow-md active:scale-95 transition-all text-sm tracking-widest">
+                保存する
+              </button>
+            </div>
+          ) : (
+            <div className="p-8 text-center bg-white">
+              <p className="text-xs font-bold text-gray-300">本日の実績入力はありません</p>
+            </div>
           )}
-        </div>
+        </section>
       </main>
 
       {/* フッター */}
-      <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/80 backdrop-blur-lg border-t border-gray-50 pb-5 pt-3">
+      <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/80 backdrop-blur-md border-t border-pink-50 pb-6 pt-3">
         <nav className="flex justify-around items-center max-w-sm mx-auto">
-          <button className="flex flex-col items-center text-pink-500 transition-transform active:scale-90" onClick={() => router.push('/')}>
-            <span className="text-xl mb-0.5">🏠</span>
-            <span className="text-[9px] font-bold">ホーム</span>
+          <button className="flex flex-col items-center text-pink-400" onClick={() => router.push('/')}>
+            <span className="text-xl mb-1">🏠</span>
+            <span className="text-[9px] font-black uppercase tracking-tighter">Home</span>
           </button>
-          <button className="flex flex-col items-center text-gray-300 transition-transform active:scale-90">
-            <span className="text-xl mb-0.5">💰</span>
-            <span className="text-[9px] font-bold">給与</span>
+          <button className="flex flex-col items-center text-gray-300">
+            <span className="text-xl mb-1">💰</span>
+            <span className="text-[9px] font-black uppercase tracking-tighter">Salary</span>
           </button>
-          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center text-gray-300 transition-transform active:scale-90">
-            <span className="text-xl mb-0.5">🚪</span>
-            <span className="text-[9px] font-bold">ログアウト</span>
+          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center text-gray-300">
+            <span className="text-xl mb-1">🚪</span>
+            <span className="text-[9px] font-black uppercase tracking-tighter">Logout</span>
           </button>
         </nav>
       </footer>
