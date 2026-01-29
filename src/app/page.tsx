@@ -20,7 +20,6 @@ export default function Page() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [loading, setLoading] = useState(true);
   
-  // 入力用（未入力時は空文字で扱えるように string 型も許容）
   const [editReward, setEditReward] = useState<{f:any, first:any, main:any, amount:any}>({ 
     f: '', first: '', main: '', amount: '' 
   });
@@ -51,7 +50,6 @@ export default function Page() {
     setLoading(false);
   }
 
-  // 日付選択時の初期値セット（0の場合は空文字にして入力しやすくする）
   useEffect(() => {
     const dateStr = format(selectedDate || new Date(), 'yyyy-MM-dd');
     const shift = shifts.find(s => s.shift_date === dateStr);
@@ -67,7 +65,7 @@ export default function Page() {
     }
   }, [selectedDate, shifts]);
 
-  // 今月の合計と各種本数の集計
+  // 今月の集計（報酬額・本数）
   const monthlyTotals = shifts
     .filter(s => {
       const date = parseISO(s.shift_date);
@@ -98,7 +96,7 @@ export default function Page() {
       alert('保存に失敗しました');
     } else {
       fetchInitialData();
-      alert('保存しました！✨');
+      alert('実績を保存しました！💰');
     }
   };
 
@@ -108,7 +106,7 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-[#FFF5F7] text-gray-800 pb-32">
-      {/* ヘッダー：お名前のみのスッキリした形に */}
+      {/* ヘッダー */}
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm flex justify-between items-center">
         <div>
           <p className="text-pink-400 text-[10px] font-black tracking-widest uppercase">Cast Home</p>
@@ -123,7 +121,7 @@ export default function Page() {
 
       <main className="px-4 mt-4 space-y-4">
         
-        {/* 💰 【改善】今月の報酬サマリー（別の枠で大きく表示） */}
+        {/* 💰 今月の報酬サマリー（独立した大きな枠） */}
         <section className="bg-gradient-to-br from-rose-400 to-pink-400 rounded-[35px] p-6 text-white shadow-xl shadow-pink-100">
           <div className="flex justify-between items-center mb-2">
             <p className="text-[10px] font-black text-white/80 uppercase tracking-widest">{format(new Date(), 'MMMM')} Total</p>
@@ -160,60 +158,79 @@ export default function Page() {
           </div>
         </section>
 
-        {/* カレンダー：過去の日付も制限なく操作可能 */}
+        {/* カレンダー */}
         <section className="bg-white p-2 rounded-[28px] shadow-sm border border-pink-50">
           <DashboardCalendar shifts={shifts} selectedDate={selectedDate} onSelect={setSelectedDate} />
         </section>
 
-        {/* 報酬入力エリア */}
-        <section className="bg-white p-6 rounded-[32px] shadow-lg border border-pink-50">
-          <div className="flex justify-between items-center mb-5">
-            <h3 className="text-lg font-black text-gray-800">{format(selectedDate || new Date(), 'M/d (eee)', { locale: ja })} の実績</h3>
-            <span className={`text-[10px] px-3 py-1 rounded-full font-bold ${selectedShift ? 'bg-pink-100 text-pink-500' : 'bg-gray-100 text-gray-300'}`}>
-              {selectedShift ? '出勤' : '休み'}
-            </span>
-          </div>
+        {/* 📅 日付詳細：以前のシフト表示 + 実績入力 */}
+        <div className="space-y-4">
+          <section className="bg-gradient-to-br from-pink-400 to-rose-400 p-5 rounded-[28px] text-white shadow-lg shadow-pink-100">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-bold">
+                {selectedDate ? format(selectedDate, 'M月d日 (eee)', { locale: ja }) : '日付を選択'}
+              </h3>
+              <span className="bg-white/30 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-widest uppercase">予定</span>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 text-center">
+              {selectedShift ? (
+                <p className="text-3xl font-black tracking-tighter">
+                  {selectedShift.start_time} <span className="text-sm font-normal mx-1">〜</span> {selectedShift.end_time}
+                </p>
+              ) : (
+                <p className="text-sm font-medium opacity-80 italic">本日はお休みです 🌙</p>
+              )}
+            </div>
+          </section>
 
-          <div className="space-y-5">
-            {/* 3列入力ボックス */}
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: 'F', key: 'f' },
-                { label: '初', key: 'first' },
-                { label: '本', key: 'main' }
-              ].map((item) => (
-                <div key={item.key} className="space-y-1">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">{item.label}</label>
+          {/* 出勤予定がある日だけ実績入力フォームを表示 */}
+          {selectedShift && (
+            <section className="bg-white p-6 rounded-[32px] shadow-lg border border-pink-50 animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className="flex items-center mb-5 ml-1">
+                <span className="text-pink-400 mr-2">✍️</span>
+                <h3 className="text-sm font-black text-gray-700 uppercase tracking-widest">実績を入力</h3>
+              </div>
+
+              <div className="space-y-5">
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: 'F', key: 'f' },
+                    { label: '初', key: 'first' },
+                    { label: '本', key: 'main' }
+                  ].map((item) => (
+                    <div key={item.key} className="space-y-1">
+                      <label className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">{item.label}</label>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={editReward[item.key as keyof typeof editReward]}
+                        onChange={e => setEditReward({...editReward, [item.key]: e.target.value})}
+                        className="w-full text-center py-3 bg-gray-50 rounded-xl font-black text-pink-500 border border-gray-100 focus:outline-none focus:ring-2 focus:ring-pink-200"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest text-center block">本日のお給料 (円)</label>
                   <input
                     type="number"
                     inputMode="numeric"
                     placeholder="0"
-                    value={editReward[item.key as keyof typeof editReward]}
-                    onChange={e => setEditReward({...editReward, [item.key]: e.target.value})}
-                    className="w-full text-center py-3 bg-gray-50 rounded-xl font-black text-pink-500 border border-gray-100 focus:outline-none focus:ring-2 focus:ring-pink-200 placeholder:text-gray-200"
+                    value={editReward.amount}
+                    onChange={e => setEditReward({...editReward, amount: e.target.value})}
+                    className="w-full text-center py-4 bg-pink-50 rounded-2xl font-black text-3xl text-pink-600 border border-pink-100 focus:outline-none focus:ring-2 focus:ring-pink-300"
                   />
                 </div>
-              ))}
-            </div>
 
-            {/* 報酬額入力 */}
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">本日のお給料 (円)</label>
-              <input
-                type="number"
-                inputMode="numeric"
-                placeholder="0"
-                value={editReward.amount}
-                onChange={e => setEditReward({...editReward, amount: e.target.value})}
-                className="w-full text-center py-4 bg-pink-50 rounded-2xl font-black text-3xl text-pink-600 border border-pink-100 focus:outline-none focus:ring-2 focus:ring-pink-300 placeholder:text-pink-200"
-              />
-            </div>
-
-            <button onClick={handleSaveReward} className="w-full bg-gray-800 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all">
-              実績を保存する 💾
-            </button>
-          </div>
-        </section>
+                <button onClick={handleSaveReward} className="w-full bg-gray-800 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-all">
+                  実績を保存する 💾
+                </button>
+              </div>
+            </section>
+          )}
+        </div>
       </main>
 
       {/* フッター */}
