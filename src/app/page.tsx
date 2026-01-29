@@ -1,13 +1,11 @@
 'use client';
 
-
 import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import DashboardCalendar from '@/components/DashboardCalendar';
-
 
 export default function Page() {
   const router = useRouter();
@@ -16,26 +14,21 @@ export default function Page() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ));
 
-
   const [shifts, setShifts] = useState<any[]>([]);
   const [castProfile, setCastProfile] = useState<any>(null);
   const [newsList, setNewsList] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [loading, setLoading] = useState(true);
   
-  // 実績入力用のステート
   const [editReward, setEditReward] = useState<{f:any, first:any, main:any, amount:any}>({ 
     f: '', first: '', main: '', amount: '' 
   });
 
-
   useEffect(() => { fetchInitialData(); }, [supabase, router]);
-
 
   async function fetchInitialData() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.push('/login'); return; }
-
 
     const loginId = session.user.email?.replace('@karinto-internal.com', '');
     const [castRes, shiftRes] = await Promise.all([
@@ -46,7 +39,6 @@ export default function Page() {
     setCastProfile(castRes.data);
     setShifts(shiftRes.data || []);
 
-
     if (castRes.data) {
       const myShopId = castRes.data.HOME_shop_ID || 'main';
       const { data: newsData } = await supabase.from('news').select('*')
@@ -56,8 +48,6 @@ export default function Page() {
     setLoading(false);
   }
 
-
-  // 日付選択時に、その日の実績をセットする
   useEffect(() => {
     const dateStr = format(selectedDate || new Date(), 'yyyy-MM-dd');
     const shift = shifts.find(s => s.shift_date === dateStr);
@@ -69,23 +59,34 @@ export default function Page() {
     });
   }, [selectedDate, shifts]);
 
-
-  // 今月の合計を計算するロジック
+  // --- 計算ロジック拡張 (ver 1.11) ---
   const monthlyTotals = shifts
     .filter(s => {
       const date = parseISO(s.shift_date);
       const now = new Date();
       return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
     })
-    .reduce((acc, s) => ({
-      amount: acc.amount + (s.reward_amount || 0),
-      f: acc.f + (s.f_count || 0),
-      first: acc.first + (s.first_request_count || 0),
-      main: acc.main + (s.main_request_count || 0),
-    }), { amount: 0, f: 0, first: 0, main: 0 });
+    .reduce((acc, s) => {
+      // 稼働時間の計算 (日またぎ対応)
+      let duration = 0;
+      if (s.start_time && s.end_time) {
+        const [sH, sM] = s.start_time.split(':').map(Number);
+        const [eH, eM] = s.end_time.split(':').map(Number);
+        let adjustedEH = eH;
+        if (eH < sH) adjustedEH += 24; // 深夜25時などの対応
+        duration = (adjustedEH + eM / 60) - (sH + sM / 60);
+      }
 
+      return {
+        amount: acc.amount + (s.reward_amount || 0),
+        f: acc.f + (s.f_count || 0),
+        first: acc.first + (s.first_request_count || 0),
+        main: acc.main + (s.main_request_count || 0),
+        count: acc.count + 1, // 出勤数
+        hours: acc.hours + duration, // 合計稼働時間
+      };
+    }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
 
-  // 保存処理
   const handleSaveReward = async () => {
     const dateStr = format(selectedDate || new Date(), 'yyyy-MM-dd');
     const { error } = await supabase.from('shifts').update({
@@ -95,7 +96,6 @@ export default function Page() {
       reward_amount: Number(editReward.amount) || 0
     }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr);
 
-
     if (error) {
       alert('保存に失敗しました');
     } else {
@@ -104,21 +104,17 @@ export default function Page() {
     }
   };
 
-
   if (loading) return (
     <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center text-pink-300 font-black">
       LOADING...
     </div>
   );
 
-
   const selectedShift = shifts.find(s => selectedDate && s.shift_date === format(selectedDate, 'yyyy-MM-dd'));
 
-
   return (
-    <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-32 font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
-      {/* 🚀 ヘッダー */}
       <header className="bg-white px-5 pt-10 pb-4 rounded-b-[25px] shadow-sm flex justify-between items-end border-b border-pink-100">
         <div>
           <p className="text-pink-300 text-[9px] font-black tracking-[0.2em] mb-0.5 uppercase">Welcome Back🌸</p>
@@ -132,14 +128,20 @@ export default function Page() {
         )}
       </header>
 
-
       <main className="px-3 mt-4 space-y-4">
         
-        {/* 1. 💰 今月の合計枠（最上部） */}
+        {/* 1. 💰 今月の合計枠 (ver 1.11 更新) */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-4 border border-pink-300 shadow-sm">
           <div className="flex justify-between items-center mb-1">
             <p className="text-[10px] font-black text-pink-400 uppercase tracking-tighter">Earnings Report</p>
-            <span className="bg-pink-400 text-[8px] text-white px-2 py-0.5 rounded-full font-bold">今月合計</span>
+            <div className="flex gap-2">
+              <span className="bg-white/50 text-[8px] text-pink-400 px-2 py-0.5 rounded-full font-bold">
+                出勤: {monthlyTotals.count}日
+              </span>
+              <span className="bg-white/50 text-[8px] text-pink-400 px-2 py-0.5 rounded-full font-bold">
+                稼働: {Math.round(monthlyTotals.hours * 10) / 10}h
+              </span>
+            </div>
           </div>
           <p className="text-[44px] font-black text-pink-500 tracking-tighter mb-3 text-center leading-none">
             <span className="text-lg mr-0.5 font-bold">¥</span>{monthlyTotals.amount.toLocaleString()}
@@ -160,12 +162,10 @@ export default function Page() {
           </div>
         </section>
 
-
-        {/* 2. 📅 カレンダー（中央） */}
+        {/* 2. 📅 カレンダー */}
         <section className="bg-white p-2 rounded-[22px] border border-pink-200 shadow-sm overflow-hidden">
           <DashboardCalendar shifts={shifts} selectedDate={selectedDate} onSelect={setSelectedDate} />
         </section>
-
 
         {/* 3. ✍️ 実績入力フォーム */}
         <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden">
@@ -181,7 +181,6 @@ export default function Page() {
               <span className="text-[9px] font-bold text-gray-400 uppercase px-2 py-1 bg-gray-100 rounded-md">Off</span>
             )}
           </div>
-
 
           {selectedShift ? (
             <div className="p-4 space-y-4">
@@ -203,8 +202,6 @@ export default function Page() {
                 ))}
               </div>
 
-
-              {/* ✨ 給料入力欄（カンマ対応） */}
               <div className="flex items-center space-x-2 bg-pink-50/50 p-2.5 px-4 rounded-xl border border-pink-200">
                 <label className="text-[11px] font-black text-pink-300 shrink-0 uppercase tracking-widest">給料</label>
                 <div className="relative flex-1 text-right">
@@ -213,20 +210,15 @@ export default function Page() {
                     type="text"
                     inputMode="numeric"
                     placeholder="0"
-                    // 表示する時にカンマをつける
                     value={editReward.amount ? Number(editReward.amount).toLocaleString() : ''}
                     onChange={e => {
-                      // 入力からカンマを除去して数字だけを保持する
                       const val = e.target.value.replace(/,/g, '');
-                      if (/^\d*$/.test(val)) {
-                        setEditReward({...editReward, amount: val});
-                      }
+                      if (/^\d*$/.test(val)) setEditReward({...editReward, amount: val});
                     }}
                     className="w-full text-right pr-1 py-1 bg-transparent font-black text-[34px] text-pink-500 focus:outline-none placeholder:text-pink-100"
                   />
                 </div>
               </div>
-
 
               <button onClick={handleSaveReward} className="w-full bg-pink-500 text-white font-black py-4 rounded-xl shadow-lg active:scale-95 transition-all text-xs tracking-[0.2em] uppercase">
                 実績を保存 💾
@@ -239,8 +231,7 @@ export default function Page() {
           )}
         </section>
 
-
-        {/* 4. 📢 NEWS（最下部） */}
+        {/* 4. 📢 NEWS */}
         <section className="bg-white rounded-xl overflow-hidden border border-pink-100 shadow-sm opacity-90">
           <div className="bg-gray-50 p-2 border-b border-pink-50">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Shop News</p>
@@ -253,11 +244,13 @@ export default function Page() {
           ))}
         </section>
 
+        {/* --- ver 1.11 可視化ラベル --- */}
+        <div className="pt-4 pb-2 text-center">
+          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.11</p>
+        </div>
 
       </main>
 
-
-      {/* 📱 フッターナビゲーション */}
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
         <nav className="flex justify-around items-center max-w-sm mx-auto px-4">
           <button className="flex flex-col items-center text-pink-500" onClick={() => router.push('/')}>
