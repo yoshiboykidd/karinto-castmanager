@@ -2,7 +2,6 @@ import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { NextResponse } from 'next/server';
 
-// データの設計図を定義
 interface ShiftData {
   login_id: string;
   shift_date: string;
@@ -17,26 +16,26 @@ export async function GET() {
   );
 
   try {
-    const { data: casts } = await supabase.from('cast_members').select('login_id, display_name');
-    const castMap = Object.fromEntries(casts?.map(c => [c.display_name, c.login_id]) || []);
+    // 1. キャスト一覧の取得
+    const { data: casts, error: castError } = await supabase.from('cast_members').select('login_id, display_name');
+    if (castError) return NextResponse.json({ success: false, step: 'fetch casts', error: castError.message });
 
+    const castMap = Object.fromEntries(casts?.map(c => [c.display_name, c.login_id]) || []);
     const today = new Date();
-    // ここを修正：ShiftDataの形をしたリストですよ、と教えてあげる
     const results: ShiftData[] = [];
 
-    // 今日から7日分くらいを取得するように少し拡張しました
+    // 2. 7日分取得
     for (let i = 0; i < 7; i++) {
       const targetDate = new Date(today);
       targetDate.setDate(today.getDate() + i);
-      
-      // 日本時間に合わせて日付文字列を作成
       const y = targetDate.getFullYear();
       const m = ('0' + (targetDate.getMonth() + 1)).slice(-2);
       const d = ('0' + targetDate.getDate()).slice(-2);
       const dateStrSlash = `${y}/${m}/${d}`;
-      const dateStrHyphen = `${y}-${m}-${d}`;
 
       const res = await fetch(`https://ikekari.com/attend.php?date_get=${dateStrSlash}`, { cache: 'no-store' });
+      if (!res.ok) continue;
+
       const html = await res.text();
       const $ = cheerio.load(html);
 
@@ -47,8 +46,8 @@ export async function GET() {
         if (castMap[name] && time.includes('-')) {
           const [start, end] = time.split('-');
           results.push({
-            login_id: castMap[name] as string,
-            shift_date: dateStrHyphen,
+            login_id: castMap[name],
+            shift_date: `${y}-${m}-${d}`,
             start_time: start.trim(),
             end_time: end.trim()
           });
@@ -56,18 +55,16 @@ export async function GET() {
       });
     }
 
+    // 3. Supabaseへの保存
     if (results.length > 0) {
-      const { error } = await supabase.from('shifts').upsert(results, { onConflict: 'login_id,shift_date' });
-      if (error) throw error;
+      const { error: upsertError } = await supabase.from('shifts').upsert(results, { 
+        onConflict: 'login_id,shift_date' 
+      });
+      if (upsertError) return NextResponse.json({ success: false, step: 'upsert', error: upsertError.message });
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: `${results.length}件のシフトを同期しました`,
-      date: new Date().toLocaleString('ja-JP')
-    });
-  } catch (error) {
-    console.error('Sync Error:', error);
-    return NextResponse.json({ success: false, error: String(error) }, { status: 500 });
+    return NextResponse.json({ success: true, count: results.length });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, step: 'unknown', error: err.message || String(err) });
   }
 }
