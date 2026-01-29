@@ -9,7 +9,6 @@ import DashboardCalendar from '@/components/DashboardCalendar';
 
 export default function Page() {
   const router = useRouter();
-  // Supabaseクライアントの初期化
   const [supabase] = useState(() => 
     createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,45 +18,42 @@ export default function Page() {
 
   const [shifts, setShifts] = useState<any[]>([]);
   const [castProfile, setCastProfile] = useState<any>(null);
+  const [news, setNews] = useState<any>(null); // ✨ 追加：お知らせ用
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function checkUserAndFetchData() {
-      // 1. セッション（ログイン状態）の確認
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        // ログインしてなければログイン画面へ飛ばす
         router.push('/login');
         return;
       }
 
-      // 2. メールアドレスからドメインを除去して ID を特定
-      // 例: 00600005@karinto-internal.com -> 00600005
       const loginId = session.user.email?.replace('@karinto-internal.com', '');
 
-      // 3. ログインしているキャストのデータとシフトを取得
-      const [castRes, shiftRes] = await Promise.all([
+      // 3つのデータを同時に取得（プロフィール、シフト、最新のお知らせ1件）
+      const [castRes, shiftRes, newsRes] = await Promise.all([
         supabase.from('cast_members').select('*').eq('login_id', loginId).single(),
-        supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true })
+        supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
+        supabase.from('news').select('*').order('created_at', { ascending: false }).limit(1).single() // ✨ 最新を1件取得
       ]);
       
       setCastProfile(castRes.data);
       setShifts(shiftRes.data || []);
+      setNews(newsRes.data); // ✨ お知らせをセット
       setLoading(false);
     }
     checkUserAndFetchData();
   }, [supabase, router]);
 
-  // ログアウト処理
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/login');
     router.refresh();
   };
 
-  // ローディング中の画面
   if (loading) {
     return (
       <div className="min-h-screen bg-[#FFF5F7] flex items-center justify-center">
@@ -66,7 +62,6 @@ export default function Page() {
     );
   }
 
-  // カレンダーとスケジュールの計算ロジック
   const now = new Date();
   const weekStart = startOfWeek(now, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
@@ -78,41 +73,40 @@ export default function Page() {
       {/* ヘッダー */}
       <header className="bg-white px-6 pt-12 pb-8 rounded-b-[40px] shadow-sm">
         <div className="mb-2">
-  <span className="text-[12px] font-black text-pink-300 tracking-tighter uppercase">Karinto Cast Manager</span>
-</div>
-<p className="text-pink-400 text-[10px] font-bold tracking-[0.2em] mb-1">お疲れ様です</p>
+          <span className="text-[12px] font-black text-pink-300 tracking-tighter uppercase">Karinto Cast Manager</span>
+        </div>
+        <p className="text-pink-400 text-[10px] font-bold tracking-[0.2em] mb-1">WELCOME BACK</p>
         <h1 className="text-3xl font-black text-gray-800">
           {castProfile?.display_name || 'キャスト'} さん
         </h1>
       </header>
 
       <main className="px-4 mt-6 space-y-6">
-        {/* --- ここから貼り付け --- */}
-{/* ============================================================
-    【追加】お知らせ（News）セクション
-    カレンダーより先に目に入るよう、一番上に配置します。
-    ============================================================ */}
-<section className="px-2">
-  <div className="bg-white border border-pink-100 rounded-[25px] p-4 flex items-start space-x-3 shadow-sm">
-    <span className="text-xl mt-1">📢</span>
-    <div className="flex-1">
-      <div className="flex justify-between items-center mb-1">
-        <p className="text-[10px] font-black text-pink-400 uppercase tracking-widest">News</p>
-        <p className="text-[9px] text-gray-400">2026.01.29</p>
-      </div>
-      <p className="text-sm font-bold text-gray-700 leading-relaxed">
-        システム名を「Karinto Cast Manager」に変更しました。今後こちらでシフトを確認してください！
-      </p>
-    </div>
-  </div>
-</section>
-{/* --- ここまで貼り付け --- */}
+        
+        {/* 📢 ダイナミックお知らせセクション */}
+        <section className="px-2">
+          <div className="bg-white border border-pink-100 rounded-[25px] p-4 flex items-start space-x-3 shadow-sm">
+            <span className="text-xl mt-1">📢</span>
+            <div className="flex-1">
+              <div className="flex justify-between items-center mb-1">
+                <p className="text-[10px] font-black text-pink-400 uppercase tracking-widest">News</p>
+                <p className="text-[9px] text-gray-400">
+                  {news ? format(parseISO(news.created_at), 'yyyy.MM.dd') : '----.--.--'}
+                </p>
+              </div>
+              <p className="text-sm font-bold text-gray-700 leading-relaxed">
+                {news ? news.content : '現在、新しいお知らせはありません🌸'}
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* カレンダーセクション */}
         <section className="bg-white p-2 rounded-[32px] shadow-sm border border-pink-50">
           <DashboardCalendar shifts={shifts} selectedDate={selectedDate} onSelect={setSelectedDate} />
         </section>
         
-        {/* 選択日の詳細表示 */}
+        {/* 選択日の詳細 */}
         <section className="bg-gradient-to-br from-pink-400 to-rose-400 p-6 rounded-[30px] text-white shadow-xl shadow-pink-100">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-bold">
@@ -155,10 +149,10 @@ export default function Page() {
         </section>
       </main>
 
-      {/* 固定フッターメニュー */}
+      {/* フッター */}
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/90 backdrop-blur-md border-t border-gray-100 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
         <nav className="flex justify-around items-center py-4 max-w-md mx-auto">
-          <button className="flex flex-col items-center text-pink-500">
+          <button className="flex flex-col items-center text-pink-500" onClick={() => router.push('/')}>
             <span className="text-2xl">🏠</span>
             <span className="text-[10px] font-bold">ホーム</span>
           </button>
@@ -167,10 +161,7 @@ export default function Page() {
             <span className="text-[10px] font-bold">給与</span>
           </button>
           <div className="w-px h-8 bg-gray-100"></div>
-          <button 
-            onClick={handleLogout} 
-            className="flex flex-col items-center text-gray-400 hover:text-rose-500 transition-colors"
-          >
+          <button onClick={handleLogout} className="flex flex-col items-center text-gray-400">
             <span className="text-2xl">🚪</span>
             <span className="text-[10px] font-bold">Logout</span>
           </button>
