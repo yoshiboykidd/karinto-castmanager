@@ -69,32 +69,33 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-[#FFF5F7] text-gray-800 pb-32">
-      {/* ヘッダー */}
-      <header className="bg-white px-6 pt-12 pb-8 rounded-b-[40px] shadow-sm">
-        <div className="mb-2">
+      {/* ヘッダー：少し高さを抑えました */}
+      <header className="bg-white px-6 pt-10 pb-6 rounded-b-[40px] shadow-sm">
+        <div className="mb-1">
           <span className="text-[12px] font-black text-pink-300 tracking-tighter uppercase">Karinto Cast Manager</span>
         </div>
-        <p className="text-pink-400 text-[10px] font-bold tracking-[0.2em] mb-1">WELCOME BACK</p>
+        <p className="text-pink-400 text-[10px] font-bold tracking-[0.2em] mb-1 uppercase">お疲れ様です</p>
         <h1 className="text-3xl font-black text-gray-800">
           {castProfile?.display_name || 'キャスト'} さん
         </h1>
       </header>
 
-      <main className="px-4 mt-6 space-y-6">
+      {/* メイン：間隔を space-y-4 に詰めました */}
+      <main className="px-4 mt-4 space-y-4">
         
-        {/* 📢 お知らせセクション (ひとつにまとめた背景) */}
-        <section className="px-2">
-          <div className="flex items-center mb-2 ml-1">
-            <span className="text-lg mr-2">📢</span>
-            <p className="text-xs font-black text-pink-400 uppercase tracking-widest">News</p>
+        {/* 📢 お知らせセクション */}
+        <section className="px-1">
+          <div className="flex items-center mb-1.5 ml-1">
+            <span className="text-base mr-2">📢</span>
+            <p className="text-[10px] font-black text-pink-400 uppercase tracking-widest">News</p>
           </div>
 
-          <div className="bg-white border border-pink-100 rounded-[28px] overflow-hidden shadow-sm">
+          <div className="bg-white border border-pink-100 rounded-[24px] overflow-hidden shadow-sm">
             {newsList.length > 0 ? (
               <div className="divide-y divide-pink-50">
                 {newsList.map((news) => (
-                  <div key={news.id} className="p-4 hover:bg-pink-50/30 transition-colors">
-                    <p className="text-[9px] text-gray-400 mb-1">
+                  <div key={news.id} className="p-3.5 active:bg-pink-50 transition-colors">
+                    <p className="text-[9px] text-gray-400 mb-0.5">
                       {format(parseISO(news.created_at), 'yyyy.MM.dd')}
                     </p>
                     <p className="text-sm font-bold text-gray-700 leading-snug">
@@ -104,25 +105,25 @@ export default function Page() {
                 ))}
               </div>
             ) : (
-              <div className="p-8 text-center italic text-gray-400 text-sm">
-                現在、新しいお知らせはありません🌸
+              <div className="p-6 text-center italic text-gray-400 text-sm">
+                お知らせはありません🌸
               </div>
             )}
           </div>
         </section>
 
         {/* カレンダーセクション */}
-        <section className="bg-white p-2 rounded-[32px] shadow-sm border border-pink-50">
+        <section className="bg-white p-2 rounded-[28px] shadow-sm border border-pink-50">
           <DashboardCalendar shifts={shifts} selectedDate={selectedDate} onSelect={setSelectedDate} />
         </section>
         
         {/* 選択日の詳細 */}
-        <section className="bg-gradient-to-br from-pink-400 to-rose-400 p-6 rounded-[30px] text-white shadow-xl shadow-pink-100">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-bold">
+        <section className="bg-gradient-to-br from-pink-400 to-rose-400 p-5 rounded-[28px] text-white shadow-lg shadow-pink-100">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-lg font-bold">
               {selectedDate ? format(selectedDate, 'M月d日 (eee)', { locale: ja }) : '日付を選択'}
             </h3>
-            <span className="bg-white/30 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest">DETAIL</span>
+            <span className="bg-white/30 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-widest uppercase">Detail</span>
           </div>
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 text-center">
             {selectedShift ? (
@@ -136,24 +137,24 @@ export default function Page() {
         </section>
 
         {/* 今週のスケジュール */}
-        <section className="bg-white p-6 rounded-[32px] shadow-sm border border-pink-50">
-          <h3 className="text-lg font-black text-gray-700 mb-4 flex items-center">
-            <span className="w-1.5 h-6 bg-pink-400 rounded-full mr-3"></span>
+        <section className="bg-white p-5 rounded-[28px] shadow-sm border border-pink-50">
+          <h3 className="text-md font-black text-gray-700 mb-3 flex items-center">
+            <span className="w-1 h-5 bg-pink-400 rounded-full mr-2.5"></span>
             今週のスケジュール
           </h3>
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {thisWeekShifts.length > 0 ? thisWeekShifts.map((s, i) => (
-              <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+              <div key={i} className="flex items-center justify-between p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
                 <div className="flex flex-col text-left">
-                  <span className="text-[10px] text-gray-400 font-bold uppercase">{format(parseISO(s.shift_date), 'MM/dd')}</span>
-                  <span className="font-bold text-gray-700">{format(parseISO(s.shift_date), 'eeee', { locale: ja })}</span>
+                  <span className="text-[9px] text-gray-400 font-bold uppercase">{format(parseISO(s.shift_date), 'MM/dd')}</span>
+                  <span className="font-bold text-gray-700 text-sm">{format(parseISO(s.shift_date), 'eeee', { locale: ja })}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-pink-500 font-black text-lg">{s.start_time} - {s.end_time}</span>
+                  <span className="text-pink-500 font-black text-md">{s.start_time} - {s.end_time}</span>
                 </div>
               </div>
             )) : (
-              <p className="text-center text-gray-400 py-6 text-sm">今週の予定はありません</p>
+              <p className="text-center text-gray-400 py-4 text-xs">予定はありません</p>
             )}
           </div>
         </section>
