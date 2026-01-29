@@ -19,31 +19,23 @@ export default function DashboardCalendar({ shifts, selectedDate, onSelect }) {
   return (
     <div className="w-full flex flex-col items-center py-2 bg-white rounded-xl relative border-2 border-pink-50">
       
-      {/* 🔴 届いているか確認するための目印 */}
-      <div className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full mb-1 font-black animate-pulse">
-        LATEST VERSION 1.3
+      {/* 🟢 反映確認用ラベルを 1.4 に更新 */}
+      <div className="text-[10px] bg-green-500 text-white px-2 py-0.5 rounded-full mb-1 font-black">
+        LATEST VERSION 1.4
       </div>
 
       <style>{`
         .rdp { margin: 0; --rdp-accent-color: #ec4899; }
         
-        /* 1. 曜日の見出し（日〜土）を強制色分け */
-        .rdp-table thead tr th:nth-child(1) { color: #ef4444 !important; opacity: 1 !important; } /* 日：赤 */
-        .rdp-table thead tr th:nth-child(7) { color: #3b82f6 !important; opacity: 1 !important; } /* 土：青 */
+        /* 曜日の見出しの色 */
+        .rdp-table thead tr th:nth-child(1) { color: #ef4444 !important; } /* 日：赤 */
+        .rdp-table thead tr th:nth-child(7) { color: #3b82f6 !important; } /* 土：青 */
 
-        /* 2. 日付の数字を「列の順番」で強制色分け */
-        /* 1列目（日曜日）のボタン */
-        .rdp-table tbody tr td:nth-child(1) button:not(.rdp-day_selected) { 
-          color: #ef4444 !important; 
-          font-weight: 800 !important; 
-        }
-        /* 7列目（土曜日）のボタン */
-        .rdp-table tbody tr td:nth-child(7) button:not(.rdp-day_selected) { 
-          color: #3b82f6 !important; 
-          font-weight: 800 !important; 
-        }
+        /* 日付（数字）の色 */
+        .rdp-day_isSun:not(.rdp-day_selected) { color: #ef4444 !important; font-weight: 800 !important; }
+        .rdp-day_isSat:not(.rdp-day_selected) { color: #3b82f6 !important; font-weight: 800 !important; }
 
-        /* 3. イベント（10, 11, 22）の金枠 */
+        /* イベント（10, 11, 22）の金枠 */
         .rdp-day_isEvent { 
           border: 2px solid #fbbf24 !important; 
           background-color: #fffbeb !important; 
@@ -64,6 +56,8 @@ export default function DashboardCalendar({ shifts, selectedDate, onSelect }) {
         locale={ja}
         modifiers={modifiers}
         modifiersClassNames={{
+          isSun: "rdp-day_isSun",
+          isSat: "rdp-day_isSat",
           isEvent: "rdp-day_isEvent"
         }}
       />
