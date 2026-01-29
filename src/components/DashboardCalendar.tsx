@@ -1,13 +1,11 @@
 //@ts-nocheck
 'use client';
 
-// 相対パスで読み込む（Vercelのビルドエラー対策）
-import { Calendar } from "./ui/calendar"; 
+import { Calendar } from "@/components/ui/calendar"; 
 import { format, getDay, getDate } from "date-fns";
 import { ja } from "date-fns/locale";
 
 export default function DashboardCalendar({ shifts, selectedDate, onSelect }) {
-  // 出勤日のリスト作成
   const shiftDates = Array.isArray(shifts) ? shifts.map(s => s.shift_date) : [];
 
   return (
@@ -18,7 +16,6 @@ export default function DashboardCalendar({ shifts, selectedDate, onSelect }) {
         onSelect={onSelect}
         locale={ja}
         className="w-full p-0"
-        // ✨ shadcn/ui の内部構造を強制的に横幅100%にする設定
         classNames={{
           months: "w-full space-y-4",
           month: "w-full space-y-4",
@@ -26,23 +23,21 @@ export default function DashboardCalendar({ shifts, selectedDate, onSelect }) {
           caption_label: "text-sm font-black text-gray-700",
           nav: "space-x-1 flex items-center",
           table: "w-full border-collapse space-y-1",
-          head_row: "flex w-full justify-between px-2", // 曜日を横いっぱいに
+          head_row: "flex w-full justify-between px-2", 
           head_cell: "text-gray-400 rounded-md w-9 font-bold text-[10px] uppercase text-center",
-          row: "flex w-full justify-between mt-2 px-2", // 日付を横いっぱいに
+          row: "flex w-full justify-between mt-2 px-2", 
           cell: "text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
           day: "h-9 w-9 p-0 font-black flex items-center justify-center rounded-lg transition-all",
           day_selected: "!bg-pink-500 !text-white hover:!bg-pink-500 hover:!text-white rounded-lg",
           day_today: "bg-gray-100 text-gray-900",
-          day_outside: "opacity-20", // 月外の日付を薄く
+          day_outside: "opacity-20",
         }}
-        // ✨ 土日・イベント日の判定
         modifiers={{
           isEvent: (date) => [10, 22].includes(getDate(date)),
           isSat: (date) => getDay(date) === 6,
           isSun: (date) => getDay(date) === 0,
           hasShift: (date) => shiftDates.includes(format(date, 'yyyy-MM-dd')),
         }}
-        // ✨ 色とデザインの「絶対上書き」設定
         modifiersClassNames={{
           isSat: "!text-blue-500", 
           isSun: "!text-red-500",
