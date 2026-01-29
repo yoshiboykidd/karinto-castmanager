@@ -1,46 +1,48 @@
 //@ts-nocheck
 'use client';
 
-import { Calendar } from "@/components/ui/calendar";
+// 相対パスで読み込む（Vercelのビルドエラー対策）
+import { Calendar } from "./ui/calendar"; 
 import { format, getDay, getDate } from "date-fns";
 import { ja } from "date-fns/locale";
 
 export default function DashboardCalendar({ shifts, selectedDate, onSelect }) {
+  // 出勤日のリスト作成
   const shiftDates = Array.isArray(shifts) ? shifts.map(s => s.shift_date) : [];
 
   return (
-    // 枠いっぱいに広げるための外枠
-    <div className="w-full flex justify-center px-1">
+    <div className="w-full flex justify-center py-1 overflow-hidden">
       <Calendar
         mode="single"
         selected={selectedDate}
         onSelect={onSelect}
         locale={ja}
         className="w-full p-0"
-        // ✨ Shadcn/uiのスタイルを力技で上書き
+        // ✨ shadcn/ui の内部構造を強制的に横幅100%にする設定
         classNames={{
           months: "w-full space-y-4",
           month: "w-full space-y-4",
-          caption: "flex justify-center pt-1 relative items-center",
-          caption_label: "text-sm font-bold text-gray-700",
+          caption: "flex justify-center pt-1 relative items-center mb-4",
+          caption_label: "text-sm font-black text-gray-700",
           nav: "space-x-1 flex items-center",
-          nav_button: "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100",
           table: "w-full border-collapse space-y-1",
-          head_row: "flex w-full justify-between mb-2", // 横に広げる
+          head_row: "flex w-full justify-between px-2", // 曜日を横いっぱいに
           head_cell: "text-gray-400 rounded-md w-9 font-bold text-[10px] uppercase text-center",
-          row: "flex w-full justify-between mt-2", // 横に広げる
+          row: "flex w-full justify-between mt-2 px-2", // 日付を横いっぱいに
           cell: "text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
           day: "h-9 w-9 p-0 font-black flex items-center justify-center rounded-lg transition-all",
-          day_selected: "!bg-pink-500 !text-white hover:!bg-pink-500 hover:!text-white", // 選択時を強制
+          day_selected: "!bg-pink-500 !text-white hover:!bg-pink-500 hover:!text-white rounded-lg",
           day_today: "bg-gray-100 text-gray-900",
+          day_outside: "opacity-20", // 月外の日付を薄く
         }}
+        // ✨ 土日・イベント日の判定
         modifiers={{
           isEvent: (date) => [10, 22].includes(getDate(date)),
           isSat: (date) => getDay(date) === 6,
           isSun: (date) => getDay(date) === 0,
           hasShift: (date) => shiftDates.includes(format(date, 'yyyy-MM-dd')),
         }}
-        // ✨ ! (重要フラグ) をつけて、元の色設定に絶対に勝つ
+        // ✨ 色とデザインの「絶対上書き」設定
         modifiersClassNames={{
           isSat: "!text-blue-500", 
           isSun: "!text-red-500",
