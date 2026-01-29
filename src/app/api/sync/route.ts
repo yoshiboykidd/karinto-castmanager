@@ -2,21 +2,21 @@ import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { NextResponse } from 'next/server';
 
-// データの形を定義
+// データの形を定義（hp_display_name を追加）
 interface ShiftData {
   login_id: string;
   shift_date: string;
   start_time: string;
   end_time: string;
+  hp_display_name: string; 
 }
 
 export async function GET() {
-  // 環境変数のチェック
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.json({ success: false, error: "環境変数が設定されていません" });
+    return NextResponse.json({ success: false, error: "環境変数が不足しています" });
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey);
@@ -28,7 +28,7 @@ export async function GET() {
       .select('login_id, display_name');
 
     if (castError) {
-      return NextResponse.json({ success: false, step: 'キャスト取得失敗', detail: castError.message });
+      return NextResponse.json({ success: false, step: 'キャスト取得失敗', error: castError.message });
     }
 
     const castMap: { [key: string]: string } = {};
@@ -39,8 +39,8 @@ export async function GET() {
     const results: ShiftData[] = [];
     const today = new Date();
 
-    // 2. HPからデータを取得（今日から3日分）
-    for (let i = 0; i < 3; i++) {
+    // 2. HPから7日分取得するように設定
+    for (let i = 0; i < 7; i++) {
       const targetDate = new Date(today);
       targetDate.setDate(today.getDate() + i);
       
@@ -48,6 +48,7 @@ export async function GET() {
       const m = String(targetDate.getMonth() + 1).padStart(2, '0');
       const d = String(targetDate.getDate()).padStart(2, '0');
       const dateStrSlash = `${y}/${m}/${d}`;
+      const dateStrHyphen = `${y}-${m}-${d}`;
 
       const res = await fetch(`https://ikekari.com/attend.php?date_get=${dateStrSlash}`, { cache: 'no-store' });
       const html = await res.text();
@@ -61,30 +62,33 @@ export async function GET() {
           const [start, end] = time.split('-');
           results.push({
             login_id: castMap[name],
-            shift_date: `${y}-${m}-${d}`,
+            shift_date: dateStrHyphen,
             start_time: start.trim(),
-            end_time: end.trim()
+            end_time: end.trim(),
+            hp_display_name: name // ここを追加しました！
           });
         }
       });
     }
 
-    // 3. Supabaseに保存
+    // 3. Supabaseに保存（upsert）
     if (results.length > 0) {
       const { error: upsertError } = await supabase
         .from('shifts')
         .upsert(results, { onConflict: 'login_id,shift_date' });
       
       if (upsertError) {
-        return NextResponse.json({ success: false, step: '保存失敗', detail: upsertError.message });
+        return NextResponse.json({ success: false, step: 'upsert', error: upsertError.message });
       }
     }
 
-    return NextResponse.json({ success: true, count: results.length, message: "同期完了" });
+    return NextResponse.json({ 
+      success: true, 
+      count: results.length, 
+      message: `${results.length}件のシフトを同期しました` 
+    });
 
-  } catch (err: unknown) {
-    // エラーを確実に文字列にする
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ success: false, step: 'システムエラー', detail: errorMessage });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, step: 'unknown', error: err.message || String(err) });
   }
 }
