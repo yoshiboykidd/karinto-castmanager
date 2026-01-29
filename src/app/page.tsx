@@ -18,7 +18,7 @@ export default function Page() {
 
   const [shifts, setShifts] = useState<any[]>([]);
   const [castProfile, setCastProfile] = useState<any>(null);
-  const [news, setNews] = useState<any>(null); // ✨ 追加：お知らせ用
+  const [newsList, setNewsList] = useState<any[]>([]); // ✨ 配列に変更
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [loading, setLoading] = useState(true);
 
@@ -33,16 +33,16 @@ export default function Page() {
 
       const loginId = session.user.email?.replace('@karinto-internal.com', '');
 
-      // 3つのデータを同時に取得（プロフィール、シフト、最新のお知らせ1件）
+      // ✨ プロフィール、シフト、最新のお知らせ3件を同時取得
       const [castRes, shiftRes, newsRes] = await Promise.all([
         supabase.from('cast_members').select('*').eq('login_id', loginId).single(),
         supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
-        supabase.from('news').select('*').order('created_at', { ascending: false }).limit(1).single() // ✨ 最新を1件取得
+        supabase.from('news').select('*').order('created_at', { ascending: false }).limit(3) // ✨ 3件に制限
       ]);
       
       setCastProfile(castRes.data);
       setShifts(shiftRes.data || []);
-      setNews(newsRes.data); // ✨ お知らせをセット
+      setNewsList(newsRes.data || []); // ✨ 取得したリストをセット
       setLoading(false);
     }
     checkUserAndFetchData();
@@ -56,8 +56,8 @@ export default function Page() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FFF5F7] flex items-center justify-center">
-        <div className="text-pink-400 font-bold animate-pulse">データを読み込み中...</div>
+      <div className="min-h-screen bg-[#FFF5F7] flex items-center justify-center text-pink-400 font-bold animate-pulse">
+        データを読み込み中...
       </div>
     );
   }
@@ -83,22 +83,33 @@ export default function Page() {
 
       <main className="px-4 mt-6 space-y-6">
         
-        {/* 📢 ダイナミックお知らせセクション */}
-        <section className="px-2">
-          <div className="bg-white border border-pink-100 rounded-[25px] p-4 flex items-start space-x-3 shadow-sm">
-            <span className="text-xl mt-1">📢</span>
-            <div className="flex-1">
-              <div className="flex justify-between items-center mb-1">
-                <p className="text-[10px] font-black text-pink-400 uppercase tracking-widest">News</p>
-                <p className="text-[9px] text-gray-400">
-                  {news ? format(parseISO(news.created_at), 'yyyy.MM.dd') : '----.--.--'}
-                </p>
-              </div>
-              <p className="text-sm font-bold text-gray-700 leading-relaxed">
-                {news ? news.content : '現在、新しいお知らせはありません🌸'}
-              </p>
-            </div>
+        {/* 📢 お知らせセクション (最新3件) */}
+        <section className="px-2 space-y-3">
+          <div className="flex items-center ml-1">
+            <span className="text-lg mr-2">📢</span>
+            <p className="text-xs font-black text-pink-400 uppercase tracking-[0.2em]">Latest News</p>
           </div>
+          
+          {newsList.length > 0 ? (
+            newsList.map((news) => (
+              <div key={news.id} className="bg-white border border-pink-100 rounded-[22px] p-4 flex items-start space-x-3 shadow-sm last:opacity-70">
+                <div className="flex-1">
+                  <div className="flex justify-between items-center mb-1">
+                    <p className="text-[9px] text-gray-400">
+                      {format(parseISO(news.created_at), 'yyyy.MM.dd')}
+                    </p>
+                  </div>
+                  <p className="text-sm font-bold text-gray-700 leading-relaxed">
+                    {news.content}
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="bg-white border border-pink-50 rounded-[22px] p-6 text-center italic text-gray-400 text-sm">
+              現在、新しいお知らせはありません🌸
+            </div>
+          )}
         </section>
 
         {/* カレンダーセクション */}
@@ -112,7 +123,7 @@ export default function Page() {
             <h3 className="text-xl font-bold">
               {selectedDate ? format(selectedDate, 'M月d日 (eee)', { locale: ja }) : '日付を選択'}
             </h3>
-            <span className="bg-white/30 px-3 py-1 rounded-full text-[10px] font-bold">DETAIL</span>
+            <span className="bg-white/30 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest">DETAIL</span>
           </div>
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 text-center">
             {selectedShift ? (
@@ -134,7 +145,7 @@ export default function Page() {
           <div className="space-y-3">
             {thisWeekShifts.length > 0 ? thisWeekShifts.map((s, i) => (
               <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                <div className="flex flex-col">
+                <div className="flex flex-col text-left">
                   <span className="text-[10px] text-gray-400 font-bold uppercase">{format(parseISO(s.shift_date), 'MM/dd')}</span>
                   <span className="font-bold text-gray-700">{format(parseISO(s.shift_date), 'eeee', { locale: ja })}</span>
                 </div>
