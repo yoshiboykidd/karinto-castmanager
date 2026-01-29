@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
-import { format, parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import DashboardCalendar from '@/components/DashboardCalendar';
 
@@ -20,6 +20,7 @@ export default function Page() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [loading, setLoading] = useState(true);
   
+  // 実績入力用のステート
   const [editReward, setEditReward] = useState<{f:any, first:any, main:any, amount:any}>({ 
     f: '', first: '', main: '', amount: '' 
   });
@@ -48,19 +49,19 @@ export default function Page() {
     setLoading(false);
   }
 
-  // 日付選択時の実績データセット
+  // 日付選択時に、その日の実績をセットする
   useEffect(() => {
     const dateStr = format(selectedDate || new Date(), 'yyyy-MM-dd');
     const shift = shifts.find(s => s.shift_date === dateStr);
     setEditReward({
-      f: shift?.f_count || '',
-      first: shift?.first_request_count || '',
-      main: shift?.main_request_count || '',
-      amount: shift?.reward_amount || ''
+      f: shift?.f_count ?? '',
+      first: shift?.first_request_count ?? '',
+      main: shift?.main_request_count ?? '',
+      amount: shift?.reward_amount ?? ''
     });
   }, [selectedDate, shifts]);
 
-  // 今月の合計計算
+  // 今月の合計を計算するロジック
   const monthlyTotals = shifts
     .filter(s => {
       const date = parseISO(s.shift_date);
@@ -74,6 +75,7 @@ export default function Page() {
       main: acc.main + (s.main_request_count || 0),
     }), { amount: 0, f: 0, first: 0, main: 0 });
 
+  // 保存処理
   const handleSaveReward = async () => {
     const dateStr = format(selectedDate || new Date(), 'yyyy-MM-dd');
     const { error } = await supabase.from('shifts').update({
@@ -148,7 +150,7 @@ export default function Page() {
           <DashboardCalendar shifts={shifts} selectedDate={selectedDate} onSelect={setSelectedDate} />
         </section>
 
-        {/* 3. ✍️ 実績入力フォーム（統合枠） */}
+        {/* 3. ✍️ 実績入力フォーム */}
         <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden">
           <div className="bg-[#FFF5F6] p-3 px-4 border-b border-pink-200 flex justify-between items-center">
             <h3 className="text-sm font-black text-gray-700">
@@ -183,14 +185,24 @@ export default function Page() {
                 ))}
               </div>
 
+              {/* ✨ 給料入力欄（カンマ対応） */}
               <div className="flex items-center space-x-2 bg-pink-50/50 p-2.5 px-4 rounded-xl border border-pink-200">
                 <label className="text-[11px] font-black text-pink-300 shrink-0 uppercase tracking-widest">給料</label>
                 <div className="relative flex-1 text-right">
                   <span className="absolute left-1 top-1/2 -translate-y-1/2 text-pink-200 text-xl font-black">¥</span>
                   <input
-                    type="number" inputMode="numeric" placeholder="0"
-                    value={editReward.amount}
-                    onChange={e => setEditReward({...editReward, amount: e.target.value})}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0"
+                    // 表示する時にカンマをつける
+                    value={editReward.amount ? Number(editReward.amount).toLocaleString() : ''}
+                    onChange={e => {
+                      // 入力からカンマを除去して数字だけを保持する
+                      const val = e.target.value.replace(/,/g, '');
+                      if (/^\d*$/.test(val)) {
+                        setEditReward({...editReward, amount: val});
+                      }
+                    }}
                     className="w-full text-right pr-1 py-1 bg-transparent font-black text-[34px] text-pink-500 focus:outline-none placeholder:text-pink-100"
                   />
                 </div>
@@ -207,7 +219,7 @@ export default function Page() {
           )}
         </section>
 
-        {/* 4. 📢 NEWS（最下部へ移動） */}
+        {/* 4. 📢 NEWS（最下部） */}
         <section className="bg-white rounded-xl overflow-hidden border border-pink-100 shadow-sm opacity-90">
           <div className="bg-gray-50 p-2 border-b border-pink-50">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Shop News</p>
@@ -222,7 +234,7 @@ export default function Page() {
 
       </main>
 
-      {/* 📱 フッター */}
+      {/* 📱 フッターナビゲーション */}
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
         <nav className="flex justify-around items-center max-w-sm mx-auto px-4">
           <button className="flex flex-col items-center text-pink-500" onClick={() => router.push('/')}>

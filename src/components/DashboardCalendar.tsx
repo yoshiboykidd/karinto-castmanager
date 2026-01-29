@@ -11,7 +11,7 @@ export default function DashboardCalendar({ shifts, selectedDate, onSelect }) {
 
   // 土日・イベント日の判定
   const modifiers = {
-    isEvent: (date) => [10, 22].includes(getDate(date)),
+    isEvent: (date) => [10,11, 22].includes(getDate(date)),
     isSat: (date) => getDay(date) === 6,
     isSun: (date) => getDay(date) === 0,
     hasShift: (date) => shiftDates.includes(format(date, 'yyyy-MM-dd')),
