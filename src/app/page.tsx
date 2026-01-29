@@ -43,13 +43,13 @@ export default function Page() {
       setCastProfile(profile);
       setShifts(shiftRes.data || []);
 
-      // 2. ✨ 所属店舗 または 全体(all) のお知らせを取得
+      // 2. 所属店舗 または 全体(all) のお知らせを取得
       if (profile) {
-        const myShopId = profile.HOME_shop_ID || 'main'; // デフォルトはmain
+        const myShopId = profile.HOME_shop_ID || 'main';
         const { data: newsData } = await supabase
           .from('news')
           .select('*')
-          .or(`shop_id.eq.${myShopId},shop_id.eq.all`) // ✨ OR条件で「自店舗」か「全体」を拾う
+          .or(`shop_id.eq.${myShopId},shop_id.eq.all`)
           .order('created_at', { ascending: false })
           .limit(3);
         
@@ -83,30 +83,31 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-[#FFF5F7] text-gray-800 pb-32">
-      {/* ヘッダー */}
+      
+      {/* 🌸 ヘッダー：構造をひとつにまとめました */}
       <header className="bg-white px-6 pt-10 pb-6 rounded-b-[40px] shadow-sm">
-        <div className="mb-1">
-          <span className="text-[12px] font-black text-pink-300 tracking-tighter uppercase">Karinto Cast Manager</span>
+        <div className="flex justify-between items-start mb-1">
+          <div className="flex flex-col">
+            <span className="text-[12px] font-black text-pink-300 tracking-tighter uppercase mb-1">
+              Karinto Cast Manager
+            </span>
+            <p className="text-pink-400 text-[11px] font-black tracking-[0.1em]">
+              お疲れ様です🌸
+            </p>
+          </div>
+          
+          {/* 管理者ログイン時のみ表示されるボタン */}
+          {castProfile?.login_id === "admin" && (
+            <button 
+              onClick={() => router.push('/admin')}
+              className="bg-gray-800 text-white text-[9px] font-bold px-3 py-1.5 rounded-full flex items-center shadow-lg active:scale-95 transition-all"
+            >
+              <span className="mr-1">⚙️</span> 管理画面
+            </button>
+          )}
         </div>
-        {/* ヘッダー内、お疲れ様です の上あたりに追加 */}
-<header className="bg-white px-6 pt-10 pb-6 rounded-b-[40px] shadow-sm">
-  <div className="flex justify-between items-start mb-1">
-    <span className="text-[12px] font-black text-pink-300 tracking-tighter uppercase">Karinto Cast Manager</span>
-    
-    {/* ✨ 管理者の時だけ表示される「設定ボタン」 */}
-    {castProfile?.login_id === "admin" && (
-      <button 
-        onClick={() => router.push('/admin')}
-        className="bg-gray-800 text-white text-[9px] font-bold px-3 py-1 rounded-full flex items-center shadow-lg active:scale-95 transition-all"
-      >
-        <span className="mr-1">⚙️</span> 管理画面へ
-      </button>
-    )}
-  </div>
-  ...
-</header>
-        <p className="text-pink-400 text-[11px] font-black tracking-[0.1em] mb-1">お疲れ様です🌸</p>
-        <h1 className="text-3xl font-black text-gray-800">
+
+        <h1 className="text-3xl font-black text-gray-800 mt-2">
           {castProfile?.display_name || 'キャスト'}
           <span className="text-sm font-bold ml-1 text-gray-400">さん</span>
         </h1>
@@ -114,7 +115,7 @@ export default function Page() {
 
       <main className="px-4 mt-4 space-y-4">
         
-        {/* 📢 お知らせセクション (フィルタリング済) */}
+        {/* 📢 お知らせセクション */}
         <section className="px-1">
           <div className="flex items-center mb-1.5 ml-1">
             <span className="text-base mr-2">📢</span>
@@ -130,7 +131,6 @@ export default function Page() {
                       <p className="text-[9px] text-gray-400">
                         {format(parseISO(news.created_at), 'yyyy.MM.dd')}
                       </p>
-                      {/* 全体向けの場合はラベルを出す */}
                       {news.shop_id === 'all' && (
                         <span className="text-[8px] bg-pink-50 text-pink-400 px-1.5 py-0.5 rounded-full font-bold">全体</span>
                       )}
@@ -149,15 +149,20 @@ export default function Page() {
           </div>
         </section>
 
-        {/* カレンダー / スケジュール部分は変更なし */}
+        {/* カレンダーセクション */}
         <section className="bg-white p-2 rounded-[28px] shadow-sm border border-pink-50">
           <DashboardCalendar shifts={shifts} selectedDate={selectedDate} onSelect={setSelectedDate} />
         </section>
         
+        {/* 選択日の予定詳細 */}
         <section className="bg-gradient-to-br from-pink-400 to-rose-400 p-5 rounded-[28px] text-white shadow-lg shadow-pink-100">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-lg font-bold">{selectedDate ? format(selectedDate, 'M月d日 (eee)', { locale: ja }) : '日付を選択'}</h3>
-            <span className="bg-white/30 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-widest uppercase">予定</span>
+            <h3 className="text-lg font-bold">
+              {selectedDate ? format(selectedDate, 'M月d日 (eee)', { locale: ja }) : '日付を選択'}
+            </h3>
+            <span className="bg-white/30 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-widest uppercase">
+              予定
+            </span>
           </div>
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 text-center">
             {selectedShift ? (
@@ -170,9 +175,11 @@ export default function Page() {
           </div>
         </section>
 
+        {/* 今週のスケジュール */}
         <section className="bg-white p-5 rounded-[28px] shadow-sm border border-pink-50">
           <h3 className="text-md font-black text-gray-700 mb-3 flex items-center">
-            <span className="w-1 h-5 bg-pink-400 rounded-full mr-2.5"></span>今週のスケジュール
+            <span className="w-1 h-5 bg-pink-400 rounded-full mr-2.5"></span>
+            今週のスケジュール
           </h3>
           <div className="space-y-2.5">
             {thisWeekShifts.length > 0 ? thisWeekShifts.map((s, i) => (
@@ -192,7 +199,7 @@ export default function Page() {
         </section>
       </main>
 
-      {/* フッター */}
+      {/* フッターナビゲーション */}
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/90 backdrop-blur-md border-t border-gray-100 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
         <nav className="flex justify-around items-center py-4 max-w-md mx-auto">
           <button className="flex flex-col items-center text-pink-500" onClick={() => router.push('/')}>
