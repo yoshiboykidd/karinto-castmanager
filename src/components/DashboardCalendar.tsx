@@ -17,21 +17,33 @@ export default function DashboardCalendar({ shifts, selectedDate, onSelect }) {
   };
 
   return (
-    <div className="w-full flex flex-col items-center py-2 bg-white rounded-xl relative">
+    <div className="w-full flex flex-col items-center py-2 bg-white rounded-xl relative border-2 border-pink-50">
+      
+      {/* 🔴 届いているか確認するための目印 */}
+      <div className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full mb-1 font-black animate-pulse">
+        LATEST VERSION 1.3
+      </div>
+
       <style>{`
-        /* 全体：土日の色を強制上書き */
         .rdp { margin: 0; --rdp-accent-color: #ec4899; }
         
-        /* 1. 曜日の見出し（日・土） */
-        .rdp-head_cell { color: #9ca3af !important; font-weight: 800 !important; }
-        .rdp-table thead tr th:first-child { color: #ef4444 !important; } /* 日曜を赤 */
-        .rdp-table thead tr th:last-child { color: #3b82f6 !important; }  /* 土曜を青 */
+        /* 1. 曜日の見出し（日〜土）を強制色分け */
+        .rdp-table thead tr th:nth-child(1) { color: #ef4444 !important; opacity: 1 !important; } /* 日：赤 */
+        .rdp-table thead tr th:nth-child(7) { color: #3b82f6 !important; opacity: 1 !important; } /* 土：青 */
 
-        /* 2. 日付の数字（日・土） */
-        .rdp-day_isSun:not(.rdp-day_selected) { color: #ef4444 !important; font-weight: 800 !important; }
-        .rdp-day_isSat:not(.rdp-day_selected) { color: #3b82f6 !important; font-weight: 800 !important; }
+        /* 2. 日付の数字を「列の順番」で強制色分け */
+        /* 1列目（日曜日）のボタン */
+        .rdp-table tbody tr td:nth-child(1) button:not(.rdp-day_selected) { 
+          color: #ef4444 !important; 
+          font-weight: 800 !important; 
+        }
+        /* 7列目（土曜日）のボタン */
+        .rdp-table tbody tr td:nth-child(7) button:not(.rdp-day_selected) { 
+          color: #3b82f6 !important; 
+          font-weight: 800 !important; 
+        }
 
-        /* 3. イベント（10, 11, 22） */
+        /* 3. イベント（10, 11, 22）の金枠 */
         .rdp-day_isEvent { 
           border: 2px solid #fbbf24 !important; 
           background-color: #fffbeb !important; 
@@ -39,16 +51,10 @@ export default function DashboardCalendar({ shifts, selectedDate, onSelect }) {
           color: #b45309 !important;
         }
 
-        /* 4. シフトありの下線 */
-        .rdp-day_hasShift:not(.rdp-day_selected) {
-          text-decoration: underline !important;
-          text-decoration-color: #f472b6 !important;
-          text-decoration-thickness: 3px !important;
-        }
-
         .rdp-day_selected { background-color: var(--rdp-accent-color) !important; color: white !important; border-radius: 8px; }
-        .rdp-table { width: 100%; max-width: 100%; }
-        .rdp-cell { width: 44px; height: 44px; text-align: center; }
+        .rdp-table { width: 100%; max-width: 100%; border-collapse: collapse; }
+        .rdp-cell { width: 44px; height: 44px; text-align: center; padding: 0; }
+        .rdp-button { width: 40px; height: 40px; justify-content: center; }
       `}</style>
       
       <DayPicker
@@ -58,15 +64,9 @@ export default function DashboardCalendar({ shifts, selectedDate, onSelect }) {
         locale={ja}
         modifiers={modifiers}
         modifiersClassNames={{
-          isSun: "rdp-day_isSun",
-          isSat: "rdp-day_isSat",
-          isEvent: "rdp-day_isEvent",
-          hasShift: "rdp-day_hasShift"
+          isEvent: "rdp-day_isEvent"
         }}
       />
-      
-      {/* 🛠️ デバッグ用目印（これが見えたら最新です） */}
-      <span className="text-[8px] text-gray-200 absolute bottom-0 right-2">v1.2</span>
     </div>
   );
 }
