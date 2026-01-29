@@ -33,15 +33,29 @@ export default function Page() {
 
       const loginId = session.user.email?.replace('@karinto-internal.com', '');
 
-      const [castRes, shiftRes, newsRes] = await Promise.all([
+      // 1. プロフィールとシフトをまず取得
+      const [castRes, shiftRes] = await Promise.all([
         supabase.from('cast_members').select('*').eq('login_id', loginId).single(),
         supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
-        supabase.from('news').select('*').order('created_at', { ascending: false }).limit(3)
       ]);
       
-      setCastProfile(castRes.data);
+      const profile = castRes.data;
+      setCastProfile(profile);
       setShifts(shiftRes.data || []);
-      setNewsList(newsRes.data || []);
+
+      // 2. ✨ 所属店舗 または 全体(all) のお知らせを取得
+      if (profile) {
+        const myShopId = profile.HOME_shop_ID || 'main'; // デフォルトはmain
+        const { data: newsData } = await supabase
+          .from('news')
+          .select('*')
+          .or(`shop_id.eq.${myShopId},shop_id.eq.all`) // ✨ OR条件で「自店舗」か「全体」を拾う
+          .order('created_at', { ascending: false })
+          .limit(3);
+        
+        setNewsList(newsData || []);
+      }
+      
       setLoading(false);
     }
     checkUserAndFetchData();
@@ -56,7 +70,7 @@ export default function Page() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#FFF5F7] flex items-center justify-center text-pink-400 font-bold animate-pulse">
-        データを読み込み中...
+        読み込み中...
       </div>
     );
   }
@@ -74,11 +88,7 @@ export default function Page() {
         <div className="mb-1">
           <span className="text-[12px] font-black text-pink-300 tracking-tighter uppercase">Karinto Cast Manager</span>
         </div>
-        {/* ✨ お疲れ様です に変更 */}
-        <p className="text-pink-400 text-[11px] font-black tracking-[0.1em] mb-1">
-          お疲れ様です🌸
-        </p>
-        {/* ✨ さん を小さく表示 */}
+        <p className="text-pink-400 text-[11px] font-black tracking-[0.1em] mb-1">お疲れ様です🌸</p>
         <h1 className="text-3xl font-black text-gray-800">
           {castProfile?.display_name || 'キャスト'}
           <span className="text-sm font-bold ml-1 text-gray-400">さん</span>
@@ -87,7 +97,7 @@ export default function Page() {
 
       <main className="px-4 mt-4 space-y-4">
         
-        {/* 📢 お知らせセクション */}
+        {/* 📢 お知らせセクション (フィルタリング済) */}
         <section className="px-1">
           <div className="flex items-center mb-1.5 ml-1">
             <span className="text-base mr-2">📢</span>
@@ -99,9 +109,15 @@ export default function Page() {
               <div className="divide-y divide-pink-50">
                 {newsList.map((news) => (
                   <div key={news.id} className="p-3.5 active:bg-pink-50 transition-colors">
-                    <p className="text-[9px] text-gray-400 mb-0.5">
-                      {format(parseISO(news.created_at), 'yyyy.MM.dd')}
-                    </p>
+                    <div className="flex justify-between items-center mb-0.5">
+                      <p className="text-[9px] text-gray-400">
+                        {format(parseISO(news.created_at), 'yyyy.MM.dd')}
+                      </p>
+                      {/* 全体向けの場合はラベルを出す */}
+                      {news.shop_id === 'all' && (
+                        <span className="text-[8px] bg-pink-50 text-pink-400 px-1.5 py-0.5 rounded-full font-bold">全体</span>
+                      )}
+                    </div>
                     <p className="text-sm font-bold text-gray-700 leading-snug">
                       {news.content}
                     </p>
@@ -116,21 +132,15 @@ export default function Page() {
           </div>
         </section>
 
-        {/* カレンダーセクション */}
+        {/* カレンダー / スケジュール部分は変更なし */}
         <section className="bg-white p-2 rounded-[28px] shadow-sm border border-pink-50">
           <DashboardCalendar shifts={shifts} selectedDate={selectedDate} onSelect={setSelectedDate} />
         </section>
         
-        {/* 選択日の詳細 */}
         <section className="bg-gradient-to-br from-pink-400 to-rose-400 p-5 rounded-[28px] text-white shadow-lg shadow-pink-100">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-lg font-bold">
-              {selectedDate ? format(selectedDate, 'M月d日 (eee)', { locale: ja }) : '日付を選択'}
-            </h3>
-            {/* ✨ DETAIL を 予定 に変更 */}
-            <span className="bg-white/30 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-widest uppercase">
-              予定
-            </span>
+            <h3 className="text-lg font-bold">{selectedDate ? format(selectedDate, 'M月d日 (eee)', { locale: ja }) : '日付を選択'}</h3>
+            <span className="bg-white/30 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-widest uppercase">予定</span>
           </div>
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 text-center">
             {selectedShift ? (
@@ -143,11 +153,9 @@ export default function Page() {
           </div>
         </section>
 
-        {/* 今週のスケジュール */}
         <section className="bg-white p-5 rounded-[28px] shadow-sm border border-pink-50">
           <h3 className="text-md font-black text-gray-700 mb-3 flex items-center">
-            <span className="w-1 h-5 bg-pink-400 rounded-full mr-2.5"></span>
-            今週のスケジュール
+            <span className="w-1 h-5 bg-pink-400 rounded-full mr-2.5"></span>今週のスケジュール
           </h3>
           <div className="space-y-2.5">
             {thisWeekShifts.length > 0 ? thisWeekShifts.map((s, i) => (
