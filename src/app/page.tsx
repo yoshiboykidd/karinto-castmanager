@@ -88,6 +88,23 @@ export default function Page() {
         <div className="mb-1">
           <span className="text-[12px] font-black text-pink-300 tracking-tighter uppercase">Karinto Cast Manager</span>
         </div>
+        {/* ヘッダー内、お疲れ様です の上あたりに追加 */}
+<header className="bg-white px-6 pt-10 pb-6 rounded-b-[40px] shadow-sm">
+  <div className="flex justify-between items-start mb-1">
+    <span className="text-[12px] font-black text-pink-300 tracking-tighter uppercase">Karinto Cast Manager</span>
+    
+    {/* ✨ 管理者の時だけ表示される「設定ボタン」 */}
+    {castProfile?.login_id === "admin" && (
+      <button 
+        onClick={() => router.push('/admin')}
+        className="bg-gray-800 text-white text-[9px] font-bold px-3 py-1 rounded-full flex items-center shadow-lg active:scale-95 transition-all"
+      >
+        <span className="mr-1">⚙️</span> 管理画面へ
+      </button>
+    )}
+  </div>
+  ...
+</header>
         <p className="text-pink-400 text-[11px] font-black tracking-[0.1em] mb-1">お疲れ様です🌸</p>
         <h1 className="text-3xl font-black text-gray-800">
           {castProfile?.display_name || 'キャスト'}
