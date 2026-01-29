@@ -15,9 +15,31 @@ export default function LoginPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ));
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+
+  const email = castId.includes('@') ? castId : `${castId}@karinto-internal.com`;
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email,
+    password: password,
+  });
+
+  if (error) {
+    alert('IDまたはパスワードが違います');
+    setLoading(false);
+  } else {
+    // ✨ ここで自動振り分け！
+    // 管理者のメールアドレスだった場合は /admin へ、それ以外は / へ
+    if (email === "admin@karinto-internal.com") {
+      router.push('/admin');
+    } else {
+      router.push('/');
+    }
+    router.refresh();
+  }
+};
 
     // ✨ 魔法の1行：@が含まれていなければ、自動でドメインを補完する
     const email = castId.includes('@') ? castId : `${castId}@karinto-internal.com`;
