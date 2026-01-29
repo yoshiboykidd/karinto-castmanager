@@ -69,18 +69,22 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-[#FFF5F7] text-gray-800 pb-32">
-      {/* ヘッダー：少し高さを抑えました */}
+      {/* ヘッダー */}
       <header className="bg-white px-6 pt-10 pb-6 rounded-b-[40px] shadow-sm">
         <div className="mb-1">
           <span className="text-[12px] font-black text-pink-300 tracking-tighter uppercase">Karinto Cast Manager</span>
         </div>
-        <p className="text-pink-400 text-[10px] font-bold tracking-[0.2em] mb-1 uppercase">お疲れ様です</p>
+        {/* ✨ お疲れ様です に変更 */}
+        <p className="text-pink-400 text-[11px] font-black tracking-[0.1em] mb-1">
+          お疲れ様です🌸
+        </p>
+        {/* ✨ さん を小さく表示 */}
         <h1 className="text-3xl font-black text-gray-800">
-          {castProfile?.display_name || 'キャスト'} さん
+          {castProfile?.display_name || 'キャスト'}
+          <span className="text-sm font-bold ml-1 text-gray-400">さん</span>
         </h1>
       </header>
 
-      {/* メイン：間隔を space-y-4 に詰めました */}
       <main className="px-4 mt-4 space-y-4">
         
         {/* 📢 お知らせセクション */}
@@ -123,7 +127,10 @@ export default function Page() {
             <h3 className="text-lg font-bold">
               {selectedDate ? format(selectedDate, 'M月d日 (eee)', { locale: ja }) : '日付を選択'}
             </h3>
-            <span className="bg-white/30 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-widest uppercase">Detail</span>
+            {/* ✨ DETAIL を 予定 に変更 */}
+            <span className="bg-white/30 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-widest uppercase">
+              予定
+            </span>
           </div>
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10 text-center">
             {selectedShift ? (
