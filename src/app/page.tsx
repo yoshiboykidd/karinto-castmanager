@@ -18,7 +18,7 @@ export default function Page() {
 
   const [shifts, setShifts] = useState<any[]>([]);
   const [castProfile, setCastProfile] = useState<any>(null);
-  const [newsList, setNewsList] = useState<any[]>([]); // ✨ 配列に変更
+  const [newsList, setNewsList] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [loading, setLoading] = useState(true);
 
@@ -33,16 +33,15 @@ export default function Page() {
 
       const loginId = session.user.email?.replace('@karinto-internal.com', '');
 
-      // ✨ プロフィール、シフト、最新のお知らせ3件を同時取得
       const [castRes, shiftRes, newsRes] = await Promise.all([
         supabase.from('cast_members').select('*').eq('login_id', loginId).single(),
         supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
-        supabase.from('news').select('*').order('created_at', { ascending: false }).limit(3) // ✨ 3件に制限
+        supabase.from('news').select('*').order('created_at', { ascending: false }).limit(3)
       ]);
       
       setCastProfile(castRes.data);
       setShifts(shiftRes.data || []);
-      setNewsList(newsRes.data || []); // ✨ 取得したリストをセット
+      setNewsList(newsRes.data || []);
       setLoading(false);
     }
     checkUserAndFetchData();
@@ -83,33 +82,33 @@ export default function Page() {
 
       <main className="px-4 mt-6 space-y-6">
         
-        {/* 📢 お知らせセクション (最新3件) */}
-        <section className="px-2 space-y-3">
-          <div className="flex items-center ml-1">
+        {/* 📢 お知らせセクション (ひとつにまとめた背景) */}
+        <section className="px-2">
+          <div className="flex items-center mb-2 ml-1">
             <span className="text-lg mr-2">📢</span>
-            <p className="text-xs font-black text-pink-400 uppercase tracking-[0.2em]">Latest News</p>
+            <p className="text-xs font-black text-pink-400 uppercase tracking-widest">News</p>
           </div>
-          
-          {newsList.length > 0 ? (
-            newsList.map((news) => (
-              <div key={news.id} className="bg-white border border-pink-100 rounded-[22px] p-4 flex items-start space-x-3 shadow-sm last:opacity-70">
-                <div className="flex-1">
-                  <div className="flex justify-between items-center mb-1">
-                    <p className="text-[9px] text-gray-400">
+
+          <div className="bg-white border border-pink-100 rounded-[28px] overflow-hidden shadow-sm">
+            {newsList.length > 0 ? (
+              <div className="divide-y divide-pink-50">
+                {newsList.map((news) => (
+                  <div key={news.id} className="p-4 hover:bg-pink-50/30 transition-colors">
+                    <p className="text-[9px] text-gray-400 mb-1">
                       {format(parseISO(news.created_at), 'yyyy.MM.dd')}
                     </p>
+                    <p className="text-sm font-bold text-gray-700 leading-snug">
+                      {news.content}
+                    </p>
                   </div>
-                  <p className="text-sm font-bold text-gray-700 leading-relaxed">
-                    {news.content}
-                  </p>
-                </div>
+                ))}
               </div>
-            ))
-          ) : (
-            <div className="bg-white border border-pink-50 rounded-[22px] p-6 text-center italic text-gray-400 text-sm">
-              現在、新しいお知らせはありません🌸
-            </div>
-          )}
+            ) : (
+              <div className="p-8 text-center italic text-gray-400 text-sm">
+                現在、新しいお知らせはありません🌸
+              </div>
+            )}
+          </div>
         </section>
 
         {/* カレンダーセクション */}
