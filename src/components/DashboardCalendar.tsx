@@ -1,60 +1,63 @@
-//@ts-nocheck
 'use client';
 
-import { DayPicker } from "react-day-picker";
-import { format, getDay } from "date-fns";
-import { ja } from "date-fns/locale";
-import "react-day-picker/dist/style.css"; 
+import React from 'react';
+import { DayPicker } from 'react-day-picker';
+import { format, parseISO } from 'date-fns';
+import { ja } from 'date-fns/locale';
+import 'react-day-picker/dist/style.css';
 
-export default function DashboardCalendar({ shifts, selectedDate, onSelect }) {
-  const shiftDates = Array.isArray(shifts) 
-    ? shifts.map(s => String(s.shift_date).trim()) 
-    : [];
+interface DashboardCalendarProps {
+  shifts: any[];
+  selectedDate: Date | undefined;
+  onSelect: (date: Date | undefined) => void;
+  month?: Date;                    // ✨ 追加
+  onMonthChange?: (date: Date) => void; // ✨ 追加
+}
+
+export default function DashboardCalendar({ 
+  shifts, 
+  selectedDate, 
+  onSelect,
+  month,           // ✨ 受け取る
+  onMonthChange    // ✨ 受け取る
+}: DashboardCalendarProps) {
+
+  // シフトがある日のスタイル設定
+  const shiftDays = shifts.map(s => parseISO(s.shift_date));
 
   const modifiers = {
-    isSat: (date) => getDay(date) === 6,
-    isSun: (date) => getDay(date) === 0,
-    hasShift: (date) => {
-      const d = format(date, 'yyyy-MM-dd');
-      return shiftDates.includes(d);
+    hasShift: shiftDays,
+  };
+
+  const modifiersStyles = {
+    hasShift: {
+      color: 'white',
+      backgroundColor: '#ec4899', // ピンク
+      fontWeight: 'bold',
+      borderRadius: '50%',
     },
   };
 
   return (
-    <div className="w-full flex flex-col items-center py-2 bg-white rounded-xl relative">
+    <div className="flex justify-center p-1 bg-white rounded-xl overflow-hidden scale-95 origin-top">
       <style>{`
-        .rdp { margin: 0; --rdp-accent-color: #ec4899; }
-        .rdp-table thead tr th:nth-child(1) { color: #ef4444 !important; opacity: 1 !important; }
-        .rdp-table thead tr th:nth-child(7) { color: #3b82f6 !important; opacity: 1 !important; }
-        .rdp-day_isSun:not(.rdp-day_selected) { color: #ef4444 !important; font-weight: 800 !important; }
-        .rdp-day_isSat:not(.rdp-day_selected) { color: #3b82f6 !important; font-weight: 800 !important; }
-        .rdp-day_hasShift:not(.rdp-day_selected) {
-          background-color: #fce7f3 !important; 
-          color: #db2777 !important;           
-          border-radius: 50% !important;
-          font-weight: 900 !important;
-          border: none !important;
-        }
-        .rdp-day_selected { 
-          background-color: var(--rdp-accent-color) !important; 
-          color: white !important; 
-          border-radius: 50% !important; 
-        }
-        .rdp-table { width: 100%; max-width: 100%; border-collapse: separate; border-spacing: 4px; }
-        .rdp-cell { width: 44px; height: 44px; text-align: center; padding: 0; }
-        .rdp-button { width: 40px; height: 40px; justify-content: center; margin: auto !important; }
+        .rdp { --rdp-cell-size: 45px; margin: 0; }
+        .rdp-day_selected { background-color: #fce7f3 !important; color: #ec4899 !important; font-weight: 900 !important; border: 2px solid #ec4899 !important; }
+        .rdp-button:hover:not([disabled]):not(.rdp-day_selected) { background-color: #fff1f2; color: #ec4899; }
+        .rdp-head_cell { font-size: 10px; font-weight: 900; color: #fda4af; text-transform: uppercase; }
+        .rdp-nav_button { color: #fda4af; }
       `}</style>
-      
       <DayPicker
         mode="single"
         selected={selectedDate}
         onSelect={onSelect}
+        month={month}              // ✨ DayPicker本体に月を伝える
+        onMonthChange={onMonthChange} // ✨ 矢印が押されたら親に伝える
         locale={ja}
         modifiers={modifiers}
-        modifiersClassNames={{
-          isSun: "rdp-day_isSun",
-          isSat: "rdp-day_isSat",
-          hasShift: "rdp-day_hasShift"
+        modifiersStyles={modifiersStyles}
+        formatters={{
+          formatCaption: (date) => format(date, 'yyyy.MM', { locale: ja }),
         }}
       />
     </div>
