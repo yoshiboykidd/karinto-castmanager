@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, getDate } from 'date-fns'; // ✨ getDateを追加
 import { ja } from 'date-fns/locale';
 import DashboardCalendar from '@/components/DashboardCalendar';
 
@@ -66,13 +66,13 @@ export default function Page() {
     });
   }, [selectedDate, shifts]);
 
-  // --- 💡 月移動時の処理 (ver 1.13.3) ---
+  // --- 月移動時の処理 ---
   const handleMonthChange = (newMonth: Date) => {
-    setViewDate(newMonth);      // 表示月を更新
-    setSelectedDate(undefined); // 月を跨いだら日付の選択を解除
+    setViewDate(newMonth);      
+    setSelectedDate(undefined); 
   };
 
-  // --- 合計金額の計算ロジック ---
+  // --- 合計金額の計算ロジック (表示月に連動) ---
   const monthlyTotals = shifts
     .filter(s => {
       const date = parseISO(s.shift_date);
@@ -117,7 +117,7 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
-      {/* 🚀 ヘッダー：日付を消し、名前を大きく配置 */}
+      {/* 🚀 ヘッダー：キャスト名 */}
       <header className="bg-white px-5 pt-12 pb-6 rounded-b-[30px] shadow-sm border-b border-pink-100">
         <h1 className="text-3xl font-black text-gray-800 tracking-tighter flex items-baseline gap-1">
           {castProfile?.display_name || 'Cast'}
@@ -130,7 +130,6 @@ export default function Page() {
         
         {/* 1. 💰 合計金額枠 */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-4 border border-pink-300 shadow-sm relative overflow-hidden">
-          {/* 背景の大きな月数字 */}
           <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none leading-none">
             {format(viewDate, 'M')}
           </span>
@@ -171,14 +170,23 @@ export default function Page() {
             selectedDate={selectedDate} 
             onSelect={setSelectedDate}
             month={viewDate}
-            onMonthChange={handleMonthChange} // ✨ 月移動時に handleMonthChange を実行
+            onMonthChange={handleMonthChange} 
           />
         </section>
 
-        {/* 3. ✍️ 実績入力フォーム */}
+        {/* 3. ✍️ 実績入力フォーム (イベント名の表示追加) */}
         <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden">
           <div className="bg-[#FFF5F6] p-3 px-4 border-b border-pink-200 flex justify-between items-center">
-            <h3 className="text-sm font-black text-gray-700">{selectedDate ? format(selectedDate, 'M/d (eee)', { locale: ja }) : '日付を選択してください'}</h3>
+            <h3 className="text-sm font-black text-gray-700">
+              {selectedDate ? (
+                <>
+                  {format(selectedDate, 'M/d (eee)', { locale: ja })}
+                  {/* ✨ イベント名の表示 */}
+                  {getDate(selectedDate) === 10 && <span className="ml-2 text-pink-500 text-[10px] bg-white px-2 py-0.5 rounded-full border border-pink-200 font-bold">かりんとの日</span>}
+                  {(getDate(selectedDate) === 11 || getDate(selectedDate) === 22) && <span className="ml-2 text-blue-500 text-[10px] bg-white px-2 py-0.5 rounded-full border border-blue-200 font-bold">添い寝の日</span>}
+                </>
+              ) : '日付を選択してください'}
+            </h3>
             <p className="text-xl font-black text-pink-500 tracking-tighter">
               {selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-[9px] font-bold text-gray-400 uppercase px-2 py-1 bg-gray-100 rounded-md">Off / No Select</span>}
             </p>
@@ -205,9 +213,9 @@ export default function Page() {
           ) : <div className="p-8 text-center bg-white italic text-gray-300 text-xs">カレンダーの日付を選択すると実績を入力できます 🌙</div>}
         </section>
 
-        {/* 🏷️ ver 1.13.3 ラベル */}
+        {/* 🏷️ ver 1.13.4 ラベル */}
         <div className="pt-4 pb-2 text-center">
-          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.13.3</p>
+          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.13.4</p>
         </div>
 
       </main>
@@ -216,7 +224,7 @@ export default function Page() {
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
         <nav className="flex justify-around items-center max-w-sm mx-auto px-4">
           <button className="flex flex-col items-center text-pink-500" onClick={() => router.push('/')}><span className="text-xl mb-0.5">🏠</span><span className="text-[9px] font-black tracking-tighter uppercase">Home</span></button>
-          <button className="flex flex-col items-center text-gray-300"><span className="text-xl mb-0.5">💰</span><span className="text-[9px] font-black tracking-tighter uppercase">Salary</span></button>
+          <button className="flex flex-col items-center text-gray-300" onClick={() => router.push('/salary')}><span className="text-xl mb-0.5">💰</span><span className="text-[9px] font-black tracking-tighter uppercase">Salary</span></button>
           <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center text-gray-300"><span className="text-xl mb-0.5">🚪</span><span className="text-[9px] font-black tracking-tighter uppercase">Logout</span></button>
         </nav>
       </footer>
