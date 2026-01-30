@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
-import { format, parseISO, addMonths, subMonths } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import DashboardCalendar from '@/components/DashboardCalendar';
 
@@ -14,11 +14,12 @@ export default function Page() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ));
 
+  // --- States ---
   const [shifts, setShifts] = useState<any[]>([]);
   const [castProfile, setCastProfile] = useState<any>(null);
   const [newsList, setNewsList] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [viewDate, setViewDate] = useState(new Date()); // ✨ 表示月を管理
+  const [viewDate, setViewDate] = useState(new Date()); // ✨ カレンダーと連動する「表示月」
   const [loading, setLoading] = useState(true);
   
   const [editReward, setEditReward] = useState<{f:any, first:any, main:any, amount:any}>({ 
@@ -61,10 +62,11 @@ export default function Page() {
     });
   }, [selectedDate, shifts]);
 
-  // --- 計算ロジック (viewDateに基づく集計) ---
+  // --- 💡 合計金額の計算ロジック (viewDate と連動) ---
   const monthlyTotals = shifts
     .filter(s => {
       const date = parseISO(s.shift_date);
+      // カレンダーで表示している月・年と一致するものだけを集計
       return date.getMonth() === viewDate.getMonth() && date.getFullYear() === viewDate.getFullYear();
     })
     .reduce((acc, s) => {
@@ -85,9 +87,6 @@ export default function Page() {
       };
     }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
 
-  const handlePrevMonth = () => setViewDate(subMonths(viewDate, 1));
-  const handleNextMonth = () => setViewDate(addMonths(viewDate, 1));
-
   const handleSaveReward = async () => {
     const dateStr = format(selectedDate || new Date(), 'yyyy-MM-dd');
     const { error } = await supabase.from('shifts').update({
@@ -101,37 +100,34 @@ export default function Page() {
     else { fetchInitialData(); alert('保存しました！💰'); }
   };
 
-  if (loading) return <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center text-pink-300 font-black">LOADING...</div>;
+  if (loading) return <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center text-pink-300 font-black tracking-tighter text-2xl italic">KARINTO...</div>;
 
   const selectedShift = shifts.find(s => selectedDate && s.shift_date === format(selectedDate, 'yyyy-MM-dd'));
 
   return (
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
-      {/* 🚀 ヘッダー（月切り替えボタン付き） */}
-      <header className="bg-white px-5 pt-10 pb-4 rounded-b-[25px] shadow-sm flex justify-between items-end border-b border-pink-100">
-        <div>
-          <p className="text-pink-300 text-[9px] font-black tracking-[0.2em] mb-0.5 uppercase">Performance Report🌸</p>
-          <h1 className="text-xl font-black text-gray-800 leading-none">
-            {format(viewDate, 'yyyy年 M月')}
-          </h1>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={handlePrevMonth} className="bg-pink-50 text-pink-400 p-2 rounded-full w-8 h-8 flex items-center justify-center font-black shadow-sm active:scale-90 transition-all text-xs">〈</button>
-          <button onClick={handleNextMonth} className="bg-pink-50 text-pink-400 p-2 rounded-full w-8 h-8 flex items-center justify-center font-black shadow-sm active:scale-90 transition-all text-xs">〉</button>
-        </div>
+      {/* 🚀 ヘッダー：キャスト名と現在表示中の月を表示 */}
+      <header className="bg-white px-5 pt-10 pb-4 rounded-b-[25px] shadow-sm border-b border-pink-100">
+        <p className="text-pink-400 text-[10px] font-black tracking-widest uppercase mb-1">
+          Welcome Back, {castProfile?.display_name || 'Cast'}🌸
+        </p>
+        <h1 className="text-2xl font-black text-gray-800 leading-none tracking-tighter">
+          {format(viewDate, 'yyyy年 M月')}
+        </h1>
       </header>
 
       <main className="px-3 mt-4 space-y-4">
         
-        {/* 1. 💰 合計金額枠（月表示連動） */}
+        {/* 1. 💰 合計金額枠 (カレンダーの月移動と連動) */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-4 border border-pink-300 shadow-sm relative overflow-hidden">
+          {/* 背景の大きな月数字 */}
           <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none leading-none">
             {format(viewDate, 'M')}
           </span>
 
           <div className="flex justify-between items-center mb-1 relative z-10">
-            <p className="text-[10px] font-black text-pink-400 uppercase tracking-tighter">Earnings Report</p>
+            <p className="text-[10px] font-black text-pink-400 uppercase tracking-tighter">Performance Totals</p>
             <div className="flex gap-2">
               <span className="bg-white/50 text-[8px] text-pink-400 px-2 py-0.5 rounded-full font-bold">出勤: {monthlyTotals.count}日</span>
               <span className="bg-white/50 text-[8px] text-pink-400 px-2 py-0.5 rounded-full font-bold">稼働: {Math.round(monthlyTotals.hours * 10) / 10}h</span>
@@ -156,9 +152,15 @@ export default function Page() {
           </div>
         </section>
 
-        {/* 2. 📅 カレンダー */}
+        {/* 2. 📅 カレンダー (viewDate と同期) */}
         <section className="bg-white p-2 rounded-[22px] border border-pink-200 shadow-sm overflow-hidden">
-          <DashboardCalendar shifts={shifts} selectedDate={selectedDate} onSelect={setSelectedDate} />
+          <DashboardCalendar 
+            shifts={shifts} 
+            selectedDate={selectedDate} 
+            onSelect={setSelectedDate}
+            month={viewDate}              // ✨ 現在の月を渡す
+            onMonthChange={setViewDate}   // ✨ カレンダー側で月を変えたら viewDate も更新
+          />
         </section>
 
         {/* 3. ✍️ 実績入力フォーム */}
@@ -195,7 +197,6 @@ export default function Page() {
         <section className="bg-white rounded-xl overflow-hidden border border-pink-100 shadow-sm opacity-90">
           <div className="bg-gray-50 p-2 border-b border-pink-50 flex justify-between items-center px-4">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Shop News</p>
-            <span className="text-[8px] font-bold text-pink-300">Latest Updates</span>
           </div>
           {newsList.length > 0 ? newsList.map((news) => (
             <div key={news.id} className="p-3 px-4 text-left flex items-start space-x-3 border-b border-gray-50 last:border-0">
@@ -205,9 +206,9 @@ export default function Page() {
           )) : <p className="p-4 text-center text-gray-300 text-[10px] italic">お知らせはありません</p>}
         </section>
 
-        {/* --- ver 1.13 可視化ラベル --- */}
+        {/* 🏷️ ver 1.13.2 ラベル */}
         <div className="pt-4 pb-2 text-center">
-          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.13</p>
+          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.13.2</p>
         </div>
 
       </main>
@@ -216,7 +217,7 @@ export default function Page() {
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
         <nav className="flex justify-around items-center max-w-sm mx-auto px-4">
           <button className="flex flex-col items-center text-pink-500" onClick={() => router.push('/')}><span className="text-xl mb-0.5">🏠</span><span className="text-[9px] font-black tracking-tighter uppercase">Home</span></button>
-          <button className="flex flex-col items-center text-gray-300"><span className="text-xl mb-0.5">💰</span><span className="text-[9px] font-black tracking-tighter uppercase">Salary</span></button>
+          <button className="flex flex-col items-center text-gray-300" onClick={() => router.push('/salary')}><span className="text-xl mb-0.5">💰</span><span className="text-[9px] font-black tracking-tighter uppercase">Salary</span></button>
           <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center text-gray-300"><span className="text-xl mb-0.5">🚪</span><span className="text-[9px] font-black tracking-tighter uppercase">Logout</span></button>
         </nav>
       </footer>
