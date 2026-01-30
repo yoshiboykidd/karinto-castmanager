@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
-import { format, parseISO, getDate } from 'date-fns'; // ✨ getDateを追加
+import { format, parseISO, getDate } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import DashboardCalendar from '@/components/DashboardCalendar';
 
@@ -66,13 +66,12 @@ export default function Page() {
     });
   }, [selectedDate, shifts]);
 
-  // --- 月移動時の処理 ---
   const handleMonthChange = (newMonth: Date) => {
     setViewDate(newMonth);      
     setSelectedDate(undefined); 
   };
 
-  // --- 合計金額の計算ロジック (表示月に連動) ---
+  // --- 合計金額の計算ロジック ---
   const monthlyTotals = shifts
     .filter(s => {
       const date = parseISO(s.shift_date);
@@ -117,53 +116,67 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
-      {/* 🚀 ヘッダー：キャスト名 */}
+      {/* 🚀 ヘッダー：名前と敬称 */}
       <header className="bg-white px-5 pt-12 pb-6 rounded-b-[30px] shadow-sm border-b border-pink-100">
         <h1 className="text-3xl font-black text-gray-800 tracking-tighter flex items-baseline gap-1">
           {castProfile?.display_name || 'Cast'}
-          <span className="text-sm text-pink-400 font-bold italic">さん🌸</span>
+          <span className="text-[13px] text-pink-400 font-bold italic translate-y-[-2px]">さん🌸</span>
         </h1>
-        <p className="text-pink-300 text-[9px] font-black tracking-[0.2em] mt-1 uppercase">Cast My Page</p>
+        <p className="text-pink-300 text-[9px] font-black tracking-[0.2em] mt-1 uppercase">Management Dashboard</p>
       </header>
 
       <main className="px-3 mt-4 space-y-4">
         
-        {/* 1. 💰 合計金額枠 */}
+        {/* 1. 💰 合計金額枠 (ver 1.13.5) */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-4 border border-pink-300 shadow-sm relative overflow-hidden">
+          {/* 背景の大きな月数字 */}
           <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none leading-none">
             {format(viewDate, 'M')}
           </span>
 
-          <div className="flex justify-between items-center mb-1 relative z-10">
-            <div className="flex items-center gap-1.5">
-              <p className="text-[10px] font-black text-pink-400 uppercase tracking-tighter">Performance Totals</p>
-              <span className="text-[9px] bg-pink-400 text-white px-1.5 py-0.5 rounded font-black">{format(viewDate, 'M月')}</span>
-            </div>
-            <div className="flex gap-2">
-              <span className="bg-white/50 text-[8px] text-pink-400 px-2 py-0.5 rounded-full font-bold">出勤: {monthlyTotals.count}日</span>
-              <span className="bg-white/50 text-[8px] text-pink-400 px-2 py-0.5 rounded-full font-bold">稼働: {Math.round(monthlyTotals.hours * 10) / 10}h</span>
+          <div className="relative z-10 mb-2">
+            {/* 月の表示を大きく */}
+            <h2 className="text-[18px] font-black text-pink-500 flex items-center gap-1.5 leading-none">
+              <span className="bg-pink-500 text-white px-2 py-1 rounded-lg text-sm">{format(viewDate, 'M月')}</span>
+              の合計実績
+            </h2>
+            
+            {/* 出勤・稼働時間を大きく目立たせる */}
+            <div className="flex gap-2 mt-2.5">
+              <div className="bg-white/60 px-3 py-1.5 rounded-xl border border-pink-200 flex items-baseline gap-1 shadow-sm">
+                <span className="text-[9px] font-black text-pink-300 uppercase tracking-tighter">出勤</span>
+                <span className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.count}</span>
+                <span className="text-[10px] font-bold text-pink-400">日</span>
+              </div>
+              <div className="bg-white/60 px-3 py-1.5 rounded-xl border border-pink-200 flex items-baseline gap-1 shadow-sm">
+                <span className="text-[9px] font-black text-pink-300 uppercase tracking-tighter">稼働</span>
+                <span className="text-xl font-black text-pink-600 leading-none">{Math.round(monthlyTotals.hours * 10) / 10}</span>
+                <span className="text-[10px] font-bold text-pink-400">h</span>
+              </div>
             </div>
           </div>
           
-          <p className="text-[44px] font-black text-pink-500 tracking-tighter mb-3 text-center leading-none relative z-10">
+          {/* 合計金額（大きさ維持） */}
+          <p className="text-[44px] font-black text-pink-500 tracking-tighter mb-3 text-center leading-none relative z-10 drop-shadow-sm">
             <span className="text-lg mr-0.5 font-bold">¥</span>{monthlyTotals.amount.toLocaleString()}
           </p>
 
-          <div className="flex justify-between items-center bg-white/70 rounded-xl py-3 border border-pink-200 relative z-10">
+          {/* 指名枠 (上下を狭く py-1.5 に調整) */}
+          <div className="flex justify-between items-center bg-white/80 rounded-xl py-1.5 border border-pink-200 relative z-10">
             {[
               { label: 'フリー', value: monthlyTotals.f },
               { label: '初指名', value: monthlyTotals.first },
               { label: '本指名', value: monthlyTotals.main }
             ].map((item, idx) => (
-              <div key={idx} className={`text-center flex-1 ${idx !== 2 ? 'border-r border-pink-200' : ''}`}>
-                <p className="text-[11px] font-bold text-pink-400 mb-0.5">{item.label}</p>
-                <p className="text-[28px] font-black text-pink-600 leading-none">{item.value}<span className="text-xs ml-0.5">本</span></p>
+              <div key={idx} className={`text-center flex-1 ${idx !== 2 ? 'border-r border-pink-100' : ''}`}>
+                <p className="text-[10px] font-bold text-pink-400 leading-tight">{item.label}</p>
+                <p className="text-[22px] font-black text-pink-600 leading-none">{item.value}<span className="text-[9px] ml-0.5">本</span></p>
               </div>
             ))}
           </div>
         </section>
 
-        {/* 2. 📅 カレンダー (viewDate と同期) */}
+        {/* 2. 📅 カレンダー */}
         <section className="bg-white p-2 rounded-[22px] border border-pink-200 shadow-sm overflow-hidden">
           <DashboardCalendar 
             shifts={shifts} 
@@ -174,14 +187,13 @@ export default function Page() {
           />
         </section>
 
-        {/* 3. ✍️ 実績入力フォーム (イベント名の表示追加) */}
+        {/* 3. ✍️ 実績入力フォーム */}
         <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden">
           <div className="bg-[#FFF5F6] p-3 px-4 border-b border-pink-200 flex justify-between items-center">
             <h3 className="text-sm font-black text-gray-700">
               {selectedDate ? (
                 <>
                   {format(selectedDate, 'M/d (eee)', { locale: ja })}
-                  {/* ✨ イベント名の表示 */}
                   {getDate(selectedDate) === 10 && <span className="ml-2 text-pink-500 text-[10px] bg-white px-2 py-0.5 rounded-full border border-pink-200 font-bold">かりんとの日</span>}
                   {(getDate(selectedDate) === 11 || getDate(selectedDate) === 22) && <span className="ml-2 text-blue-500 text-[10px] bg-white px-2 py-0.5 rounded-full border border-blue-200 font-bold">添い寝の日</span>}
                 </>
@@ -213,9 +225,8 @@ export default function Page() {
           ) : <div className="p-8 text-center bg-white italic text-gray-300 text-xs">カレンダーの日付を選択すると実績を入力できます 🌙</div>}
         </section>
 
-        {/* 🏷️ ver 1.13.4 ラベル */}
         <div className="pt-4 pb-2 text-center">
-          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.13.4</p>
+          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.13.5</p>
         </div>
 
       </main>
