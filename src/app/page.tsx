@@ -19,7 +19,7 @@ export default function Page() {
   const [castProfile, setCastProfile] = useState<any>(null);
   const [newsList, setNewsList] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [viewDate, setViewDate] = useState(new Date()); // ✨ カレンダーと連動する「表示月」
+  const [viewDate, setViewDate] = useState(new Date()); 
   const [loading, setLoading] = useState(true);
   
   const [editReward, setEditReward] = useState<{f:any, first:any, main:any, amount:any}>({ 
@@ -52,7 +52,11 @@ export default function Page() {
 
   // 日付選択時の実績セット
   useEffect(() => {
-    const dateStr = format(selectedDate || new Date(), 'yyyy-MM-dd');
+    if (!selectedDate) {
+      setEditReward({ f: '', first: '', main: '', amount: '' });
+      return;
+    }
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const shift = shifts.find(s => s.shift_date === dateStr);
     setEditReward({
       f: shift?.f_count ?? '',
@@ -62,11 +66,16 @@ export default function Page() {
     });
   }, [selectedDate, shifts]);
 
-  // --- 💡 合計金額の計算ロジック (viewDate と連動) ---
+  // --- 💡 月移動時の処理 (ver 1.13.3) ---
+  const handleMonthChange = (newMonth: Date) => {
+    setViewDate(newMonth);      // 表示月を更新
+    setSelectedDate(undefined); // 月を跨いだら日付の選択を解除
+  };
+
+  // --- 合計金額の計算ロジック ---
   const monthlyTotals = shifts
     .filter(s => {
       const date = parseISO(s.shift_date);
-      // カレンダーで表示している月・年と一致するものだけを集計
       return date.getMonth() === viewDate.getMonth() && date.getFullYear() === viewDate.getFullYear();
     })
     .reduce((acc, s) => {
@@ -88,7 +97,8 @@ export default function Page() {
     }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
 
   const handleSaveReward = async () => {
-    const dateStr = format(selectedDate || new Date(), 'yyyy-MM-dd');
+    if (!selectedDate) return;
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const { error } = await supabase.from('shifts').update({
       f_count: Number(editReward.f) || 0,
       first_request_count: Number(editReward.first) || 0,
@@ -107,19 +117,18 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
-      {/* 🚀 ヘッダー：キャスト名と現在表示中の月を表示 */}
-      <header className="bg-white px-5 pt-10 pb-4 rounded-b-[25px] shadow-sm border-b border-pink-100">
-        <p className="text-pink-400 text-[10px] font-black tracking-widest uppercase mb-1">
-          Welcome Back, {castProfile?.display_name || 'Cast'}🌸
-        </p>
-        <h1 className="text-2xl font-black text-gray-800 leading-none tracking-tighter">
-          {format(viewDate, 'yyyy年 M月')}
+      {/* 🚀 ヘッダー：日付を消し、名前を大きく配置 */}
+      <header className="bg-white px-5 pt-12 pb-6 rounded-b-[30px] shadow-sm border-b border-pink-100">
+        <h1 className="text-3xl font-black text-gray-800 tracking-tighter flex items-baseline gap-1">
+          {castProfile?.display_name || 'Cast'}
+          <span className="text-sm text-pink-400 font-bold italic">さん🌸</span>
         </h1>
+        <p className="text-pink-300 text-[9px] font-black tracking-[0.2em] mt-1 uppercase">Cast My Page</p>
       </header>
 
       <main className="px-3 mt-4 space-y-4">
         
-        {/* 1. 💰 合計金額枠 (カレンダーの月移動と連動) */}
+        {/* 1. 💰 合計金額枠 */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-4 border border-pink-300 shadow-sm relative overflow-hidden">
           {/* 背景の大きな月数字 */}
           <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none leading-none">
@@ -127,7 +136,10 @@ export default function Page() {
           </span>
 
           <div className="flex justify-between items-center mb-1 relative z-10">
-            <p className="text-[10px] font-black text-pink-400 uppercase tracking-tighter">Performance Totals</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[10px] font-black text-pink-400 uppercase tracking-tighter">Performance Totals</p>
+              <span className="text-[9px] bg-pink-400 text-white px-1.5 py-0.5 rounded font-black">{format(viewDate, 'M月')}</span>
+            </div>
             <div className="flex gap-2">
               <span className="bg-white/50 text-[8px] text-pink-400 px-2 py-0.5 rounded-full font-bold">出勤: {monthlyTotals.count}日</span>
               <span className="bg-white/50 text-[8px] text-pink-400 px-2 py-0.5 rounded-full font-bold">稼働: {Math.round(monthlyTotals.hours * 10) / 10}h</span>
@@ -158,17 +170,17 @@ export default function Page() {
             shifts={shifts} 
             selectedDate={selectedDate} 
             onSelect={setSelectedDate}
-            month={viewDate}              // ✨ 現在の月を渡す
-            onMonthChange={setViewDate}   // ✨ カレンダー側で月を変えたら viewDate も更新
+            month={viewDate}
+            onMonthChange={handleMonthChange} // ✨ 月移動時に handleMonthChange を実行
           />
         </section>
 
         {/* 3. ✍️ 実績入力フォーム */}
         <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden">
           <div className="bg-[#FFF5F6] p-3 px-4 border-b border-pink-200 flex justify-between items-center">
-            <h3 className="text-sm font-black text-gray-700">{selectedDate ? format(selectedDate, 'M/d (eee)', { locale: ja }) : '選択中'}</h3>
+            <h3 className="text-sm font-black text-gray-700">{selectedDate ? format(selectedDate, 'M/d (eee)', { locale: ja }) : '日付を選択してください'}</h3>
             <p className="text-xl font-black text-pink-500 tracking-tighter">
-              {selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-[9px] font-bold text-gray-400 uppercase px-2 py-1 bg-gray-100 rounded-md">Off</span>}
+              {selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-[9px] font-bold text-gray-400 uppercase px-2 py-1 bg-gray-100 rounded-md">Off / No Select</span>}
             </p>
           </div>
           {selectedShift ? (
@@ -190,25 +202,12 @@ export default function Page() {
               </div>
               <button onClick={handleSaveReward} className="w-full bg-pink-500 text-white font-black py-4 rounded-xl shadow-lg active:scale-95 transition-all text-xs tracking-[0.2em] uppercase">実績を保存 💾</button>
             </div>
-          ) : <div className="p-8 text-center bg-white italic text-gray-300 text-xs">お休みの日です 🌙</div>}
+          ) : <div className="p-8 text-center bg-white italic text-gray-300 text-xs">カレンダーの日付を選択すると実績を入力できます 🌙</div>}
         </section>
 
-        {/* 4. 📢 NEWS (最新3件) */}
-        <section className="bg-white rounded-xl overflow-hidden border border-pink-100 shadow-sm opacity-90">
-          <div className="bg-gray-50 p-2 border-b border-pink-50 flex justify-between items-center px-4">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Shop News</p>
-          </div>
-          {newsList.length > 0 ? newsList.map((news) => (
-            <div key={news.id} className="p-3 px-4 text-left flex items-start space-x-3 border-b border-gray-50 last:border-0">
-              <span className="text-[9px] text-pink-200 font-bold shrink-0 mt-0.5">{format(parseISO(news.created_at), 'MM/dd')}</span>
-              <p className="text-xs font-bold text-gray-500 leading-tight">{news.content}</p>
-            </div>
-          )) : <p className="p-4 text-center text-gray-300 text-[10px] italic">お知らせはありません</p>}
-        </section>
-
-        {/* 🏷️ ver 1.13.2 ラベル */}
+        {/* 🏷️ ver 1.13.3 ラベル */}
         <div className="pt-4 pb-2 text-center">
-          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.13.2</p>
+          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.13.3</p>
         </div>
 
       </main>
@@ -217,7 +216,7 @@ export default function Page() {
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
         <nav className="flex justify-around items-center max-w-sm mx-auto px-4">
           <button className="flex flex-col items-center text-pink-500" onClick={() => router.push('/')}><span className="text-xl mb-0.5">🏠</span><span className="text-[9px] font-black tracking-tighter uppercase">Home</span></button>
-          <button className="flex flex-col items-center text-gray-300" onClick={() => router.push('/salary')}><span className="text-xl mb-0.5">💰</span><span className="text-[9px] font-black tracking-tighter uppercase">Salary</span></button>
+          <button className="flex flex-col items-center text-gray-300"><span className="text-xl mb-0.5">💰</span><span className="text-[9px] font-black tracking-tighter uppercase">Salary</span></button>
           <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center text-gray-300"><span className="text-xl mb-0.5">🚪</span><span className="text-[9px] font-black tracking-tighter uppercase">Logout</span></button>
         </nav>
       </footer>
