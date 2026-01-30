@@ -14,7 +14,6 @@ export default function Page() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ));
 
-  // --- States ---
   const [shifts, setShifts] = useState<any[]>([]);
   const [castProfile, setCastProfile] = useState<any>(null);
   const [newsList, setNewsList] = useState<any[]>([]);
@@ -45,12 +44,11 @@ export default function Page() {
       const myShopId = castRes.data.HOME_shop_ID || 'main';
       const { data: newsData } = await supabase.from('news').select('*')
         .or(`shop_id.eq.${myShopId},shop_id.eq.all`).order('created_at', { ascending: false }).limit(3);
-      setNewsList(newsData || []);
+      setNewsList(newsData || []); // ✨ お知らせを確実にセット
     }
     setLoading(false);
   }
 
-  // 日付選択時の実績セット
   useEffect(() => {
     if (!selectedDate) {
       setEditReward({ f: '', first: '', main: '', amount: '' });
@@ -71,7 +69,6 @@ export default function Page() {
     setSelectedDate(undefined); 
   };
 
-  // --- 合計金額の計算ロジック ---
   const monthlyTotals = shifts
     .filter(s => {
       const date = parseISO(s.shift_date);
@@ -116,32 +113,28 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
-      {/* 🚀 ヘッダー：名前と敬称 */}
+      {/* 🚀 ヘッダー */}
       <header className="bg-white px-5 pt-12 pb-6 rounded-b-[30px] shadow-sm border-b border-pink-100">
         <h1 className="text-3xl font-black text-gray-800 tracking-tighter flex items-baseline gap-1">
           {castProfile?.display_name || 'Cast'}
           <span className="text-[13px] text-pink-400 font-bold italic translate-y-[-2px]">さん🌸</span>
         </h1>
-        <p className="text-pink-300 text-[9px] font-black tracking-[0.2em] mt-1 uppercase">Management Dashboard</p>
+        <p className="text-pink-300 text-[9px] font-black tracking-[0.2em] mt-1 uppercase">Cast Dashboard</p>
       </header>
 
       <main className="px-3 mt-4 space-y-4">
         
-        {/* 1. 💰 合計金額枠 (ver 1.13.5) */}
+        {/* 1. 💰 合計金額枠 */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-4 border border-pink-300 shadow-sm relative overflow-hidden">
-          {/* 背景の大きな月数字 */}
           <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none leading-none">
             {format(viewDate, 'M')}
           </span>
 
           <div className="relative z-10 mb-2">
-            {/* 月の表示を大きく */}
             <h2 className="text-[18px] font-black text-pink-500 flex items-center gap-1.5 leading-none">
               <span className="bg-pink-500 text-white px-2 py-1 rounded-lg text-sm">{format(viewDate, 'M月')}</span>
               の合計実績
             </h2>
-            
-            {/* 出勤・稼働時間を大きく目立たせる */}
             <div className="flex gap-2 mt-2.5">
               <div className="bg-white/60 px-3 py-1.5 rounded-xl border border-pink-200 flex items-baseline gap-1 shadow-sm">
                 <span className="text-[9px] font-black text-pink-300 uppercase tracking-tighter">出勤</span>
@@ -156,12 +149,10 @@ export default function Page() {
             </div>
           </div>
           
-          {/* 合計金額（大きさ維持） */}
           <p className="text-[44px] font-black text-pink-500 tracking-tighter mb-3 text-center leading-none relative z-10 drop-shadow-sm">
             <span className="text-lg mr-0.5 font-bold">¥</span>{monthlyTotals.amount.toLocaleString()}
           </p>
 
-          {/* 指名枠 (上下を狭く py-1.5 に調整) */}
           <div className="flex justify-between items-center bg-white/80 rounded-xl py-1.5 border border-pink-200 relative z-10">
             {[
               { label: 'フリー', value: monthlyTotals.f },
@@ -187,51 +178,64 @@ export default function Page() {
           />
         </section>
 
-        {/* 3. ✍️ 実績入力フォーム */}
+        {/* 3. ✍️ 実績入力フォーム (入力欄をさらに狭く調整) */}
         <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden">
-          <div className="bg-[#FFF5F6] p-3 px-4 border-b border-pink-200 flex justify-between items-center">
-            <h3 className="text-sm font-black text-gray-700">
+          <div className="bg-[#FFF5F6] p-2.5 px-4 border-b border-pink-100 flex justify-between items-center">
+            <h3 className="text-[13px] font-black text-gray-700 leading-none">
               {selectedDate ? (
-                <>
+                <div className="flex items-center gap-2">
                   {format(selectedDate, 'M/d (eee)', { locale: ja })}
-                  {getDate(selectedDate) === 10 && <span className="ml-2 text-pink-500 text-[10px] bg-white px-2 py-0.5 rounded-full border border-pink-200 font-bold">かりんとの日</span>}
-                  {(getDate(selectedDate) === 11 || getDate(selectedDate) === 22) && <span className="ml-2 text-blue-500 text-[10px] bg-white px-2 py-0.5 rounded-full border border-blue-200 font-bold">添い寝の日</span>}
-                </>
+                  {getDate(selectedDate) === 10 && <span className="text-pink-500 text-[9px] bg-white px-1.5 py-0.5 rounded border border-pink-200 font-bold italic">かりんとの日</span>}
+                  {(getDate(selectedDate) === 11 || getDate(selectedDate) === 22) && <span className="text-blue-500 text-[9px] bg-white px-1.5 py-0.5 rounded border border-blue-200 font-bold italic">添い寝の日</span>}
+                </div>
               ) : '日付を選択してください'}
             </h3>
-            <p className="text-xl font-black text-pink-500 tracking-tighter">
-              {selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-[9px] font-bold text-gray-400 uppercase px-2 py-1 bg-gray-100 rounded-md">Off / No Select</span>}
+            <p className="text-lg font-black text-pink-500 tracking-tighter leading-none">
+              {selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-[8px] font-bold text-gray-300 uppercase px-1.5 py-0.5 bg-gray-50 rounded">OFF</span>}
             </p>
           </div>
           {selectedShift ? (
-            <div className="p-4 space-y-4">
+            <div className="p-3 space-y-3">
               <div className="grid grid-cols-3 gap-2">
                 {['f', 'first', 'main'].map((key) => (
                   <div key={key} className="space-y-1 text-center">
-                    <label className="text-[11px] font-bold text-gray-300 block tracking-tighter">{key === 'f' ? 'フリー' : key === 'first' ? '初指名' : '本指名'}</label>
-                    <input type="number" inputMode="numeric" value={editReward[key as keyof typeof editReward]} onChange={e => setEditReward({...editReward, [key]: e.target.value})} className="w-full text-center py-2.5 bg-[#FAFAFA] rounded-lg font-black text-[26px] text-pink-500 border border-gray-100 focus:outline-none" />
+                    <label className="text-[10px] font-bold text-gray-300 block tracking-tighter leading-none">{key === 'f' ? 'フリー' : key === 'first' ? '初指名' : '本指名'}</label>
+                    <input type="number" inputMode="numeric" value={editReward[key as keyof typeof editReward]} onChange={e => setEditReward({...editReward, [key]: e.target.value})} className="w-full text-center py-1.5 bg-[#FAFAFA] rounded-lg font-black text-[22px] text-pink-500 border border-gray-100 focus:outline-none" />
                   </div>
                 ))}
               </div>
-              <div className="flex items-center space-x-2 bg-pink-50/50 p-2.5 px-4 rounded-xl border border-pink-200">
-                <label className="text-[11px] font-black text-pink-300 shrink-0 uppercase tracking-widest">給料</label>
+              <div className="flex items-center space-x-2 bg-pink-50/30 p-2 rounded-xl border border-pink-100">
+                <label className="text-[10px] font-black text-pink-300 shrink-0 uppercase tracking-widest leading-none">給料</label>
                 <div className="relative flex-1 text-right">
-                  <span className="absolute left-1 top-1/2 -translate-y-1/2 text-pink-200 text-xl font-black">¥</span>
-                  <input type="text" inputMode="numeric" value={editReward.amount ? Number(editReward.amount).toLocaleString() : ''} onChange={e => { const val = e.target.value.replace(/,/g, ''); if (/^\d*$/.test(val)) setEditReward({...editReward, amount: val}); }} className="w-full text-right pr-1 py-1 bg-transparent font-black text-[34px] text-pink-500 focus:outline-none" />
+                  <span className="absolute left-1 top-1/2 -translate-y-1/2 text-pink-200 text-lg font-black">¥</span>
+                  <input type="text" inputMode="numeric" value={editReward.amount ? Number(editReward.amount).toLocaleString() : ''} onChange={e => { const val = e.target.value.replace(/,/g, ''); if (/^\d*$/.test(val)) setEditReward({...editReward, amount: val}); }} className="w-full text-right pr-1 py-0.5 bg-transparent font-black text-[28px] text-pink-500 focus:outline-none" />
                 </div>
               </div>
-              <button onClick={handleSaveReward} className="w-full bg-pink-500 text-white font-black py-4 rounded-xl shadow-lg active:scale-95 transition-all text-xs tracking-[0.2em] uppercase">実績を保存 💾</button>
+              <button onClick={handleSaveReward} className="w-full bg-pink-500 text-white font-black py-3 rounded-xl shadow-lg active:scale-95 transition-all text-[11px] tracking-[0.2em] uppercase">実績を保存 💾</button>
             </div>
-          ) : <div className="p-8 text-center bg-white italic text-gray-300 text-xs">カレンダーの日付を選択すると実績を入力できます 🌙</div>}
+          ) : <div className="p-6 text-center bg-white italic text-gray-300 text-[10px]">カレンダーの日付を選択すると入力できます</div>}
+        </section>
+
+        {/* 📢 4. NEWS (復活！) */}
+        <section className="bg-white rounded-[22px] overflow-hidden border border-pink-100 shadow-sm opacity-90">
+          <div className="bg-gray-50 p-2 px-4 border-b border-gray-100 flex justify-between items-center">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Shop News</p>
+            <span className="text-[8px] font-bold text-pink-300">LATEST</span>
+          </div>
+          {newsList.length > 0 ? newsList.map((news) => (
+            <div key={news.id} className="p-3 px-4 text-left flex items-start space-x-3 border-b border-gray-50 last:border-0">
+              <span className="text-[9px] text-pink-200 font-bold shrink-0 mt-0.5">{format(parseISO(news.created_at), 'MM/dd')}</span>
+              <p className="text-xs font-bold text-gray-500 leading-tight">{news.content}</p>
+            </div>
+          )) : <p className="p-4 text-center text-gray-300 text-[10px] italic leading-none">お知らせはありません</p>}
         </section>
 
         <div className="pt-4 pb-2 text-center">
-          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.13.5</p>
+          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.13.6</p>
         </div>
 
       </main>
 
-      {/* 📱 フッターナビゲーション */}
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
         <nav className="flex justify-around items-center max-w-sm mx-auto px-4">
           <button className="flex flex-col items-center text-pink-500" onClick={() => router.push('/')}><span className="text-xl mb-0.5">🏠</span><span className="text-[9px] font-black tracking-tighter uppercase">Home</span></button>

@@ -19,8 +19,6 @@ export default function DashboardCalendar({
 }: DashboardCalendarProps) {
 
   const shiftDays = shifts.map(s => parseISO(s.shift_date));
-  
-  // ✨ イベント日の判定 (10, 11, 22日)
   const eventDays = (date: Date) => [10, 11, 22].includes(getDate(date));
 
   const modifiers = {
@@ -31,27 +29,24 @@ export default function DashboardCalendar({
   };
 
   return (
-    <div className="flex justify-center p-1 bg-white rounded-xl overflow-hidden scale-95 origin-top">
+    <div className="flex justify-center p-1 bg-white rounded-xl overflow-hidden scale-100 origin-top">
       <style>{`
-        /* 基本の色 */
-        .rdp-day_selected { background-color: #fce7f3 !important; color: #ec4899 !important; font-weight: 900 !important; border: 2px solid #ec4899 !important; }
+        /* ✨ 数字を大きく、セルを広く (45px -> 48px) */
+        .rdp { --rdp-cell-size: 48px; margin: 0; }
+        .rdp-day { font-size: 16px; font-weight: 600; } 
         
-        /* 土曜日を青に */
+        .rdp-day_selected { background-color: #fce7f3 !important; color: #ec4899 !important; font-weight: 900 !important; border: 2px solid #ec4899 !important; }
         .rdp-day.isSaturday:not(.rdp-day_selected) { color: #3b82f6 !important; }
-        .rdp-head_cell:nth-child(6) { color: #3b82f6 !important; } /* 曜日の「土」 */
-
-        /* 日曜・祝日を赤に (祝日は暫定的に日曜と同じ扱いに設定) */
+        .rdp-head_cell:nth-child(6) { color: #3b82f6 !important; }
         .rdp-day.isSunday:not(.rdp-day_selected) { color: #ef4444 !important; }
-        .rdp-head_cell:nth-child(7) { color: #ef4444 !important; } /* 曜日の「日」 */
+        .rdp-head_cell:nth-child(7) { color: #ef4444 !important; }
 
-        /* ✨ イベント日のデザイン（数字の下にドット、または背景を薄く） */
         .isEvent:not(.rdp-day_selected) { 
-          background-color: #fffbeb; /* 薄い黄色 */
+          background-color: #fffbeb;
           font-weight: 900 !important;
           border-radius: 8px;
         }
 
-        /* シフトがある日（ピンクの丸） */
         .hasShift:not(.rdp-day_selected) {
           color: white !important;
           background-color: #ec4899 !important;
