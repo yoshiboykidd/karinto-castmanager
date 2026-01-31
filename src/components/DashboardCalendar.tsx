@@ -22,19 +22,21 @@ export default function DashboardCalendar({
   const eventDays = (date: Date) => [10, 11, 22].includes(date.getDate());
 
   return (
-    <div className="w-full flex justify-center p-1 bg-white rounded-xl overflow-hidden">
+    <div className="w-full flex justify-center p-1 bg-white rounded-xl overflow-hidden custom-calendar-root">
       <style>{`
-        /* 🚨 強制的に全ての丸を 12px の角丸四角へ */
-        .rdp-day, .rdp-button, .rdp-day_selected, .rdp-day_selected:hover {
+        /* ✨ カレンダー内の全要素から「円」を排除し「12pxの角丸」へ */
+        .custom-calendar-root .rdp-day, 
+        .custom-calendar-root .rdp-button, 
+        .custom-calendar-root .rdp-day_selected {
           border-radius: 12px !important;
           aspect-ratio: 1 / 1 !important;
         }
 
-        .rdp { --rdp-cell-size: 45px; margin: 0; }
-        .rdp-table { border-collapse: separate !important; border-spacing: 2px !important; }
-        .rdp-months { justify-content: center !important; }
+        .custom-calendar-root .rdp { --rdp-cell-size: 45px; margin: 0; }
+        .custom-calendar-root .rdp-table { border-collapse: separate !important; border-spacing: 2px !important; }
+        .custom-calendar-root .rdp-months { justify-content: center !important; }
 
-        .rdp-button {
+        .custom-calendar-root .rdp-button {
           width: 44px !important;
           height: 44px !important;
           font-size: 18px !important;
@@ -45,24 +47,29 @@ export default function DashboardCalendar({
           border: 3px solid transparent !important;
         }
 
-        /* 🟦 選択時：角丸の青い「枠線のみ」 */
-        .rdp-day_selected {
+        /* 🟦 選択時：青い「角丸の枠線」 */
+        .custom-calendar-root .rdp-day_selected {
           background-color: transparent !important;
           color: #3b82f6 !important;
           border: 3px solid #3b82f6 !important;
           box-shadow: none !important;
         }
 
-        /* 🌸 シフトあり：薄ピンク (特定日より優先) */
-        .hasShift { background-color: #fdf2f8 !important; color: #ec4899 !important; }
+        /* 🌸 シフトあり：薄ピンク */
+        .custom-calendar-root .hasShift {
+          background-color: #fdf2f8 !important;
+          color: #ec4899 !important;
+        }
 
-        /* 💡 特定日：薄黄色 (シフトなしの時のみ) */
-        .isEvent:not(.hasShift) { background-color: #fffbeb !important; }
+        /* 💡 特定日：薄黄色（シフトなし時のみ） */
+        .custom-calendar-root .isEvent:not(.hasShift) { 
+          background-color: #fffbeb !important;
+        }
 
-        .rdp-day.isSaturday:not(.rdp-day_selected) { color: #3b82f6 !important; }
-        .rdp-day.isSunday:not(.rdp-day_selected) { color: #ef4444 !important; }
-        .rdp-nav_button { color: #fda4af; border: none !important; }
-        .rdp-caption_label { font-weight: 900; color: #4b5563; font-size: 17px; }
+        .custom-calendar-root .rdp-day.isSaturday:not(.rdp-day_selected) { color: #3b82f6 !important; }
+        .custom-calendar-root .rdp-day.isSunday:not(.rdp-day_selected) { color: #ef4444 !important; }
+        .custom-calendar-root .rdp-nav_button { color: #fda4af; border: none !important; }
+        .custom-calendar-root .rdp-caption_label { font-weight: 900; color: #4b5563; font-size: 17px; }
       `}</style>
       <DayPicker
         mode="single"
