@@ -98,7 +98,7 @@ export default function Page() {
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
       <header className="bg-white px-5 pt-12 pb-5 rounded-b-[30px] shadow-sm border-b border-pink-100">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.1.6</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.1.7</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'Cast'}
           <span className="text-[24px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
@@ -113,26 +113,26 @@ export default function Page() {
 
       <main className="px-3 mt-3 space-y-3">
         
-        {/* ✨ 実績合計：1行固定 ＆ 数字ピンク版 */}
+        {/* ✨ 実績合計：1行固定・枠復活・数字ピンク・中央寄せ */}
         <section className="bg-[#FFE9ED] rounded-[24px] p-4 border border-pink-300 relative overflow-hidden shadow-sm">
           <span className="absolute -right-2 -top-6 text-[110px] font-black text-pink-200/20 italic select-none leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10 flex flex-col items-center">
             
-            <h2 className="text-[16px] font-black text-pink-500 mb-2 whitespace-nowrap tracking-tighter text-center">
+            <h2 className="text-[16px] font-black text-pink-500 mb-2 whitespace-nowrap tracking-tighter text-center leading-none">
               {format(viewDate, 'M月')}の実績合計
             </h2>
 
-            {/* ✨ 数字をピンク(text-pink-500)にし、1行(flex-nowrap)に収める */}
-            <div className="flex items-baseline justify-center gap-4 mb-3 w-full flex-nowrap">
-              <div className="flex items-baseline gap-1">
-                <span className="text-[11px] font-black text-gray-500">出勤</span>
-                <span className="text-2xl font-black text-pink-500 tracking-tighter">{monthlyTotals.count}</span>
-                <span className="text-[11px] font-black text-gray-500 italic">日</span>
+            {/* ✨ バッジ枠復活 ＆ 数字ピンク ＆ 1行維持 */}
+            <div className="flex items-center justify-center gap-2 mb-3 w-full flex-nowrap">
+              <div className="bg-white/90 border border-pink-200 px-3 py-1.5 rounded-2xl flex items-baseline gap-1 shadow-sm shrink-0">
+                <span className="text-[10px] font-black text-gray-400 leading-none">出勤</span>
+                <span className="text-2xl font-black text-pink-500 leading-none tracking-tighter">{monthlyTotals.count}</span>
+                <span className="text-[10px] font-black text-gray-400 leading-none italic">日</span>
               </div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-[11px] font-black text-gray-500">稼働</span>
-                <span className="text-2xl font-black text-pink-500 tracking-tighter">{Math.round(monthlyTotals.hours * 10) / 10}</span>
-                <span className="text-[11px] font-black text-gray-500 italic">h</span>
+              <div className="bg-white/90 border border-pink-200 px-3 py-1.5 rounded-2xl flex items-baseline gap-1 shadow-sm shrink-0">
+                <span className="text-[10px] font-black text-gray-400 leading-none">稼働</span>
+                <span className="text-2xl font-black text-pink-500 leading-none tracking-tighter">{Math.round(monthlyTotals.hours * 10) / 10}</span>
+                <span className="text-[10px] font-black text-gray-400 leading-none italic">h</span>
               </div>
             </div>
             
@@ -141,9 +141,9 @@ export default function Page() {
             </p>
 
             <div className="grid grid-cols-3 gap-1 w-full bg-white/80 rounded-xl py-3 border border-pink-200 text-center shadow-inner">
-              <div className="leading-none"><p className="text-[13px] text-pink-400 font-black mb-0.5">フリー</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.f}</p></div>
-              <div className="border-x border-pink-100 leading-none"><p className="text-[12px] text-pink-400 font-black mb-0.5">初指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.first}</p></div>
-              <div className="leading-none"><p className="text-[13px] text-pink-400 font-black mb-0.5">本指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.main}</p></div>
+              <div className="leading-none"><p className="text-[13px] text-pink-400 font-black mb-1">フリー</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.f}</p></div>
+              <div className="border-x border-pink-100 leading-none"><p className="text-[12px] text-pink-400 font-black mb-1">初指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.first}</p></div>
+              <div className="leading-none"><p className="text-[13px] text-pink-400 font-black mb-1">本指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.main}</p></div>
             </div>
           </div>
         </section>
@@ -156,7 +156,7 @@ export default function Page() {
           <section className="bg-white rounded-[24px] border border-purple-200 p-4 shadow-xl animate-in slide-in-from-bottom-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-black text-purple-600 text-[13px] uppercase tracking-widest">選択中: {multiDates.length}日</h3>
-              {multiDates.length > 0 && <button onClick={() => setMultiDates([])} className="text-[9px] font-black text-gray-300 uppercase border border-gray-100 px-2 py-1 rounded-md">リセット</button>}
+              {multiDates.length > 0 && <button onClick={() => setMultiDates([])} className="text-[9px] font-black text-gray-300 uppercase border border-gray-200 px-2 py-1 rounded-md">リセット</button>}
             </div>
             <div className="max-h-48 overflow-y-auto space-y-2 mb-4 pr-1">
               {multiDates.sort((a,b)=>a.getTime()-b.getTime()).map(d => {
@@ -218,7 +218,7 @@ export default function Page() {
             </div>
           ))}
         </section>
-        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 2.1.6</p>
+        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 2.1.7</p>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-sm">
