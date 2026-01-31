@@ -30,16 +30,13 @@ export default function Page() {
   async function fetchInitialData() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.push('/login'); return; }
-
     const loginId = session.user.email?.replace('@karinto-internal.com', '');
     const [castRes, shiftRes] = await Promise.all([
       supabase.from('cast_members').select('*').eq('login_id', loginId).single(),
       supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
     ]);
-    
     setCastProfile(castRes.data);
     setShifts(shiftRes.data || []);
-
     if (castRes.data) {
       const myShopId = castRes.data.HOME_shop_ID || 'main';
       const { data: newsData } = await supabase.from('news').select('*')
@@ -56,12 +53,11 @@ export default function Page() {
     }
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const shift = shifts.find(s => s.shift_date === dateStr);
-    // ✨ 0の場合は空文字にして消す手間を省く
     setEditReward({
-      f: shift?.f_count === 0 ? '' : (shift?.f_count ?? ''),
-      first: shift?.first_request_count === 0 ? '' : (shift?.first_request_count ?? ''),
-      main: shift?.main_request_count === 0 ? '' : (shift?.main_request_count ?? ''),
-      amount: shift?.reward_amount === 0 ? '' : (shift?.reward_amount ?? '')
+      f: (shift?.f_count === 0 || !shift) ? '' : shift.f_count,
+      first: (shift?.first_request_count === 0 || !shift) ? '' : shift.first_request_count,
+      main: (shift?.main_request_count === 0 || !shift) ? '' : shift.main_request_count,
+      amount: (shift?.reward_amount === 0 || !shift) ? '' : shift.reward_amount
     });
   }, [selectedDate, shifts]);
 
@@ -93,13 +89,22 @@ export default function Page() {
       };
     }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
 
+  // --- ✨ 保存時のチェック機能を強化 (ver 1.14.3) ---
   const handleSaveReward = async () => {
     if (!selectedDate) return;
+
+    // 「いずれか1つでも空欄（または未入力）」ならエラーを出す
+    // (0を入力したい場合は「0」と打つ必要があります)
+    if (editReward.f === '' || editReward.first === '' || editReward.main === '') {
+      alert('「フリー」「初指名」「本指名」の全てを入力してください（無い場合は 0 を入力）');
+      return;
+    }
+
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const { error } = await supabase.from('shifts').update({
-      f_count: Number(editReward.f) || 0,
-      first_request_count: Number(editReward.first) || 0,
-      main_request_count: Number(editReward.main) || 0,
+      f_count: Number(editReward.f),
+      first_request_count: Number(editReward.first),
+      main_request_count: Number(editReward.main),
       reward_amount: Number(editReward.amount) || 0
     }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr);
 
@@ -129,7 +134,6 @@ export default function Page() {
           <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none leading-none">
             {format(viewDate, 'M')}
           </span>
-
           <div className="relative z-10 mb-2">
             <h2 className="text-[18px] font-black text-pink-500 flex items-center gap-1.5 leading-none">
               <span className="bg-pink-500 text-white px-2 py-1 rounded-lg text-sm">{format(viewDate, 'M月')}</span>
@@ -148,11 +152,9 @@ export default function Page() {
               </div>
             </div>
           </div>
-          
-          <p className="text-[44px] font-black text-pink-500 tracking-tighter mb-3 text-center leading-none relative z-10 drop-shadow-sm">
+          <p className="text-[44px] font-black text-pink-500 tracking-tighter mb-3 text-center leading-none relative z-10">
             <span className="text-lg mr-0.5 font-bold">¥</span>{monthlyTotals.amount.toLocaleString()}
           </p>
-
           <div className="flex justify-between items-center bg-white/80 rounded-xl py-1.5 border border-pink-200 relative z-10">
             {[
               { label: 'フリー', value: monthlyTotals.f },
@@ -178,7 +180,7 @@ export default function Page() {
           />
         </section>
 
-        {/* 3. ✍️ 実績入力フォーム (✨ 日付拡大 & 入力改善) */}
+        {/* 3. ✍️ 実績入力フォーム */}
         <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden">
           <div className="bg-[#FFF5F6] p-3 px-4 border-b border-pink-100 flex justify-between items-center">
             <h3 className="text-[17px] font-black text-gray-800 leading-none">
@@ -198,14 +200,17 @@ export default function Page() {
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-3 gap-2">
                 {['f', 'first', 'main'].map((key) => (
-                  <div key={key} className="space-y-1 text-center">
-                    <label className="text-[10px] font-bold text-gray-400 block tracking-tighter leading-none">{key === 'f' ? 'フリー' : key === 'first' ? '初指名' : '本指名'}</label>
+                  <div key={key} className="space-y-1.5 text-center">
+                    {/* ✨ 文言を大きく、黒字（text-gray-900）に */}
+                    <label className="text-[13px] font-black text-gray-900 block tracking-tighter leading-none">
+                      {key === 'f' ? 'フリー' : key === 'first' ? '初指名' : '本指名'}
+                    </label>
                     <input 
                       type="number" 
                       inputMode="numeric" 
-                      placeholder="0" // ✨ 0のときはこれが出る
+                      placeholder="0"
                       value={editReward[key as keyof typeof editReward]} 
-                      onFocus={(e) => e.target.select()} // ✨ タップで全選択（すぐ書き換えられる）
+                      onFocus={(e) => e.target.select()}
                       onChange={e => setEditReward({...editReward, [key]: e.target.value})} 
                       className="w-full text-center py-2 bg-[#FAFAFA] rounded-lg font-black text-[24px] text-pink-500 border border-gray-100 focus:outline-none focus:ring-0 focus:border-pink-300 transition-colors placeholder:text-gray-200" 
                     />
@@ -213,9 +218,8 @@ export default function Page() {
                 ))}
               </div>
               
-              {/* ✨ お給料入力：中央揃え & 自動調整 */}
               <div className="bg-pink-50/30 p-3 rounded-xl border border-pink-100 flex flex-col items-center justify-center">
-                <label className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">本日の給料</label>
+                <label className="text-[11px] font-black text-pink-400 uppercase tracking-widest mb-1">本日の給料実績</label>
                 <div className="flex items-center justify-center w-full">
                   <span className="text-pink-200 text-2xl font-black mr-1 translate-y-[2px]">¥</span>
                   <input 
@@ -225,7 +229,7 @@ export default function Page() {
                     value={editReward.amount ? Number(editReward.amount).toLocaleString() : ''} 
                     onFocus={(e) => e.target.select()}
                     onChange={e => { const val = e.target.value.replace(/,/g, ''); if (/^\d*$/.test(val)) setEditReward({...editReward, amount: val}); }} 
-                    className="w-auto min-w-[100px] text-center bg-transparent font-black text-[32px] text-pink-500 focus:outline-none focus:ring-0 border-none placeholder:text-gray-200" 
+                    className="w-auto min-w-[120px] text-center bg-transparent font-black text-[32px] text-pink-500 focus:outline-none focus:ring-0 border-none placeholder:text-gray-200" 
                   />
                 </div>
               </div>
@@ -235,22 +239,8 @@ export default function Page() {
           ) : <div className="p-8 text-center bg-white italic text-gray-300 text-[10px]">カレンダーの日付を選択すると入力できます</div>}
         </section>
 
-        {/* 📢 NEWS */}
-        <section className="bg-white rounded-[22px] overflow-hidden border border-pink-100 shadow-sm opacity-90">
-          <div className="bg-gray-50 p-2 px-4 border-b border-gray-100 flex justify-between items-center">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Shop News</p>
-            <span className="text-[8px] font-bold text-pink-300">LATEST</span>
-          </div>
-          {newsList.length > 0 ? newsList.map((news) => (
-            <div key={news.id} className="p-3 px-4 text-left flex items-start space-x-3 border-b border-gray-50 last:border-0">
-              <span className="text-[9px] text-pink-200 font-bold shrink-0 mt-0.5">{format(parseISO(news.created_at), 'MM/dd')}</span>
-              <p className="text-xs font-bold text-gray-500 leading-tight">{news.content}</p>
-            </div>
-          )) : <p className="p-4 text-center text-gray-300 text-[10px] italic leading-none">お知らせはありません</p>}
-        </section>
-
         <div className="pt-4 pb-2 text-center">
-          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.14.2</p>
+          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.14.3</p>
         </div>
       </main>
 
