@@ -24,8 +24,8 @@ export default function DashboardCalendar({
   const isEventDay = (date: Date) => [10, 11, 22].includes(date.getDate());
 
   const commonProps = {
-    month: month,
-    onMonthChange: onMonthChange,
+    month,
+    onMonthChange,
     locale: ja,
     modifiers: {
       hasShift: shiftDays,
@@ -53,25 +53,15 @@ export default function DashboardCalendar({
         .rdp-button { font-size: 18px !important; font-weight: 800 !important; }
         .rdp-caption { display: flex !important; justify-content: center !important; align-items: center !important; position: relative !important; height: 36px; }
         .rdp-caption_label { font-weight: 900; color: #4b5563; font-size: 18px !important; }
-
         .hasShift:not(.rdp-day_selected) { background-color: #fdf2f8 !important; color: #ec4899 !important; border-radius: 12px !important; }
         .isRequested:not(.rdp-day_selected) { border: 2px dashed #fda4af !important; border-radius: 12px !important; }
         .isEvent:not(.hasShift):not(.rdp-day_selected) { background-color: #fffbeb !important; border-radius: 8px !important; }
-
-        /* 実績モード：青い丸 */
         .rdp-day_selected:not(.is-request-ui) { background-color: #3b82f6 !important; color: white !important; border-radius: 50% !important; }
-        
-        /* 申請モード：紫の角丸を強化 */
-        .is-request-ui .rdp-day_selected {
-          background-color: #f3e8ff !important; color: #a855f7 !important;
-          border: 2px solid #a855f7 !important; border-radius: 12px !important;
-        }
-
+        .is-request-ui .rdp-day_selected { background-color: #f3e8ff !important; color: #a855f7 !important; border: 2px solid #a855f7 !important; border-radius: 12px !important; }
         .rdp-day.isSaturday:not(.rdp-day_selected) { color: #3b82f6 !important; }
         .rdp-day.isSunday:not(.rdp-day_selected) { color: #ef4444 !important; }
         .rdp-nav_button { color: #fda4af; }
       `}</style>
-
       {isRequestMode ? (
         <DayPicker mode="multiple" selected={selectedDates as Date[]} onSelect={onSelect} className="is-request-ui" {...commonProps} />
       ) : (
