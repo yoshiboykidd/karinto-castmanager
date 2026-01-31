@@ -98,7 +98,7 @@ export default function Page() {
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
       <header className="bg-white px-5 pt-12 pb-5 rounded-b-[30px] shadow-sm border-b border-pink-100">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.1.5</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.1.6</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'Cast'}
           <span className="text-[24px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
@@ -113,45 +113,42 @@ export default function Page() {
 
       <main className="px-3 mt-3 space-y-3">
         
-        {/* ✨ 実績合計：中央寄せ & サイズアップ版 */}
+        {/* ✨ 実績合計：1行固定 ＆ 数字ピンク版 */}
         <section className="bg-[#FFE9ED] rounded-[24px] p-4 border border-pink-300 relative overflow-hidden shadow-sm">
           <span className="absolute -right-2 -top-6 text-[110px] font-black text-pink-200/20 italic select-none leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10 flex flex-col items-center">
             
-            {/* 1. タイトル中央寄せ */}
-            <h2 className="text-[17px] font-black text-pink-500 mb-3 whitespace-nowrap tracking-tighter text-center">
+            <h2 className="text-[16px] font-black text-pink-500 mb-2 whitespace-nowrap tracking-tighter text-center">
               {format(viewDate, 'M月')}の実績合計
             </h2>
 
-            {/* 2. 出勤・稼働バッジを中央寄せ ＆ 大きく */}
-            <div className="flex gap-2 mb-4 justify-center w-full">
-              <div className="bg-pink-400 px-4 py-2 rounded-2xl border border-pink-300 flex items-baseline gap-1 shadow-md shrink-0">
-                <span className="text-[11px] font-black text-white leading-none">出勤</span>
-                <span className="text-2xl font-black text-white leading-none tracking-tighter">{monthlyTotals.count}</span>
-                <span className="text-[11px] font-black text-white leading-none italic">日</span>
+            {/* ✨ 数字をピンク(text-pink-500)にし、1行(flex-nowrap)に収める */}
+            <div className="flex items-baseline justify-center gap-4 mb-3 w-full flex-nowrap">
+              <div className="flex items-baseline gap-1">
+                <span className="text-[11px] font-black text-gray-500">出勤</span>
+                <span className="text-2xl font-black text-pink-500 tracking-tighter">{monthlyTotals.count}</span>
+                <span className="text-[11px] font-black text-gray-500 italic">日</span>
               </div>
-              <div className="bg-pink-400 px-4 py-2 rounded-2xl border border-pink-300 flex items-baseline gap-1 shadow-md shrink-0">
-                <span className="text-[11px] font-black text-white leading-none">稼働</span>
-                <span className="text-2xl font-black text-white leading-none tracking-tighter">{Math.round(monthlyTotals.hours * 10) / 10}</span>
-                <span className="text-[11px] font-black text-white leading-none italic">h</span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-[11px] font-black text-gray-500">稼働</span>
+                <span className="text-2xl font-black text-pink-500 tracking-tighter">{Math.round(monthlyTotals.hours * 10) / 10}</span>
+                <span className="text-[11px] font-black text-gray-500 italic">h</span>
               </div>
             </div>
             
-            {/* 金額デカ文字 */}
             <p className="text-[52px] font-black text-pink-500 text-center mb-4 leading-none tracking-tighter">
               <span className="text-2xl mr-1 leading-none">¥</span>{monthlyTotals.amount.toLocaleString()}
             </p>
 
-            {/* フリー・初指名・本指名 内訳 */}
             <div className="grid grid-cols-3 gap-1 w-full bg-white/80 rounded-xl py-3 border border-pink-200 text-center shadow-inner">
-              <div className="leading-none"><p className="text-[13px] text-pink-400 font-black mb-1">フリー</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.f}</p></div>
-              <div className="border-x border-pink-100 leading-none"><p className="text-[12px] text-pink-400 font-black mb-1">初指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.first}</p></div>
-              <div className="leading-none"><p className="text-[13px] text-pink-400 font-black mb-1">本指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.main}</p></div>
+              <div className="leading-none"><p className="text-[13px] text-pink-400 font-black mb-0.5">フリー</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.f}</p></div>
+              <div className="border-x border-pink-100 leading-none"><p className="text-[12px] text-pink-400 font-black mb-0.5">初指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.first}</p></div>
+              <div className="leading-none"><p className="text-[13px] text-pink-400 font-black mb-0.5">本指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.main}</p></div>
             </div>
           </div>
         </section>
 
-        <section className="bg-white p-1 rounded-[22px] border border-pink-200 shadow-sm overflow-hidden">
+        <section className="bg-white p-1 rounded-[22px] border border-pink-200 shadow-sm overflow-hidden text-center">
           <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={(v:any)=>isRequestMode?setMultiDates(v||[]):setSingleDate(v)} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
         </section>
 
@@ -212,16 +209,16 @@ export default function Page() {
           </section>
         )}
 
-        <section className="bg-white rounded-[22px] border border-pink-100 shadow-sm overflow-hidden opacity-90">
-          <div className="bg-gray-50 p-2 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 text-left">Shop News</div>
+        <section className="bg-white rounded-[22px] border border-pink-100 shadow-sm overflow-hidden opacity-90 text-left">
+          <div className="bg-gray-50 p-2 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Shop News</div>
           {newsList.map((n) => (
-            <div key={n.id} className="p-3 px-4 border-b border-gray-50 last:border-0 flex gap-3 items-start text-left">
+            <div key={n.id} className="p-3 px-4 border-b border-gray-50 last:border-0 flex gap-3 items-start">
               <span className="text-[9px] text-pink-200 font-bold mt-0.5 shrink-0">{format(parseISO(n.created_at), 'MM/dd')}</span>
               <p className="text-xs font-bold text-gray-900 leading-tight">{n.content}</p>
             </div>
           ))}
         </section>
-        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 2.1.5</p>
+        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 2.1.6</p>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-sm">
