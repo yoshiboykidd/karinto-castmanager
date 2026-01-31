@@ -31,45 +31,44 @@ export default function DashboardCalendar({
   return (
     <div className="w-full flex justify-center p-1 bg-white rounded-xl">
       <style>{`
-        /* ✨ 全ての枠線を完全に消去 */
         .rdp { --rdp-cell-size: 45px; margin: 0; border: none !important; }
         .rdp-table { border-collapse: collapse !important; border: 0 !important; }
         .rdp-cell { border: 0 !important; padding: 0 !important; }
-        .rdp-button { border: 0 !important; outline: none !important; }
-        .rdp-day { border: 0 !important; }
-        
-        /* 7列レイアウトの安定 */
         .rdp-months { justify-content: center !important; }
 
-        /* 数字と円の設定 */
+        /* ✨ 全てを統一の角丸（12px）へ */
         .rdp-button {
           width: 44px !important;
           height: 44px !important;
-          border-radius: 50% !important;
+          border-radius: 12px !important; /* 角丸に統一 */
           font-size: 18px !important;
           font-weight: 800 !important;
           display: flex !important;
           align-items: center !important;
           justify-content: center !important;
+          transition: all 0.2s ease;
         }
 
-        /* シフトあり（桜色） */
+        /* シフトあり（桜色の角丸） */
         .hasShift:not(.rdp-day_selected) {
           background-color: #fdf2f8 !important;
           color: #ec4899 !important;
+          border-radius: 12px !important;
         }
 
-        /* 選択時（青丸） */
+        /* 選択時（青い角丸：ピンクを完全に覆う） */
         .rdp-day_selected {
           background-color: #3b82f6 !important;
           color: white !important;
           box-shadow: 0 0 0 3px #3b82f6;
+          border-radius: 12px !important;
           z-index: 10;
         }
 
         .rdp-day.isSaturday:not(.rdp-day_selected) { color: #3b82f6 !important; }
         .rdp-day.isSunday:not(.rdp-day_selected) { color: #ef4444 !important; }
         
+        /* 特定日（黄色い角丸） */
         .isEvent:not(.rdp-day_selected):not(.hasShift) { 
           background-color: #fffbeb !important;
           border-radius: 12px !important;

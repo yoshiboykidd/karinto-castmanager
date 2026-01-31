@@ -89,17 +89,12 @@ export default function Page() {
       };
     }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
 
-  // --- ✨ 保存時のチェック機能を強化 (ver 1.14.3) ---
   const handleSaveReward = async () => {
     if (!selectedDate) return;
-
-    // 「いずれか1つでも空欄（または未入力）」ならエラーを出す
-    // (0を入力したい場合は「0」と打つ必要があります)
     if (editReward.f === '' || editReward.first === '' || editReward.main === '') {
       alert('「フリー」「初指名」「本指名」の全てを入力してください（無い場合は 0 を入力）');
       return;
     }
-
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const { error } = await supabase.from('shifts').update({
       f_count: Number(editReward.f),
@@ -107,7 +102,6 @@ export default function Page() {
       main_request_count: Number(editReward.main),
       reward_amount: Number(editReward.amount) || 0
     }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr);
-
     if (error) { alert('保存に失敗しました'); } 
     else { fetchInitialData(); alert('保存しました！💰'); }
   };
@@ -180,7 +174,7 @@ export default function Page() {
           />
         </section>
 
-        {/* 3. ✍️ 実績入力フォーム */}
+        {/* 3. ✍️ 実績入力フォーム (✨ 報酬1行 & ボタン拡大) */}
         <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden">
           <div className="bg-[#FFF5F6] p-3 px-4 border-b border-pink-100 flex justify-between items-center">
             <h3 className="text-[17px] font-black text-gray-800 leading-none">
@@ -193,7 +187,7 @@ export default function Page() {
               ) : '日付を選択してください'}
             </h3>
             <div className="text-lg font-black text-pink-500 tracking-tighter leading-none">
-              {selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-[9px] font-bold text-gray-300 uppercase px-1.5 py-0.5 bg-gray-50 rounded">OFF</span>}
+              {selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-[9px] font-bold text-gray-400 uppercase px-1.5 py-0.5 bg-gray-50 rounded">OFF</span>}
             </div>
           </div>
           {selectedShift ? (
@@ -201,7 +195,6 @@ export default function Page() {
               <div className="grid grid-cols-3 gap-2">
                 {['f', 'first', 'main'].map((key) => (
                   <div key={key} className="space-y-1.5 text-center">
-                    {/* ✨ 文言を大きく、黒字（text-gray-900）に */}
                     <label className="text-[13px] font-black text-gray-900 block tracking-tighter leading-none">
                       {key === 'f' ? 'フリー' : key === 'first' ? '初指名' : '本指名'}
                     </label>
@@ -218,9 +211,10 @@ export default function Page() {
                 ))}
               </div>
               
-              <div className="bg-pink-50/30 p-3 rounded-xl border border-pink-100 flex flex-col items-center justify-center">
-                <label className="text-[11px] font-black text-pink-400 uppercase tracking-widest mb-1">本日の給料実績</label>
-                <div className="flex items-center justify-center w-full">
+              {/* ✨ 本日の報酬（横1行スリム版） */}
+              <div className="bg-pink-50/30 p-3 rounded-xl border border-pink-100 flex items-center justify-between h-[64px]">
+                <label className="text-[13px] font-black text-gray-900 uppercase tracking-widest shrink-0">本日の報酬</label>
+                <div className="flex items-center justify-end flex-1 pl-4">
                   <span className="text-pink-200 text-2xl font-black mr-1 translate-y-[2px]">¥</span>
                   <input 
                     type="text" 
@@ -229,21 +223,23 @@ export default function Page() {
                     value={editReward.amount ? Number(editReward.amount).toLocaleString() : ''} 
                     onFocus={(e) => e.target.select()}
                     onChange={e => { const val = e.target.value.replace(/,/g, ''); if (/^\d*$/.test(val)) setEditReward({...editReward, amount: val}); }} 
-                    className="w-auto min-w-[120px] text-center bg-transparent font-black text-[32px] text-pink-500 focus:outline-none focus:ring-0 border-none placeholder:text-gray-200" 
+                    className="w-full text-right bg-transparent font-black text-[32px] text-pink-500 focus:outline-none focus:ring-0 border-none placeholder:text-gray-200" 
                   />
                 </div>
               </div>
 
-              <button onClick={handleSaveReward} className="w-full bg-pink-500 text-white font-black py-4 rounded-xl shadow-lg active:scale-95 transition-all text-xs tracking-[0.2em] uppercase">実績を保存 💾</button>
+              {/* ✨ ボタンを大きく (py-5, text-lg) */}
+              <button onClick={handleSaveReward} className="w-full bg-pink-500 text-white font-black py-5 rounded-xl shadow-lg active:scale-95 transition-all text-lg tracking-[0.2em] uppercase">実績を保存 💾</button>
             </div>
           ) : <div className="p-8 text-center bg-white italic text-gray-300 text-[10px]">カレンダーの日付を選択すると入力できます</div>}
         </section>
 
         <div className="pt-4 pb-2 text-center">
-          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.14.3</p>
+          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.14.4</p>
         </div>
       </main>
 
+      {/* フッター省略 */}
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
         <nav className="flex justify-around items-center max-w-sm mx-auto px-4">
           <button className="flex flex-col items-center text-pink-500" onClick={() => router.push('/')}><span className="text-xl mb-0.5">🏠</span><span className="text-[9px] font-black tracking-tighter uppercase">Home</span></button>
