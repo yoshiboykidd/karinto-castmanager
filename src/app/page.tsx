@@ -46,6 +46,7 @@ export default function Page() {
     setLoading(false);
   }
 
+  // ✨ データ読み込み時、0 は '' に変換してグレーアウト状態にする
   useEffect(() => {
     if (!selectedDate) {
       setEditReward({ f: '', first: '', main: '', amount: '' });
@@ -174,7 +175,7 @@ export default function Page() {
           />
         </section>
 
-        {/* 3. ✍️ 実績入力フォーム (✨ 報酬1行 & ボタン拡大) */}
+        {/* 3. ✍️ 実績入力フォーム */}
         <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden">
           <div className="bg-[#FFF5F6] p-3 px-4 border-b border-pink-100 flex justify-between items-center">
             <h3 className="text-[17px] font-black text-gray-800 leading-none">
@@ -187,7 +188,7 @@ export default function Page() {
               ) : '日付を選択してください'}
             </h3>
             <div className="text-lg font-black text-pink-500 tracking-tighter leading-none">
-              {selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-[9px] font-bold text-gray-400 uppercase px-1.5 py-0.5 bg-gray-50 rounded">OFF</span>}
+              {selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-[9px] font-bold text-gray-300 uppercase px-1.5 py-0.5 bg-gray-50 rounded">OFF</span>}
             </div>
           </div>
           {selectedShift ? (
@@ -211,7 +212,6 @@ export default function Page() {
                 ))}
               </div>
               
-              {/* ✨ 本日の報酬（横1行スリム版） */}
               <div className="bg-pink-50/30 p-3 rounded-xl border border-pink-100 flex items-center justify-between h-[64px]">
                 <label className="text-[13px] font-black text-gray-900 uppercase tracking-widest shrink-0">本日の報酬</label>
                 <div className="flex items-center justify-end flex-1 pl-4">
@@ -228,18 +228,16 @@ export default function Page() {
                 </div>
               </div>
 
-              {/* ✨ ボタンを大きく (py-5, text-lg) */}
               <button onClick={handleSaveReward} className="w-full bg-pink-500 text-white font-black py-5 rounded-xl shadow-lg active:scale-95 transition-all text-lg tracking-[0.2em] uppercase">実績を保存 💾</button>
             </div>
           ) : <div className="p-8 text-center bg-white italic text-gray-300 text-[10px]">カレンダーの日付を選択すると入力できます</div>}
         </section>
 
         <div className="pt-4 pb-2 text-center">
-          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.14.4</p>
+          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.14.5</p>
         </div>
       </main>
 
-      {/* フッター省略 */}
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
         <nav className="flex justify-around items-center max-w-sm mx-auto px-4">
           <button className="flex flex-col items-center text-pink-500" onClick={() => router.push('/')}><span className="text-xl mb-0.5">🏠</span><span className="text-[9px] font-black tracking-tighter uppercase">Home</span></button>
