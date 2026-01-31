@@ -82,7 +82,6 @@ export default function Page() {
   };
 
   if (loading) return (
-    /* ✨ 以前好評だった読み込み画面のスタイルに復元 */
     <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center">
       <div className="text-pink-300 font-black tracking-tighter text-3xl italic animate-pulse">KARINTO...</div>
     </div>
@@ -93,47 +92,47 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
-      {/* 1. Header: ツール名、名前＋さん⛄️、お疲れ様です🍵 */}
+      {/* 1. Header: ツール名 + 名前⛄️ + 挨拶 */}
       <header className="bg-white px-5 pt-12 pb-6 rounded-b-[30px] shadow-sm border-b border-pink-100">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 1.4.1</p>
-        <h1 className="text-3xl font-black flex items-baseline gap-1.5">
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 1.4.2</p>
+        <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'Cast'}
-          <span className="text-[20px] text-pink-400 font-bold italic">さん⛄️</span>
+          <span className="text-[20px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
         </h1>
-        <p className="text-[13px] font-bold text-gray-500 mt-0.5 ml-0.5">お疲れ様です🍵</p>
+        <p className="text-[13px] font-bold text-gray-500 mt-1 ml-0.5 tracking-tighter leading-none">お疲れ様です🍵</p>
       </header>
 
       <main className="px-3 mt-4 space-y-4">
         
-        {/* 2. Monthly Summary Section */}
+        {/* 2. Monthly Summary Section: タイトルとバッジを強制1行化 */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-4 border border-pink-300 relative overflow-hidden shadow-sm">
           <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10">
-            <div className="flex flex-col items-center gap-3 mb-4">
-              <h2 className="text-[17px] font-black text-pink-500 whitespace-nowrap">{format(viewDate, 'M月')}の実績合計</h2>
-              {/* ✨ 画面幅が狭くても1行に収まるように調整 (flex-nowrap) */}
-              <div className="flex gap-1.5 w-full justify-center">
-                <div className="bg-pink-400 px-3 py-1.5 rounded-2xl border border-pink-300 flex items-baseline gap-1 shadow-md shrink-0">
-                  <span className="text-[10px] font-black text-white">出勤</span>
-                  <span className="text-xl font-black text-white leading-none">{monthlyTotals.count}</span>
-                  <span className="text-[10px] font-black text-white">日</span>
+            {/* ✨ タイトル + バッジを横一列に詰め込み */}
+            <div className="flex items-center justify-between gap-1 mb-4">
+              <h2 className="text-[14px] font-black text-pink-500 whitespace-nowrap shrink-0">{format(viewDate, 'M月')}の合計実績</h2>
+              <div className="flex gap-1">
+                <div className="bg-pink-400 px-2 py-1.5 rounded-xl border border-pink-300 flex items-baseline gap-0.5 shadow-md shrink-0">
+                  <span className="text-[9px] font-black text-white leading-none">出勤</span>
+                  <span className="text-[16px] font-black text-white leading-none tracking-tighter">{monthlyTotals.count}</span>
+                  <span className="text-[9px] font-black text-white leading-none">日</span>
                 </div>
-                <div className="bg-pink-400 px-3 py-1.5 rounded-2xl border border-pink-300 flex items-baseline gap-1 shadow-md shrink-0">
-                  <span className="text-[10px] font-black text-white">稼働</span>
-                  <span className="text-xl font-black text-white leading-none">{Math.round(monthlyTotals.hours * 10) / 10}</span>
-                  <span className="text-[10px] font-black text-white">h</span>
+                <div className="bg-pink-400 px-2 py-1.5 rounded-xl border border-pink-300 flex items-baseline gap-0.5 shadow-md shrink-0">
+                  <span className="text-[9px] font-black text-white leading-none">稼働</span>
+                  <span className="text-[16px] font-black text-white leading-none tracking-tighter">{Math.round(monthlyTotals.hours * 10) / 10}</span>
+                  <span className="text-[9px] font-black text-white leading-none">h</span>
                 </div>
               </div>
             </div>
             
             <p className="text-[48px] font-black text-pink-500 text-center mb-4 leading-none tracking-tighter">
-              <span className="text-2xl mr-1">¥</span>{monthlyTotals.amount.toLocaleString()}
+              <span className="text-2xl mr-1 leading-none">¥</span>{monthlyTotals.amount.toLocaleString()}
             </p>
 
             <div className="grid grid-cols-3 gap-1 bg-white/80 rounded-xl py-3 border border-pink-200 text-center shadow-inner">
-              <div><p className="text-[12px] text-pink-400 font-black mb-0.5 leading-none">フリー</p><p className="text-2xl font-black text-pink-600">{monthlyTotals.f}</p></div>
-              <div className="border-x border-pink-100"><p className="text-[12px] text-pink-400 font-black mb-0.5 leading-none">初指名</p><p className="text-2xl font-black text-pink-600">{monthlyTotals.first}</p></div>
-              <div><p className="text-[12px] text-pink-400 font-black mb-0.5 leading-none">本指名</p><p className="text-2xl font-black text-pink-600">{monthlyTotals.main}</p></div>
+              <div><p className="text-[12px] text-pink-400 font-black mb-0.5 leading-none tracking-tighter">フリー</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.f}</p></div>
+              <div className="border-x border-pink-100"><p className="text-[12px] text-pink-400 font-black mb-0.5 leading-none tracking-tighter">初指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.first}</p></div>
+              <div><p className="text-[12px] text-pink-400 font-black mb-0.5 leading-none tracking-tighter">本指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.main}</p></div>
             </div>
           </div>
         </section>
@@ -147,7 +146,7 @@ export default function Page() {
         <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden">
           <div className="bg-[#FFF5F6] p-3 px-4 flex justify-center items-center h-[42px] border-b border-pink-100 relative">
             <h3 className="text-[17px] font-black text-gray-800">{selectedDate ? format(selectedDate, 'M/d (eee)', { locale: ja }) : ''}</h3>
-            <span className="absolute right-4 text-pink-500 font-black text-lg tracking-tighter">{selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-xs text-gray-300 font-bold uppercase">OFF</span>}</span>
+            <span className="absolute right-4 text-pink-500 font-black text-lg tracking-tighter leading-none">{selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-xs text-gray-300 font-bold uppercase">OFF</span>}</span>
           </div>
           {selectedShift && (
             <div className="p-4 space-y-4">
@@ -160,9 +159,9 @@ export default function Page() {
                 ))}
               </div>
               <div className="bg-pink-50/30 p-3 rounded-xl border border-pink-100 flex items-center justify-between h-[64px]">
-                <label className="text-[13px] font-black shrink-0 text-gray-900 uppercase tracking-widest">本日の報酬</label>
+                <label className="text-[13px] font-black shrink-0 text-gray-900 uppercase tracking-widest leading-none">本日の報酬</label>
                 <div className="flex items-center flex-1 justify-end pl-4">
-                  <span className="text-pink-200 text-2xl font-black mr-1 translate-y-[2px]">¥</span>
+                  <span className="text-pink-200 text-2xl font-black mr-1 translate-y-[2px] leading-none">¥</span>
                   <input type="text" inputMode="numeric" placeholder="0" value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} onFocus={e=>e.target.select()} onChange={e=>{const v=e.target.value.replace(/,/g,''); if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});}} className={`w-full text-right bg-transparent font-black text-[32px] focus:ring-0 border-none ${editReward.amount===''?'text-gray-200':'text-pink-500'}`} />
                 </div>
               </div>
@@ -177,13 +176,12 @@ export default function Page() {
           {newsList.map((n) => (
             <div key={n.id} className="p-3 px-4 border-b border-gray-50 last:border-0 flex gap-3 items-start">
               <span className="text-[9px] text-pink-200 font-bold mt-0.5 shrink-0">{format(parseISO(n.created_at), 'MM/dd')}</span>
-              {/* ✨ ニュース内容を黒字 (text-gray-900) に修正 */}
               <p className="text-xs font-bold text-gray-900 leading-tight">{n.content}</p>
             </div>
           ))}
         </section>
 
-        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 1.4.1</p>
+        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 1.4.2</p>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
