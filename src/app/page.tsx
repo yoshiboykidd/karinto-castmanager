@@ -98,7 +98,7 @@ export default function Page() {
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
       <header className="bg-white px-5 pt-12 pb-5 rounded-b-[30px] shadow-sm border-b border-pink-100">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.1.7</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.1.8</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'Cast'}
           <span className="text-[24px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
@@ -113,25 +113,25 @@ export default function Page() {
 
       <main className="px-3 mt-3 space-y-3">
         
-        {/* ✨ 実績合計：1行固定・枠復活・数字ピンク・中央寄せ */}
+        {/* ✨ 実績合計：中央寄せ固定 ＆ 1行死守 ＆ 色味復元 */}
         <section className="bg-[#FFE9ED] rounded-[24px] p-4 border border-pink-300 relative overflow-hidden shadow-sm">
           <span className="absolute -right-2 -top-6 text-[110px] font-black text-pink-200/20 italic select-none leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10 flex flex-col items-center">
             
-            <h2 className="text-[16px] font-black text-pink-500 mb-2 whitespace-nowrap tracking-tighter text-center leading-none">
+            <h2 className="text-[16px] font-black text-pink-500 mb-2.5 tracking-tighter text-center leading-none">
               {format(viewDate, 'M月')}の実績合計
             </h2>
 
-            {/* ✨ バッジ枠復活 ＆ 数字ピンク ＆ 1行維持 */}
-            <div className="flex items-center justify-center gap-2 mb-3 w-full flex-nowrap">
-              <div className="bg-white/90 border border-pink-200 px-3 py-1.5 rounded-2xl flex items-baseline gap-1 shadow-sm shrink-0">
+            {/* ✨ 1行固定のためのflex設定 ＆ バッジ枠復活 */}
+            <div className="flex items-center justify-center gap-1.5 mb-3.5 w-full">
+              <div className="bg-white border border-pink-200 px-2.5 py-1.5 rounded-2xl flex items-baseline gap-0.5 shadow-sm">
                 <span className="text-[10px] font-black text-gray-400 leading-none">出勤</span>
-                <span className="text-2xl font-black text-pink-500 leading-none tracking-tighter">{monthlyTotals.count}</span>
+                <span className="text-[22px] font-black text-pink-500 leading-none tracking-tighter">{monthlyTotals.count}</span>
                 <span className="text-[10px] font-black text-gray-400 leading-none italic">日</span>
               </div>
-              <div className="bg-white/90 border border-pink-200 px-3 py-1.5 rounded-2xl flex items-baseline gap-1 shadow-sm shrink-0">
+              <div className="bg-white border border-pink-200 px-2.5 py-1.5 rounded-2xl flex items-baseline gap-0.5 shadow-sm">
                 <span className="text-[10px] font-black text-gray-400 leading-none">稼働</span>
-                <span className="text-2xl font-black text-pink-500 leading-none tracking-tighter">{Math.round(monthlyTotals.hours * 10) / 10}</span>
+                <span className="text-[22px] font-black text-pink-500 leading-none tracking-tighter">{Math.round(monthlyTotals.hours * 10) / 10}</span>
                 <span className="text-[10px] font-black text-gray-400 leading-none italic">h</span>
               </div>
             </div>
@@ -218,7 +218,7 @@ export default function Page() {
             </div>
           ))}
         </section>
-        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 2.1.7</p>
+        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 2.1.8</p>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-sm">
