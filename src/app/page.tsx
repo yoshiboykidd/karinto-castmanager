@@ -56,11 +56,12 @@ export default function Page() {
     }
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const shift = shifts.find(s => s.shift_date === dateStr);
+    // ✨ 0の場合は空文字にして消す手間を省く
     setEditReward({
-      f: shift?.f_count ?? '',
-      first: shift?.first_request_count ?? '',
-      main: shift?.main_request_count ?? '',
-      amount: shift?.reward_amount ?? ''
+      f: shift?.f_count === 0 ? '' : (shift?.f_count ?? ''),
+      first: shift?.first_request_count === 0 ? '' : (shift?.first_request_count ?? ''),
+      main: shift?.main_request_count === 0 ? '' : (shift?.main_request_count ?? ''),
+      amount: shift?.reward_amount === 0 ? '' : (shift?.reward_amount ?? '')
     });
   }, [selectedDate, shifts]);
 
@@ -112,6 +113,7 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
+      
       <header className="bg-white px-5 pt-12 pb-6 rounded-b-[30px] shadow-sm border-b border-pink-100">
         <h1 className="text-3xl font-black text-gray-800 tracking-tighter flex items-baseline gap-1">
           {castProfile?.display_name || 'Cast'}
@@ -121,10 +123,13 @@ export default function Page() {
       </header>
 
       <main className="px-3 mt-4 space-y-4">
+        
+        {/* 1. 💰 合計金額枠 */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-4 border border-pink-300 shadow-sm relative overflow-hidden">
           <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none leading-none">
             {format(viewDate, 'M')}
           </span>
+
           <div className="relative z-10 mb-2">
             <h2 className="text-[18px] font-black text-pink-500 flex items-center gap-1.5 leading-none">
               <span className="bg-pink-500 text-white px-2 py-1 rounded-lg text-sm">{format(viewDate, 'M月')}</span>
@@ -143,9 +148,11 @@ export default function Page() {
               </div>
             </div>
           </div>
+          
           <p className="text-[44px] font-black text-pink-500 tracking-tighter mb-3 text-center leading-none relative z-10 drop-shadow-sm">
             <span className="text-lg mr-0.5 font-bold">¥</span>{monthlyTotals.amount.toLocaleString()}
           </p>
+
           <div className="flex justify-between items-center bg-white/80 rounded-xl py-1.5 border border-pink-200 relative z-10">
             {[
               { label: 'フリー', value: monthlyTotals.f },
@@ -160,6 +167,7 @@ export default function Page() {
           </div>
         </section>
 
+        {/* 2. 📅 カレンダー */}
         <section className="bg-white p-2 rounded-[22px] border border-pink-200 shadow-sm overflow-hidden">
           <DashboardCalendar 
             shifts={shifts} 
@@ -170,43 +178,64 @@ export default function Page() {
           />
         </section>
 
+        {/* 3. ✍️ 実績入力フォーム (✨ 日付拡大 & 入力改善) */}
         <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden">
-          <div className="bg-[#FFF5F6] p-2.5 px-4 border-b border-pink-100 flex justify-between items-center h-[42px]">
-            <h3 className="text-[13px] font-black text-gray-700 leading-none">
+          <div className="bg-[#FFF5F6] p-3 px-4 border-b border-pink-100 flex justify-between items-center">
+            <h3 className="text-[17px] font-black text-gray-800 leading-none">
               {selectedDate ? (
                 <div className="flex items-center gap-2">
                   {format(selectedDate, 'M/d (eee)', { locale: ja })}
-                  {getDate(selectedDate) === 10 && <span className="text-pink-500 text-[9px] bg-white px-1.5 py-0.5 rounded border border-pink-200 font-bold italic">かりんとの日</span>}
-                  {(getDate(selectedDate) === 11 || getDate(selectedDate) === 22) && <span className="text-blue-500 text-[9px] bg-white px-1.5 py-0.5 rounded border border-blue-200 font-bold italic">添い寝の日</span>}
+                  {getDate(selectedDate) === 10 && <span className="text-pink-500 text-[10px] bg-white px-2 py-0.5 rounded border border-pink-200 font-bold italic">かりんとの日</span>}
+                  {(getDate(selectedDate) === 11 || getDate(selectedDate) === 22) && <span className="text-blue-500 text-[10px] bg-white px-2 py-0.5 rounded border border-blue-200 font-bold italic">添い寝の日</span>}
                 </div>
               ) : '日付を選択してください'}
             </h3>
             <div className="text-lg font-black text-pink-500 tracking-tighter leading-none">
-              {selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-[8px] font-bold text-gray-300 uppercase px-1.5 py-0.5 bg-gray-50 rounded">OFF</span>}
+              {selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-[9px] font-bold text-gray-300 uppercase px-1.5 py-0.5 bg-gray-50 rounded">OFF</span>}
             </div>
           </div>
           {selectedShift ? (
-            <div className="p-3 space-y-3">
+            <div className="p-4 space-y-4">
               <div className="grid grid-cols-3 gap-2">
                 {['f', 'first', 'main'].map((key) => (
                   <div key={key} className="space-y-1 text-center">
-                    <label className="text-[10px] font-bold text-gray-300 block tracking-tighter leading-none">{key === 'f' ? 'フリー' : key === 'first' ? '初指名' : '本指名'}</label>
-                    <input type="number" inputMode="numeric" value={editReward[key as keyof typeof editReward]} onChange={e => setEditReward({...editReward, [key]: e.target.value})} className="w-full text-center py-1.5 bg-[#FAFAFA] rounded-lg font-black text-[22px] text-pink-500 border border-gray-100 focus:outline-none focus:ring-0 focus:border-pink-300 transition-colors" />
+                    <label className="text-[10px] font-bold text-gray-400 block tracking-tighter leading-none">{key === 'f' ? 'フリー' : key === 'first' ? '初指名' : '本指名'}</label>
+                    <input 
+                      type="number" 
+                      inputMode="numeric" 
+                      placeholder="0" // ✨ 0のときはこれが出る
+                      value={editReward[key as keyof typeof editReward]} 
+                      onFocus={(e) => e.target.select()} // ✨ タップで全選択（すぐ書き換えられる）
+                      onChange={e => setEditReward({...editReward, [key]: e.target.value})} 
+                      className="w-full text-center py-2 bg-[#FAFAFA] rounded-lg font-black text-[24px] text-pink-500 border border-gray-100 focus:outline-none focus:ring-0 focus:border-pink-300 transition-colors placeholder:text-gray-200" 
+                    />
                   </div>
                 ))}
               </div>
-              <div className="flex items-center space-x-2 bg-pink-50/30 p-2 rounded-xl border border-pink-100 h-[54px]">
-                <label className="text-[10px] font-black text-pink-300 shrink-0 uppercase tracking-widest leading-none">給料</label>
-                <div className="relative flex-1 text-right">
-                  <span className="absolute left-1 top-1/2 -translate-y-1/2 text-pink-200 text-lg font-black pointer-events-none">¥</span>
-                  <input type="text" inputMode="numeric" value={editReward.amount ? Number(editReward.amount).toLocaleString() : ''} onChange={e => { const val = e.target.value.replace(/,/g, ''); if (/^\d*$/.test(val)) setEditReward({...editReward, amount: val}); }} className="w-full text-right pr-1 py-0 bg-transparent font-black text-[28px] text-pink-500 focus:outline-none focus:ring-0 border-none" />
+              
+              {/* ✨ お給料入力：中央揃え & 自動調整 */}
+              <div className="bg-pink-50/30 p-3 rounded-xl border border-pink-100 flex flex-col items-center justify-center">
+                <label className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">本日の給料</label>
+                <div className="flex items-center justify-center w-full">
+                  <span className="text-pink-200 text-2xl font-black mr-1 translate-y-[2px]">¥</span>
+                  <input 
+                    type="text" 
+                    inputMode="numeric" 
+                    placeholder="0"
+                    value={editReward.amount ? Number(editReward.amount).toLocaleString() : ''} 
+                    onFocus={(e) => e.target.select()}
+                    onChange={e => { const val = e.target.value.replace(/,/g, ''); if (/^\d*$/.test(val)) setEditReward({...editReward, amount: val}); }} 
+                    className="w-auto min-w-[100px] text-center bg-transparent font-black text-[32px] text-pink-500 focus:outline-none focus:ring-0 border-none placeholder:text-gray-200" 
+                  />
                 </div>
               </div>
-              <button onClick={handleSaveReward} className="w-full bg-pink-500 text-white font-black py-3 rounded-xl shadow-lg active:scale-95 transition-all text-[11px] tracking-[0.2em] uppercase">実績を保存 💾</button>
+
+              <button onClick={handleSaveReward} className="w-full bg-pink-500 text-white font-black py-4 rounded-xl shadow-lg active:scale-95 transition-all text-xs tracking-[0.2em] uppercase">実績を保存 💾</button>
             </div>
-          ) : <div className="p-6 text-center bg-white italic text-gray-300 text-[10px]">カレンダーの日付を選択すると入力できます</div>}
+          ) : <div className="p-8 text-center bg-white italic text-gray-300 text-[10px]">カレンダーの日付を選択すると入力できます</div>}
         </section>
 
+        {/* 📢 NEWS */}
         <section className="bg-white rounded-[22px] overflow-hidden border border-pink-100 shadow-sm opacity-90">
           <div className="bg-gray-50 p-2 px-4 border-b border-gray-100 flex justify-between items-center">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Shop News</p>
@@ -220,9 +249,8 @@ export default function Page() {
           )) : <p className="p-4 text-center text-gray-300 text-[10px] italic leading-none">お知らせはありません</p>}
         </section>
 
-        {/* ✨ バージョン確認用ラベル ✨ */}
         <div className="pt-4 pb-2 text-center">
-          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.14.1</p>
+          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.14.2</p>
         </div>
       </main>
 
