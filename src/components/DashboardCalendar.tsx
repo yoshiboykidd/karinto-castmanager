@@ -31,47 +31,46 @@ export default function DashboardCalendar({
   return (
     <div className="w-full flex justify-center p-1 bg-white rounded-xl">
       <style>{`
-        .rdp { --rdp-cell-size: 45px; margin: 0; border: none !important; }
+        /* ✨ ライブラリの「円形」設定を強制上書き */
+        .rdp-day { border-radius: 12px !important; }
+        .rdp-button { border-radius: 12px !important; }
+        .rdp-day_selected { border-radius: 12px !important; }
+
+        .rdp { --rdp-cell-size: 45px; margin: 0; }
         .rdp-table { border-collapse: collapse !important; border: 0 !important; }
-        .rdp-cell { border: 0 !important; padding: 0 !important; }
         .rdp-months { justify-content: center !important; }
 
-        /* ✨ 全てを 12px の角丸に統一 (円を廃止) */
         .rdp-button {
           width: 44px !important;
           height: 44px !important;
-          border-radius: 12px !important; /* 👈 ここを固定 */
           font-size: 18px !important;
           font-weight: 800 !important;
           display: flex !important;
           align-items: center !important;
           justify-content: center !important;
-          transition: all 0.1s ease;
-          border: 2px solid transparent !important;
+          border: 3px solid transparent !important; /* 👈 枠線を常に確保してガタつき防止 */
         }
 
         /* ✨ 選択時：青い「角丸の枠線」 */
-        .rdp-day_selected {
+        .rdp-day_selected, .rdp-day_selected:hover {
           background-color: transparent !important;
           color: #3b82f6 !important;
-          border: 3px solid #3b82f6 !important; /* 👈 太い枠線 */
-          border-radius: 12px !important; /* 👈 角丸を維持 */
+          border: 3px solid #3b82f6 !important; /* 👈 青枠 */
           z-index: 10;
         }
 
-        /* シフトあり：薄ピンクの「角丸」 */
-        .hasShift:not(.rdp-day_selected) {
+        /* 🌸 シフトあり：薄ピンク（特定日よりも優先） */
+        .hasShift {
           background-color: #fdf2f8 !important;
           color: #ec4899 !important;
-          border-radius: 12px !important;
         }
 
-        /* 特定日：薄黄色の「角丸」 */
-        .isEvent:not(.rdp-day_selected):not(.hasShift) { 
+        /* 💡 特定日：薄黄色（シフトがない時だけ黄色くなる） */
+        .isEvent:not(.hasShift) { 
           background-color: #fffbeb !important;
-          border-radius: 12px !important;
         }
 
+        /* 休日設定 */
         .rdp-day.isSaturday:not(.rdp-day_selected) { color: #3b82f6 !important; }
         .rdp-day.isSunday:not(.rdp-day_selected) { color: #ef4444 !important; }
         
