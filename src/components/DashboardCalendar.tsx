@@ -31,67 +31,57 @@ export default function DashboardCalendar({
   return (
     <div className="w-full flex justify-center p-1 bg-white rounded-xl">
       <style>{`
-        /* ✨ 縦並びを解消する魔法のコード */
+        /* ✨ 7列のテーブルレイアウトを死守 */
         .rdp-table {
-          display: table !important; /* テーブル形式を強制 */
+          display: table !important;
           border-collapse: separate !important;
-          border-spacing: 4px !important; /* セル同士の隙間をあける */
+          border-spacing: 2px !important;
           width: auto !important;
-          max-width: none !important;
-        }
-        
-        /* 月の表示エリア */
-        .rdp-months { justify-content: center !important; }
-
-        /* ✨ 日付セル（サイズを固定して安定させる） */
-        .rdp-cell {
-          width: 40px !important;
-          height: 40px !important;
-          padding: 0 !important;
         }
 
+        /* ✨ 数字を大きく、セルを丸く */
         .rdp-button {
-          width: 40px !important;
-          height: 40px !important;
-          max-width: 40px !important;
-          border-radius: 50% !important;
+          width: 44px !important;
+          height: 44px !important;
+          border-radius: 50% !important; /* 👈 ここで確実に丸くする */
+          font-size: 18px !important;    /* 👈 数字をさらに大きく */
+          font-weight: 800 !important;
           display: flex !important;
           align-items: center !important;
           justify-content: center !important;
-          font-size: 16px !important;
-          font-weight: 600 !important;
-          position: relative;
+          position: relative !important;
+          padding: 0 !important;
         }
 
-        /* ✨ シフトあり（薄いピンク） */
+        /* ✨ シフトあり（桜色の正円） */
         .hasShift:not(.rdp-day_selected) {
           background-color: #fdf2f8 !important;
           color: #ec4899 !important;
           border: 1px solid #fce7f3 !important;
+          border-radius: 50% !important;
         }
 
-        /* ✨ 選択時（青丸：ピンクを完全に飲み込む） */
+        /* ✨ 選択時（青い正円：ピンクを上書き） */
         .rdp-day_selected {
           background-color: #3b82f6 !important;
           color: white !important;
           border: none !important;
-          /* 外側に少し広げて後ろのピンクを隠す */
-          transform: scale(1.1); 
+          border-radius: 50% !important;
+          box-shadow: 0 0 0 3px #3b82f6;
           z-index: 10;
-          box-shadow: 0 0 0 2px #3b82f6;
         }
 
+        /* 土日・イベントの色設定 */
         .rdp-day.isSaturday:not(.rdp-day_selected) { color: #3b82f6 !important; }
         .rdp-day.isSunday:not(.rdp-day_selected) { color: #ef4444 !important; }
         
         .isEvent:not(.rdp-day_selected):not(.hasShift) { 
           background-color: #fffbeb !important;
-          border-radius: 8px !important;
+          border-radius: 12px !important; /* イベント日のみ少し角丸四角 */
         }
 
-        /* ナビゲーションの調整 */
         .rdp-nav_button { color: #fda4af; }
-        .rdp-caption_label { font-weight: 900; color: #4b5563; font-size: 15px; }
+        .rdp-caption_label { font-weight: 900; color: #4b5563; font-size: 17px; }
       `}</style>
       <DayPicker
         mode="single"

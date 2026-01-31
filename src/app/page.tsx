@@ -222,7 +222,7 @@ export default function Page() {
 
         {/* ✨ バージョン確認用ラベル ✨ */}
         <div className="pt-4 pb-2 text-center">
-          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.14</p>
+          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.14.1</p>
         </div>
       </main>
 
