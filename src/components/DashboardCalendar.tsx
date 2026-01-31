@@ -21,8 +21,6 @@ export default function DashboardCalendar({
 
   const shiftDays = shifts.filter(s => s.status === 'official').map(s => parseISO(s.shift_date));
   const requestedDays = shifts.filter(s => s.status === 'requested').map(s => parseISO(s.shift_date));
-  
-  // ✨ 特定日 (10, 11, 22日) の判定を復元
   const isEventDay = (date: Date) => [10, 11, 22].includes(date.getDate());
 
   const commonProps = {
@@ -53,17 +51,22 @@ export default function DashboardCalendar({
       <style>{`
         .rdp { --rdp-cell-size: 45px; margin: 0; }
         .rdp-button { font-size: 18px !important; font-weight: 800 !important; }
-        .rdp-caption { display: flex !important; justify-content: center !important; align-items: center !important; position: relative !important; height: 40px; }
+        .rdp-caption { display: flex !important; justify-content: center !important; align-items: center !important; position: relative !important; height: 36px; }
         .rdp-caption_label { font-weight: 900; color: #4b5563; font-size: 18px !important; }
 
         .hasShift:not(.rdp-day_selected) { background-color: #fdf2f8 !important; color: #ec4899 !important; border-radius: 12px !important; }
         .isRequested:not(.rdp-day_selected) { border: 2px dashed #fda4af !important; border-radius: 12px !important; }
-        
-        /* ✨ 特定日の黄色い枠を復元 */
         .isEvent:not(.hasShift):not(.rdp-day_selected) { background-color: #fffbeb !important; border-radius: 8px !important; }
 
+        /* 実績モード：青い丸 */
         .rdp-day_selected:not(.is-request-ui) { background-color: #3b82f6 !important; color: white !important; border-radius: 50% !important; }
-        .is-request-ui .rdp-day_selected { background-color: #f3e8ff !important; color: #a855f7 !important; border: 2px solid #a855f7 !important; border-radius: 12px !important; }
+        
+        /* 申請モード：紫の角丸を強化 */
+        .is-request-ui .rdp-day_selected {
+          background-color: #f3e8ff !important; color: #a855f7 !important;
+          border: 2px solid #a855f7 !important; border-radius: 12px !important;
+        }
+
         .rdp-day.isSaturday:not(.rdp-day_selected) { color: #3b82f6 !important; }
         .rdp-day.isSunday:not(.rdp-day_selected) { color: #ef4444 !important; }
         .rdp-nav_button { color: #fda4af; }
