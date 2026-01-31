@@ -9,10 +9,7 @@ import DashboardCalendar from '@/components/DashboardCalendar';
 
 export default function Page() {
   const router = useRouter();
-  const [supabase] = useState(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ));
+  const [supabase] = useState(() => createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!));
 
   const [shifts, setShifts] = useState<any[]>([]);
   const [castProfile, setCastProfile] = useState<any>(null);
@@ -23,7 +20,6 @@ export default function Page() {
   const [isRequestMode, setIsRequestMode] = useState(false);
   const [singleDate, setSingleDate] = useState<Date | undefined>(new Date());
   const [multiDates, setMultiDates] = useState<Date[]>([]);
-  
   const [editReward, setEditReward] = useState<any>({ f: '', first: '', main: '', amount: '' });
 
   useEffect(() => { fetchInitialData(); }, [supabase, router]);
@@ -46,6 +42,29 @@ export default function Page() {
     setLoading(false);
   }
 
+  // ✨ 月間合計の計算ロジックを復元
+  const monthlyTotals = shifts
+    .filter(s => {
+      const d = parseISO(s.shift_date);
+      return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear() && s.status === 'official';
+    })
+    .reduce((acc, s) => {
+      let dur = 0;
+      if (s.start_time && s.end_time && s.start_time !== 'OFF') {
+        const [sH, sM] = s.start_time.split(':').map(Number);
+        const [eH, eM] = s.end_time.split(':').map(Number);
+        dur = ((eH < sH ? eH + 24 : eH) + eM / 60) - (sH + sM / 60);
+      }
+      return { 
+        amount: acc.amount + (s.reward_amount || 0), 
+        f: acc.f + (s.f_count || 0), 
+        first: acc.first + (s.first_request_count || 0), 
+        main: acc.main + (s.main_request_count || 0), 
+        count: acc.count + 1, 
+        hours: acc.hours + dur 
+      };
+    }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
+
   useEffect(() => {
     if (isRequestMode || !singleDate) return;
     const dateStr = format(singleDate, 'yyyy-MM-dd');
@@ -55,11 +74,8 @@ export default function Page() {
   }, [singleDate, shifts, isRequestMode]);
 
   const handleDateSelect = (val: any) => {
-    if (isRequestMode) {
-      setMultiDates(val || []);
-    } else {
-      setSingleDate(val);
-    }
+    if (isRequestMode) setMultiDates(val || []);
+    else setSingleDate(val);
   };
 
   const handleBulkRequest = async (startTime: string, endTime: string) => {
@@ -72,14 +88,10 @@ export default function Page() {
       status: 'requested',
       is_official: false
     }));
-
-    const { error } = await supabase.from('shifts').upsert(requests, { onConflict: 'login_id,shift_date' });
-    if (error) alert('申請に失敗しました');
-    else {
-      alert(`${multiDates.length}日分の申請を送信しました！🚀`);
-      setMultiDates([]);
-      fetchInitialData();
-    }
+    await supabase.from('shifts').upsert(requests, { onConflict: 'login_id,shift_date' });
+    alert(`${multiDates.length}日分の申請を送信しました！🚀`);
+    setMultiDates([]);
+    fetchInitialData();
   };
 
   const handleSaveReward = async () => {
@@ -88,12 +100,7 @@ export default function Page() {
       alert('「フリー」「初指名」「本指名」をすべて入力してください');
       return;
     }
-    await supabase.from('shifts').update({ 
-      f_count: Number(editReward.f), 
-      first_request_count: Number(editReward.first), 
-      main_request_count: Number(editReward.main), 
-      reward_amount: Number(editReward.amount) || 0 
-    }).eq('login_id', castProfile.login_id).eq('shift_date', format(singleDate, 'yyyy-MM-dd'));
+    await supabase.from('shifts').update({ f_count: Number(editReward.f), first_request_count: Number(editReward.first), main_request_count: Number(editReward.main), reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', format(singleDate, 'yyyy-MM-dd'));
     fetchInitialData();
     alert('保存しました💰');
   };
@@ -110,7 +117,7 @@ export default function Page() {
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
       <header className="bg-white px-5 pt-12 pb-6 rounded-b-[30px] shadow-sm border-b border-pink-100">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.0.2</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.0.3</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'Cast'}
           <span className="text-[24px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
@@ -118,35 +125,56 @@ export default function Page() {
         <p className="text-[13px] font-bold text-gray-500 mt-1 ml-0.5 tracking-tighter leading-none">お疲れ様です🍵</p>
       </header>
 
+      {/* モード切替 */}
       <div className="flex p-1 bg-gray-100 mx-5 mt-4 rounded-xl border border-gray-200 shadow-inner">
         <button onClick={() => { setIsRequestMode(false); setMultiDates([]); }} className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
         <button onClick={() => { setIsRequestMode(true); setSingleDate(undefined); }} className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${isRequestMode ? 'bg-white text-purple-500 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
       </div>
 
       <main className="px-3 mt-4 space-y-4">
-        <section className="bg-white p-2 rounded-[22px] border border-pink-200 shadow-sm overflow-hidden text-center">
-          <DashboardCalendar 
-            shifts={shifts} 
-            selectedDates={isRequestMode ? multiDates : singleDate} 
-            onSelect={handleDateSelect}
-            month={viewDate} onMonthChange={setViewDate}
-            isRequestMode={isRequestMode}
-          />
+        
+        {/* ✨ 合計実績セクションを復元 */}
+        <section className="bg-[#FFE9ED] rounded-[22px] p-4 border border-pink-300 relative overflow-hidden shadow-sm">
+          <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none leading-none">{format(viewDate, 'M')}</span>
+          <div className="relative z-10 flex flex-col items-center">
+            <div className="flex items-center justify-between gap-1 mb-4 w-full">
+              <h2 className="text-[14px] font-black text-pink-500 whitespace-nowrap tracking-tighter shrink-0">{format(viewDate, 'M月')}の実績合計</h2>
+              <div className="flex gap-1">
+                <div className="bg-pink-400 px-2 py-1.5 rounded-xl border border-pink-300 flex items-baseline gap-0.5 shadow-md">
+                  <span className="text-[9px] font-black text-white leading-none">出勤</span>
+                  <span className="text-[18px] font-black text-white leading-none tracking-tighter">{monthlyTotals.count}</span>
+                  <span className="text-[9px] font-black text-white leading-none italic">日</span>
+                </div>
+                <div className="bg-pink-400 px-2 py-1.5 rounded-xl border border-pink-300 flex items-baseline gap-0.5 shadow-md">
+                  <span className="text-[9px] font-black text-white leading-none">稼働</span>
+                  <span className="text-[18px] font-black text-white leading-none tracking-tighter">{Math.round(monthlyTotals.hours * 10) / 10}</span>
+                  <span className="text-[9px] font-black text-white leading-none italic">h</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-[52px] font-black text-pink-500 text-center mb-5 leading-none tracking-tighter">
+              <span className="text-2xl mr-1 leading-none">¥</span>{monthlyTotals.amount.toLocaleString()}
+            </p>
+            <div className="grid grid-cols-3 gap-1 w-full bg-white/80 rounded-xl py-3 border border-pink-200 text-center shadow-inner">
+              <div><p className="text-[13px] text-pink-400 font-black mb-0.5 leading-none">フリー</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.f}</p></div>
+              <div className="border-x border-pink-100"><p className="text-[13px] text-pink-400 font-black mb-0.5 leading-none">初指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.first}</p></div>
+              <div><p className="text-[13px] text-pink-400 font-black mb-0.5 leading-none">本指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.main}</p></div>
+            </div>
+          </div>
         </section>
 
+        {/* カレンダー */}
+        <section className="bg-white p-2 rounded-[22px] border border-pink-200 shadow-sm overflow-hidden text-center">
+          <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={handleDateSelect} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
+        </section>
+
+        {/* フォーム類 */}
         {isRequestMode ? (
-          <section className="bg-white rounded-[24px] border border-purple-200 p-4 shadow-xl animate-in fade-in slide-in-from-bottom-4">
+          <section className="bg-white rounded-[24px] border border-purple-200 p-4 shadow-xl">
             <h3 className="text-center font-black text-purple-600 mb-3">{multiDates.length}日分を選択中</h3>
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              {[
-                { label: '朝 (10-18)', s: '10:00', e: '18:00' },
-                { label: '昼 (12-21)', s: '12:00', e: '21:00' },
-                { label: '夜 (18-24)', s: '18:00', e: '24:00' },
-                { label: '休み希望', s: 'OFF', e: 'OFF' }
-              ].map(p => (
-                <button key={p.label} onClick={() => handleBulkRequest(p.s, p.e)} className="bg-purple-50 border border-purple-100 py-3 rounded-xl font-black text-purple-600 text-sm active:scale-95 transition-all shadow-sm">
-                  {p.label}
-                </button>
+            <div className="grid grid-cols-2 gap-2">
+              {[{ label: '朝 (10-18)', s: '10:00', e: '18:00' }, { label: '昼 (12-21)', s: '12:00', e: '21:00' }, { label: '夜 (18-24)', s: '18:00', e: '24:00' }, { label: '休み希望', s: 'OFF', e: 'OFF' }].map(p => (
+                <button key={p.label} onClick={() => handleBulkRequest(p.s, p.e)} className="bg-purple-50 border border-purple-100 py-3 rounded-xl font-black text-purple-600 text-sm active:scale-95 transition-all shadow-sm">{p.label}</button>
               ))}
             </div>
           </section>
@@ -188,7 +216,7 @@ export default function Page() {
             </div>
           ))}
         </section>
-        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 2.0.2</p>
+        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 2.0.3</p>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-sm">
