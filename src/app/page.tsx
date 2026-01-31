@@ -89,19 +89,18 @@ export default function Page() {
       <header className="bg-white px-5 pt-12 pb-6 rounded-b-[30px] shadow-sm border-b border-pink-100">
         <h1 className="text-3xl font-black flex items-baseline gap-1">
           {castProfile?.display_name || 'Cast'}
-          <span className="text-[13px] text-pink-400 font-bold italic translate-y-[-2px]">さん🌸</span>
+          {/* ✨ さん🌸 を少し大きく調整 */}
+          <span className="text-[18px] text-pink-400 font-bold italic translate-y-[-1px]">さん🌸</span>
         </h1>
       </header>
 
       <main className="px-3 mt-4 space-y-4">
-        {/* ✨ 合計実績：デザイン調整 */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-4 border border-pink-300 relative overflow-hidden shadow-sm">
           <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10">
             <div className="flex flex-col items-center gap-3 mb-4">
               <h2 className="text-[18px] font-black text-pink-500 whitespace-nowrap">{format(viewDate, 'M月')}の実績合計</h2>
               <div className="flex gap-2">
-                {/* ✨ バッジ背景を少し濃くして白文字を強調 */}
                 <div className="bg-pink-400 px-4 py-2 rounded-2xl border border-pink-300 flex items-baseline gap-1.5 shadow-md">
                   <span className="text-[11px] font-black text-white">出勤</span>
                   <span className="text-2xl font-black text-white leading-none">{monthlyTotals.count}</span>
@@ -163,12 +162,13 @@ export default function Page() {
           {newsList.map((n) => (
             <div key={n.id} className="p-3 px-4 border-b border-gray-50 last:border-0 flex gap-3 items-start">
               <span className="text-[9px] text-pink-200 font-bold mt-0.5">{format(parseISO(n.created_at), 'MM/dd')}</span>
-              <p className="text-xs font-bold text-gray-500 leading-tight">{n.content}</p>
+              {/* ✨ ニュース内容を黒字に修正 */}
+              <p className="text-xs font-bold text-gray-900 leading-tight">{n.content}</p>
             </div>
           ))}
         </section>
 
-        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 1.17.0</p>
+        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 1.4.0</p>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
