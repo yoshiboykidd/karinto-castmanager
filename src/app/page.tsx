@@ -9,7 +9,10 @@ import DashboardCalendar from '@/components/DashboardCalendar';
 
 export default function Page() {
   const router = useRouter();
-  const [supabase] = useState(() => createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!));
+  const [supabase] = useState(() => createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ));
 
   const [shifts, setShifts] = useState<any[]>([]);
   const [castProfile, setCastProfile] = useState<any>(null);
@@ -44,7 +47,7 @@ export default function Page() {
     setLoading(false);
   }
 
-  // 実績入力の読み込みロジック
+  // 実績入力の読み込み
   useEffect(() => {
     if (isRequestMode || !singleDate) return;
     const dateStr = format(singleDate, 'yyyy-MM-dd');
@@ -52,6 +55,15 @@ export default function Page() {
     const v = (val: any) => (val === null || val === undefined) ? '' : val;
     setEditReward({ f: v(shift?.f_count), first: v(shift?.first_request_count), main: v(shift?.main_request_count), amount: v(shift?.reward_amount) });
   }, [singleDate, shifts, isRequestMode]);
+
+  // ✨ 波線を解消する日付選択ハンドラ
+  const handleDateSelect = (val: any) => {
+    if (isRequestMode) {
+      setMultiDates(val || []);
+    } else {
+      setSingleDate(val);
+    }
+  };
 
   // ✨ まとめ申請の処理
   const handleBulkRequest = async (startTime: string, endTime: string) => {
@@ -80,14 +92,19 @@ export default function Page() {
       alert('「フリー」「初指名」「本指名」をすべて入力してください');
       return;
     }
-    await supabase.from('shifts').update({ f_count: Number(editReward.f), first_request_count: Number(editReward.first), main_request_count: Number(editReward.main), reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', format(singleDate, 'yyyy-MM-dd'));
+    await supabase.from('shifts').update({ 
+      f_count: Number(editReward.f), 
+      first_request_count: Number(editReward.first), 
+      main_request_count: Number(editReward.main), 
+      reward_amount: Number(editReward.amount) || 0 
+    }).eq('login_id', castProfile.login_id).eq('shift_date', format(singleDate, 'yyyy-MM-dd'));
     fetchInitialData();
     alert('保存しました💰');
   };
 
   if (loading) return (
     <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center">
-      <div className="text-pink-300 tracking-tighter text-5xl italic animate-pulse" style={{ fontWeight: 900 }}>KARINTO...</div>
+      <div className="text-pink-300 tracking-tighter text-5xl italic animate-pulse" style={{ fontWeight: 900, textShadow: '2px 2px 0px rgba(249, 168, 212, 0.3)' }}>KARINTO...</div>
     </div>
   );
 
@@ -97,18 +114,18 @@ export default function Page() {
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
       <header className="bg-white px-5 pt-12 pb-6 rounded-b-[30px] shadow-sm border-b border-pink-100">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.0.0</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.0.1</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'Cast'}
-          <span className="text-[20px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
+          <span className="text-[24px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
         </h1>
         <p className="text-[13px] font-bold text-gray-500 mt-1 ml-0.5 tracking-tighter leading-none">お疲れ様です🍵</p>
       </header>
 
       {/* 🔄 モード切替タブ */}
       <div className="flex p-1 bg-gray-100 mx-5 mt-4 rounded-xl border border-gray-200 shadow-inner">
-        <button onClick={() => setIsRequestMode(false)} className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
-        <button onClick={() => setIsRequestMode(true)} className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${isRequestMode ? 'bg-white text-purple-500 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
+        <button onClick={() => { setIsRequestMode(false); setMultiDates([]); }} className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
+        <button onClick={() => { setIsRequestMode(true); setSingleDate(undefined); }} className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${isRequestMode ? 'bg-white text-purple-500 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
       </div>
 
       <main className="px-3 mt-4 space-y-4">
@@ -118,13 +135,13 @@ export default function Page() {
           <DashboardCalendar 
             shifts={shifts} 
             selectedDates={isRequestMode ? multiDates : singleDate} 
-            onSelect={isRequestMode ? setMultiDates : setSingleDate}
+            onSelect={handleDateSelect}
             month={viewDate} onMonthChange={setViewDate}
             isRequestMode={isRequestMode}
           />
         </section>
 
-        {/* 💜 申請モード時のまとめパネル */}
+        {/* 💜 申請モードパネル */}
         {isRequestMode ? (
           <section className="bg-white rounded-[24px] border border-purple-200 p-4 shadow-xl animate-in fade-in slide-in-from-bottom-4">
             <h3 className="text-center font-black text-purple-600 mb-3">{multiDates.length}日分を選択中</h3>
@@ -135,15 +152,15 @@ export default function Page() {
                 { label: '夜 (18-24)', s: '18:00', e: '24:00' },
                 { label: '休み希望', s: 'OFF', e: 'OFF' }
               ].map(p => (
-                <button key={p.label} onClick={() => handleBulkRequest(p.s, p.e)} className="bg-purple-50 border border-purple-100 py-3 rounded-xl font-black text-purple-500 text-sm active:scale-95 transition-all shadow-sm">
+                <button key={p.label} onClick={() => handleBulkRequest(p.s, p.e)} className="bg-purple-50 border border-purple-100 py-3 rounded-xl font-black text-purple-600 text-sm active:scale-95 transition-all shadow-sm">
                   {p.label}
                 </button>
               ))}
             </div>
-            <p className="text-[10px] text-center text-purple-300 font-bold">※選択して時間を押すと即座に申請されます</p>
+            <p className="text-[10px] text-center text-purple-300 font-bold">※時間を押すと、選択中の全日程が申請されます</p>
           </section>
         ) : (
-          /* ✍️ 実績入力フォーム (既存機能) */
+          /* ✍️ 実績入力フォーム */
           <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden text-center">
             <div className="bg-[#FFF5F6] p-3 px-4 flex justify-center items-center h-[42px] border-b border-pink-100 relative">
               <h3 className="text-[17px] font-black text-gray-800">{singleDate ? format(singleDate, 'M/d (eee)', { locale: ja }) : ''}</h3>
@@ -174,7 +191,7 @@ export default function Page() {
 
         {/* ショップニュース */}
         <section className="bg-white rounded-[22px] border border-pink-100 shadow-sm overflow-hidden opacity-90">
-          <div className="bg-gray-50 p-2 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Shop News</div>
+          <div className="bg-gray-50 p-2 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 text-left">Shop News</div>
           {newsList.map((n) => (
             <div key={n.id} className="p-3 px-4 border-b border-gray-50 last:border-0 flex gap-3 items-start text-left">
               <span className="text-[9px] text-pink-200 font-bold mt-0.5 shrink-0">{format(parseISO(n.created_at), 'MM/dd')}</span>
@@ -183,7 +200,7 @@ export default function Page() {
           ))}
         </section>
 
-        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 2.0.0</p>
+        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 2.0.1</p>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-sm">
