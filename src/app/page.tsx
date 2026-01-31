@@ -35,8 +35,10 @@ export default function Page() {
       supabase.from('cast_members').select('*').eq('login_id', loginId).single(),
       supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
     ]);
+    
     setCastProfile(castRes.data);
     setShifts(shiftRes.data || []);
+
     if (castRes.data) {
       const myShopId = castRes.data.HOME_shop_ID || 'main';
       const { data: newsData } = await supabase.from('news').select('*')
@@ -46,11 +48,16 @@ export default function Page() {
     setLoading(false);
   }
 
+  // ✨ 入力データの「未設定」と「実数の0」の判別
   useEffect(() => {
     if (!selectedDate) return;
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const shift = shifts.find(s => s.shift_date === dateStr);
+    
+    // データがない(null/undefined)なら空文字にする → グレーの0が出る
+    // すでに値(0含む)があればそのままセットする → ピンクの色付きが出る
     const v = (val: any) => (val === null || val === undefined) ? '' : val;
+
     setEditReward({
       f: v(shift?.f_count),
       first: v(shift?.first_request_count),
@@ -71,13 +78,20 @@ export default function Page() {
         const [eH, eM] = s.end_time.split(':').map(Number);
         dur = ((eH < sH ? eH + 24 : eH) + eM / 60) - (sH + sM / 60);
       }
-      return { amount: acc.amount + (s.reward_amount || 0), f: acc.f + (s.f_count || 0), first: acc.first + (s.first_request_count || 0), main: acc.main + (s.main_request_count || 0), count: acc.count + 1, hours: acc.hours + dur };
+      return {
+        amount: acc.amount + (s.reward_amount || 0),
+        f: acc.f + (s.f_count || 0),
+        first: acc.first + (s.first_request_count || 0),
+        main: acc.main + (s.main_request_count || 0),
+        count: acc.count + 1,
+        hours: acc.hours + dur,
+      };
     }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
 
   const handleSaveReward = async () => {
     if (!selectedDate) return;
     if (editReward.f === '' || editReward.first === '' || editReward.main === '') {
-      alert('「フリー」「初指名」「本指名」を入力してください');
+      alert('全ての項目を入力してください（無い場合は 0）');
       return;
     }
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -99,17 +113,14 @@ export default function Page() {
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       <header className="bg-white px-5 pt-12 pb-6 rounded-b-[30px] shadow-sm border-b border-pink-100">
         <h1 className="text-3xl font-black">{castProfile?.display_name || 'Cast'}さん🌸</h1>
-        <p className="text-pink-300 text-[9px] font-black uppercase mt-1">Cast Dashboard</p>
       </header>
 
       <main className="px-3 mt-4 space-y-4">
-        {/* 1. 月間合計実績 */}
+        {/* 1. 💰 月間合計実績 */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-4 border border-pink-300 relative overflow-hidden shadow-sm">
           <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10">
-            <h2 className="text-[18px] font-black text-pink-500 mb-2 flex items-center gap-1.5 leading-none">
-              <span className="bg-pink-500 text-white px-2 py-1 rounded-lg text-sm">{format(viewDate, 'M月')}</span> の実績
-            </h2>
+            <h2 className="text-[18px] font-black text-pink-500 mb-2">{format(viewDate, 'M月')}の合計実績</h2>
             <div className="flex gap-2 mb-3">
               <div className="bg-white/60 px-3 py-1.5 rounded-xl border border-pink-200 text-pink-600 font-black text-xs">出勤 {monthlyTotals.count}日</div>
               <div className="bg-white/60 px-3 py-1.5 rounded-xl border border-pink-200 text-pink-600 font-black text-xs">稼働 {Math.round(monthlyTotals.hours * 10) / 10}h</div>
@@ -167,7 +178,7 @@ export default function Page() {
           )) : <p className="p-4 text-center text-gray-300 text-[10px] italic">お知らせはありません</p>}
         </section>
 
-        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 1.16.3</p>
+        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 1.16.5</p>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">

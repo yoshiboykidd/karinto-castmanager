@@ -24,12 +24,13 @@ export default function DashboardCalendar({
   return (
     <div className="w-full flex justify-center p-1 bg-white rounded-xl overflow-hidden custom-calendar-root">
       <style>{`
-        /* ✨ カレンダー内の全要素から「円」を排除し「12pxの角丸」へ */
+        /* ✨ ライブラリの「丸」を完全に排除し、全パーツを角丸四角（12px）へ */
         .custom-calendar-root .rdp-day, 
         .custom-calendar-root .rdp-button, 
         .custom-calendar-root .rdp-day_selected {
           border-radius: 12px !important;
           aspect-ratio: 1 / 1 !important;
+          clip-path: none !important;
         }
 
         .custom-calendar-root .rdp { --rdp-cell-size: 45px; margin: 0; }
@@ -47,7 +48,7 @@ export default function DashboardCalendar({
           border: 3px solid transparent !important;
         }
 
-        /* 🟦 選択時：青い「角丸の枠線」 */
+        /* 🟦 選択中：青い「角丸の枠線」のみ */
         .custom-calendar-root .rdp-day_selected {
           background-color: transparent !important;
           color: #3b82f6 !important;
@@ -61,7 +62,7 @@ export default function DashboardCalendar({
           color: #ec4899 !important;
         }
 
-        /* 💡 特定日：薄黄色（シフトなし時のみ） */
+        /* 💡 特定日：薄黄色（シフトなし時） */
         .custom-calendar-root .isEvent:not(.hasShift) { 
           background-color: #fffbeb !important;
         }
