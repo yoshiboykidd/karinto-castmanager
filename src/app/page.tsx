@@ -35,10 +35,8 @@ export default function Page() {
       supabase.from('cast_members').select('*').eq('login_id', loginId).single(),
       supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
     ]);
-    
     setCastProfile(castRes.data);
     setShifts(shiftRes.data || []);
-
     if (castRes.data) {
       const myShopId = castRes.data.HOME_shop_ID || 'main';
       const { data: newsData } = await supabase.from('news').select('*')
@@ -52,14 +50,8 @@ export default function Page() {
     if (!selectedDate) return;
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const shift = shifts.find(s => s.shift_date === dateStr);
-    
-    const checkValue = (v: any) => (v === null || v === undefined) ? '' : v;
-    setEditReward({
-      f: checkValue(shift?.f_count),
-      first: checkValue(shift?.first_request_count),
-      main: checkValue(shift?.main_request_count),
-      amount: checkValue(shift?.reward_amount)
-    });
+    const v = (val: any) => (val === null || val === undefined) ? '' : val;
+    setEditReward({ f: v(shift?.f_count), first: v(shift?.first_request_count), main: v(shift?.main_request_count), amount: v(shift?.reward_amount) });
   }, [selectedDate, shifts]);
 
   const monthlyTotals = shifts
@@ -68,38 +60,21 @@ export default function Page() {
       return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
     })
     .reduce((acc, s) => {
-      let duration = 0;
+      let dur = 0;
       if (s.start_time && s.end_time) {
         const [sH, sM] = s.start_time.split(':').map(Number);
         const [eH, eM] = s.end_time.split(':').map(Number);
-        duration = ((eH < sH ? eH + 24 : eH) + eM / 60) - (sH + sM / 60);
+        dur = ((eH < sH ? eH + 24 : eH) + eM / 60) - (sH + sM / 60);
       }
-      return {
-        amount: acc.amount + (s.reward_amount || 0),
-        f: acc.f + (s.f_count || 0),
-        first: acc.first + (s.first_request_count || 0),
-        main: acc.main + (s.main_request_count || 0),
-        count: acc.count + 1,
-        hours: acc.hours + duration,
-      };
+      return { amount: acc.amount + (s.reward_amount || 0), f: acc.f + (s.f_count || 0), first: acc.first + (s.first_request_count || 0), main: acc.main + (s.main_request_count || 0), count: acc.count + 1, hours: acc.hours + dur };
     }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
 
   const handleSaveReward = async () => {
     if (!selectedDate) return;
-    if (editReward.f === '' || editReward.first === '' || editReward.main === '') {
-      alert('「フリー」「初指名」「本指名」を入力してください');
-      return;
-    }
+    if (editReward.f === '' || editReward.first === '' || editReward.main === '') { alert('全ての項目を入力してください'); return; }
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    const { error } = await supabase.from('shifts').update({
-      f_count: Number(editReward.f),
-      first_request_count: Number(editReward.first),
-      main_request_count: Number(editReward.main),
-      reward_amount: Number(editReward.amount) || 0
-    }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr);
-    
-    if (error) alert('保存失敗');
-    else { fetchInitialData(); alert('保存しました！💰'); }
+    const { error } = await supabase.from('shifts').update({ f_count: Number(editReward.f), first_request_count: Number(editReward.first), main_request_count: Number(editReward.main), reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr);
+    if (error) alert('失敗'); else { fetchInitialData(); alert('保存完了！💰'); }
   };
 
   if (loading) return <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center text-pink-300 font-black italic text-2xl">KARINTO...</div>;
@@ -109,11 +84,10 @@ export default function Page() {
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       <header className="bg-white px-5 pt-12 pb-6 rounded-b-[30px] shadow-sm border-b border-pink-100">
         <h1 className="text-3xl font-black">{castProfile?.display_name || 'Cast'}さん🌸</h1>
-        <p className="text-pink-300 text-[9px] font-black uppercase mt-1">Cast Dashboard</p>
       </header>
 
       <main className="px-3 mt-4 space-y-4">
-        {/* 1. 月間合計実績 */}
+        {/* 1. 合計実績 */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-4 border border-pink-300 relative overflow-hidden shadow-sm">
           <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10">
@@ -138,7 +112,7 @@ export default function Page() {
           <DashboardCalendar shifts={shifts} selectedDate={selectedDate} onSelect={setSelectedDate} month={viewDate} onMonthChange={setViewDate} />
         </section>
 
-        {/* 3. ✍️ 実績入力フォーム */}
+        {/* 3. ✍️ 入力フォーム */}
         <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden">
           <div className="bg-[#FFF5F6] p-3 px-4 flex justify-between items-center h-[42px] border-b border-pink-100">
             <h3 className="text-[17px] font-black text-gray-800">{selectedDate ? format(selectedDate, 'M/d (eee)', { locale: ja }) : ''}</h3>
@@ -166,8 +140,8 @@ export default function Page() {
           )}
         </section>
 
-        {/* 📢 SHOP NEWS */}
-        <section className="bg-white rounded-[22px] border border-pink-100 shadow-sm overflow-hidden opacity-90">
+        {/* 📢 4. NEWS */}
+        <section className="bg-white rounded-[22px] border border-pink-100 shadow-sm overflow-hidden">
           <div className="bg-gray-50 p-2 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Shop News</div>
           {newsList.length > 0 ? newsList.map((n) => (
             <div key={n.id} className="p-3 px-4 border-b border-gray-50 last:border-0 flex gap-3 items-start">
@@ -177,7 +151,7 @@ export default function Page() {
           )) : <p className="p-4 text-center text-gray-300 text-[10px] italic">お知らせはありません</p>}
         </section>
 
-        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 1.16.0</p>
+        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 1.16.1</p>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
