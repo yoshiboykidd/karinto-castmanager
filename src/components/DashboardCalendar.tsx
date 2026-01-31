@@ -27,7 +27,6 @@ export default function DashboardCalendar({
         .rdp { --rdp-cell-size: 45px; margin: 0; }
         .rdp-button { font-size: 18px !important; font-weight: 800 !important; }
         
-        /* 年月（2026/1）をセンター寄せ */
         .rdp-caption { 
           display: flex !important;
           justify-content: center !important;
@@ -42,21 +41,18 @@ export default function DashboardCalendar({
           font-size: 18px !important;
         }
 
-        /* シフトあり：12pxの角丸四角 */
         .hasShift:not(.rdp-day_selected) { 
           background-color: #fdf2f8 !important; 
           color: #ec4899 !important; 
           border-radius: 12px !important; 
         }
 
-        /* 選択時：青い丸 */
         .rdp-day_selected { 
           background-color: #3b82f6 !important; 
           color: white !important; 
           border-radius: 50% !important;
         }
 
-        /* 特定日：角丸四角 */
         .isEvent:not(.hasShift):not(.rdp-day_selected) { 
           background-color: #fffbeb !important; 
           border-radius: 8px !important; 
