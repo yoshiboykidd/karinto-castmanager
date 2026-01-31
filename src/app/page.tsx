@@ -21,9 +21,10 @@ export default function Page() {
   const [singleDate, setSingleDate] = useState<Date | undefined>(new Date());
   const [multiDates, setMultiDates] = useState<Date[]>([]);
   
-  // ✨ 日付ごとの申請時間を管理するステート
   const [requestDetails, setRequestDetails] = useState<{[key: string]: {s: string, e: string}}>({});
-  const [editReward, setEditReward] = useState<any>({ f: '', first: '', main: '', amount: '' });
+  
+  // ✨ Stateの型を定義して波線を防止
+  const [editReward, setEditReward] = useState({ f: '', first: '', main: '', amount: '' });
 
   useEffect(() => { fetchInitialData(); }, []);
 
@@ -45,7 +46,6 @@ export default function Page() {
     setLoading(false);
   }
 
-  // 日付が選ばれるたびにデフォルト(11:00-23:00)をセット
   useEffect(() => {
     const newDetails = { ...requestDetails };
     multiDates.forEach(d => {
@@ -54,6 +54,15 @@ export default function Page() {
     });
     setRequestDetails(newDetails);
   }, [multiDates]);
+
+  // 実績データの読み込み
+  useEffect(() => {
+    if (isRequestMode || !singleDate) return;
+    const dateStr = format(singleDate, 'yyyy-MM-dd');
+    const shift = shifts.find(s => s.shift_date === dateStr);
+    const v = (val: any) => (val === null || val === undefined) ? '' : String(val);
+    setEditReward({ f: v(shift?.f_count), first: v(shift?.first_request_count), main: v(shift?.main_request_count), amount: v(shift?.reward_amount) });
+  }, [singleDate, shifts, isRequestMode]);
 
   const monthlyTotals = shifts
     .filter(s => {
@@ -90,10 +99,12 @@ export default function Page() {
 
   if (loading) return <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center font-black text-5xl italic text-pink-300 animate-pulse" style={{ fontWeight: 900 }}>KARINTO...</div>;
 
+  const selectedShift = !isRequestMode && singleDate ? shifts.find(s => s.shift_date === format(singleDate, 'yyyy-MM-dd')) : null;
+
   return (
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       <header className="bg-white px-5 pt-12 pb-5 rounded-b-[30px] shadow-sm border-b border-pink-100">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.1.2</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.1.3</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'Cast'}
           <span className="text-[24px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
@@ -107,17 +118,17 @@ export default function Page() {
       </div>
 
       <main className="px-3 mt-3 space-y-3">
-        {/* ✨ 実績合計：さらに行間を凝縮 */}
+        {/* 実績合計 */}
         <section className="bg-[#FFE9ED] rounded-[20px] p-2 border border-pink-200 relative overflow-hidden">
           <span className="absolute -right-2 -top-6 text-[100px] font-black text-pink-200/10 italic leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10 flex flex-col items-center">
             <div className="flex items-center justify-between w-full leading-none mb-0.5">
               <h2 className="text-[12px] font-black text-pink-400 uppercase tracking-tighter">Summary</h2>
               <div className="flex gap-1">
-                <div className="bg-pink-400 px-1.5 py-0.5 rounded-lg flex items-baseline gap-0.5">
+                <div className="bg-pink-400 px-1.5 py-0.5 rounded-lg flex items-baseline gap-0.5 shadow-sm">
                   <span className="text-[14px] font-black text-white">{monthlyTotals.count}</span><span className="text-[7px] text-white/80 font-bold">日</span>
                 </div>
-                <div className="bg-pink-400 px-1.5 py-0.5 rounded-lg flex items-baseline gap-0.5">
+                <div className="bg-pink-400 px-1.5 py-0.5 rounded-lg flex items-baseline gap-0.5 shadow-sm">
                   <span className="text-[14px] font-black text-white">{Math.round(monthlyTotals.hours * 10) / 10}</span><span className="text-[7px] text-white/80 font-bold">h</span>
                 </div>
               </div>
@@ -144,7 +155,6 @@ export default function Page() {
               {multiDates.length > 0 && <button onClick={() => setMultiDates([])} className="text-[9px] font-black text-gray-300 uppercase border border-gray-100 px-2 py-1 rounded-md">Clear</button>}
             </div>
 
-            {/* ✨ 個別調整リスト */}
             <div className="max-h-48 overflow-y-auto space-y-2 mb-4 pr-1 custom-scrollbar">
               {multiDates.sort((a,b)=>a.getTime()-b.getTime()).map(d => {
                 const key = format(d, 'yyyy-MM-dd');
@@ -162,33 +172,36 @@ export default function Page() {
               })}
             </div>
 
-            <button 
-              disabled={multiDates.length === 0} 
-              onClick={handleBulkSubmit} 
-              className={`w-full font-black py-4 rounded-xl text-lg shadow-lg active:scale-95 transition-all uppercase tracking-widest ${multiDates.length > 0 ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-300'}`}
-            >
-              Confirm Request 🚀
-            </button>
+            <button disabled={multiDates.length === 0} onClick={handleBulkSubmit} className={`w-full font-black py-4 rounded-xl text-lg shadow-lg active:scale-95 transition-all uppercase tracking-widest ${multiDates.length > 0 ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-300'}`}>Confirm Request 🚀</button>
           </section>
         ) : (
-          /* 実績入力 (省略なし) */
+          /* 実績入力：波線解消済み */
           <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden text-center">
-            <div className="bg-[#FFF5F6] p-3 px-4 flex justify-center items-center h-[42px] border-b border-pink-100 relative">
+            <div className="bg-[#FFF5F6] p-3 px-4 flex justify-center items-center h-[42px] border-b border-pink-100 relative leading-none">
               <h3 className="text-[17px] font-black text-gray-800">{singleDate ? format(singleDate, 'M/d (eee)', { locale: ja }) : ''}</h3>
-              <span className="absolute right-4 text-pink-500 font-black text-lg">{selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-xs text-gray-300 font-bold uppercase">OFF</span>}</span>
+              <span className="absolute right-4 text-pink-500 font-black text-lg tracking-tighter">{selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-xs text-gray-300 font-bold uppercase tracking-widest">OFF</span>}</span>
             </div>
             {selectedShift && (
               <div className="p-4 space-y-4">
                 <div className="grid grid-cols-3 gap-2">
-                  {['f', 'first', 'main'].map((key) => (
+                  {(['f', 'first', 'main'] as const).map((key) => (
                     <div key={key} className="text-center space-y-1">
-                      <label className="text-[11px] font-black block text-gray-400 uppercase tracking-tighter">{key}</label>
-                      <input type="number" inputMode="numeric" placeholder="0" value={editReward[key]} onFocus={e=>e.target.select()} onChange={e=>setEditReward({...editReward,[key]:e.target.value})} className={`w-full text-center py-2 bg-[#FAFAFA] rounded-lg font-black text-2xl border border-gray-100 focus:ring-0 focus:border-pink-300 transition-colors ${editReward[key]===''?'text-gray-200':'text-pink-500'}`} />
+                      <label className="text-[11px] font-black block text-gray-400 uppercase tracking-tighter leading-none">{key}</label>
+                      {/* ✨ editReward[key] の波線を解消 */}
+                      <input 
+                        type="number" 
+                        inputMode="numeric" 
+                        placeholder="0" 
+                        value={editReward[key]} 
+                        onFocus={e=>e.target.select()} 
+                        onChange={e=>setEditReward({...editReward,[key]:e.target.value})} 
+                        className={`w-full text-center py-2 bg-[#FAFAFA] rounded-lg font-black text-2xl border border-gray-100 focus:ring-0 focus:border-pink-300 transition-colors ${editReward[key]===''?'text-gray-200':'text-pink-500'}`} 
+                      />
                     </div>
                   ))}
                 </div>
                 <div className="bg-pink-50/30 p-3 rounded-xl border border-pink-100 flex items-center justify-between h-[64px]">
-                  <label className="text-[13px] font-black shrink-0 text-gray-900 uppercase tracking-widest leading-none">Reward</label>
+                  <label className="text-[13px] font-black shrink-0 text-gray-900 uppercase tracking-widest leading-none">Daily Reward</label>
                   <div className="flex items-center flex-1 justify-end pl-4">
                     <span className="text-pink-200 text-2xl font-black mr-1 translate-y-[2px] leading-none">¥</span>
                     <input type="text" inputMode="numeric" placeholder="0" value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} onFocus={e=>e.target.select()} onChange={e=>{const v=e.target.value.replace(/,/g,''); if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});}} className={`w-full text-right bg-transparent font-black text-[32px] focus:ring-0 border-none ${editReward.amount===''?'text-gray-200':'text-pink-500'}`} />
@@ -213,7 +226,7 @@ export default function Page() {
             </div>
           ))}
         </section>
-        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 2.1.2</p>
+        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 2.1.3</p>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-sm">
