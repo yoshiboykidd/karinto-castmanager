@@ -21,7 +21,7 @@ export default function Page() {
   const [viewDate, setViewDate] = useState(new Date()); 
   const [loading, setLoading] = useState(true);
   
-  // 初期値を空文字にすることで「未入力」を表現
+  // 初期値は空文字（未入力状態）
   const [editReward, setEditReward] = useState<{f:any, first:any, main:any, amount:any}>({ 
     f: '', first: '', main: '', amount: '' 
   });
@@ -52,7 +52,8 @@ export default function Page() {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const shift = shifts.find(s => s.shift_date === dateStr);
     
-    // DBがnullまたはundefinedなら空文字（未入力状態）にする
+    // ✨ DBの値が null または undefined の場合のみ、空文字（未入力）にする。
+    // DBに0が保存されていれば「0」という値が入ります。
     const v = (val: any) => (val === null || val === undefined) ? '' : val;
 
     setEditReward({
@@ -80,8 +81,8 @@ export default function Page() {
 
   const handleSaveReward = async () => {
     if (!selectedDate) return;
-    
-    // 「いずれかに入力が無ければ（空文字なら）」保存をブロック
+
+    // ✨「いずれか」に値が入っていなければ保存を許可しない
     if (editReward.f === '' || editReward.first === '' || editReward.main === '') {
       alert('「フリー」「初指名」「本指名」のすべてを入力してください（無い場合は 0 を入力）');
       return;
@@ -101,10 +102,9 @@ export default function Page() {
 
   if (loading) return (
     <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center">
-      {/* ✨ フォントウェイトを 900 (極太) に固定 */}
       <div 
-        className="text-pink-300 tracking-tighter text-4xl italic animate-pulse"
-        style={{ fontWeight: 900 }}
+        className="text-pink-300 tracking-tighter text-5xl italic animate-pulse"
+        style={{ fontWeight: 900, WebkitTextStroke: '1px #F9A8D4' }}
       >
         KARINTO...
       </div>
@@ -117,10 +117,10 @@ export default function Page() {
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
       <header className="bg-white px-5 pt-12 pb-6 rounded-b-[30px] shadow-sm border-b border-pink-100">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 1.4.5</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 1.4.0</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'Cast'}
-          <span className="text-[20px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
+          <span className="text-[24px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
         </h1>
         <p className="text-[13px] font-bold text-gray-500 mt-1 ml-0.5 tracking-tighter leading-none">お疲れ様です🍵</p>
       </header>
@@ -131,20 +131,20 @@ export default function Page() {
           <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10 flex flex-col items-center">
             
-            <div className="flex items-center justify-center gap-2 mb-4 w-full">
-              <h2 className="text-[14px] font-black text-pink-500 whitespace-nowrap tracking-tighter">
+            <div className="flex items-center justify-between gap-1 mb-4 w-full">
+              <h2 className="text-[14px] font-black text-pink-500 whitespace-nowrap tracking-tighter shrink-0">
                 {format(viewDate, 'M月')}の実績合計
               </h2>
               <div className="flex gap-1">
                 <div className="bg-pink-400 px-2 py-1.5 rounded-xl border border-pink-300 flex items-baseline gap-0.5 shadow-md">
                   <span className="text-[9px] font-black text-white leading-none">出勤</span>
                   <span className="text-[18px] font-black text-white leading-none tracking-tighter">{monthlyTotals.count}</span>
-                  <span className="text-[9px] font-black text-white leading-none">日</span>
+                  <span className="text-[9px] font-black text-white leading-none italic">日</span>
                 </div>
                 <div className="bg-pink-400 px-2 py-1.5 rounded-xl border border-pink-300 flex items-baseline gap-0.5 shadow-md">
                   <span className="text-[9px] font-black text-white leading-none">稼働</span>
                   <span className="text-[18px] font-black text-white leading-none tracking-tighter">{Math.round(monthlyTotals.hours * 10) / 10}</span>
-                  <span className="text-[9px] font-black text-white leading-none">h</span>
+                  <span className="text-[9px] font-black text-white leading-none italic">h</span>
                 </div>
               </div>
             </div>
@@ -155,7 +155,7 @@ export default function Page() {
 
             <div className="grid grid-cols-3 gap-1 w-full bg-white/80 rounded-xl py-3 border border-pink-200 text-center shadow-inner">
               <div><p className="text-[13px] text-pink-400 font-black mb-0.5 leading-none">フリー</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.f}</p></div>
-              <div className="border-x border-pink-100"><p className="text-[12px] text-pink-400 font-black mb-0.5 leading-none">初指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.first}</p></div>
+              <div className="border-x border-pink-100"><p className="text-[13px] text-pink-400 font-black mb-0.5 leading-none">初指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.first}</p></div>
               <div><p className="text-[13px] text-pink-400 font-black mb-0.5 leading-none">本指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.main}</p></div>
             </div>
           </div>
@@ -176,7 +176,6 @@ export default function Page() {
                 {['f', 'first', 'main'].map((key) => (
                   <div key={key} className="text-center space-y-1">
                     <label className="text-[13px] font-black block text-gray-900 leading-none">{key==='f'?'フリー':key==='first'?'初指名':'本指名'}</label>
-                    {/* ✨ editReward[key] が空文字なら text-gray-200、数字なら text-pink-500 */}
                     <input 
                       type="number" 
                       inputMode="numeric" 
@@ -184,6 +183,7 @@ export default function Page() {
                       value={editReward[key as keyof typeof editReward]} 
                       onFocus={e=>e.target.select()} 
                       onChange={e=>setEditReward({...editReward,[key]:e.target.value})} 
+                      /* ✨ 空文字ならグレー、値が入っていればピンク */
                       className={`w-full text-center py-2 bg-[#FAFAFA] rounded-lg font-black text-2xl border border-gray-100 focus:ring-0 focus:border-pink-300 transition-colors ${editReward[key as keyof typeof editReward]===''?'text-gray-200':'text-pink-500'}`} 
                     />
                   </div>
@@ -211,7 +211,7 @@ export default function Page() {
           ))}
         </section>
 
-        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 1.4.5</p>
+        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 1.4.0</p>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
