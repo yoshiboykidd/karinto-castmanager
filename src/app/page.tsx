@@ -48,18 +48,20 @@ export default function Page() {
     setLoading(false);
   }
 
+  // ✨ 入力データの「未設定」と「0」の区別ロジック
   useEffect(() => {
     if (!selectedDate) return;
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const shift = shifts.find(s => s.shift_date === dateStr);
     
-    // ✨ nullなら '' (グレー0) 、値があればそのまま (ピンク0)
-    const val = (v: any) => (v === null || v === undefined) ? '' : v;
+    // データが全くない(null)なら空文字にする → グレーの0が出る
+    const checkValue = (v: any) => (v === null || v === undefined) ? '' : v;
+
     setEditReward({
-      f: val(shift?.f_count),
-      first: val(shift?.first_request_count),
-      main: val(shift?.main_request_count),
-      amount: val(shift?.reward_amount)
+      f: checkValue(shift?.f_count),
+      first: checkValue(shift?.first_request_count),
+      main: checkValue(shift?.main_request_count),
+      amount: checkValue(shift?.reward_amount)
     });
   }, [selectedDate, shifts]);
 
@@ -110,72 +112,75 @@ export default function Page() {
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       <header className="bg-white px-5 pt-12 pb-6 rounded-b-[30px] shadow-sm border-b border-pink-100">
         <h1 className="text-3xl font-black">{castProfile?.display_name || 'Cast'}さん🌸</h1>
+        <p className="text-pink-300 text-[9px] font-black uppercase tracking-widest mt-1">Cast Dashboard</p>
       </header>
 
       <main className="px-3 mt-4 space-y-4">
         {/* 1. 💰 月間合計実績 */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-4 border border-pink-300 relative overflow-hidden">
-          <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none">{format(viewDate, 'M')}</span>
+          <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10">
-            <h2 className="text-[18px] font-black text-pink-500 mb-2">{format(viewDate, 'M月')}の合計実績</h2>
+            <h2 className="text-[18px] font-black text-pink-500 mb-2 flex items-center gap-1.5 leading-none">
+              <span className="bg-pink-500 text-white px-2 py-1 rounded-lg text-sm">{format(viewDate, 'M月')}</span> の実績合計
+            </h2>
             <div className="flex gap-2 mb-3">
-              <div className="bg-white/60 px-3 py-1 rounded-xl border border-pink-200 text-pink-600 font-black">出勤 {monthlyTotals.count}日</div>
-              <div className="bg-white/60 px-3 py-1 rounded-xl border border-pink-200 text-pink-600 font-black">稼働 {Math.round(monthlyTotals.hours * 10) / 10}h</div>
+              <div className="bg-white/60 px-3 py-1.5 rounded-xl border border-pink-200 text-pink-600 font-black">出勤 {monthlyTotals.count}日</div>
+              <div className="bg-white/60 px-3 py-1.5 rounded-xl border border-pink-200 text-pink-600 font-black">稼働 {Math.round(monthlyTotals.hours * 10) / 10}h</div>
             </div>
             <p className="text-[44px] font-black text-pink-500 text-center mb-3">¥{monthlyTotals.amount.toLocaleString()}</p>
             <div className="grid grid-cols-3 gap-1 bg-white/80 rounded-xl py-2 border border-pink-200">
-              <div className="text-center"><p className="text-[10px] text-pink-400">フリー</p><p className="text-xl font-black text-pink-600">{monthlyTotals.f}</p></div>
-              <div className="text-center border-x border-pink-100"><p className="text-[10px] text-pink-400">初指名</p><p className="text-xl font-black text-pink-600">{monthlyTotals.first}</p></div>
-              <div className="text-center"><p className="text-[10px] text-pink-400">本指名</p><p className="text-xl font-black text-pink-600">{monthlyTotals.main}</p></div>
+              <div className="text-center"><p className="text-[10px] text-pink-400 font-bold">フリー</p><p className="text-xl font-black text-pink-600">{monthlyTotals.f}本</p></div>
+              <div className="text-center border-x border-pink-100"><p className="text-[10px] text-pink-400 font-bold">初指名</p><p className="text-xl font-black text-pink-600">{monthlyTotals.first}本</p></div>
+              <div className="text-center"><p className="text-[10px] text-pink-400 font-bold">本指名</p><p className="text-xl font-black text-pink-600">{monthlyTotals.main}本</p></div>
             </div>
           </div>
         </section>
 
         {/* 2. 📅 カレンダー */}
-        <section className="bg-white p-2 rounded-[22px] border border-pink-200">
+        <section className="bg-white p-2 rounded-[22px] border border-pink-200 shadow-sm overflow-hidden">
           <DashboardCalendar shifts={shifts} selectedDate={selectedDate} onSelect={setSelectedDate} month={viewDate} onMonthChange={setViewDate} />
         </section>
 
         {/* 3. ✍️ 実績入力フォーム */}
         <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden">
-          <div className="bg-[#FFF5F6] p-3 px-4 flex justify-between items-center h-[42px]">
-            <h3 className="text-[17px] font-black">{selectedDate ? format(selectedDate, 'M/d (eee)', { locale: ja }) : ''}</h3>
-            <span className="text-pink-500 font-black">{selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : 'OFF'}</span>
+          <div className="bg-[#FFF5F6] p-3 px-4 flex justify-between items-center h-[42px] border-b border-pink-100">
+            <h3 className="text-[17px] font-black text-gray-800">{selectedDate ? format(selectedDate, 'M/d (eee)', { locale: ja }) : ''}</h3>
+            <span className="text-pink-500 font-black text-lg tracking-tighter">{selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-xs text-gray-300 font-bold uppercase">OFF</span>}</span>
           </div>
           {selectedShift && (
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-3 gap-2">
                 {['f', 'first', 'main'].map((key) => (
-                  <div key={key} className="text-center">
-                    <label className="text-[13px] font-black block mb-1">{key==='f'?'フリー':key==='first'?'初指名':'本指名'}</label>
-                    <input type="number" inputMode="numeric" placeholder="0" value={editReward[key as keyof typeof editReward]} onFocus={e=>e.target.select()} onChange={e=>setEditReward({...editReward,[key]:e.target.value})} className={`w-full text-center py-2 bg-[#FAFAFA] rounded-lg font-black text-2xl border border-gray-100 focus:ring-0 ${editReward[key as keyof typeof editReward]===''?'text-gray-200':'text-pink-500'}`} />
+                  <div key={key} className="text-center space-y-1">
+                    <label className="text-[13px] font-black block text-gray-900">{key==='f'?'フリー':key==='first'?'初指名':'本指名'}</label>
+                    <input type="number" inputMode="numeric" placeholder="0" value={editReward[key as keyof typeof editReward]} onFocus={e=>e.target.select()} onChange={e=>setEditReward({...editReward,[key]:e.target.value})} className={`w-full text-center py-2 bg-[#FAFAFA] rounded-lg font-black text-2xl border border-gray-100 focus:ring-0 focus:border-pink-300 transition-colors ${editReward[key as keyof typeof editReward]===''?'text-gray-200':'text-pink-500'}`} />
                   </div>
                 ))}
               </div>
-              <div className="bg-pink-50/30 p-3 rounded-xl border border-pink-100 flex items-center justify-between">
-                <label className="text-[13px] font-black shrink-0">本日の報酬</label>
-                <div className="flex items-center flex-1 justify-end">
-                  <span className="text-pink-200 text-2xl font-black mr-1">¥</span>
-                  <input type="text" inputMode="numeric" placeholder="0" value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} onFocus={e=>e.target.select()} onChange={e=>{const val=e.target.value.replace(/,/g,''); if(/^\d*$/.test(val))setEditReward({...editReward,amount:val});}} className={`w-full text-right bg-transparent font-black text-[32px] focus:ring-0 border-none ${editReward.amount===''?'text-gray-200':'text-pink-500'}`} />
+              <div className="bg-pink-50/30 p-3 rounded-xl border border-pink-100 flex items-center justify-between h-[64px]">
+                <label className="text-[13px] font-black shrink-0 text-gray-900 uppercase">本日の報酬</label>
+                <div className="flex items-center flex-1 justify-end pl-4">
+                  <span className="text-pink-200 text-2xl font-black mr-1 translate-y-[2px]">¥</span>
+                  <input type="text" inputMode="numeric" placeholder="0" value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} onFocus={e=>e.target.select()} onChange={e=>{const v=e.target.value.replace(/,/g,''); if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});}} className={`w-full text-right bg-transparent font-black text-[32px] focus:ring-0 border-none ${editReward.amount===''?'text-gray-200':'text-pink-500'}`} />
                 </div>
               </div>
-              <button onClick={handleSaveReward} className="w-full bg-pink-500 text-white font-black py-5 rounded-xl text-lg shadow-lg active:scale-95 transition-all">実績を保存 💾</button>
+              <button onClick={handleSaveReward} className="w-full bg-pink-500 text-white font-black py-5 rounded-xl text-xl shadow-lg active:scale-95 transition-all uppercase tracking-widest">実績を保存 💾</button>
             </div>
           )}
         </section>
 
-        {/* 📢 4. SHOP NEWS */}
-        <section className="bg-white rounded-[22px] border border-pink-100 shadow-sm overflow-hidden">
-          <div className="bg-gray-50 p-2 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Shop News</div>
+        {/* 📢 SHOP NEWS */}
+        <section className="bg-white rounded-[22px] border border-pink-100 shadow-sm overflow-hidden opacity-90">
+          <div className="bg-gray-50 p-2 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Shop News</div>
           {newsList.length > 0 ? newsList.map((n) => (
             <div key={n.id} className="p-3 px-4 border-b border-gray-50 last:border-0 flex gap-3 items-start">
               <span className="text-[9px] text-pink-200 font-bold mt-0.5">{format(parseISO(n.created_at), 'MM/dd')}</span>
-              <p className="text-xs font-bold text-gray-500">{n.content}</p>
+              <p className="text-xs font-bold text-gray-500 leading-tight">{n.content}</p>
             </div>
-          )) : <p className="p-4 text-center text-gray-300 text-[10px] italic text-xs">お知らせはありません</p>}
+          )) : <p className="p-4 text-center text-gray-300 text-[10px] italic">お知らせはありません</p>}
         </section>
 
-        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-4 uppercase">Karinto Cast Manager ver 1.15.2</p>
+        <p className="text-center text-[10px] font-bold text-gray-200 tracking-[0.2em] pb-8 uppercase">Karinto Cast Manager ver 1.15.3</p>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">

@@ -31,14 +31,14 @@ export default function DashboardCalendar({
   return (
     <div className="w-full flex justify-center p-1 bg-white rounded-xl overflow-hidden">
       <style>{`
-        /* 🚨 ライブラリの丸を徹底的に排除 */
-        .rdp-day, .rdp-button, .rdp-day_selected, .rdp-day_selected:hover {
-          border-radius: 12px !important;
-          -webkit-border-radius: 12px !important;
+        /* 🚨 強制的に丸を四角へ矯正 */
+        .rdp-day, .rdp-button, .rdp-day_selected {
+          border-radius: 12px !important; /* 👈 円(50%)を完全に上書き */
+          aspect-ratio: 1 / 1 !important;
         }
 
         .rdp { --rdp-cell-size: 45px; margin: 0; }
-        .rdp-table { border-collapse: collapse !important; border: 0 !important; }
+        .rdp-table { border-collapse: separate !important; border-spacing: 2px !important; }
         .rdp-months { justify-content: center !important; }
 
         .rdp-button {
@@ -52,25 +52,26 @@ export default function DashboardCalendar({
           border: 3px solid transparent !important;
         }
 
-        /* 🟦 選択時：角丸の青い枠線 */
-        .rdp-day_selected {
-          background-color: transparent !important;
+        /* 🟦 選択時：青い「角丸の枠線」 */
+        .rdp-day_selected, .rdp-day_selected:hover, .rdp-day_selected:focus {
+          background: transparent !important; /* 塗りつぶしを消す */
           color: #3b82f6 !important;
-          border: 3px solid #3b82f6 !important;
-          box-shadow: none !important;
+          border: 3px solid #3b82f6 !important; /* 枠線を出す */
+          opacity: 1 !important;
         }
 
-        /* 🌸 シフトあり：角丸の薄ピンク（特定日より優先） */
+        /* 🌸 シフトあり：薄ピンク */
         .hasShift {
           background-color: #fdf2f8 !important;
           color: #ec4899 !important;
         }
 
-        /* 💡 特定日：角丸の薄黄色（シフトなし時） */
+        /* 💡 特定日：薄黄色 */
         .isEvent:not(.hasShift) { 
           background-color: #fffbeb !important;
         }
 
+        /* 曜日と年月 */
         .rdp-day.isSaturday:not(.rdp-day_selected) { color: #3b82f6 !important; }
         .rdp-day.isSunday:not(.rdp-day_selected) { color: #ef4444 !important; }
         .rdp-nav_button { color: #fda4af; border: none !important; }
