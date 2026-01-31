@@ -16,7 +16,6 @@ export default function Page() {
 
   const [shifts, setShifts] = useState<any[]>([]);
   const [castProfile, setCastProfile] = useState<any>(null);
-  const [newsList, setNewsList] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [viewDate, setViewDate] = useState(new Date()); 
   const [loading, setLoading] = useState(true);
@@ -40,19 +39,19 @@ export default function Page() {
     setLoading(false);
   }
 
-  // ✨ 入力データの出し分け
+  // ✨ 入力データの「未設定」と「0」の区別を厳密化
   useEffect(() => {
     if (!selectedDate) return;
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const shift = shifts.find(s => s.shift_date === dateStr);
     
-    // nullやundefined（未入力）は '' にして placeholder を出す
-    // 0が保存されていれば 0（実数）としてセット
+    const getValue = (val: any) => (val === null || val === undefined) ? '' : val;
+
     setEditReward({
-      f: shift?.f_count ?? '',
-      first: shift?.first_request_count ?? '',
-      main: shift?.main_request_count ?? '',
-      amount: shift?.reward_amount ?? ''
+      f: getValue(shift?.f_count),
+      first: getValue(shift?.first_request_count),
+      main: getValue(shift?.main_request_count),
+      amount: getValue(shift?.reward_amount)
     });
   }, [selectedDate, shifts]);
 
@@ -84,8 +83,7 @@ export default function Page() {
       </header>
 
       <main className="px-3 mt-4 space-y-4">
-        {/* 📅 カレンダー */}
-        <section className="bg-white p-2 rounded-[22px] border border-pink-200">
+        <section className="bg-white p-2 rounded-[22px] border border-pink-200 shadow-sm">
           <DashboardCalendar 
             shifts={shifts} 
             selectedDate={selectedDate} 
@@ -95,7 +93,6 @@ export default function Page() {
           />
         </section>
 
-        {/* ✍️ 入力フォーム */}
         <section className="bg-white rounded-[24px] border border-pink-300 overflow-hidden shadow-xl">
           <div className="bg-[#FFF5F6] p-3 px-4 flex justify-between items-center">
             <h3 className="text-lg font-black">{selectedDate ? format(selectedDate, 'M/d (eee)', { locale: ja }) : '日付選択'}</h3>
@@ -114,7 +111,7 @@ export default function Page() {
                       value={editReward[key as keyof typeof editReward]} 
                       onFocus={(e) => e.target.select()}
                       onChange={e => setEditReward({...editReward, [key]: e.target.value})}
-                      /* ✨ 空ならグレー(placeholder風)、数字があればピンク */
+                      /* ✨ '' ならグレー(text-gray-200)、0以上ならピンク(text-pink-500) */
                       className={`w-full text-center py-2 bg-[#FAFAFA] rounded-lg font-black text-2xl border border-gray-100 focus:ring-0 focus:border-pink-300 ${editReward[key as keyof typeof editReward] === '' ? 'text-gray-200' : 'text-pink-500'}`}
                     />
                   </div>
@@ -122,13 +119,13 @@ export default function Page() {
               </div>
 
               <div className="bg-pink-50/30 p-3 rounded-xl border border-pink-100 flex items-center justify-between">
-                <label className="font-black text-gray-900">本日の報酬</label>
-                <div className="flex items-center text-right flex-1">
+                <label className="font-black text-gray-900 text-[13px] uppercase tracking-widest">本日の報酬</label>
+                <div className="flex items-center text-right flex-1 pl-4">
                   <span className="text-pink-200 text-2xl font-black mr-1">¥</span>
                   <input 
                     type="text" 
                     placeholder="0"
-                    value={editReward.amount ? Number(editReward.amount).toLocaleString() : ''} 
+                    value={editReward.amount !== '' ? Number(editReward.amount).toLocaleString() : ''} 
                     onFocus={(e) => e.target.select()}
                     onChange={e => { const val = e.target.value.replace(/,/g, ''); if (/^\d*$/.test(val)) setEditReward({...editReward, amount: val}); }} 
                     className={`w-full text-right bg-transparent font-black text-3xl focus:ring-0 border-none ${editReward.amount === '' ? 'text-gray-200' : 'text-pink-500'}`}
@@ -142,7 +139,7 @@ export default function Page() {
         </section>
 
         <div className="text-center py-4">
-          <p className="text-[10px] font-bold text-gray-200 uppercase">Karinto Cast Manager ver 1.15.0</p>
+          <p className="text-[10px] font-bold text-gray-200 uppercase tracking-widest">Karinto Cast Manager ver 1.15.1</p>
         </div>
       </main>
     </div>
