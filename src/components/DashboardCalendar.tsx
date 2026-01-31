@@ -29,29 +29,45 @@ export default function DashboardCalendar({
   };
 
   return (
-    <div className="flex justify-center p-1 bg-white rounded-xl overflow-hidden scale-100 origin-top">
+    <div className="flex justify-center p-1 bg-white rounded-xl overflow-hidden shadow-inner">
       <style>{`
-        /* ✨ 数字を大きく、セルを広く (45px -> 48px) */
+        /* ✨ 全体のサイズとフォント */
         .rdp { --rdp-cell-size: 48px; margin: 0; }
-        .rdp-day { font-size: 16px; font-weight: 600; } 
+        .rdp-day { font-size: 16px; font-weight: 600; position: relative; width: 48px; height: 48px; display: flex; items-center; justify-content: center; } 
         
-        .rdp-day_selected { background-color: #fce7f3 !important; color: #ec4899 !important; font-weight: 900 !important; border: 2px solid #ec4899 !important; }
+        /* ✨ 選択時の青い丸（ズレ防止） */
+        .rdp-day_selected { 
+          background-color: #3b82f6 !important; /* 青に変更 */
+          color: white !important; 
+          font-weight: 900 !important;
+          border-radius: 50% !important;
+          border: none !important; /* 枠線を消してズレを防止 */
+          box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+        }
+
+        /* ✨ シフト該当日のピンク（薄く変更） */
+        .hasShift:not(.rdp-day_selected) {
+          color: #ec4899 !important;
+          background-color: #fdf2f8 !important; /* 極めて薄いピンク */
+          border: 1px solid #fce7f3;
+          border-radius: 50%;
+        }
+
+        /* 土日・イベントの基本色 */
         .rdp-day.isSaturday:not(.rdp-day_selected) { color: #3b82f6 !important; }
         .rdp-head_cell:nth-child(6) { color: #3b82f6 !important; }
         .rdp-day.isSunday:not(.rdp-day_selected) { color: #ef4444 !important; }
         .rdp-head_cell:nth-child(7) { color: #ef4444 !important; }
 
-        .isEvent:not(.rdp-day_selected) { 
+        .isEvent:not(.rdp-day_selected):not(.hasShift) { 
           background-color: #fffbeb;
           font-weight: 900 !important;
           border-radius: 8px;
         }
 
-        .hasShift:not(.rdp-day_selected) {
-          color: white !important;
-          background-color: #ec4899 !important;
-          border-radius: 50%;
-        }
+        /* 矢印や曜日の調整 */
+        .rdp-nav_button { color: #fda4af; }
+        .rdp-caption_label { font-weight: 900; color: #4b5563; font-size: 16px; }
       `}</style>
       <DayPicker
         mode="single"
