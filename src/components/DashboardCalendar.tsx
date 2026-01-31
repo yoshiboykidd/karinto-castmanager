@@ -36,40 +36,45 @@ export default function DashboardCalendar({
         .rdp-cell { border: 0 !important; padding: 0 !important; }
         .rdp-months { justify-content: center !important; }
 
+        /* ✨ 全てを 12px の角丸に統一 (円を廃止) */
         .rdp-button {
           width: 44px !important;
           height: 44px !important;
-          border-radius: 12px !important;
+          border-radius: 12px !important; /* 👈 ここを固定 */
           font-size: 18px !important;
           font-weight: 800 !important;
           display: flex !important;
           align-items: center !important;
           justify-content: center !important;
           transition: all 0.1s ease;
-          border: 2px solid transparent !important; /* 枠の予約 */
+          border: 2px solid transparent !important;
         }
 
-        /* ✨ 選択時：青い線枠だけにする */
+        /* ✨ 選択時：青い「角丸の枠線」 */
         .rdp-day_selected {
-          background-color: transparent !important; /* 背景は塗らない */
-          color: #3b82f6 !important; /* 文字を青く */
-          border: 3px solid #3b82f6 !important; /* 太めの青枠 */
+          background-color: transparent !important;
+          color: #3b82f6 !important;
+          border: 3px solid #3b82f6 !important; /* 👈 太い枠線 */
+          border-radius: 12px !important; /* 👈 角丸を維持 */
           z-index: 10;
         }
 
-        /* シフトあり（桜色の角丸） */
+        /* シフトあり：薄ピンクの「角丸」 */
         .hasShift:not(.rdp-day_selected) {
           background-color: #fdf2f8 !important;
           color: #ec4899 !important;
+          border-radius: 12px !important;
+        }
+
+        /* 特定日：薄黄色の「角丸」 */
+        .isEvent:not(.rdp-day_selected):not(.hasShift) { 
+          background-color: #fffbeb !important;
+          border-radius: 12px !important;
         }
 
         .rdp-day.isSaturday:not(.rdp-day_selected) { color: #3b82f6 !important; }
         .rdp-day.isSunday:not(.rdp-day_selected) { color: #ef4444 !important; }
         
-        .isEvent:not(.rdp-day_selected):not(.hasShift) { 
-          background-color: #fffbeb !important;
-        }
-
         .rdp-nav_button { color: #fda4af; border: none !important; }
         .rdp-caption_label { font-weight: 900; color: #4b5563; font-size: 17px; }
       `}</style>

@@ -46,7 +46,7 @@ export default function Page() {
     setLoading(false);
   }
 
-  // ✨ データ読み込み時、0 は '' に変換してグレーアウト状態にする
+  // ✨ 入力欄の初期化ロジック修正
   useEffect(() => {
     if (!selectedDate) {
       setEditReward({ f: '', first: '', main: '', amount: '' });
@@ -54,11 +54,14 @@ export default function Page() {
     }
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const shift = shifts.find(s => s.shift_date === dateStr);
+    
+    // データが全くない場合のみ '' にしてプレースホルダーを表示
+    // すでに0以上の数字が入っていれば、そのまま表示する
     setEditReward({
-      f: (shift?.f_count === 0 || !shift) ? '' : shift.f_count,
-      first: (shift?.first_request_count === 0 || !shift) ? '' : shift.first_request_count,
-      main: (shift?.main_request_count === 0 || !shift) ? '' : shift.main_request_count,
-      amount: (shift?.reward_amount === 0 || !shift) ? '' : shift.reward_amount
+      f: (shift?.f_count === undefined || shift?.f_count === null) ? '' : shift.f_count,
+      first: (shift?.first_request_count === undefined || shift?.first_request_count === null) ? '' : shift.first_request_count,
+      main: (shift?.main_request_count === undefined || shift?.main_request_count === null) ? '' : shift.main_request_count,
+      amount: (shift?.reward_amount === undefined || shift?.reward_amount === null) ? '' : shift.reward_amount
     });
   }, [selectedDate, shifts]);
 
@@ -188,7 +191,7 @@ export default function Page() {
               ) : '日付を選択してください'}
             </h3>
             <div className="text-lg font-black text-pink-500 tracking-tighter leading-none">
-              {selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-[9px] font-bold text-gray-300 uppercase px-1.5 py-0.5 bg-gray-50 rounded">OFF</span>}
+              {selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-[9px] font-bold text-gray-400 uppercase px-1.5 py-0.5 bg-gray-50 rounded">OFF</span>}
             </div>
           </div>
           {selectedShift ? (
@@ -234,7 +237,7 @@ export default function Page() {
         </section>
 
         <div className="pt-4 pb-2 text-center">
-          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.14.5</p>
+          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.14.6</p>
         </div>
       </main>
 
