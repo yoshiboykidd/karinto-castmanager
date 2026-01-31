@@ -20,12 +20,11 @@ export default function Page() {
   const [viewDate, setViewDate] = useState(new Date()); 
   const [loading, setLoading] = useState(true);
 
-  // Ver 2.0 シフト申請用
+  // Ver 2.0 シフト申請用ステート
   const [isRequestMode, setIsRequestMode] = useState(false);
   const [singleDate, setSingleDate] = useState<Date | undefined>(new Date());
   const [multiDates, setMultiDates] = useState<Date[]>([]);
   const [requestDetails, setRequestDetails] = useState<{[key: string]: {s: string, e: string}}>({});
-  
   const [editReward, setEditReward] = useState({ f: '', first: '', main: '', amount: '' });
 
   useEffect(() => { fetchInitialData(); }, []);
@@ -48,7 +47,6 @@ export default function Page() {
     setLoading(false);
   }
 
-  // 申請時のデフォルト時間セット
   useEffect(() => {
     const newDetails = { ...requestDetails };
     multiDates.forEach(d => {
@@ -104,7 +102,7 @@ export default function Page() {
       
       {/* ⛄️ Ver 1.4.1 ヘッダー */}
       <header className="bg-white px-5 pt-12 pb-6 rounded-b-[30px] shadow-sm border-b border-pink-100">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.2.1</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.2.2</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'Cast'}
           <span className="text-[24px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
@@ -120,23 +118,23 @@ export default function Page() {
 
       <main className="px-3 mt-4 space-y-4">
         
-        {/* 📊 実績合計：Ver 1.4.1 デザイン完全再現 ＆ 1行絶対固定 */}
+        {/* 📊 実績合計：Ver 1.4.1 デザイン ＆ 1行強制固定 ＆ 文字黒・数字ピンク */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-4 border border-pink-300 relative overflow-hidden shadow-sm flex flex-col items-center">
           <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10 w-full flex flex-col items-center">
             
-            <h2 className="text-[14px] font-black text-pink-500 mb-4 tracking-tighter text-center leading-none">
+            <h2 className="text-[15px] font-black text-pink-500 mb-4 tracking-tighter text-center leading-none">
               {format(viewDate, 'M月')}の実績合計
             </h2>
 
-            {/* ✨ 1行固定のための魔法：flex-nowrap ＆ justify-center */}
-            <div className="flex flex-row flex-nowrap items-center justify-center gap-2 mb-5 w-full overflow-visible">
-              <div className="bg-white/90 border border-pink-200 px-3 py-1.5 rounded-xl flex items-baseline gap-1 shadow-sm shrink-0">
+            {/* 🏆 出勤・稼働バッジ：絶対に1行 (whitespace-nowrap) */}
+            <div className="flex flex-row items-center justify-center gap-2 mb-5 w-full whitespace-nowrap">
+              <div className="bg-white/90 border border-pink-200 px-3 py-1.5 rounded-xl flex items-baseline gap-0.5 shadow-sm">
                 <span className="text-[10px] font-black text-gray-900 leading-none">出勤</span>
                 <span className="text-2xl font-black text-pink-500 leading-none tracking-tighter">{monthlyTotals.count}</span>
                 <span className="text-[10px] font-black text-gray-900 leading-none italic">日</span>
               </div>
-              <div className="bg-white/90 border border-pink-200 px-3 py-1.5 rounded-xl flex items-baseline gap-1 shadow-sm shrink-0">
+              <div className="bg-white/90 border border-pink-200 px-3 py-1.5 rounded-xl flex items-baseline gap-0.5 shadow-sm">
                 <span className="text-[10px] font-black text-gray-900 leading-none">稼働</span>
                 <span className="text-2xl font-black text-pink-500 leading-none tracking-tighter">{Math.round(monthlyTotals.hours * 10) / 10}</span>
                 <span className="text-[10px] font-black text-gray-900 leading-none italic">h</span>
@@ -147,7 +145,7 @@ export default function Page() {
               <span className="text-2xl mr-1 leading-none">¥</span>{monthlyTotals.amount.toLocaleString()}
             </p>
 
-            {/* Ver 1.4.1 詳細内訳 */}
+            {/* Ver 1.4.1 内訳 */}
             <div className="grid grid-cols-3 gap-1 w-full bg-white/80 rounded-xl py-3 border border-pink-200 text-center shadow-inner">
               <div className="leading-none"><p className="text-[13px] text-pink-400 font-black mb-1">フリー</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.f}</p></div>
               <div className="border-x border-pink-100 leading-none"><p className="text-[12px] text-pink-400 font-black mb-1">初指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.first}</p></div>
@@ -167,14 +165,14 @@ export default function Page() {
           />
         </section>
 
-        {/* 💜 シフト申請パネル */}
+        {/* 💜 申請パネル */}
         {isRequestMode ? (
           <section className="bg-white rounded-[24px] border border-purple-200 p-4 shadow-xl animate-in slide-in-from-bottom-4">
-            <div className="flex justify-between items-center mb-4 leading-none">
+            <div className="flex justify-between items-center mb-4">
               <h3 className="font-black text-purple-600 text-[13px] uppercase tracking-widest">選択中: {multiDates.length}日</h3>
               {multiDates.length > 0 && <button onClick={() => setMultiDates([])} className="text-[9px] font-black text-gray-300 uppercase border border-gray-200 px-2 py-1 rounded-md">リセット</button>}
             </div>
-            <div className="max-h-48 overflow-y-auto space-y-2 mb-4 pr-1">
+            <div className="max-h-48 overflow-y-auto space-y-2 mb-4 pr-1 custom-scrollbar">
               {multiDates.sort((a,b)=>a.getTime()-b.getTime()).map(d => {
                 const key = format(d, 'yyyy-MM-dd');
                 return (
@@ -193,7 +191,7 @@ export default function Page() {
             <button disabled={multiDates.length === 0} onClick={handleBulkSubmit} className="w-full bg-purple-600 text-white font-black py-4 rounded-xl text-lg shadow-lg active:scale-95 transition-all uppercase tracking-widest disabled:bg-gray-100 disabled:text-gray-300">申請を送信する 🚀</button>
           </section>
         ) : (
-          /* ✍️ 実績入力：Ver 1.4.1 ベース */
+          /* ✍️ 実績入力：Ver 1.4.1 完全再現 */
           <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden text-center">
             <div className="bg-[#FFF5F6] p-3 px-4 flex justify-center items-center h-[42px] border-b border-pink-100 relative leading-none">
               <h3 className="text-[17px] font-black text-gray-800">{singleDate ? format(singleDate, 'M/d (eee)', { locale: ja }) : ''}</h3>
@@ -236,7 +234,7 @@ export default function Page() {
             </div>
           ))}
         </section>
-        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 2.2.1</p>
+        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 2.2.2</p>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-sm">
