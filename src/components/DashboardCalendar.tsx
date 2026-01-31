@@ -21,20 +21,14 @@ export default function DashboardCalendar({
   const shiftDays = shifts.map(s => parseISO(s.shift_date));
   const eventDays = (date: Date) => [10, 11, 22].includes(date.getDate());
 
-  const modifiers = {
-    hasShift: shiftDays,
-    isSaturday: (date: Date) => isSaturday(date),
-    isSunday: (date: Date) => isSunday(date),
-    isEvent: eventDays,
-  };
-
   return (
     <div className="w-full flex justify-center p-1 bg-white rounded-xl overflow-hidden">
       <style>{`
-        /* 🚨 強制的に丸を四角へ矯正 */
-        .rdp-day, .rdp-button, .rdp-day_selected {
-          border-radius: 12px !important; /* 👈 円(50%)を完全に上書き */
+        /* 🚨 あらゆる丸設定を根こそぎ四角にする設定 */
+        .rdp-day, .rdp-button, .rdp-day_selected, .rdp-day_selected:hover {
+          border-radius: 12px !important;
           aspect-ratio: 1 / 1 !important;
+          clip-path: none !important;
         }
 
         .rdp { --rdp-cell-size: 45px; margin: 0; }
@@ -53,10 +47,11 @@ export default function DashboardCalendar({
         }
 
         /* 🟦 選択時：青い「角丸の枠線」 */
-        .rdp-day_selected, .rdp-day_selected:hover, .rdp-day_selected:focus {
-          background: transparent !important; /* 塗りつぶしを消す */
+        .rdp-day_selected {
+          background-color: transparent !important;
           color: #3b82f6 !important;
-          border: 3px solid #3b82f6 !important; /* 枠線を出す */
+          border: 3px solid #3b82f6 !important;
+          box-shadow: none !important;
           opacity: 1 !important;
         }
 
@@ -66,12 +61,11 @@ export default function DashboardCalendar({
           color: #ec4899 !important;
         }
 
-        /* 💡 特定日：薄黄色 */
+        /* 💡 特定日：薄黄色（シフトなし時） */
         .isEvent:not(.hasShift) { 
           background-color: #fffbeb !important;
         }
 
-        /* 曜日と年月 */
         .rdp-day.isSaturday:not(.rdp-day_selected) { color: #3b82f6 !important; }
         .rdp-day.isSunday:not(.rdp-day_selected) { color: #ef4444 !important; }
         .rdp-nav_button { color: #fda4af; border: none !important; }
@@ -84,7 +78,12 @@ export default function DashboardCalendar({
         month={month}
         onMonthChange={onMonthChange}
         locale={ja}
-        modifiers={modifiers}
+        modifiers={{
+          hasShift: shiftDays,
+          isSaturday: (date: Date) => isSaturday(date),
+          isSunday: (date: Date) => isSunday(date),
+          isEvent: eventDays,
+        }}
         modifiersClassNames={{
           isSaturday: 'isSaturday',
           isSunday: 'isSunday',
