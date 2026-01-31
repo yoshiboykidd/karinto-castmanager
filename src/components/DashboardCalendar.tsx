@@ -27,11 +27,19 @@ export default function DashboardCalendar({
         .rdp { --rdp-cell-size: 45px; margin: 0; }
         .rdp-button { font-size: 18px !important; font-weight: 800 !important; }
         
-        /* ✨ カレンダーの年月（2026年1月）を中央寄せ */
+        /* ✨ 年月（2026年1月）を完全に中央固定 */
         .rdp-caption { 
-          display: flex; 
-          justify-content: center !important; 
-          position: relative;
+          display: flex !important;
+          justify-content: center !important;
+          align-items: center !important;
+          position: relative !important;
+          height: 40px;
+        }
+        .rdp-caption_label { 
+          position: static !important; 
+          font-weight: 900; 
+          color: #4b5563; 
+          font-size: 18px !important;
         }
 
         /* 🌸 シフトあり：12pxの角丸（四角） */
@@ -57,7 +65,6 @@ export default function DashboardCalendar({
         .rdp-day.isSaturday:not(.rdp-day_selected) { color: #3b82f6 !important; }
         .rdp-day.isSunday:not(.rdp-day_selected) { color: #ef4444 !important; }
         .rdp-nav_button { color: #fda4af; }
-        .rdp-caption_label { font-weight: 900; color: #4b5563; font-size: 17px; }
       `}</style>
       <DayPicker
         mode="single"
@@ -79,7 +86,7 @@ export default function DashboardCalendar({
           hasShift: 'hasShift'
         }}
         formatters={{
-          formatCaption: (date) => format(date, 'yyyy年M月', { locale: ja }),
+          formatCaption: (date) => format(date, 'yyyy/M', { locale: ja }),
         }}
       />
     </div>
