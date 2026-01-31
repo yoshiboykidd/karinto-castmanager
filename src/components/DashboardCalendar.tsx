@@ -31,10 +31,14 @@ export default function DashboardCalendar({
   return (
     <div className="w-full flex justify-center p-1 bg-white rounded-xl">
       <style>{`
-        /* ✨ ライブラリの「円形」設定を強制上書き */
-        .rdp-day { border-radius: 12px !important; }
-        .rdp-button { border-radius: 12px !important; }
-        .rdp-day_selected { border-radius: 12px !important; }
+        /* ✨ ライブラリの丸（50%）をあらゆる場所で角丸（12px）に書き換える */
+        .rdp-day, 
+        .rdp-button, 
+        .rdp-day_selected,
+        .rdp-day_selected:hover,
+        .rdp-day:hover { 
+          border-radius: 12px !important; 
+        }
 
         .rdp { --rdp-cell-size: 45px; margin: 0; }
         .rdp-table { border-collapse: collapse !important; border: 0 !important; }
@@ -48,29 +52,28 @@ export default function DashboardCalendar({
           display: flex !important;
           align-items: center !important;
           justify-content: center !important;
-          border: 3px solid transparent !important; /* 👈 枠線を常に確保してガタつき防止 */
+          border: 3px solid transparent !important;
         }
 
         /* ✨ 選択時：青い「角丸の枠線」 */
-        .rdp-day_selected, .rdp-day_selected:hover {
+        .rdp-day_selected {
           background-color: transparent !important;
           color: #3b82f6 !important;
-          border: 3px solid #3b82f6 !important; /* 👈 青枠 */
-          z-index: 10;
+          border: 3px solid #3b82f6 !important;
+          box-shadow: none !important;
         }
 
-        /* 🌸 シフトあり：薄ピンク（特定日よりも優先） */
+        /* 🌸 シフトあり：薄ピンク */
         .hasShift {
           background-color: #fdf2f8 !important;
           color: #ec4899 !important;
         }
 
-        /* 💡 特定日：薄黄色（シフトがない時だけ黄色くなる） */
+        /* 💡 特定日：薄黄色（シフトがない時のみ） */
         .isEvent:not(.hasShift) { 
           background-color: #fffbeb !important;
         }
 
-        /* 休日設定 */
         .rdp-day.isSaturday:not(.rdp-day_selected) { color: #3b82f6 !important; }
         .rdp-day.isSunday:not(.rdp-day_selected) { color: #ef4444 !important; }
         

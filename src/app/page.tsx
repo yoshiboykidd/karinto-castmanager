@@ -46,7 +46,6 @@ export default function Page() {
     setLoading(false);
   }
 
-  // ✨ 入力欄の初期化ロジック修正
   useEffect(() => {
     if (!selectedDate) {
       setEditReward({ f: '', first: '', main: '', amount: '' });
@@ -55,8 +54,7 @@ export default function Page() {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const shift = shifts.find(s => s.shift_date === dateStr);
     
-    // データが全くない場合のみ '' にしてプレースホルダーを表示
-    // すでに0以上の数字が入っていれば、そのまま表示する
+    // ✨ 全くデータがない（null/undefined）なら ''、0が保存されていれば 0 をセット
     setEditReward({
       f: (shift?.f_count === undefined || shift?.f_count === null) ? '' : shift.f_count,
       first: (shift?.first_request_count === undefined || shift?.first_request_count === null) ? '' : shift.first_request_count,
@@ -202,6 +200,7 @@ export default function Page() {
                     <label className="text-[13px] font-black text-gray-900 block tracking-tighter leading-none">
                       {key === 'f' ? 'フリー' : key === 'first' ? '初指名' : '本指名'}
                     </label>
+                    {/* ✨ editReward[key] が '' なら text-gray-200、数字が入れば text-pink-500 */}
                     <input 
                       type="number" 
                       inputMode="numeric" 
@@ -209,7 +208,7 @@ export default function Page() {
                       value={editReward[key as keyof typeof editReward]} 
                       onFocus={(e) => e.target.select()}
                       onChange={e => setEditReward({...editReward, [key]: e.target.value})} 
-                      className="w-full text-center py-2 bg-[#FAFAFA] rounded-lg font-black text-[24px] text-pink-500 border border-gray-100 focus:outline-none focus:ring-0 focus:border-pink-300 transition-colors placeholder:text-gray-200" 
+                      className={`w-full text-center py-2 bg-[#FAFAFA] rounded-lg font-black text-[24px] border border-gray-100 focus:outline-none focus:ring-0 focus:border-pink-300 transition-colors placeholder:text-gray-200 ${editReward[key as keyof typeof editReward] === '' ? 'text-gray-200' : 'text-pink-500'}`} 
                     />
                   </div>
                 ))}
@@ -219,6 +218,7 @@ export default function Page() {
                 <label className="text-[13px] font-black text-gray-900 uppercase tracking-widest shrink-0">本日の報酬</label>
                 <div className="flex items-center justify-end flex-1 pl-4">
                   <span className="text-pink-200 text-2xl font-black mr-1 translate-y-[2px]">¥</span>
+                  {/* ✨ 金額欄も同様の色の出し分け */}
                   <input 
                     type="text" 
                     inputMode="numeric" 
@@ -226,7 +226,7 @@ export default function Page() {
                     value={editReward.amount ? Number(editReward.amount).toLocaleString() : ''} 
                     onFocus={(e) => e.target.select()}
                     onChange={e => { const val = e.target.value.replace(/,/g, ''); if (/^\d*$/.test(val)) setEditReward({...editReward, amount: val}); }} 
-                    className="w-full text-right bg-transparent font-black text-[32px] text-pink-500 focus:outline-none focus:ring-0 border-none placeholder:text-gray-200" 
+                    className={`w-full text-right bg-transparent font-black text-[32px] focus:outline-none focus:ring-0 border-none placeholder:text-gray-200 ${editReward.amount === '' ? 'text-gray-200' : 'text-pink-500'}`} 
                   />
                 </div>
               </div>
@@ -237,7 +237,7 @@ export default function Page() {
         </section>
 
         <div className="pt-4 pb-2 text-center">
-          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.14.7</p>
+          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.14.8</p>
         </div>
       </main>
 
