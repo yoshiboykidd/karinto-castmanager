@@ -6,44 +6,18 @@ import { format, parseISO, isSaturday, isSunday } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import 'react-day-picker/dist/style.css';
 
-interface DashboardCalendarProps {
-  shifts: any[];
-  selectedDates: any; 
-  onSelect: (val: any) => void; 
-  month: Date;
-  onMonthChange: (date: Date) => void;
-  isRequestMode: boolean;
-}
-
 export default function DashboardCalendar({ 
   shifts, selectedDates, onSelect, month, onMonthChange, isRequestMode 
-}: DashboardCalendarProps) {
-
-  const shiftDays = shifts.filter(s => s.status === 'official').map(s => parseISO(s.shift_date));
-  const requestedDays = shifts.filter(s => s.status === 'requested').map(s => parseISO(s.shift_date));
+}: any) {
+  const shiftDays = shifts.filter((s:any) => s.status === 'official').map((s:any) => parseISO(s.shift_date));
+  const requestedDays = shifts.filter((s:any) => s.status === 'requested').map((s:any) => parseISO(s.shift_date));
   const isEventDay = (date: Date) => [10, 11, 22].includes(date.getDate());
 
   const commonProps = {
-    month,
-    onMonthChange,
-    locale: ja,
-    modifiers: {
-      hasShift: shiftDays,
-      isRequested: requestedDays,
-      isEvent: isEventDay,
-      isSaturday: (date: Date) => isSaturday(date),
-      isSunday: (date: Date) => isSunday(date),
-    },
-    modifiersClassNames: {
-      hasShift: 'hasShift',
-      isRequested: 'isRequested',
-      isEvent: 'isEvent',
-      isSaturday: 'isSaturday',
-      isSunday: 'isSunday',
-    },
-    formatters: {
-      formatCaption: (date: Date) => format(date, 'yyyy/M', { locale: ja }),
-    },
+    month, onMonthChange, locale: ja,
+    modifiers: { hasShift: shiftDays, isRequested: requestedDays, isEvent: isEventDay, isSaturday, isSunday },
+    modifiersClassNames: { hasShift: 'hasShift', isRequested: 'isRequested', isEvent: 'isEvent', isSaturday: 'isSaturday', isSunday: 'isSunday' },
+    formatters: { formatCaption: (date: Date) => format(date, 'yyyy/M', { locale: ja }) },
   };
 
   return (
@@ -60,12 +34,11 @@ export default function DashboardCalendar({
         .is-request-ui .rdp-day_selected { background-color: #f3e8ff !important; color: #a855f7 !important; border: 2px solid #a855f7 !important; border-radius: 12px !important; }
         .rdp-day.isSaturday:not(.rdp-day_selected) { color: #3b82f6 !important; }
         .rdp-day.isSunday:not(.rdp-day_selected) { color: #ef4444 !important; }
-        .rdp-nav_button { color: #fda4af; }
       `}</style>
       {isRequestMode ? (
-        <DayPicker mode="multiple" selected={selectedDates as Date[]} onSelect={onSelect} className="is-request-ui" {...commonProps} />
+        <DayPicker mode="multiple" selected={selectedDates} onSelect={onSelect} className="is-request-ui" {...commonProps} />
       ) : (
-        <DayPicker mode="single" selected={selectedDates as Date} onSelect={onSelect} {...commonProps} />
+        <DayPicker mode="single" selected={selectedDates} onSelect={onSelect} {...commonProps} />
       )}
     </div>
   );
