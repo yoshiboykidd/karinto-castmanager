@@ -27,6 +27,13 @@ export default function DashboardCalendar({
         .rdp { --rdp-cell-size: 45px; margin: 0; }
         .rdp-button { font-size: 18px !important; font-weight: 800 !important; }
         
+        /* ✨ カレンダーの年月（2026年1月）を中央寄せ */
+        .rdp-caption { 
+          display: flex; 
+          justify-content: center !important; 
+          position: relative;
+        }
+
         /* 🌸 シフトあり：12pxの角丸（四角） */
         .hasShift:not(.rdp-day_selected) { 
           background-color: #fdf2f8 !important; 
@@ -70,6 +77,9 @@ export default function DashboardCalendar({
           isSunday: 'isSunday',
           isEvent: 'isEvent',
           hasShift: 'hasShift'
+        }}
+        formatters={{
+          formatCaption: (date) => format(date, 'yyyy年M月', { locale: ja }),
         }}
       />
     </div>

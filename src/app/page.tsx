@@ -94,14 +94,26 @@ export default function Page() {
       </header>
 
       <main className="px-3 mt-4 space-y-4">
+        {/* ✨ 合計実績：1行にまとめ、数字を大きく、文字を黒く */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-4 border border-pink-300 relative overflow-hidden shadow-sm">
           <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10">
-            <h2 className="text-[18px] font-black text-pink-500 mb-2">{format(viewDate, 'M月')}の合計実績</h2>
-            <div className="flex gap-2 mb-3">
-              <div className="bg-white/60 px-3 py-1.5 rounded-xl border border-pink-200 text-pink-600 font-black text-xs">出勤 {monthlyTotals.count}日</div>
-              <div className="bg-white/60 px-3 py-1.5 rounded-xl border border-pink-200 text-pink-600 font-black text-xs">稼働 {Math.round(monthlyTotals.hours * 10) / 10}h</div>
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <h2 className="text-[16px] font-black text-pink-500 whitespace-nowrap">{format(viewDate, 'M月')}の実績合計</h2>
+              <div className="flex gap-1.5">
+                <div className="bg-white/60 px-2.5 py-1 rounded-xl border border-pink-200 flex items-baseline gap-1 shadow-sm">
+                  <span className="text-[9px] font-black text-gray-900">出勤</span>
+                  <span className="text-lg font-black text-pink-600 leading-none">{monthlyTotals.count}</span>
+                  <span className="text-[9px] font-black text-gray-900">日</span>
+                </div>
+                <div className="bg-white/60 px-2.5 py-1 rounded-xl border border-pink-200 flex items-baseline gap-1 shadow-sm">
+                  <span className="text-[9px] font-black text-gray-900">稼働</span>
+                  <span className="text-lg font-black text-pink-600 leading-none">{Math.round(monthlyTotals.hours * 10) / 10}</span>
+                  <span className="text-[9px] font-black text-gray-900">h</span>
+                </div>
+              </div>
             </div>
+            
             <p className="text-[44px] font-black text-pink-500 text-center mb-3">¥{monthlyTotals.amount.toLocaleString()}</p>
             <div className="grid grid-cols-3 gap-1 bg-white/80 rounded-xl py-2 border border-pink-200 text-center">
               <div><p className="text-[10px] text-pink-400 font-bold">フリー</p><p className="text-xl font-black text-pink-600">{monthlyTotals.f}</p></div>
@@ -116,9 +128,10 @@ export default function Page() {
         </section>
 
         <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden">
-          <div className="bg-[#FFF5F6] p-3 px-4 flex justify-between items-center h-[42px] border-b border-pink-100">
+          {/* ✨ 日付詳細：中央寄せ */}
+          <div className="bg-[#FFF5F6] p-3 px-4 flex justify-center items-center h-[42px] border-b border-pink-100 relative">
             <h3 className="text-[17px] font-black text-gray-800">{selectedDate ? format(selectedDate, 'M/d (eee)', { locale: ja }) : ''}</h3>
-            <span className="text-pink-500 font-black text-lg tracking-tighter">{selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-xs text-gray-300 font-bold uppercase">OFF</span>}</span>
+            <span className="absolute right-4 text-pink-500 font-black text-lg tracking-tighter">{selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-xs text-gray-300 font-bold uppercase">OFF</span>}</span>
           </div>
           {selectedShift && (
             <div className="p-4 space-y-4">
@@ -152,7 +165,7 @@ export default function Page() {
           ))}
         </section>
 
-        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 1.16.8</p>
+        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase">Karinto Cast Manager ver 1.16.9</p>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
