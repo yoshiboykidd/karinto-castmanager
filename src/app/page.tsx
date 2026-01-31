@@ -112,8 +112,6 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
-      
-      {/* 🚀 ヘッダー：名前大きく */}
       <header className="bg-white px-5 pt-12 pb-6 rounded-b-[30px] shadow-sm border-b border-pink-100">
         <h1 className="text-3xl font-black text-gray-800 tracking-tighter flex items-baseline gap-1">
           {castProfile?.display_name || 'Cast'}
@@ -123,13 +121,10 @@ export default function Page() {
       </header>
 
       <main className="px-3 mt-4 space-y-4">
-        
-        {/* 1. 💰 合計金額枠 */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-4 border border-pink-300 shadow-sm relative overflow-hidden">
           <span className="absolute -right-2 -top-4 text-[80px] font-black text-pink-200/20 italic select-none leading-none">
             {format(viewDate, 'M')}
           </span>
-
           <div className="relative z-10 mb-2">
             <h2 className="text-[18px] font-black text-pink-500 flex items-center gap-1.5 leading-none">
               <span className="bg-pink-500 text-white px-2 py-1 rounded-lg text-sm">{format(viewDate, 'M月')}</span>
@@ -148,11 +143,9 @@ export default function Page() {
               </div>
             </div>
           </div>
-          
           <p className="text-[44px] font-black text-pink-500 tracking-tighter mb-3 text-center leading-none relative z-10 drop-shadow-sm">
             <span className="text-lg mr-0.5 font-bold">¥</span>{monthlyTotals.amount.toLocaleString()}
           </p>
-
           <div className="flex justify-between items-center bg-white/80 rounded-xl py-1.5 border border-pink-200 relative z-10">
             {[
               { label: 'フリー', value: monthlyTotals.f },
@@ -167,7 +160,6 @@ export default function Page() {
           </div>
         </section>
 
-        {/* 2. 📅 カレンダー（大型化） */}
         <section className="bg-white p-2 rounded-[22px] border border-pink-200 shadow-sm overflow-hidden">
           <DashboardCalendar 
             shifts={shifts} 
@@ -178,7 +170,6 @@ export default function Page() {
           />
         </section>
 
-        {/* 3. ✍️ 実績入力フォーム (✨ ズレ防止・スリム版) */}
         <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden">
           <div className="bg-[#FFF5F6] p-2.5 px-4 border-b border-pink-100 flex justify-between items-center h-[42px]">
             <h3 className="text-[13px] font-black text-gray-700 leading-none">
@@ -200,14 +191,7 @@ export default function Page() {
                 {['f', 'first', 'main'].map((key) => (
                   <div key={key} className="space-y-1 text-center">
                     <label className="text-[10px] font-bold text-gray-300 block tracking-tighter leading-none">{key === 'f' ? 'フリー' : key === 'first' ? '初指名' : '本指名'}</label>
-                    {/* ✨ ズレ防止設定: focus:ring-0 / focus:border-pink-300 */}
-                    <input 
-                      type="number" 
-                      inputMode="numeric" 
-                      value={editReward[key as keyof typeof editReward]} 
-                      onChange={e => setEditReward({...editReward, [key]: e.target.value})} 
-                      className="w-full text-center py-1.5 bg-[#FAFAFA] rounded-lg font-black text-[22px] text-pink-500 border border-gray-100 focus:outline-none focus:ring-0 focus:border-pink-300 transition-colors" 
-                    />
+                    <input type="number" inputMode="numeric" value={editReward[key as keyof typeof editReward]} onChange={e => setEditReward({...editReward, [key]: e.target.value})} className="w-full text-center py-1.5 bg-[#FAFAFA] rounded-lg font-black text-[22px] text-pink-500 border border-gray-100 focus:outline-none focus:ring-0 focus:border-pink-300 transition-colors" />
                   </div>
                 ))}
               </div>
@@ -215,13 +199,7 @@ export default function Page() {
                 <label className="text-[10px] font-black text-pink-300 shrink-0 uppercase tracking-widest leading-none">給料</label>
                 <div className="relative flex-1 text-right">
                   <span className="absolute left-1 top-1/2 -translate-y-1/2 text-pink-200 text-lg font-black pointer-events-none">¥</span>
-                  <input 
-                    type="text" 
-                    inputMode="numeric" 
-                    value={editReward.amount ? Number(editReward.amount).toLocaleString() : ''} 
-                    onChange={e => { const val = e.target.value.replace(/,/g, ''); if (/^\d*$/.test(val)) setEditReward({...editReward, amount: val}); }} 
-                    className="w-full text-right pr-1 py-0 bg-transparent font-black text-[28px] text-pink-500 focus:outline-none focus:ring-0 border-none" 
-                  />
+                  <input type="text" inputMode="numeric" value={editReward.amount ? Number(editReward.amount).toLocaleString() : ''} onChange={e => { const val = e.target.value.replace(/,/g, ''); if (/^\d*$/.test(val)) setEditReward({...editReward, amount: val}); }} className="w-full text-right pr-1 py-0 bg-transparent font-black text-[28px] text-pink-500 focus:outline-none focus:ring-0 border-none" />
                 </div>
               </div>
               <button onClick={handleSaveReward} className="w-full bg-pink-500 text-white font-black py-3 rounded-xl shadow-lg active:scale-95 transition-all text-[11px] tracking-[0.2em] uppercase">実績を保存 💾</button>
@@ -229,7 +207,6 @@ export default function Page() {
           ) : <div className="p-6 text-center bg-white italic text-gray-300 text-[10px]">カレンダーの日付を選択すると入力できます</div>}
         </section>
 
-        {/* 📢 NEWS */}
         <section className="bg-white rounded-[22px] overflow-hidden border border-pink-100 shadow-sm opacity-90">
           <div className="bg-gray-50 p-2 px-4 border-b border-gray-100 flex justify-between items-center">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Shop News</p>
@@ -243,13 +220,12 @@ export default function Page() {
           )) : <p className="p-4 text-center text-gray-300 text-[10px] italic leading-none">お知らせはありません</p>}
         </section>
 
+        {/* ✨ バージョン確認用ラベル ✨ */}
         <div className="pt-4 pb-2 text-center">
-          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.13.7</p>
+          <p className="text-[10px] font-bold text-gray-200 tracking-widest uppercase">Karinto Cast Manager ver 1.13.9</p>
         </div>
-
       </main>
 
-      {/* 📱 フッター */}
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-[0_-5px_15px_rgba(0,0,0,0.02)]">
         <nav className="flex justify-around items-center max-w-sm mx-auto px-4">
           <button className="flex flex-col items-center text-pink-500" onClick={() => router.push('/')}><span className="text-xl mb-0.5">🏠</span><span className="text-[9px] font-black tracking-tighter uppercase">Home</span></button>

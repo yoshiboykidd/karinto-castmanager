@@ -29,46 +29,43 @@ export default function DashboardCalendar({
   };
 
   return (
-    <div className="flex justify-center p-1 bg-white rounded-xl overflow-hidden shadow-inner">
+    <div className="flex justify-center p-1 bg-white rounded-xl overflow-hidden">
       <style>{`
-        /* ✨ 基本レイアウトの復旧（縦一列になるのを防ぐ） */
+        /* ✨ 縦一列になるのを防ぐための基本リセット */
+        .rdp-months { display: flex !important; justify-content: center !important; }
+        .rdp-month { margin: 0 !important; }
+        .rdp-table { max-width: none !important; }
+        
         .rdp { --rdp-cell-size: 45px; margin: 0; }
-        .rdp-months { justify-content: center; }
 
-        /* ✨ 日付セルの基本設定 */
+        /* 日付セルのスタイル */
         .rdp-day {
           width: 42px !important;
           height: 42px !important;
-          max-width: 42px !important;
           border-radius: 50% !important;
-          margin: 1.5px !important;
           font-size: 16px;
           font-weight: 600;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: all 0.2s;
         }
 
-        /* ✨ シフトありのピンク（桜色） */
+        /* シフトあり（桜色） */
         .hasShift {
           background-color: #fdf2f8 !important;
           color: #ec4899 !important;
           border: 1px solid #fce7f3 !important;
         }
 
-        /* ✨ 選択時の青丸（ピンクを完全に隠す） */
-        .rdp-day_selected, 
-        .rdp-day_selected:hover {
+        /* 選択時（青丸：ピンクを完全に隠す） */
+        .rdp-day_selected {
           background-color: #3b82f6 !important;
           color: white !important;
-          opacity: 1 !important;
           border: none !important;
-          /* ピンクを隠すために一回り大きく、かつz-index的な強さを持たせる */
-          box-shadow: 0 0 0 2px #3b82f6; 
+          box-shadow: 0 0 0 3px #3b82f6; /* 青い縁取りでピンクを隠す */
+          z-index: 20;
         }
 
-        /* 土日・イベントの色 */
         .rdp-day.isSaturday:not(.rdp-day_selected) { color: #3b82f6 !important; }
         .rdp-day.isSunday:not(.rdp-day_selected) { color: #ef4444 !important; }
         
@@ -76,10 +73,6 @@ export default function DashboardCalendar({
           background-color: #fffbeb !important;
           border-radius: 8px !important;
         }
-
-        /* 見出し（年月）の調整 */
-        .rdp-caption_label { font-weight: 900; color: #4b5563; font-size: 15px; }
-        .rdp-head_cell { font-size: 11px; font-weight: 900; color: #fda4af; }
       `}</style>
       <DayPicker
         mode="single"
