@@ -38,13 +38,10 @@ export default function Page() {
   async function fetchInitialData() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.push('/login'); return; }
-    
     const loginId = session.user.email?.replace('@karinto-internal.com', '');
     const { data: castData } = await supabase.from('cast_members').select('*').eq('login_id', loginId).single();
     setCastProfile(castData);
-
     if (castData) {
-      // 🚀 カラム名は小文字の home_shop_id
       const myShopId = castData.home_shop_id || 'main';
       const [shopRes, shiftRes, newsRes] = await Promise.all([
         supabase.from('shop_master').select('*').eq('shop_id', myShopId).single(),
@@ -85,8 +82,11 @@ export default function Page() {
     multiDates.forEach(d => {
       const key = format(d, 'yyyy-MM-dd');
       if (!newDetails[key]) {
-        const existing = (shifts || []).find(s => s.shift_date === key && s.status === 'official');
-        newDetails[key] = existing ? { s: existing.start_time, e: existing.end_time } : { s: '11:00', e: '23:00' };
+        // ✨ 初期値：申請中があればそれを、なければ確定シフトを、なければ11-23をセット
+        const existingReq = (shifts || []).find(s => s.shift_date === key && s.status === 'requested');
+        const existingOff = (shifts || []).find(s => s.shift_date === key && s.status === 'official');
+        const base = existingReq || existingOff;
+        newDetails[key] = base ? { s: base.start_time, e: base.end_time } : { s: '11:00', e: '23:00' };
       }
     });
     setRequestDetails(newDetails);
@@ -109,7 +109,6 @@ export default function Page() {
       const timeStr = (r.start_time === 'OFF') ? "休み希望 😴" : `${r.start_time}〜${r.end_time}`;
       return `${type} ${r.shift_date} (${timeStr})`;
     }).join('\n');
-
     try {
       await fetch(webhookUrl, {
         method: 'POST',
@@ -142,7 +141,6 @@ export default function Page() {
         is_official_pre_exist: (shifts || []).some(s => s.shift_date === key && s.status === 'official')
       };
     });
-
     const { error } = await supabase.from('shifts').upsert(requests, { onConflict: 'login_id,shift_date' });
     if (!error) {
       await sendDiscordNotification(requests);
@@ -152,9 +150,7 @@ export default function Page() {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center">
-      <div className="text-pink-300 tracking-tighter text-5xl italic animate-pulse" style={{ fontWeight: 900 }}>KARINTO...</div>
-    </div>
+    <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center font-black italic text-5xl text-pink-300 animate-pulse">KARINTO...</div>
   );
 
   const selectedShift = !isRequestMode && singleDate ? (shifts || []).find(s => s.shift_date === format(singleDate, 'yyyy-MM-dd')) : null;
@@ -162,9 +158,8 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
-      {/* --- Header --- */}
       <header className="bg-white px-5 pt-12 pb-5 rounded-b-[30px] shadow-sm border-b border-pink-100">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.4.6</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.4.7</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'Cast'}
           <span className="text-[24px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
@@ -172,91 +167,102 @@ export default function Page() {
         <p className="text-[13px] font-bold text-gray-500 mt-1 tracking-tighter leading-none">{shopInfo?.shop_name || 'Karinto'} お疲れ様です🍵</p>
       </header>
 
-      {/* --- Tabs --- */}
       <div className="flex p-1 bg-gray-100 mx-5 mt-4 rounded-xl border border-gray-200 shadow-inner">
         <button onClick={() => { setIsRequestMode(false); setMultiDates([]); }} className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
         <button onClick={() => { setIsRequestMode(true); setSingleDate(undefined); }} className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${isRequestMode ? 'bg-white text-purple-500 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
       </div>
 
       <main className="px-3 mt-3 space-y-3">
-        
-        {/* --- 実績合計 --- */}
+        {/* 実績合計 */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-3 border border-pink-300 relative overflow-hidden shadow-sm">
           <span className="absolute -right-2 -top-6 text-[100px] font-black text-pink-200/20 italic select-none leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10 flex flex-col items-center">
-            <div className="flex items-center justify-between gap-1 w-full leading-none mb-1.5">
-              <h2 className="text-[13px] font-black text-pink-500 tracking-tighter shrink-0">{format(viewDate, 'M月')}の実績合計</h2>
+            <div className="flex items-center justify-between gap-1 w-full mb-1.5">
+              <h2 className="text-[13px] font-black text-pink-500 tracking-tighter whitespace-nowrap">{format(viewDate, 'M月')}の実績合計</h2>
               <div className="flex gap-1.5">
-                <div className="bg-white/95 border border-pink-200 px-3 py-1.5 rounded-xl flex items-baseline gap-0.5 shadow-sm shrink-0">
+                <div className="bg-white/95 border border-pink-200 px-3 py-1.5 rounded-xl flex items-baseline gap-0.5 shadow-sm">
                   <span className="text-[10px] font-black text-gray-900 leading-none">出勤</span>
-                  <span className="text-[20px] font-black text-pink-500 leading-none tracking-tighter">{monthlyTotals.count}</span>
-                  <span className="text-[10px] font-black text-gray-900 leading-none font-bold">日</span>
+                  <span className="text-[20px] font-black text-pink-500 leading-none">{monthlyTotals.count}</span>
+                  <span className="text-[10px] font-black text-gray-900 leading-none">日</span>
                 </div>
-                <div className="bg-white/95 border border-pink-200 px-3 py-1.5 rounded-xl flex items-baseline gap-0.5 shadow-sm shrink-0">
+                <div className="bg-white/95 border border-pink-200 px-3 py-1.5 rounded-xl flex items-baseline gap-0.5 shadow-sm">
                   <span className="text-[10px] font-black text-gray-900 leading-none">稼働</span>
-                  <span className="text-[20px] font-black text-pink-500 leading-none tracking-tighter">{Math.round(monthlyTotals.hours * 10) / 10}</span>
-                  <span className="text-[10px] font-black text-gray-900 leading-none font-bold">h</span>
+                  <span className="text-[20px] font-black text-pink-500 leading-none">{Math.round(monthlyTotals.hours * 10) / 10}</span>
+                  <span className="text-[10px] font-black text-gray-900 leading-none">h</span>
                 </div>
               </div>
             </div>
             <p className="text-[48px] font-black text-pink-500 text-center mb-2 leading-none tracking-tighter">
-              <span className="text-xl mr-0.5 leading-none">¥</span>{monthlyTotals.amount.toLocaleString()}
+              <span className="text-xl mr-0.5">¥</span>{monthlyTotals.amount.toLocaleString()}
             </p>
             <div className="grid grid-cols-3 gap-0.5 w-full bg-white/80 rounded-xl py-2 border border-pink-200 text-center shadow-inner">
-              <div className="leading-none"><p className="text-[11px] text-pink-400 font-black mb-1">フリー</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.f}</p></div>
-              <div className="border-x border-pink-100 leading-none"><p className="text-[11px] text-pink-400 font-black mb-1 tracking-tighter">初指名</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.first}</p></div>
-              <div className="leading-none"><p className="text-[11px] text-pink-400 font-black mb-1 tracking-tighter">本指名</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.main}</p></div>
+              <div className="leading-none"><p className="text-[11px] text-pink-400 font-black mb-1">フリー</p><p className="text-xl font-black text-pink-600">{monthlyTotals.f}</p></div>
+              <div className="border-x border-pink-100 leading-none"><p className="text-[11px] text-pink-400 font-black mb-1 tracking-tighter">初指名</p><p className="text-xl font-black text-pink-600">{monthlyTotals.first}</p></div>
+              <div className="leading-none"><p className="text-[11px] text-pink-400 font-black mb-1 tracking-tighter">本指名</p><p className="text-xl font-black text-pink-600">{monthlyTotals.main}</p></div>
             </div>
           </div>
         </section>
 
-        {/* --- Calendar --- */}
-        <section className="bg-white p-1 rounded-[22px] border border-pink-200 shadow-sm overflow-hidden text-center">
+        <section className="bg-white p-1 rounded-[22px] border border-pink-200 shadow-sm text-center">
           <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={(v:any)=>isRequestMode?setMultiDates(v||[]):setSingleDate(v)} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
         </section>
 
         {isRequestMode ? (
-          /* 💜 シフト申請パネル：Ver 2.4.6 (元シフト表示機能) */
+          /* 💜 シフト申請パネル：Ver 2.4.7 (確定・申請中のダブル表示) */
           <section className="bg-white rounded-[24px] border border-purple-200 p-4 shadow-xl">
             <div className="flex justify-between items-center mb-4 leading-none">
               <h3 className="font-black text-purple-600 text-[13px] uppercase tracking-widest">選択中: {multiDates.length}日</h3>
-              {multiDates.length > 0 && <button onClick={() => setMultiDates([])} className="text-[9px] font-black text-gray-300 uppercase border border-gray-200 px-2 py-1 rounded-md">リセット</button>}
             </div>
-            <div className="max-h-64 overflow-y-auto space-y-2 mb-4 pr-1 custom-scrollbar">
+            <div className="max-h-72 overflow-y-auto space-y-3 mb-4 pr-1 custom-scrollbar">
               {multiDates.sort((a,b)=>a.getTime()-b.getTime()).map(d => {
                 const key = format(d, 'yyyy-MM-dd');
                 const isOff = requestDetails[key]?.s === 'OFF';
+                
+                // ✨ データの分類
                 const officialShift = (shifts || []).find(s => s.shift_date === key && s.status === 'official');
+                const pendingShift = (shifts || []).find(s => s.shift_date === key && s.status === 'requested');
                 const isModification = !!officialShift;
 
                 return (
-                  <div key={key} className={`p-2 rounded-xl border transition-colors ${isModification ? 'bg-blue-50/50 border-blue-100' : 'bg-rose-50/50 border-rose-100'}`}>
-                    <div className="flex items-center justify-between mb-1">
+                  <div key={key} className={`p-3 rounded-xl border transition-all ${isModification ? 'bg-blue-50/30 border-blue-100 shadow-sm' : 'bg-rose-50/30 border-rose-100 shadow-sm'}`}>
+                    <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className={`text-[11px] font-black ${isModification ? 'text-blue-500' : 'text-rose-500'}`}>{format(d, 'M/d(ee)', {locale: ja})}</span>
-                        <span className={`text-[8px] font-black px-1 py-0.5 rounded uppercase leading-none ${isModification ? 'bg-blue-500 text-white' : 'bg-rose-500 text-white'}`}>
+                        <span className={`text-[12px] font-black ${isModification ? 'text-blue-500' : 'text-rose-500'}`}>{format(d, 'M/d(ee)', {locale: ja})}</span>
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase leading-none ${isModification ? 'bg-blue-500 text-white' : 'bg-rose-500 text-white'}`}>
                           {isModification ? '変更申請' : '新規申請'}
                         </span>
                       </div>
-                      {isModification && (
-                        <span className="text-[9px] font-bold text-blue-400 bg-blue-100/50 px-1.5 py-0.5 rounded italic">
-                          元: {officialShift.start_time}〜{officialShift.end_time}
-                        </span>
+                    </div>
+
+                    {/* ✨ 状態バッジエリア：確定時間と申請中時間を並べる */}
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {officialShift && (
+                        <div className="flex items-center gap-1 bg-blue-100/60 px-2 py-1 rounded-md">
+                          <span className="text-[8px] font-black text-blue-500 uppercase italic">Official:</span>
+                          <span className="text-[10px] font-black text-blue-600">{officialShift.start_time}〜{officialShift.end_time}</span>
+                        </div>
+                      )}
+                      {pendingShift && (
+                        <div className="flex items-center gap-1 bg-amber-100/60 px-2 py-1 rounded-md border border-amber-200">
+                          <span className="text-[8px] font-black text-amber-500 uppercase italic">Pending:</span>
+                          <span className="text-[10px] font-black text-amber-600">{pendingShift.start_time}〜{pendingShift.end_time}</span>
+                        </div>
                       )}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">New Time:</span>
+
+                    <div className="flex items-center justify-between bg-white/60 p-2 rounded-lg border border-white">
+                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter italic">Edit:</span>
                       <div className="flex items-center gap-1">
-                        <select value={requestDetails[key]?.s} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} className="bg-white text-[11px] font-black border border-gray-100 rounded-md p-1 min-w-[65px] text-center appearance-none">
+                        <select value={requestDetails[key]?.s} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} className="bg-white text-[12px] font-black border border-gray-200 rounded-lg p-1.5 min-w-[70px] text-center shadow-sm appearance-none">
                           {isOff && <option value="OFF">OFF</option>}
                           {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
-                        <span className={isModification ? 'text-blue-200' : 'text-rose-200'}>~</span>
-                        <select value={requestDetails[key]?.e} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} className="bg-white text-[11px] font-black border border-gray-100 rounded-md p-1 min-w-[65px] text-center appearance-none">
+                        <span className="text-gray-300">~</span>
+                        <select value={requestDetails[key]?.e} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} className="bg-white text-[12px] font-black border border-gray-200 rounded-lg p-1.5 min-w-[70px] text-center shadow-sm appearance-none">
                           {isOff && <option value="OFF">OFF</option>}
                           {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
-                        <button onClick={()=>setRequestDetails({...requestDetails,[key]:{s:'OFF',e:'OFF'}})} className={`ml-1 text-[9px] font-bold uppercase px-1 ${isModification ? 'text-blue-400' : 'text-rose-400'}`}>休み</button>
+                        <button onClick={()=>setRequestDetails({...requestDetails,[key]:{s:'OFF',e:'OFF'}})} className={`ml-1 text-[10px] font-black uppercase px-2 py-1 rounded-md border ${isModification ? 'text-blue-500 border-blue-200' : 'text-rose-500 border-rose-200'}`}>休み</button>
                       </div>
                     </div>
                   </div>
@@ -284,7 +290,7 @@ export default function Page() {
                 </div>
                 <div className="bg-pink-50/30 p-3 rounded-xl border border-pink-100 flex items-center justify-between h-[64px]">
                   <label className="text-[13px] font-black shrink-0 text-gray-900 uppercase tracking-widest leading-none text-left">本日の報酬</label>
-                  <div className="flex items-center flex-1 justify-end pl-4 leading-none text-pink-500">
+                  <div className="flex items-center flex-1 justify-end pl-4 text-pink-500">
                     <span className="text-pink-200 text-2xl font-black mr-1 translate-y-[2px]">¥</span>
                     <input type="text" inputMode="numeric" value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} onFocus={e=>e.target.select()} onChange={e=>{const v=e.target.value.replace(/,/g,''); if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});}} className="w-full text-right bg-transparent font-black text-[32px] focus:ring-0 border-none" />
                   </div>
@@ -312,9 +318,9 @@ export default function Page() {
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-sm">
         <nav className="flex justify-around items-center max-w-sm mx-auto px-4">
-          <button className="flex flex-col items-center text-pink-500" onClick={() => router.push('/')}><span className="text-xl mb-0.5 leading-none">🏠</span><span className="text-[9px] font-black uppercase tracking-tighter">Home</span></button>
-          <button className="flex flex-col items-center text-gray-300" onClick={() => router.push('/salary')}><span className="text-xl mb-0.5 leading-none">💰</span><span className="text-[9px] font-black uppercase tracking-tighter">Salary</span></button>
-          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center text-gray-300"><span className="text-xl mb-0.5 leading-none">🚪</span><span className="text-[9px] font-black uppercase tracking-tighter">Logout</span></button>
+          <button className="flex flex-col items-center text-pink-500" onClick={() => router.push('/')}><span className="text-xl mb-0.5">🏠</span><span className="text-[9px] font-black uppercase">Home</span></button>
+          <button className="flex flex-col items-center text-gray-300" onClick={() => router.push('/salary')}><span className="text-xl mb-0.5">💰</span><span className="text-[9px] font-black uppercase">Salary</span></button>
+          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center text-gray-300"><span className="text-xl mb-0.5">🚪</span><span className="text-[9px] font-black uppercase">Logout</span></button>
         </nav>
       </footer>
     </div>
