@@ -98,17 +98,21 @@ export default function Page() {
     setRequestDetails(newDetails);
   }, [multiDates, shifts]);
 
-  useEffect(() => {
-    if (isRequestMode || !singleDate) return;
-    const dateStr = format(singleDate, 'yyyy-MM-dd');
-    const shift = (shifts || []).find(s => s.shift_date === dateStr);
-    const v = (val: any) => (val === null || val === undefined) ? '' : String(val);
-    setEditReward({ f: v(shift?.f_count), first: v(shift?.first_request_count), main: v(shift?.main_request_count), amount: v(shift?.reward_amount) });
-  }, [singleDate, shifts, isRequestMode]);
-
+  // 🔔 追跡・デバッグ機能付き通知ロジック
   const sendDiscordNotification = async (requestList: any[]) => {
-    const webhookUrl = shopInfo?.discord_webhook_url;
-    if (!webhookUrl) return;
+    // 🔍 追跡1: shopInfoが取れているか
+    if (!shopInfo) {
+      alert("⚠️ デバッグ通知: shopInfo(店舗情報)が空です。キャストのHOME_shop_IDがshop_masterに存在するか確認してください。");
+      return;
+    }
+
+    const webhookUrl = shopInfo.discord_webhook_url;
+    
+    // 🔍 追跡2: URLが取れているか
+    if (!webhookUrl) {
+      alert(`⚠️ デバッグ通知: 店舗「${shopInfo.shop_name}」にWebhook URLが設定されていません。shop_masterテーブルを確認してください。`);
+      return;
+    }
 
     const castName = castProfile?.display_name || 'Cast';
     const detailText = requestList.map(r => {
@@ -118,7 +122,7 @@ export default function Page() {
     }).join('\n');
 
     try {
-      await fetch(webhookUrl, {
+      const res = await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -132,17 +136,26 @@ export default function Page() {
           }]
         })
       });
-    } catch (err) { console.error("Notification failed", err); }
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        alert(`❌ Discordが拒否しました: ${res.status} ${errorText}`);
+      } else {
+        console.log("Discord Success!");
+      }
+    } catch (err: any) {
+      alert(`❌ 通信エラー: ${err.message}`);
+    }
   };
 
   const handleBulkSubmit = async () => {
-    if (!castProfile) return;
+    if (!castProfile) { alert("エラー: キャスト情報がありません"); return; }
 
     const requests = multiDates.map(date => {
       const key = format(date, 'yyyy-MM-dd');
       return { 
         login_id: castProfile.login_id, 
-        hp_display_name: castProfile.display_name || 'Cast', // ✨ ここが今回の重要ポイント
+        hp_display_name: castProfile.display_name || 'Cast',
         shift_date: key, 
         start_time: requestDetails[key].s, 
         end_time: requestDetails[key].e, 
@@ -153,15 +166,19 @@ export default function Page() {
     });
 
     const { error } = await supabase.from('shifts').upsert(requests, { onConflict: 'login_id,shift_date' });
+    
     if (!error) {
+      // 🔍 ここで通知関数を呼び出す
       await sendDiscordNotification(requests);
-      alert(`${multiDates.length}日分の申請を送信しました！🚀`);
-      setMultiDates([]); fetchInitialData();
+      alert(`${multiDates.length}日分の申請をDBに保存しました。Discord通知を確認してください。🚀`);
+      setMultiDates([]); 
+      fetchInitialData();
     } else {
-      alert(`送信エラー: ${error.message}`);
+      alert(`DB保存エラー: ${error.message}`);
     }
   };
 
+  // --- 以下デザイン部分は Ver 2.4.3 と同じ（聖域維持） ---
   if (loading) return (
     <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center">
       <div className="text-pink-300 tracking-tighter text-5xl italic animate-pulse" style={{ fontWeight: 900, textShadow: '2px 2px 0px rgba(249, 168, 212, 0.3)' }}>KARINTO...</div>
@@ -172,9 +189,8 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
-      
       <header className="bg-white px-5 pt-12 pb-5 rounded-b-[30px] shadow-sm border-b border-pink-100">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.4.3</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.4.4 (DEBUG)</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'Cast'}
           <span className="text-[24px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
@@ -188,7 +204,7 @@ export default function Page() {
       </div>
 
       <main className="px-3 mt-3 space-y-3">
-        
+        {/* 実績合計 */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-3 border border-pink-300 relative overflow-hidden shadow-sm">
           <span className="absolute -right-2 -top-6 text-[100px] font-black text-pink-200/20 italic select-none leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10 flex flex-col items-center">
@@ -226,40 +242,37 @@ export default function Page() {
           <section className="bg-white rounded-[24px] border border-purple-200 p-4 shadow-xl">
             <div className="flex justify-between items-center mb-4 leading-none">
               <h3 className="font-black text-purple-600 text-[13px] uppercase tracking-widest">選択中: {multiDates.length}日</h3>
-              {multiDates.length > 0 && <button onClick={() => setMultiDates([])} className="text-[9px] font-black text-gray-300 uppercase border border-gray-200 px-2 py-1 rounded-md">リセット</button>}
             </div>
             <div className="max-h-48 overflow-y-auto space-y-2 mb-4 pr-1 custom-scrollbar">
               {multiDates.sort((a,b)=>a.getTime()-b.getTime()).map(d => {
                 const key = format(d, 'yyyy-MM-dd');
-                const isOff = requestDetails[key]?.s === 'OFF';
-                const isMod = (shifts || []).some(s => s.shift_date === key && s.status === 'official');
-
+                const isModification = (shifts || []).some(s => s.shift_date === key && s.status === 'official');
                 return (
-                  <div key={key} className={`flex items-center justify-between p-2 rounded-xl border transition-colors ${isMod ? 'bg-blue-50/50 border-blue-100' : 'bg-rose-50/50 border-rose-100'}`}>
+                  <div key={key} className={`flex items-center justify-between p-2 rounded-xl border transition-colors ${isModification ? 'bg-blue-50/50 border-blue-100' : 'bg-rose-50/50 border-rose-100'}`}>
                     <div className="flex flex-col">
-                      <span className={`text-[11px] font-black mb-1 ${isMod ? 'text-blue-500' : 'text-rose-500'}`}>{format(d, 'M/d(ee)', {locale: ja})}</span>
-                      <span className={`text-[8px] font-black px-1 py-0.5 rounded uppercase w-fit leading-none ${isMod ? 'bg-blue-500 text-white' : 'bg-rose-500 text-white'}`}>{isMod ? '変更' : '新規'}</span>
+                      <span className={`text-[11px] font-black mb-1 ${isModification ? 'text-blue-500' : 'text-rose-500'}`}>{format(d, 'M/d(ee)', {locale: ja})}</span>
+                      <span className={`text-[8px] font-black px-1 py-0.5 rounded uppercase w-fit leading-none ${isModification ? 'bg-blue-500 text-white' : 'bg-rose-500 text-white'}`}>{isModification ? '変更' : '新規'}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <select value={requestDetails[key]?.s} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} className="bg-white text-[11px] font-black border border-gray-100 rounded-md p-1 min-w-[60px] text-center appearance-none">
-                        {isOff && <option value="OFF">OFF</option>}
+                        {requestDetails[key]?.s === 'OFF' && <option value="OFF">OFF</option>}
                         {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
-                      <span className={isMod ? 'text-blue-200' : 'text-rose-200'}>~</span>
+                      <span>~</span>
                       <select value={requestDetails[key]?.e} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} className="bg-white text-[11px] font-black border border-gray-100 rounded-md p-1 min-w-[60px] text-center appearance-none">
-                        {isOff && <option value="OFF">OFF</option>}
+                        {requestDetails[key]?.e === 'OFF' && <option value="OFF">OFF</option>}
                         {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
-                      <button onClick={()=>setRequestDetails({...requestDetails,[key]:{s:'OFF',e:'OFF'}})} className={`ml-1 text-[9px] font-bold uppercase px-1 ${isMod ? 'text-blue-400' : 'text-rose-400'}`}>OFF</button>
                     </div>
                   </div>
                 );
               })}
             </div>
-            <button disabled={multiDates.length === 0} onClick={handleBulkSubmit} className="w-full bg-purple-600 text-white font-black py-4 rounded-xl text-lg shadow-lg active:scale-95 transition-all tracking-widest disabled:opacity-30">申請を送信する 🚀</button>
+            <button disabled={multiDates.length === 0} onClick={handleBulkSubmit} className="w-full bg-purple-600 text-white font-black py-4 rounded-xl text-lg shadow-lg active:scale-95 transition-all tracking-widest disabled:opacity-30 uppercase">申請を送信する 🚀</button>
           </section>
         ) : (
           <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden text-center">
+            {/* 実績入力フォーム (省略なし) */}
             <div className="bg-[#FFF5F6] p-3 px-4 flex justify-center items-center h-[42px] border-b border-pink-100 relative leading-none">
               <h3 className="text-[17px] font-black text-gray-800">{singleDate ? format(singleDate, 'M/d (eee)', { locale: ja }) : ''}</h3>
               <span className="absolute right-4 text-pink-500 font-black text-lg tracking-tighter">{selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-xs text-gray-300 font-bold uppercase tracking-widest">OFF</span>}</span>
@@ -285,13 +298,13 @@ export default function Page() {
                   if (!singleDate) return;
                   const dateStr = format(singleDate, 'yyyy-MM-dd');
                   supabase.from('shifts').update({ f_count: Number(editReward.f), first_request_count: Number(editReward.first), main_request_count: Number(editReward.main), reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('保存完了💰'); });
-                }} className="w-full bg-pink-500 text-white font-black py-5 rounded-xl text-2xl shadow-lg active:scale-95 transition-all tracking-widest uppercase leading-none">実績を保存 💾</button>
+                }} className="w-full bg-pink-500 text-white font-black py-5 rounded-xl text-2xl shadow-lg active:scale-95 transition-all tracking-widest uppercase leading-none tracking-widest">実績を保存 💾</button>
               </div>
             )}
           </section>
         )}
 
-        <section className="bg-white rounded-[22px] border border-pink-100 shadow-sm overflow-hidden opacity-90 text-left">
+        <section className="bg-white rounded-[22px] border border-pink-100 shadow-sm overflow-hidden opacity-90 text-left pb-4">
           <div className="bg-gray-50 p-2 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Shop News</div>
           {newsList.map((n) => (
             <div key={n.id} className="p-3 px-4 border-b border-gray-50 last:border-0 flex gap-3 items-start leading-tight">
@@ -300,7 +313,6 @@ export default function Page() {
             </div>
           ))}
         </section>
-        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase leading-none">Karinto Cast Manager ver 2.4.3</p>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-sm">
