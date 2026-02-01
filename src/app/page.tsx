@@ -152,180 +152,66 @@ export default function Page() {
     <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center font-black italic text-5xl text-pink-300 animate-pulse">KARINTO...</div>
   );
 
-  // 実績入力用にその日のデータを抽出
   const targetDateStr = singleDate ? format(singleDate, 'yyyy-MM-dd') : '';
   const dayOfficial = (shifts || []).find(s => s.shift_date === targetDateStr && s.status === 'official');
   const dayPending = (shifts || []).find(s => s.shift_date === targetDateStr && s.status === 'requested');
 
   return (
-    <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
-      <header className="bg-white px-5 pt-12 pb-5 rounded-b-[30px] shadow-sm border-b border-pink-100">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.4.8</p>
-        <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
-          {castProfile?.display_name || 'Cast'}
-          <span className="text-[24px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
-        </h1>
-        <p className="text-[13px] font-bold text-gray-500 mt-1 tracking-tighter leading-none">{shopInfo?.shop_name || 'Karinto'} お疲れ様です🍵</p>
+      {/* 🏔️ Header: Sanctuary Design Premium */}
+      <header className="bg-white px-6 pt-14 pb-6 rounded-b-[40px] shadow-[0_4px_20px_-5px_rgba(236,72,153,0.1)] border-b border-pink-50 relative z-20">
+        <div className="flex justify-between items-start">
+          <div>
+            <p className="text-[10px] font-black text-pink-300 uppercase tracking-[0.2em] mb-1.5">KarintoCastManager v2.5.0</p>
+            <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none tracking-tighter">
+              {castProfile?.display_name || 'Cast'}
+              <span className="text-[22px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
+            </h1>
+            <p className="text-[13px] font-bold text-gray-400 mt-2 tracking-tight flex items-center gap-1">
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+              {shopInfo?.shop_name || 'Karinto'} 入室中
+            </p>
+          </div>
+          <div className="bg-pink-50 p-2 rounded-2xl">
+             <span className="text-2xl">🍯</span>
+          </div>
+        </div>
       </header>
 
-      <div className="flex p-1 bg-gray-100 mx-5 mt-4 rounded-xl border border-gray-200 shadow-inner">
-        <button onClick={() => { setIsRequestMode(false); setMultiDates([]); }} className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
-        <button onClick={() => { setIsRequestMode(true); setSingleDate(undefined); }} className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${isRequestMode ? 'bg-white text-purple-500 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
+      {/* 📱 Smart Tabs */}
+      <div className="flex p-1.5 bg-gray-100/80 backdrop-blur-sm mx-6 mt-6 rounded-2xl border border-gray-200/50 shadow-inner">
+        <button onClick={() => { setIsRequestMode(false); setMultiDates([]); }} className={`flex-1 py-2.5 text-[11px] font-black rounded-xl transition-all duration-300 ${!isRequestMode ? 'bg-white text-pink-500 shadow-md scale-[1.02]' : 'text-gray-400 hover:text-gray-500'}`}>実績入力</button>
+        <button onClick={() => { setIsRequestMode(true); setSingleDate(undefined); }} className={`flex-1 py-2.5 text-[11px] font-black rounded-xl transition-all duration-300 ${isRequestMode ? 'bg-white text-purple-600 shadow-md scale-[1.02]' : 'text-gray-400 hover:text-gray-500'}`}>シフト申請</button>
       </div>
 
-      <main className="px-3 mt-3 space-y-3">
-        {/* 実績合計 */}
-        <section className="bg-[#FFE9ED] rounded-[22px] p-3 border border-pink-300 relative overflow-hidden shadow-sm">
-          <span className="absolute -right-2 -top-6 text-[100px] font-black text-pink-200/20 italic select-none leading-none">{format(viewDate, 'M')}</span>
-          <div className="relative z-10 flex flex-col items-center">
-            <div className="flex items-center justify-between gap-1 w-full mb-1.5 leading-none">
-              <h2 className="text-[13px] font-black text-pink-500 tracking-tighter whitespace-nowrap">{format(viewDate, 'M月')}の実績合計</h2>
-              <div className="flex gap-1.5">
-                <div className="bg-white/95 border border-pink-200 px-3 py-1.5 rounded-xl flex items-baseline gap-0.5 shadow-sm">
-                  <span className="text-[10px] font-black text-gray-900 leading-none">出勤</span>
-                  <span className="text-[20px] font-black text-pink-500 leading-none">{monthlyTotals.count}</span>
-                  <span className="text-[10px] font-black text-gray-900 leading-none">日</span>
+      <main className="px-4 mt-6 space-y-5">
+        
+        {/* 💎 究極の「デカバッジ」実績カード */}
+        <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-5 border border-pink-200 relative overflow-hidden shadow-sm">
+          <span className="absolute -right-4 -top-8 text-[120px] font-black text-pink-200/20 italic select-none leading-none tracking-tighter">{format(viewDate, 'M')}</span>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-[14px] font-black text-pink-500 tracking-tighter bg-white/60 px-3 py-1 rounded-full border border-pink-100">{format(viewDate, 'M月')}の獲得実績</h2>
+              <div className="flex gap-2">
+                <div className="bg-white/90 px-3 py-1.5 rounded-2xl flex items-baseline gap-0.5 shadow-sm border border-pink-100">
+                  <span className="text-[18px] font-black text-pink-500 leading-none">{monthlyTotals.count}</span>
+                  <span className="text-[9px] font-black text-gray-500">days</span>
                 </div>
-                <div className="bg-white/95 border border-pink-200 px-3 py-1.5 rounded-xl flex items-baseline gap-0.5 shadow-sm">
-                  <span className="text-[10px] font-black text-gray-900 leading-none">稼働</span>
-                  <span className="text-[20px] font-black text-pink-500 leading-none">{Math.round(monthlyTotals.hours * 10) / 10}</span>
-                  <span className="text-[10px] font-black text-gray-900 leading-none">h</span>
+                <div className="bg-white/90 px-3 py-1.5 rounded-2xl flex items-baseline gap-0.5 shadow-sm border border-pink-100">
+                  <span className="text-[18px] font-black text-pink-500 leading-none">{Math.round(monthlyTotals.hours * 10) / 10}</span>
+                  <span className="text-[9px] font-black text-gray-500">h</span>
                 </div>
               </div>
             </div>
-            <p className="text-[48px] font-black text-pink-500 text-center mb-2 leading-none tracking-tighter">
-              <span className="text-xl mr-0.5">¥</span>{monthlyTotals.amount.toLocaleString()}
-            </p>
-            <div className="grid grid-cols-3 gap-0.5 w-full bg-white/80 rounded-xl py-2 border border-pink-200 text-center shadow-inner">
-              <div className="leading-none"><p className="text-[11px] text-pink-400 font-black mb-1">フリー</p><p className="text-xl font-black text-pink-600">{monthlyTotals.f}</p></div>
-              <div className="border-x border-pink-100 leading-none"><p className="text-[11px] text-pink-400 font-black mb-1 tracking-tighter">初指名</p><p className="text-xl font-black text-pink-600">{monthlyTotals.first}</p></div>
-              <div className="leading-none"><p className="text-[11px] text-pink-400 font-black mb-1 tracking-tighter">本指名</p><p className="text-xl font-black text-pink-600">{monthlyTotals.main}</p></div>
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-white p-1 rounded-[22px] border border-pink-200 shadow-sm text-center">
-          <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={(v:any)=>isRequestMode?setMultiDates(v||[]):setSingleDate(v)} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
-        </section>
-
-        {isRequestMode ? (
-          /* 💜 シフト申請パネル */
-          <section className="bg-white rounded-[24px] border border-purple-200 p-4 shadow-xl">
-            <div className="flex justify-between items-center mb-4 leading-none">
-              <h3 className="font-black text-purple-600 text-[13px] uppercase tracking-widest">選択中: {multiDates.length}日</h3>
-            </div>
-            <div className="max-h-72 overflow-y-auto space-y-3 mb-4 pr-1 custom-scrollbar">
-              {multiDates.sort((a,b)=>a.getTime()-b.getTime()).map(d => {
-                const key = format(d, 'yyyy-MM-dd');
-                const isOff = requestDetails[key]?.s === 'OFF';
-                const offS = (shifts || []).find(s => s.shift_date === key && s.status === 'official');
-                const pendS = (shifts || []).find(s => s.shift_date === key && s.status === 'requested');
-
-                return (
-                  <div key={key} className={`p-3 rounded-xl border transition-all ${offS ? 'bg-blue-50/30 border-blue-100 shadow-sm' : 'bg-rose-50/30 border-rose-100 shadow-sm'}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={`text-[12px] font-black ${offS ? 'text-blue-500' : 'text-rose-500'}`}>{format(d, 'M/d(ee)', {locale: ja})}</span>
-                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase leading-none ${offS ? 'bg-blue-500 text-white' : 'bg-rose-500 text-white'}`}>
-                        {offS ? '変更申請' : '新規申請'}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {offS && <div className="flex items-center gap-1 bg-blue-100/60 px-2 py-1 rounded-md"><span className="text-[8px] font-black text-blue-500 uppercase italic">Official:</span><span className="text-[10px] font-black text-blue-600">{offS.start_time}〜{offS.end_time}</span></div>}
-                      {pendS && <div className="flex items-center gap-1 bg-amber-100/60 px-2 py-1 rounded-md border border-amber-200"><span className="text-[8px] font-black text-amber-500 uppercase italic">Pending:</span><span className="text-[10px] font-black text-amber-600">{pendS.start_time}〜{pendS.end_time}</span></div>}
-                    </div>
-                    <div className="flex items-center justify-between bg-white/60 p-2 rounded-lg border border-white">
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter italic">Edit:</span>
-                      <div className="flex items-center gap-1">
-                        <select value={requestDetails[key]?.s} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} className="bg-white text-[12px] font-black border border-gray-200 rounded-lg p-1.5 min-w-[70px] text-center shadow-sm appearance-none">
-                          {isOff && <option value="OFF">OFF</option>}
-                          {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                        <span className="text-gray-300">~</span>
-                        <select value={requestDetails[key]?.e} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} className="bg-white text-[12px] font-black border border-gray-200 rounded-lg p-1.5 min-w-[70px] text-center shadow-sm appearance-none">
-                          {isOff && <option value="OFF">OFF</option>}
-                          {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                        <button onClick={()=>setRequestDetails({...requestDetails,[key]:{s:'OFF',e:'OFF'}})} className={`ml-1 text-[10px] font-black uppercase px-2 py-1 rounded-md border ${offS ? 'text-blue-500 border-blue-200' : 'text-rose-500 border-rose-200'}`}>休み</button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <button disabled={multiDates.length === 0} onClick={handleBulkSubmit} className="w-full bg-purple-600 text-white font-black py-4 rounded-xl text-lg shadow-lg active:scale-95 transition-all tracking-widest disabled:opacity-30 uppercase">申請を送信する 🚀</button>
-          </section>
-        ) : (
-          /* --- ✨ 実績入力：Ver 2.4.8 (コンテキスト連動ヘッダー) --- */
-          <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden text-center pb-4">
-            <div className="bg-[#FFF5F6] p-3 px-4 border-b border-pink-100 relative">
-              <div className="flex justify-between items-center mb-1">
-                <h3 className="text-[17px] font-black text-gray-800 leading-none">{singleDate ? format(singleDate, 'M/d (eee)', { locale: ja }) : ''}</h3>
-                {/* メイン表示：確定している時間 */}
-                <span className="text-pink-500 font-black text-lg tracking-tighter leading-none">
-                  {dayOfficial ? `${dayOfficial.start_time}~${dayOfficial.end_time}` : <span className="text-xs text-gray-300 font-bold uppercase tracking-widest italic">No Official Shift</span>}
-                </span>
-              </div>
-              
-              {/* ✨ スケジュール詳細（Official と Pending の状態を表示） */}
-              <div className="flex gap-1 justify-end">
-                {dayOfficial && (
-                  <span className="text-[8px] font-black px-1.5 py-0.5 bg-blue-500 text-white rounded uppercase tracking-tighter">Official</span>
-                )}
-                {dayPending && (
-                  <span className="text-[8px] font-black px-1.5 py-0.5 bg-amber-500 text-white rounded uppercase tracking-tighter animate-pulse">Pending: {dayPending.start_time}-{dayPending.end_time}</span>
-                )}
-              </div>
+            
+            <div className="text-center my-6">
+              <p className="text-[14px] font-black text-pink-400 leading-none mb-1 uppercase tracking-widest">Est. Salary</p>
+              <p className="text-[56px] font-black text-pink-600 leading-none tracking-tighter flex items-center justify-center gap-1">
+                <span className="text-2xl translate-y-2">¥</span>{monthlyTotals.amount.toLocaleString()}
+              </p>
             </div>
 
-            {dayOfficial ? (
-              <div className="p-4 space-y-4">
-                <div className="grid grid-cols-3 gap-2">
-                  {(['f', 'first', 'main'] as const).map((key) => (
-                    <div key={key} className="text-center space-y-1">
-                      <label className="text-[13px] font-black block text-gray-900 leading-none">{key==='f'?'フリー':key==='first'?'初指名':'本指名'}</label>
-                      <input type="number" inputMode="numeric" value={editReward[key]} onFocus={e=>e.target.select()} onChange={e=>setEditReward({...editReward,[key]:e.target.value})} className={`w-full text-center py-2 bg-[#FAFAFA] rounded-lg font-black text-2xl border border-gray-100 focus:ring-0 focus:border-pink-300 ${editReward[key]===''?'text-gray-200':'text-pink-500'}`} />
-                    </div>
-                  ))}
-                </div>
-                <div className="bg-pink-50/30 p-3 rounded-xl border border-pink-100 flex items-center justify-between h-[64px]">
-                  <label className="text-[13px] font-black shrink-0 text-gray-900 uppercase tracking-widest leading-none text-left">本日の報酬</label>
-                  <div className="flex items-center flex-1 justify-end pl-4 text-pink-500">
-                    <span className="text-pink-200 text-2xl font-black mr-1 translate-y-[2px]">¥</span>
-                    <input type="text" inputMode="numeric" value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} onFocus={e=>e.target.select()} onChange={e=>{const v=e.target.value.replace(/,/g,''); if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});}} className="w-full text-right bg-transparent font-black text-[32px] focus:ring-0 border-none" />
-                  </div>
-                </div>
-                <button onClick={() => {
-                  const dateStr = format(singleDate!, 'yyyy-MM-dd');
-                  supabase.from('shifts').update({ f_count: Number(editReward.f), first_request_count: Number(editReward.first), main_request_count: Number(editReward.main), reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('保存完了💰'); });
-                }} className="w-full bg-pink-500 text-white font-black py-5 rounded-xl text-2xl shadow-lg active:scale-95 transition-all tracking-widest uppercase">実績を保存 💾</button>
-              </div>
-            ) : (
-              <div className="p-10 text-gray-300 font-bold italic text-sm">
-                確定シフトがありません。<br/>実績入力は確定後に行えます⛄️
-              </div>
-            )}
-          </section>
-        )}
-
-        <section className="bg-white rounded-[22px] border border-pink-100 shadow-sm overflow-hidden opacity-90 text-left pb-4">
-          <div className="bg-gray-50 p-2 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Shop News</div>
-          {newsList.map((n) => (
-            <div key={n.id} className="p-3 px-4 border-b border-gray-50 last:border-0 flex gap-3 items-start leading-tight">
-              <span className="text-[9px] text-pink-200 font-bold mt-0.5 shrink-0">{format(parseISO(n.created_at), 'MM/dd')}</span>
-              <p className="text-xs font-bold text-gray-900">{n.content}</p>
-            </div>
-          ))}
-        </section>
-      </main>
-
-      <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-sm">
-        <nav className="flex justify-around items-center max-w-sm mx-auto px-4">
-          <button className="flex flex-col items-center text-pink-500" onClick={() => router.push('/')}><span className="text-xl mb-0.5">🏠</span><span className="text-[9px] font-black uppercase">Home</span></button>
-          <button className="flex flex-col items-center text-gray-300" onClick={() => router.push('/salary')}><span className="text-xl mb-0.5">💰</span><span className="text-[9px] font-black uppercase">Salary</span></button>
-          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center text-gray-300"><span className="text-xl mb-0.5">🚪</span><span className="text-[9px] font-black uppercase">Logout</span></button>
-        </nav>
-      </footer>
-    </div>
-  );
-}
+            <div className="grid grid-cols-3 gap-2 bg-white/40 p-1 rounded-[20px] border border-white/60 backdrop-blur-sm shadow-inner">
+              <div className="py-3 text-center rounded-xl bg-white/60">
+                <p className="text-[10px] text-pink-400 font-black mb-1">フリー</p>
