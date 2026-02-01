@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
-import { format, parseISO, isAfter, startOfToday } from 'date-fns';
+import { format, parseISO, startOfToday } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import DashboardCalendar from '@/components/DashboardCalendar';
 
@@ -91,12 +91,10 @@ export default function Page() {
     setRequestDetails(newDetails);
   }, [multiDates, shifts]);
 
-  // ✨ 日付選択時のバリデーション（翌日以降のみ許可）
   const handleDateSelect = (dates: any) => {
     if (isRequestMode) {
       const tomorrow = startOfToday();
       tomorrow.setDate(tomorrow.getDate() + 1);
-      // 翌日以降の日付だけをフィルタリングして保存
       const validDates = (dates as Date[] || []).filter(d => d >= tomorrow);
       setMultiDates(validDates);
     } else {
@@ -174,7 +172,7 @@ export default function Page() {
       
       {/* 🏔️ ヘッダー */}
       <header className="bg-white px-6 pt-14 pb-6 rounded-b-[40px] shadow-sm border-b border-pink-50">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1.5">KarintoCastManager v2.5.3</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1.5">KarintoCastManager v2.5.4</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'キャスト'}
           <span className="text-[22px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
@@ -192,7 +190,8 @@ export default function Page() {
       </div>
 
       <main className="px-4 mt-6 space-y-5">
-        {/* 実績カード */}
+        
+        {/* 📊 実績カード */}
         <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-5 border border-pink-200 relative overflow-hidden">
           <span className="absolute -right-4 -top-8 text-[120px] font-black text-pink-200/20 italic leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10">
@@ -222,16 +221,8 @@ export default function Page() {
           </div>
         </section>
 
-        {/* 📅 カレンダー（過去日制限付き） */}
         <section className="bg-white p-2 rounded-[32px] border border-gray-100 shadow-sm text-center">
-          <DashboardCalendar 
-            shifts={shifts} 
-            selectedDates={isRequestMode ? multiDates : singleDate} 
-            onSelect={handleDateSelect} // ✨ 新しい選択ハンドラ
-            month={viewDate} 
-            onMonthChange={setViewDate} 
-            isRequestMode={isRequestMode} 
-          />
+          <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={handleDateSelect} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
         </section>
 
         {isRequestMode ? (
@@ -281,7 +272,7 @@ export default function Page() {
             <button disabled={multiDates.length === 0} onClick={handleBulkSubmit} className="w-full bg-purple-600 text-white font-black py-5 rounded-[22px] text-lg shadow-lg active:scale-95 transition-all tracking-[0.2em]">申請を送信する 🚀</button>
           </section>
         ) : (
-          /* 💖 実績入力 */
+          /* 💖 実績入力：0グレーアウト復活版 */
           <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl overflow-hidden pb-5">
             <div className="bg-[#FFF8F9] p-5 border-b border-pink-50">
               <div className="flex justify-between items-center">
@@ -291,9 +282,9 @@ export default function Page() {
                     <span className="text-pink-500 font-black text-2xl tracking-tighter leading-none">
                       {dayOfficial ? `${dayOfficial.start_time}~${dayOfficial.end_time}` : <span className="text-sm text-gray-300 font-bold italic">お休み</span>}
                     </span>
-                    {dayOfficial && <span className="text-[10px] font-black px-2 py-1 bg-blue-500 text-white rounded-lg shadow-sm leading-none whitespace-nowrap">確定シフト</span>}
+                    {dayOfficial && <span className="text-[10px] font-black px-2 py-1 bg-blue-500 text-white rounded-lg shadow-sm whitespace-nowrap">確定シフト</span>}
                   </div>
-                  {dayPending && <span className="text-[10px] font-black px-2 py-1 bg-amber-500 text-white rounded-lg animate-pulse shadow-sm leading-none">申請中: {dayPending.start_time}〜{dayPending.end_time}</span>}
+                  {dayPending && <span className="text-[10px] font-black px-2 py-1 bg-amber-500 text-white rounded-lg animate-pulse shadow-sm">申請中: {dayPending.start_time}〜{dayPending.end_time}</span>}
                 </div>
               </div>
             </div>
@@ -304,7 +295,15 @@ export default function Page() {
                   {(['f', 'first', 'main'] as const).map((key) => (
                     <div key={key} className="space-y-2">
                       <label className="text-[12px] font-black block text-gray-900 text-center">{key==='f'?'フリー':key==='first'?'初指名':'本指名'}</label>
-                      <input type="number" inputMode="numeric" value={editReward[key]} onFocus={e=>e.target.select()} onChange={e=>setEditReward({...editReward,[key]:e.target.value})} className={`w-full text-center py-3 bg-gray-50 rounded-2xl font-black text-2xl border-2 transition-all ${editReward[key]===''?'border-gray-50 text-gray-200':'border-pink-100 text-pink-500 bg-white shadow-sm'}`} />
+                      <input 
+                        type="number" 
+                        inputMode="numeric" 
+                        value={editReward[key]} 
+                        onFocus={e=>e.target.select()} 
+                        onChange={e=>setEditReward({...editReward,[key]:e.target.value})} 
+                        className={`w-full text-center py-3 bg-gray-50 rounded-2xl font-black text-2xl border-2 transition-all 
+                          ${(editReward[key] === '' || editReward[key] === '0') ? 'border-gray-50 text-gray-200' : 'border-pink-100 text-pink-500 bg-white shadow-sm'}`} 
+                      />
                     </div>
                   ))}
                 </div>
@@ -312,7 +311,15 @@ export default function Page() {
                   <label className="text-[13px] font-black text-gray-900">本日の報酬合計</label>
                   <div className="flex items-center text-pink-500">
                     <span className="text-2xl font-black mr-1 translate-y-[2px]">¥</span>
-                    <input type="text" inputMode="numeric" value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} onFocus={e=>e.target.select()} onChange={e=>{const v=e.target.value.replace(/,/g,''); if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});}} className="w-32 text-right bg-transparent font-black text-[36px] focus:ring-0 border-none tracking-tighter" />
+                    <input 
+                      type="text" 
+                      inputMode="numeric" 
+                      value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} 
+                      onFocus={e=>e.target.select()} 
+                      onChange={e=>{const v=e.target.value.replace(/,/g,''); if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});}} 
+                      className={`w-32 text-right bg-transparent font-black text-[36px] focus:ring-0 border-none tracking-tighter 
+                        ${(editReward.amount === '' || editReward.amount === '0') ? 'text-gray-200' : 'text-pink-500'}`} 
+                    />
                   </div>
                 </div>
                 <button onClick={() => {
