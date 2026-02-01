@@ -44,7 +44,9 @@ export default function Page() {
     setCastProfile(castData);
 
     if (castData) {
-      const myShopId = castData.HOME_shop_ID || 'main';
+      // 🚀 ここを home_shop_id (小文字) に修正しました！
+      const myShopId = castData.home_shop_id || 'main';
+      
       const [shopRes, shiftRes, newsRes] = await Promise.all([
         supabase.from('shop_master').select('*').eq('shop_id', myShopId).single(),
         supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
@@ -98,19 +100,23 @@ export default function Page() {
     setRequestDetails(newDetails);
   }, [multiDates, shifts]);
 
-  // 🔔 追跡・デバッグ機能付き通知ロジック
+  useEffect(() => {
+    if (isRequestMode || !singleDate) return;
+    const dateStr = format(singleDate, 'yyyy-MM-dd');
+    const shift = (shifts || []).find(s => s.shift_date === dateStr);
+    const v = (val: any) => (val === null || val === undefined) ? '' : String(val);
+    setEditReward({ f: v(shift?.f_count), first: v(shift?.first_request_count), main: v(shift?.main_request_count), amount: v(shift?.reward_amount) });
+  }, [singleDate, shifts, isRequestMode]);
+
   const sendDiscordNotification = async (requestList: any[]) => {
-    // 🔍 追跡1: shopInfoが取れているか
     if (!shopInfo) {
-      alert("⚠️ デバッグ通知: shopInfo(店舗情報)が空です。キャストのHOME_shop_IDがshop_masterに存在するか確認してください。");
+      alert(`⚠️ shopInfoが空です。現在のmyShopId: ${castProfile?.home_shop_id}`);
       return;
     }
 
     const webhookUrl = shopInfo.discord_webhook_url;
-    
-    // 🔍 追跡2: URLが取れているか
     if (!webhookUrl) {
-      alert(`⚠️ デバッグ通知: 店舗「${shopInfo.shop_name}」にWebhook URLが設定されていません。shop_masterテーブルを確認してください。`);
+      alert(`⚠️ ウェブフックURLが未設定です (${shopInfo.shop_name})`);
       return;
     }
 
@@ -139,9 +145,7 @@ export default function Page() {
 
       if (!res.ok) {
         const errorText = await res.text();
-        alert(`❌ Discordが拒否しました: ${res.status} ${errorText}`);
-      } else {
-        console.log("Discord Success!");
+        alert(`❌ Discordエラー: ${res.status} ${errorText}`);
       }
     } catch (err: any) {
       alert(`❌ 通信エラー: ${err.message}`);
@@ -149,7 +153,7 @@ export default function Page() {
   };
 
   const handleBulkSubmit = async () => {
-    if (!castProfile) { alert("エラー: キャスト情報がありません"); return; }
+    if (!castProfile) return;
 
     const requests = multiDates.map(date => {
       const key = format(date, 'yyyy-MM-dd');
@@ -166,19 +170,15 @@ export default function Page() {
     });
 
     const { error } = await supabase.from('shifts').upsert(requests, { onConflict: 'login_id,shift_date' });
-    
     if (!error) {
-      // 🔍 ここで通知関数を呼び出す
       await sendDiscordNotification(requests);
-      alert(`${multiDates.length}日分の申請をDBに保存しました。Discord通知を確認してください。🚀`);
-      setMultiDates([]); 
-      fetchInitialData();
+      alert(`${multiDates.length}日分の申請を完了しました！🚀`);
+      setMultiDates([]); fetchInitialData();
     } else {
-      alert(`DB保存エラー: ${error.message}`);
+      alert(`DBエラー: ${error.message}`);
     }
   };
 
-  // --- 以下デザイン部分は Ver 2.4.3 と同じ（聖域維持） ---
   if (loading) return (
     <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center">
       <div className="text-pink-300 tracking-tighter text-5xl italic animate-pulse" style={{ fontWeight: 900, textShadow: '2px 2px 0px rgba(249, 168, 212, 0.3)' }}>KARINTO...</div>
@@ -190,7 +190,7 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       <header className="bg-white px-5 pt-12 pb-5 rounded-b-[30px] shadow-sm border-b border-pink-100">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.4.4 (DEBUG)</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.4.5</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'Cast'}
           <span className="text-[24px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
@@ -271,9 +271,9 @@ export default function Page() {
             <button disabled={multiDates.length === 0} onClick={handleBulkSubmit} className="w-full bg-purple-600 text-white font-black py-4 rounded-xl text-lg shadow-lg active:scale-95 transition-all tracking-widest disabled:opacity-30 uppercase">申請を送信する 🚀</button>
           </section>
         ) : (
-          <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden text-center">
-            {/* 実績入力フォーム (省略なし) */}
-            <div className="bg-[#FFF5F6] p-3 px-4 flex justify-center items-center h-[42px] border-b border-pink-100 relative leading-none">
+          <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden text-center pb-4">
+             {/* 実績入力フォーム */}
+             <div className="bg-[#FFF5F6] p-3 px-4 flex justify-center items-center h-[42px] border-b border-pink-100 relative leading-none">
               <h3 className="text-[17px] font-black text-gray-800">{singleDate ? format(singleDate, 'M/d (eee)', { locale: ja }) : ''}</h3>
               <span className="absolute right-4 text-pink-500 font-black text-lg tracking-tighter">{selectedShift ? `${selectedShift.start_time}~${selectedShift.end_time}` : <span className="text-xs text-gray-300 font-bold uppercase tracking-widest">OFF</span>}</span>
             </div>
@@ -298,7 +298,7 @@ export default function Page() {
                   if (!singleDate) return;
                   const dateStr = format(singleDate, 'yyyy-MM-dd');
                   supabase.from('shifts').update({ f_count: Number(editReward.f), first_request_count: Number(editReward.first), main_request_count: Number(editReward.main), reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('保存完了💰'); });
-                }} className="w-full bg-pink-500 text-white font-black py-5 rounded-xl text-2xl shadow-lg active:scale-95 transition-all tracking-widest uppercase leading-none tracking-widest">実績を保存 💾</button>
+                }} className="w-full bg-pink-500 text-white font-black py-5 rounded-xl text-2xl shadow-lg active:scale-95 transition-all tracking-widest uppercase">実績を保存 💾</button>
               </div>
             )}
           </section>
