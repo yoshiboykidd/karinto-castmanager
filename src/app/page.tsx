@@ -110,32 +110,6 @@ export default function Page() {
     setEditReward({ f: v(shift?.f_count), first: v(shift?.first_request_count), main: v(shift?.main_request_count), amount: v(shift?.reward_amount) });
   }, [singleDate, shifts, isRequestMode]);
 
-  const sendDiscordNotification = async (requestList: any[]) => {
-    const webhookUrl = shopInfo?.discord_webhook_url;
-    if (!webhookUrl) return;
-    const castName = castProfile?.display_name || 'キャスト';
-    const detailText = requestList.map(r => {
-      const type = r.is_official_pre_exist ? "【変更】" : "【新規】";
-      const timeStr = (r.start_time === 'OFF') ? "休み希望 😴" : `${r.start_time}〜${r.end_time}`;
-      return `${type} ${r.shift_date} (${timeStr})`;
-    }).join('\n');
-    try {
-      await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: `🔔 **シフト申請を受信しました**`,
-          embeds: [{
-            title: `${castName} さん (${shopInfo.shop_name})`,
-            description: `\`\`\`\n${detailText}\n\`\`\``,
-            color: 0xec4899,
-            timestamp: new Date().toISOString()
-          }]
-        })
-      });
-    } catch (err) { console.error(err); }
-  };
-
   const handleBulkSubmit = async () => {
     if (!castProfile) return;
     const requests = multiDates.map(date => {
@@ -153,7 +127,6 @@ export default function Page() {
     });
     const { error } = await supabase.from('shifts').upsert(requests, { onConflict: 'login_id,shift_date' });
     if (!error) {
-      await sendDiscordNotification(requests);
       alert('申請を送信しました！🚀');
       setMultiDates([]); fetchInitialData();
     } else { alert(`エラー: ${error.message}`); }
@@ -165,22 +138,17 @@ export default function Page() {
 
   const targetDateStr = singleDate ? format(singleDate, 'yyyy-MM-dd') : '';
   const dayOfficial = (shifts || []).find(s => s.shift_date === targetDateStr && s.status === 'official');
-  const dayPending = (shifts || []).find(s => s.shift_date === targetDateStr && s.status === 'requested');
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
       {/* 🏔️ ヘッダー */}
       <header className="bg-white px-6 pt-14 pb-6 rounded-b-[40px] shadow-sm border-b border-pink-50">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1.5">KarintoCastManager v2.6.1</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1.5">KarintoCastManager v2.6.2</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'キャスト'}
           <span className="text-[22px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
         </h1>
-        <p className="text-[13px] font-bold text-gray-400 mt-2 flex items-center gap-1">
-          <span className="w-2 h-2 bg-green-400 rounded-full"></span>
-          {shopInfo?.shop_name || 'Karinto'} お疲れ様です🍵
-        </p>
       </header>
 
       {/* 📱 タブ */}
@@ -190,35 +158,13 @@ export default function Page() {
       </div>
 
       <main className="px-4 mt-6 space-y-5">
-        {/* 実績カード */}
+        
+        {/* 実績サマリー (実績入力モードのみ表示) */}
         {!isRequestMode && (
-          <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-5 border border-pink-200 relative overflow-hidden">
-            <span className="absolute -right-4 -top-8 text-[120px] font-black text-pink-200/20 italic leading-none">{format(viewDate, 'M')}</span>
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-[14px] font-black text-pink-500 tracking-tighter bg-white/60 px-3 py-1 rounded-full border border-pink-100">{format(viewDate, 'M月')}の実績合計</h2>
-                <div className="flex gap-2">
-                  <div className="bg-white/90 px-3 py-1.5 rounded-2xl flex items-baseline gap-0.5 shadow-sm border border-pink-50">
-                    <span className="text-[10px] font-black text-gray-900 leading-none mr-0.5">出勤</span>
-                    <span className="text-[20px] font-black text-pink-500 leading-none">{monthlyTotals.count}</span>
-                    <span className="text-[10px] font-black text-gray-900 leading-none">日</span>
-                  </div>
-                  <div className="bg-white/90 px-3 py-1.5 rounded-2xl flex items-baseline gap-0.5 shadow-sm border border-pink-50">
-                    <span className="text-[10px] font-black text-gray-900 leading-none mr-0.5">稼働</span>
-                    <span className="text-[20px] font-black text-pink-500 leading-none">{Math.round(monthlyTotals.hours * 10) / 10}</span>
-                    <span className="text-[10px] font-black text-gray-900 leading-none">h</span>
-                  </div>
-                </div>
-              </div>
-              <p className="text-[52px] font-black text-pink-600 text-center mb-5 leading-none tracking-tighter">
-                <span className="text-2xl mr-0.5 leading-none">¥</span>{monthlyTotals.amount.toLocaleString()}
-              </p>
-              <div className="grid grid-cols-3 gap-0.5 w-full bg-white/40 rounded-[20px] border border-white/60 text-center shadow-inner">
-                <div className="py-3"><p className="text-[11px] text-pink-400 font-black mb-1">フリー</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.f}</p></div>
-                <div className="py-3 border-x border-pink-100/50"><p className="text-[11px] text-pink-400 font-black mb-1">初指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.first}</p></div>
-                <div className="py-3"><p className="text-[11px] text-pink-400 font-black mb-1">本指名</p><p className="text-2xl font-black text-pink-600 leading-none">{monthlyTotals.main}</p></div>
-              </div>
-            </div>
+          <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-5 border border-pink-200">
+            <p className="text-[52px] font-black text-pink-600 text-center mb-5 leading-none tracking-tighter">
+              <span className="text-2xl mr-0.5 leading-none">¥</span>{monthlyTotals.amount.toLocaleString()}
+            </p>
           </section>
         )}
 
@@ -235,15 +181,16 @@ export default function Page() {
         </section>
 
         {isRequestMode ? (
-          /* 💜 シフト申請パネル (Ver 2.6.1 改良版) */
+          /* 💜 シフト申請パネル (視認性大幅向上版) */
           <section className="bg-white rounded-[32px] border border-gray-100 p-5 shadow-xl space-y-4">
             <h3 className="font-black text-purple-600 text-[14px] uppercase tracking-widest flex items-center gap-2">
               <span className="w-1.5 h-4 bg-purple-500 rounded-full"></span>
               申請リスト ({multiDates.length})
             </h3>
-            <div className="max-h-[500px] overflow-y-auto space-y-6 pr-1 custom-scrollbar">
+            
+            <div className="max-h-[500px] overflow-y-auto space-y-8 pr-1 custom-scrollbar">
               {multiDates.length === 0 ? (
-                <div className="py-12 text-center text-gray-300 font-bold italic text-sm">カレンダーから日付を<br/>選んでください 🗓️</div>
+                <div className="py-12 text-center text-gray-300 font-bold italic text-sm leading-relaxed">カレンダーから<br/>日付を選択してください 🗓️</div>
               ) : (
                 multiDates.sort((a,b)=>a.getTime()-b.getTime()).map(d => {
                   const key = format(d, 'yyyy-MM-dd');
@@ -251,41 +198,48 @@ export default function Page() {
                   const isOff = requestDetails[key]?.s === 'OFF';
 
                   return (
-                    <div key={key} className="relative pl-2 border-l-4 border-gray-100 pb-2">
-                      {/* 日付ヘッダー */}
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[15px] font-black text-gray-800">{format(d, 'M/d(ee)', {locale: ja})}</span>
+                    <div key={key} className="relative pl-3 border-l-4 border-gray-50 pb-1">
+                      {/* 1. 日付・曜日・確定状況 */}
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[16px] font-black text-gray-800">
+                          {format(d, 'M/d', {locale: ja})}<span className="text-gray-400 ml-1">({format(d, 'E', {locale: ja})})</span>
+                        </span>
                         {offS && (
-                          <span className="text-[11px] font-bold text-blue-500 bg-blue-50 px-3 py-0.5 rounded-full border border-blue-100">
+                          <span className="text-[11px] font-bold text-blue-500">
                             確定済み {offS.start_time}〜{offS.end_time}
                           </span>
                         )}
                       </div>
 
-                      {/* 入力ライン：[バッジ][時間][～][時間][休み] */}
-                      <div className="flex items-center gap-1.5">
-                        {/* 左側バッジ */}
-                        <div className={`shrink-0 text-[10px] font-black px-2 py-2 rounded-lg leading-none ${offS ? 'bg-blue-500 text-white' : 'bg-pink-400 text-white'}`}>
+                      {/* 2. 入力エリア (バッジ + セパレート時間 + 休み) */}
+                      <div className="flex items-center gap-2">
+                        {/* バッジ */}
+                        <div className={`shrink-0 w-16 text-center text-[10px] font-black py-2.5 rounded-xl leading-none ${offS ? 'bg-blue-500 text-white' : 'bg-pink-400 text-white'}`}>
                           {offS ? '変更申請' : '新規申請'}
                         </div>
 
-                        {/* 時間選択エリア */}
-                        <div className={`flex items-center gap-1 flex-1 bg-gray-50 p-1 rounded-xl border ${isOff ? 'opacity-30' : 'border-gray-200'}`}>
+                        {/* 時間：開始ボタン */}
+                        <div className={`flex-1 relative ${isOff ? 'opacity-20' : ''}`}>
                           <select 
                             disabled={isOff}
                             value={requestDetails[key]?.s} 
                             onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} 
-                            className="bg-transparent text-[13px] font-black p-1.5 flex-1 text-center appearance-none focus:outline-none"
+                            className="w-full bg-gray-100 border border-gray-200 text-[14px] font-black py-3 rounded-2xl text-center appearance-none focus:outline-none focus:ring-2 focus:ring-purple-200 transition-all"
                           >
                             {requestDetails[key]?.s === 'OFF' && <option value="OFF">OFF</option>}
                             {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                           </select>
-                          <span className="text-gray-300 font-bold text-xs">～</span>
+                        </div>
+
+                        <span className={`text-gray-300 font-bold text-xs ${isOff ? 'opacity-20' : ''}`}>～</span>
+
+                        {/* 時間：終了ボタン */}
+                        <div className={`flex-1 relative ${isOff ? 'opacity-20' : ''}`}>
                           <select 
                             disabled={isOff}
                             value={requestDetails[key]?.e} 
                             onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} 
-                            className="bg-transparent text-[13px] font-black p-1.5 flex-1 text-center appearance-none focus:outline-none"
+                            className="w-full bg-gray-100 border border-gray-200 text-[14px] font-black py-3 rounded-2xl text-center appearance-none focus:outline-none focus:ring-2 focus:ring-purple-200 transition-all"
                           >
                             {requestDetails[key]?.e === 'OFF' && <option value="OFF">OFF</option>}
                             {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
@@ -298,7 +252,7 @@ export default function Page() {
                             const nextVal = isOff ? {s: '11:00', e: '23:00'} : {s: 'OFF', e: 'OFF'};
                             setRequestDetails({...requestDetails, [key]: nextVal});
                           }} 
-                          className={`shrink-0 px-3 py-2.5 rounded-xl text-[11px] font-black transition-all ${isOff ? 'bg-gray-800 text-white shadow-inner' : 'bg-gray-200 text-gray-500'}`}
+                          className={`shrink-0 w-12 py-3 rounded-2xl text-[11px] font-black transition-all ${isOff ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-500'}`}
                         >
                           休み
                         </button>
@@ -308,110 +262,52 @@ export default function Page() {
                 })
               )}
             </div>
-            <button disabled={multiDates.length === 0} onClick={handleBulkSubmit} className="w-full bg-purple-600 text-white font-black py-5 rounded-2xl text-lg shadow-lg active:scale-95 transition-all tracking-[0.2em]">申請を確定する 🚀</button>
+            
+            <button disabled={multiDates.length === 0} onClick={handleBulkSubmit} className="w-full bg-purple-600 text-white font-black py-5 rounded-2xl text-lg shadow-lg active:scale-95 transition-all tracking-[0.2em]">申請を送信する 🚀</button>
           </section>
         ) : (
-          /* 💖 実績入力 (Ver 2.6.0 デザイン + 本数必須) */
-          <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl overflow-hidden pb-5">
-            <div className="bg-[#FFF8F9] p-5 border-b border-pink-50">
-              <div className="flex justify-between items-center">
-                <h3 className="text-xl font-black text-gray-800">{singleDate ? format(singleDate, 'M/d (eee)', { locale: ja }) : ''}</h3>
-                <div className="flex flex-col items-end gap-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-pink-500 font-black text-2xl tracking-tighter leading-none">
-                      {dayOfficial ? `${dayOfficial.start_time}~${dayOfficial.end_time}` : <span className="text-sm text-gray-300 font-bold italic">お休み</span>}
-                    </span>
-                    {dayOfficial && <span className="text-[10px] font-black px-2 py-1 bg-blue-500 text-white rounded-lg shadow-sm leading-none whitespace-nowrap">確定シフト</span>}
-                  </div>
-                </div>
-              </div>
-            </div>
-
+          /* 💖 実績入力 (v2.6.0 デザイン継承) */
+          <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-5 space-y-6">
+            <h3 className="text-xl font-black text-gray-800">{singleDate ? format(singleDate, 'M/d (E)', { locale: ja }) : ''}</h3>
+            
             {dayOfficial ? (
-              <div className="p-5 space-y-6">
+              <>
                 <div className="grid grid-cols-3 gap-3">
                   {(['f', 'first', 'main'] as const).map((key) => (
-                    <div key={key} className="space-y-2">
-                      <label className="text-[12px] font-black block text-gray-900 text-center">{key==='f'?'フリー':key==='first'?'初指名':'本指名'}</label>
-                      <input 
-                        type="number" 
-                        inputMode="numeric" 
-                        value={editReward[key]} 
-                        onFocus={e=>e.target.select()} 
-                        onChange={e=>setEditReward({...editReward,[key]:e.target.value})} 
-                        className="w-full text-center py-3 bg-white rounded-2xl font-black text-2xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none caret-pink-500 transition-all text-pink-500" 
-                      />
+                    <div key={key} className="space-y-2 text-center">
+                      <label className="text-[12px] font-black text-gray-500">{key==='f'?'フリー':key==='first'?'初指名':'本指名'}</label>
+                      <input type="number" inputMode="numeric" value={editReward[key]} onFocus={e=>e.target.select()} onChange={e=>setEditReward({...editReward,[key]:e.target.value})} className="w-full text-center py-4 bg-white rounded-2xl font-black text-2xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none caret-pink-500 text-pink-500" />
                     </div>
                   ))}
                 </div>
                 
-                <div className="bg-pink-50/50 p-4 rounded-[24px] border border-pink-100 flex items-center justify-between shadow-inner">
-                  <label className="text-[13px] font-black text-gray-900 shrink-0">本日の報酬合計</label>
-                  <div className="flex items-center text-pink-500 flex-1 justify-end">
+                <div className="bg-pink-50/50 p-4 rounded-3xl border border-pink-100 flex items-center justify-between">
+                  <label className="text-[13px] font-black text-gray-900">報酬合計</label>
+                  <div className="flex items-center text-pink-500">
                     <span className="text-xl font-black mr-1 opacity-40">¥</span>
-                    <input 
-                      type="text" 
-                      inputMode="numeric" 
-                      value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} 
-                      onFocus={e=>e.target.select()} 
-                      onChange={e=>{
-                        const v=e.target.value.replace(/,/g,''); 
-                        if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});
-                      }} 
-                      className="w-40 text-right bg-transparent font-black text-[36px] focus:ring-0 border-none tracking-tighter caret-pink-500" 
-                      placeholder="0"
-                    />
+                    <input type="text" inputMode="numeric" value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} onFocus={e=>e.target.select()} onChange={e=>{const v=e.target.value.replace(/,/g,''); if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});}} className="w-36 text-right bg-transparent font-black text-[32px] border-none focus:ring-0 caret-pink-500" />
                   </div>
                 </div>
                 
                 <button onClick={() => {
-                  const fCount = Number(editReward.f) || 0;
-                  const firstCount = Number(editReward.first) || 0;
-                  const mainCount = Number(editReward.main) || 0;
-                  if ((fCount + firstCount + mainCount) < 1) {
-                    alert('いずれかの項目に1以上の数字を入力してください。');
-                    return;
-                  }
+                  if ((Number(editReward.f)+Number(editReward.first)+Number(editReward.main)) < 1) { alert('本数を入力してください'); return; }
                   const dateStr = format(singleDate!, 'yyyy-MM-dd');
-                  supabase.from('shifts').update({ 
-                    f_count: fCount, 
-                    first_request_count: firstCount, 
-                    main_request_count: mainCount, 
-                    reward_amount: Number(editReward.amount) || 0 
-                  }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { 
-                    fetchInitialData(); 
-                    alert('実績を保存しました💰'); 
-                  });
-                }} className="w-full bg-pink-500 text-white font-black py-5 rounded-[22px] text-xl shadow-lg active:scale-95 transition-all tracking-[0.2em]">実績を保存 💾</button>
-              </div>
+                  supabase.from('shifts').update({ f_count: Number(editReward.f), first_request_count: Number(editReward.first), main_request_count: Number(editReward.main), reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('保存しました💰'); });
+                }} className="w-full bg-pink-500 text-white font-black py-5 rounded-2xl text-xl shadow-lg active:scale-95 transition-all">実績を保存 💾</button>
+              </>
             ) : (
-              <div className="py-20 text-center">
-                <p className="text-gray-300 font-bold italic text-sm">確定シフトがありません⛄️</p>
-              </div>
+              <p className="py-12 text-center text-gray-300 font-bold italic">確定シフトがありません</p>
             )}
           </section>
         )}
-
-        {/* お知らせ */}
-        <section className="bg-white rounded-[28px] border border-gray-100 shadow-sm overflow-hidden mb-8">
-          <div className="bg-gray-50 p-2.5 px-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">店舗からのお知らせ</div>
-          <div className="divide-y divide-gray-50">
-            {newsList.map((n) => (
-              <div key={n.id} className="p-4 px-5 flex gap-4 items-start">
-                <span className="text-[10px] text-pink-300 font-black mt-1 shrink-0 bg-pink-50 px-1.5 py-0.5 rounded leading-none">{format(parseISO(n.created_at), 'MM/dd')}</span>
-                <p className="text-xs font-bold text-gray-700 leading-relaxed">{n.content}</p>
-              </div>
-            ))}
-          </div>
-        </section>
       </main>
 
-      {/* フッターメニュー */}
-      <footer className="fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-xl border-t border-gray-100 pb-8 pt-4 shadow-2xl">
+      {/* フッター固定メニュー */}
+      <footer className="fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-xl border-t border-gray-100 pb-8 pt-4">
         <nav className="flex justify-around items-center max-md mx-auto px-6">
-          <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1.5"><span className={`text-2xl ${!isRequestMode ? 'opacity-100' : 'opacity-30'}`}>🏠</span><span className={`text-[9px] font-black uppercase ${!isRequestMode ? 'text-pink-500' : 'text-gray-300'}`}>ホーム</span></button>
-          <button onClick={() => router.push('/salary')} className="flex flex-col items-center gap-1.5"><span className="text-2xl opacity-30">💰</span><span className="text-[9px] font-black text-gray-300 uppercase">給与明細</span></button>
-          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center gap-1.5"><span className="text-2xl opacity-30">🚪</span><span className="text-[9px] font-black text-gray-300 uppercase">ログアウト</span></button>
+          <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1.5 text-pink-500"><span className="text-2xl opacity-100">🏠</span><span className="text-[9px] font-black uppercase">ホーム</span></button>
+          <button onClick={() => router.push('/salary')} className="flex flex-col items-center gap-1.5 text-gray-300"><span className="text-2xl opacity-30">💰</span><span className="text-[9px] font-black uppercase">給与明細</span></button>
+          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center gap-1.5 text-gray-300"><span className="text-2xl opacity-30">🚪</span><span className="text-[9px] font-black uppercase">ログアウト</span></button>
         </nav>
       </footer>
     </div>
