@@ -7,6 +7,7 @@ import { format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import DashboardCalendar from '@/components/DashboardCalendar';
 
+// 30分刻みの時間リスト
 const TIME_OPTIONS: string[] = [];
 for (let h = 11; h <= 23; h++) {
   TIME_OPTIONS.push(`${h}:00`);
@@ -22,6 +23,7 @@ export default function Page() {
 
   const [shifts, setShifts] = useState<any[]>([]);
   const [castProfile, setCastProfile] = useState<any>(null);
+  const [shopInfo, setShopInfo] = useState<any>(null);
   const [newsList, setNewsList] = useState<any[]>([]);
   const [viewDate, setViewDate] = useState(new Date()); 
   const [loading, setLoading] = useState(true);
@@ -37,20 +39,54 @@ export default function Page() {
   async function fetchInitialData() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.push('/login'); return; }
+    
     const loginId = session.user.email?.replace('@karinto-internal.com', '');
-    const [castRes, shiftRes] = await Promise.all([
-      supabase.from('cast_members').select('*').eq('login_id', loginId).single(),
-      supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
-    ]);
-    setCastProfile(castRes.data);
-    setShifts(shiftRes.data || []);
-    if (castRes.data) {
-      const myShopId = castRes.data.HOME_shop_ID || 'main';
-      const { data } = await supabase.from('news').select('*').or(`shop_id.eq.${myShopId},shop_id.eq.all`).order('created_at', { ascending: false }).limit(3);
-      setNewsList(data || []);
+    const { data: castData } = await supabase.from('cast_members').select('*').eq('login_id', loginId).single();
+    setCastProfile(castData);
+
+    if (castData) {
+      const myShopId = castData.HOME_shop_ID || 'main';
+      const [shopRes, shiftRes, newsRes] = await Promise.all([
+        supabase.from('shop_master').select('*').eq('shop_id', myShopId).single(),
+        supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
+        supabase.from('news').select('*').or(`shop_id.eq.${myShopId},shop_id.eq.all`).order('created_at', { ascending: false }).limit(3)
+      ]);
+      setShopInfo(shopRes.data);
+      setShifts(shiftRes.data || []);
+      setNewsList(newsRes.data || []);
     }
     setLoading(false);
   }
+
+  // ✨ 波線を解消した monthlyTotals の計算ロジック
+  const monthlyTotals = (shifts || [])
+    .filter((s: any) => {
+      const d = parseISO(s.shift_date);
+      return (
+        d.getMonth() === viewDate.getMonth() &&
+        d.getFullYear() === viewDate.getFullYear() &&
+        s.status === 'official'
+      );
+    })
+    .reduce(
+      (acc, s: any) => {
+        let dur = 0;
+        if (s.start_time && s.end_time && s.start_time !== 'OFF') {
+          const [sH, sM] = s.start_time.split(':').map(Number);
+          const [eH, eM] = s.end_time.split(':').map(Number);
+          dur = (eH < sH ? eH + 24 : eH) + eM / 60 - (sH + sM / 60);
+        }
+        return {
+          amount: acc.amount + (Number(s.reward_amount) || 0),
+          f: acc.f + (Number(s.f_count) || 0),
+          first: acc.first + (Number(s.first_request_count) || 0),
+          main: acc.main + (Number(s.main_request_count) || 0),
+          count: acc.count + 1,
+          hours: acc.hours + dur,
+        };
+      },
+      { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 }
+    );
 
   useEffect(() => {
     const newDetails = { ...requestDetails };
@@ -58,11 +94,7 @@ export default function Page() {
       const key = format(d, 'yyyy-MM-dd');
       if (!newDetails[key]) {
         const existing = shifts.find(s => s.shift_date === key && s.status === 'official');
-        if (existing) {
-          newDetails[key] = { s: existing.start_time, e: existing.end_time };
-        } else {
-          newDetails[key] = { s: '11:00', e: '23:00' };
-        }
+        newDetails[key] = existing ? { s: existing.start_time, e: existing.end_time } : { s: '11:00', e: '23:00' };
       }
     });
     setRequestDetails(newDetails);
@@ -71,30 +103,43 @@ export default function Page() {
   useEffect(() => {
     if (isRequestMode || !singleDate) return;
     const dateStr = format(singleDate, 'yyyy-MM-dd');
-    const shift = shifts.find(s => s.shift_date === dateStr);
+    const shift = (shifts || []).find(s => s.shift_date === dateStr);
     const v = (val: any) => (val === null || val === undefined) ? '' : String(val);
     setEditReward({ f: v(shift?.f_count), first: v(shift?.first_request_count), main: v(shift?.main_request_count), amount: v(shift?.reward_amount) });
   }, [singleDate, shifts, isRequestMode]);
 
-  const monthlyTotals = shifts
-    .filter(s => {
-      const d = parseISO(s.shift_date);
-      return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear() && s.status === 'official';
-    })
-    .reduce((acc, s) => {
-      let dur = 0;
-      if (s.start_time && s.end_time && s.start_time !== 'OFF') {
-        const [sH, sM] = s.start_time.split(':').map(Number);
-        const [eH, eM] = s.end_time.split(':').map(Number);
-        dur = ((eH < sH ? eH + 24 : eH) + eM / 60) - (sH + sM / 60);
-      }
-      return { amount: acc.amount + (s.reward_amount || 0), f: acc.f + (s.f_count || 0), first: acc.first + (s.first_request_count || 0), main: acc.main + (s.main_request_count || 0), count: acc.count + 1, hours: acc.hours + dur };
-    }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
+  const sendDiscordNotification = async (requestList: any[]) => {
+    const webhookUrl = shopInfo?.discord_webhook_url;
+    if (!webhookUrl) return;
+
+    const castName = castProfile?.display_name || 'Cast';
+    const detailText = requestList.map(r => {
+      const type = r.is_official_pre_exist ? "【変更申請】" : "【新規申請】";
+      const timeStr = (r.start_time === 'OFF') ? "お休み希望" : `${r.start_time}〜${r.end_time}`;
+      return `${type} ${r.shift_date} (${timeStr})`;
+    }).join('\n');
+
+    try {
+      await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: `🔔 **シフト申請を受信しました**`,
+          embeds: [{
+            title: `${castName} さん (${shopInfo.shop_name})`,
+            description: detailText,
+            color: 0xec4899,
+            timestamp: new Date().toISOString(),
+            footer: { text: "Karinto Cast Manager" }
+          }]
+        })
+      });
+    } catch (err) { console.error(err); }
+  };
 
   const handleBulkSubmit = async () => {
     const requests = multiDates.map(date => {
       const key = format(date, 'yyyy-MM-dd');
-      const isOfficialExist = shifts.some(s => s.shift_date === key && s.status === 'official');
       return { 
         login_id: castProfile.login_id, 
         shift_date: key, 
@@ -102,12 +147,16 @@ export default function Page() {
         end_time: requestDetails[key].e, 
         status: 'requested', 
         is_official: false,
-        is_official_pre_exist: isOfficialExist
+        is_official_pre_exist: (shifts || []).some(s => s.shift_date === key && s.status === 'official')
       };
     });
-    await supabase.from('shifts').upsert(requests, { onConflict: 'login_id,shift_date' });
-    alert(`${multiDates.length}日分の申請を送信しました！🚀`);
-    setMultiDates([]); fetchInitialData();
+
+    const { error } = await supabase.from('shifts').upsert(requests, { onConflict: 'login_id,shift_date' });
+    if (!error) {
+      await sendDiscordNotification(requests);
+      alert(`${multiDates.length}日分の申請を送信しました！🚀`);
+      setMultiDates([]); fetchInitialData();
+    }
   };
 
   if (loading) return (
@@ -116,18 +165,18 @@ export default function Page() {
     </div>
   );
 
-  const selectedShift = !isRequestMode && singleDate ? shifts.find(s => s.shift_date === format(singleDate, 'yyyy-MM-dd')) : null;
+  const selectedShift = !isRequestMode && singleDate ? (shifts || []).find(s => s.shift_date === format(singleDate, 'yyyy-MM-dd')) : null;
 
   return (
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
       <header className="bg-white px-5 pt-12 pb-5 rounded-b-[30px] shadow-sm border-b border-pink-100">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.3.2</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.4.2</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'Cast'}
           <span className="text-[24px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
         </h1>
-        <p className="text-[13px] font-bold text-gray-500 mt-1 ml-0.5 tracking-tighter leading-none">お疲れ様です🍵</p>
+        <p className="text-[13px] font-bold text-gray-500 mt-1 ml-0.5 tracking-tighter leading-none">{shopInfo?.shop_name || 'Karinto'} お疲れ様です🍵</p>
       </header>
 
       <div className="flex p-1 bg-gray-100 mx-5 mt-4 rounded-xl border border-gray-200 shadow-inner">
@@ -136,8 +185,7 @@ export default function Page() {
       </div>
 
       <main className="px-3 mt-3 space-y-3">
-        
-        {/* 実績合計 (Sanctuary Ver 2.2.4) */}
+        {/* 実績合計：聖域デザイン */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-3 border border-pink-300 relative overflow-hidden shadow-sm">
           <span className="absolute -right-2 -top-6 text-[100px] font-black text-pink-200/20 italic select-none leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10 flex flex-col items-center">
@@ -172,56 +220,41 @@ export default function Page() {
         </section>
 
         {isRequestMode ? (
-          <section className="bg-white rounded-[24px] border border-purple-200 p-4 shadow-xl animate-in slide-in-from-bottom-4">
+          <section className="bg-white rounded-[24px] border border-purple-200 p-4 shadow-xl">
             <div className="flex justify-between items-center mb-4 leading-none">
               <h3 className="font-black text-purple-600 text-[13px] uppercase tracking-widest">選択中: {multiDates.length}日</h3>
               {multiDates.length > 0 && <button onClick={() => setMultiDates([])} className="text-[9px] font-black text-gray-300 uppercase border border-gray-200 px-2 py-1 rounded-md">リセット</button>}
             </div>
-            
             <div className="max-h-48 overflow-y-auto space-y-2 mb-4 pr-1 custom-scrollbar">
               {multiDates.sort((a,b)=>a.getTime()-b.getTime()).map(d => {
                 const key = format(d, 'yyyy-MM-dd');
                 const isOff = requestDetails[key]?.s === 'OFF';
-                
-                // ✨ 確定日かどうかを判定
-                const isModification = shifts.some(s => s.shift_date === key && s.status === 'official');
-
+                const isMod = (shifts || []).some(s => s.shift_date === key && s.status === 'official');
                 return (
-                  <div key={key} className={`flex items-center justify-between p-2 rounded-xl border transition-colors ${isModification ? 'bg-blue-50/50 border-blue-100' : 'bg-rose-50/50 border-rose-100'}`}>
+                  <div key={key} className={`flex items-center justify-between p-2 rounded-xl border transition-colors ${isMod ? 'bg-blue-50/50 border-blue-100' : 'bg-rose-50/50 border-rose-100'}`}>
                     <div className="flex flex-col">
-                      <span className={`text-[11px] font-black leading-none mb-1 ${isModification ? 'text-blue-500' : 'text-rose-500'}`}>{format(d, 'M/d(ee)', {locale: ja})}</span>
-                      <span className={`text-[8px] font-black px-1 py-0.5 rounded uppercase w-fit leading-none ${isModification ? 'bg-blue-500 text-white' : 'bg-rose-500 text-white'}`}>
-                        {isModification ? '変更' : '新規'}
-                      </span>
+                      <span className={`text-[11px] font-black mb-1 ${isMod ? 'text-blue-500' : 'text-rose-500'}`}>{format(d, 'M/d(ee)', {locale: ja})}</span>
+                      <span className={`text-[8px] font-black px-1 py-0.5 rounded uppercase w-fit leading-none ${isMod ? 'bg-blue-500 text-white' : 'bg-rose-500 text-white'}`}>{isMod ? '変更' : '新規'}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <select 
-                        value={requestDetails[key]?.s} 
-                        onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})}
-                        className={`bg-white text-[11px] font-black rounded-md p-1 focus:ring-0 appearance-none text-center min-w-[60px] border ${isModification ? 'border-blue-100' : 'border-rose-100'}`}
-                      >
+                      <select value={requestDetails[key]?.s} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} className="bg-white text-[11px] font-black border border-gray-100 rounded-md p-1 min-w-[60px] text-center appearance-none">
                         {isOff && <option value="OFF">OFF</option>}
                         {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
-                      <span className={isModification ? 'text-blue-200' : 'text-rose-200'}>~</span>
-                      <select 
-                        value={requestDetails[key]?.e} 
-                        onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})}
-                        className={`bg-white text-[11px] font-black rounded-md p-1 focus:ring-0 appearance-none text-center min-w-[60px] border ${isModification ? 'border-blue-100' : 'border-rose-100'}`}
-                      >
+                      <span className={isMod ? 'text-blue-200' : 'text-rose-200'}>~</span>
+                      <select value={requestDetails[key]?.e} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} className="bg-white text-[11px] font-black border border-gray-100 rounded-md p-1 min-w-[60px] text-center appearance-none">
                         {isOff && <option value="OFF">OFF</option>}
                         {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
-                      <button onClick={()=>setRequestDetails({...requestDetails,[key]:{s:'OFF',e:'OFF'}})} className={`ml-1 text-[9px] font-bold uppercase leading-none px-1 ${isModification ? 'text-blue-400' : 'text-rose-400'}`}>OFF</button>
+                      <button onClick={()=>setRequestDetails({...requestDetails,[key]:{s:'OFF',e:'OFF'}})} className={`ml-1 text-[9px] font-bold uppercase px-1 ${isMod ? 'text-blue-400' : 'text-rose-400'}`}>OFF</button>
                     </div>
                   </div>
                 );
               })}
             </div>
-            <button disabled={multiDates.length === 0} onClick={handleBulkSubmit} className="w-full bg-purple-600 text-white font-black py-4 rounded-xl text-lg shadow-lg active:scale-95 transition-all uppercase tracking-widest disabled:opacity-30">申請を送信する 🚀</button>
+            <button disabled={multiDates.length === 0} onClick={handleBulkSubmit} className="w-full bg-purple-600 text-white font-black py-4 rounded-xl text-lg shadow-lg active:scale-95 transition-all tracking-widest disabled:opacity-30">申請を送信する 🚀</button>
           </section>
         ) : (
-          /* 実績入力 (Ver 2.2.4) */
           <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden text-center">
             <div className="bg-[#FFF5F6] p-3 px-4 flex justify-center items-center h-[42px] border-b border-pink-100 relative leading-none">
               <h3 className="text-[17px] font-black text-gray-800">{singleDate ? format(singleDate, 'M/d (eee)', { locale: ja }) : ''}</h3>
@@ -247,7 +280,7 @@ export default function Page() {
                 <button onClick={() => {
                   if (!singleDate) return;
                   const dateStr = format(singleDate, 'yyyy-MM-dd');
-                  supabase.from('shifts').update({ f_count: Number(editReward.f), first_request_count: Number(editReward.first), main_request_count: Number(editReward.main), reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('保存しました💰'); });
+                  supabase.from('shifts').update({ f_count: Number(editReward.f), first_request_count: Number(editReward.first), main_request_count: Number(editReward.main), reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('保存完了💰'); });
                 }} className="w-full bg-pink-500 text-white font-black py-5 rounded-xl text-2xl shadow-lg active:scale-95 transition-all tracking-widest uppercase leading-none">実績を保存 💾</button>
               </div>
             )}
@@ -263,11 +296,11 @@ export default function Page() {
             </div>
           ))}
         </section>
-        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase leading-none">Karinto Cast Manager ver 2.3.2</p>
+        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase leading-none">Karinto Cast Manager ver 2.4.2</p>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-sm">
-        <nav className="flex justify-around items-center max-sm mx-auto px-4">
+        <nav className="flex justify-around items-center max-w-sm mx-auto px-4">
           <button className="flex flex-col items-center text-pink-500" onClick={() => router.push('/')}><span className="text-xl mb-0.5 leading-none">🏠</span><span className="text-[9px] font-black uppercase tracking-tighter">Home</span></button>
           <button className="flex flex-col items-center text-gray-300" onClick={() => router.push('/salary')}><span className="text-xl mb-0.5 leading-none">💰</span><span className="text-[9px] font-black uppercase tracking-tighter">Salary</span></button>
           <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center text-gray-300"><span className="text-xl mb-0.5 leading-none">🚪</span><span className="text-[9px] font-black uppercase tracking-tighter">Logout</span></button>
