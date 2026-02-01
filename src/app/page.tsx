@@ -190,7 +190,7 @@ export default function Page() {
       </div>
 
       <main className="px-4 mt-6 space-y-5">
-        {/* 実績カード */}
+        {/* 実績カード（月間合計） */}
         <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-5 border border-pink-200 relative overflow-hidden">
           <span className="absolute -right-4 -top-8 text-[120px] font-black text-pink-200/20 italic leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10">
@@ -279,7 +279,7 @@ export default function Page() {
             <button disabled={multiDates.length === 0} onClick={handleBulkSubmit} className="w-full bg-purple-600 text-white font-black py-5 rounded-[22px] text-lg shadow-lg active:scale-95 transition-all tracking-[0.2em]">申請を送信する 🚀</button>
           </section>
         ) : (
-          /* 💖 実績入力 (Ver 2.6.0 デザイン修正版) */
+          /* 💖 実績入力 (Ver 2.6.0 デザイン + 本数必須ロジック) */
           <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl overflow-hidden pb-5">
             <div className="bg-[#FFF8F9] p-5 border-b border-pink-50">
               <div className="flex justify-between items-center">
@@ -298,6 +298,7 @@ export default function Page() {
 
             {dayOfficial ? (
               <div className="p-5 space-y-6">
+                {/* 1. 実績カウント（グレーアウト廃止・ピンクのカーソル） */}
                 <div className="grid grid-cols-3 gap-3">
                   {(['f', 'first', 'main'] as const).map((key) => (
                     <div key={key} className="space-y-2">
@@ -314,7 +315,7 @@ export default function Page() {
                   ))}
                 </div>
                 
-                {/* 報酬合計入力（6桁対応 & ¥マーク左寄せ） */}
+                {/* 2. 報酬合計（¥マークを左に、6桁対応） */}
                 <div className="bg-pink-50/50 p-4 rounded-[24px] border border-pink-100 flex items-center justify-between shadow-inner">
                   <label className="text-[13px] font-black text-gray-900 shrink-0">本日の報酬合計</label>
                   <div className="flex items-center text-pink-500 flex-1 justify-end">
@@ -334,9 +335,28 @@ export default function Page() {
                   </div>
                 </div>
                 
+                {/* 3. 保存ボタン（本数必須バリデーション付き） */}
                 <button onClick={() => {
+                  const fCount = Number(editReward.f) || 0;
+                  const firstCount = Number(editReward.first) || 0;
+                  const mainCount = Number(editReward.main) || 0;
+                  const totalCount = fCount + firstCount + mainCount;
+
+                  if (totalCount < 1) {
+                    alert('フリー・初指名・本指名のいずれかに1以上の数字を入力してください。');
+                    return;
+                  }
+
                   const dateStr = format(singleDate!, 'yyyy-MM-dd');
-                  supabase.from('shifts').update({ f_count: Number(editReward.f), first_request_count: Number(editReward.first), main_request_count: Number(editReward.main), reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('実績を保存しました💰'); });
+                  supabase.from('shifts').update({ 
+                    f_count: fCount, 
+                    first_request_count: firstCount, 
+                    main_request_count: mainCount, 
+                    reward_amount: Number(editReward.amount) || 0 
+                  }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { 
+                    fetchInitialData(); 
+                    alert('実績を保存しました💰'); 
+                  });
                 }} className="w-full bg-pink-500 text-white font-black py-5 rounded-[22px] text-xl shadow-lg active:scale-95 transition-all tracking-[0.2em]">実績を保存 💾</button>
               </div>
             ) : (
@@ -347,7 +367,7 @@ export default function Page() {
           </section>
         )}
 
-        {/* お知らせセクション */}
+        {/* 店舗からのお知らせ */}
         <section className="bg-white rounded-[28px] border border-gray-100 shadow-sm overflow-hidden mb-8">
           <div className="bg-gray-50 p-2.5 px-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">店舗からのお知らせ</div>
           <div className="divide-y divide-gray-50">
@@ -361,7 +381,7 @@ export default function Page() {
         </section>
       </main>
 
-      {/* フッターナビゲーション */}
+      {/* フッター固定メニュー */}
       <footer className="fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-xl border-t border-gray-100 pb-8 pt-4">
         <nav className="flex justify-around items-center max-md mx-auto px-6">
           <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1.5"><span className={`text-2xl ${!isRequestMode ? 'opacity-100' : 'opacity-30'}`}>🏠</span><span className={`text-[9px] font-black uppercase ${!isRequestMode ? 'text-pink-500' : 'text-gray-300'}`}>ホーム</span></button>
