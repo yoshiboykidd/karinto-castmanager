@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isAfter, startOfToday } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import DashboardCalendar from '@/components/DashboardCalendar';
 
@@ -91,6 +91,19 @@ export default function Page() {
     setRequestDetails(newDetails);
   }, [multiDates, shifts]);
 
+  // ✨ 日付選択時のバリデーション（翌日以降のみ許可）
+  const handleDateSelect = (dates: any) => {
+    if (isRequestMode) {
+      const tomorrow = startOfToday();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      // 翌日以降の日付だけをフィルタリングして保存
+      const validDates = (dates as Date[] || []).filter(d => d >= tomorrow);
+      setMultiDates(validDates);
+    } else {
+      setSingleDate(dates as Date);
+    }
+  };
+
   useEffect(() => {
     if (isRequestMode || !singleDate) return;
     const dateStr = format(singleDate, 'yyyy-MM-dd');
@@ -161,7 +174,7 @@ export default function Page() {
       
       {/* 🏔️ ヘッダー */}
       <header className="bg-white px-6 pt-14 pb-6 rounded-b-[40px] shadow-sm border-b border-pink-50">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1.5">KarintoCastManager v2.5.2</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1.5">KarintoCastManager v2.5.3</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'キャスト'}
           <span className="text-[22px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
@@ -179,8 +192,7 @@ export default function Page() {
       </div>
 
       <main className="px-4 mt-6 space-y-5">
-        
-        {/* 📊 実績カード */}
+        {/* 実績カード */}
         <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-5 border border-pink-200 relative overflow-hidden">
           <span className="absolute -right-4 -top-8 text-[120px] font-black text-pink-200/20 italic leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10">
@@ -210,8 +222,16 @@ export default function Page() {
           </div>
         </section>
 
+        {/* 📅 カレンダー（過去日制限付き） */}
         <section className="bg-white p-2 rounded-[32px] border border-gray-100 shadow-sm text-center">
-          <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={(v:any)=>isRequestMode?setMultiDates(v||[]):setSingleDate(v)} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
+          <DashboardCalendar 
+            shifts={shifts} 
+            selectedDates={isRequestMode ? multiDates : singleDate} 
+            onSelect={handleDateSelect} // ✨ 新しい選択ハンドラ
+            month={viewDate} 
+            onMonthChange={setViewDate} 
+            isRequestMode={isRequestMode} 
+          />
         </section>
 
         {isRequestMode ? (
@@ -223,7 +243,7 @@ export default function Page() {
             </h3>
             <div className="max-h-[340px] overflow-y-auto space-y-3 pr-1 custom-scrollbar">
               {multiDates.length === 0 ? (
-                <div className="py-12 text-center text-gray-300 font-bold italic text-sm">カレンダーから日付を選んでください 🗓️</div>
+                <div className="py-12 text-center text-gray-300 font-bold italic text-sm">翌日以降の日付を選んでください 🗓️</div>
               ) : (
                 multiDates.sort((a,b)=>a.getTime()-b.getTime()).map(d => {
                   const key = format(d, 'yyyy-MM-dd');
@@ -261,29 +281,19 @@ export default function Page() {
             <button disabled={multiDates.length === 0} onClick={handleBulkSubmit} className="w-full bg-purple-600 text-white font-black py-5 rounded-[22px] text-lg shadow-lg active:scale-95 transition-all tracking-[0.2em]">申請を送信する 🚀</button>
           </section>
         ) : (
-          /* 💖 実績入力：バッジの配置を修正 */
+          /* 💖 実績入力 */
           <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl overflow-hidden pb-5">
             <div className="bg-[#FFF8F9] p-5 border-b border-pink-50">
               <div className="flex justify-between items-center">
                 <h3 className="text-xl font-black text-gray-800">{singleDate ? format(singleDate, 'M/d (eee)', { locale: ja }) : ''}</h3>
                 <div className="flex flex-col items-end gap-1">
-                  {/* ✨ 【重要】確定シフトバッジを時間の右側に配置 */}
                   <div className="flex items-center gap-2">
                     <span className="text-pink-500 font-black text-2xl tracking-tighter leading-none">
                       {dayOfficial ? `${dayOfficial.start_time}~${dayOfficial.end_time}` : <span className="text-sm text-gray-300 font-bold italic">お休み</span>}
                     </span>
-                    {dayOfficial && (
-                      <span className="text-[10px] font-black px-2 py-1 bg-blue-500 text-white rounded-lg shadow-sm leading-none whitespace-nowrap">
-                        確定シフト
-                      </span>
-                    )}
+                    {dayOfficial && <span className="text-[10px] font-black px-2 py-1 bg-blue-500 text-white rounded-lg shadow-sm leading-none whitespace-nowrap">確定シフト</span>}
                   </div>
-                  {/* ✨ 申請中バッジはすぐ下に控えめに表示 */}
-                  {dayPending && (
-                    <span className="text-[10px] font-black px-2 py-1 bg-amber-500 text-white rounded-lg animate-pulse shadow-sm leading-none">
-                      申請中: {dayPending.start_time}〜{dayPending.end_time}
-                    </span>
-                  )}
+                  {dayPending && <span className="text-[10px] font-black px-2 py-1 bg-amber-500 text-white rounded-lg animate-pulse shadow-sm leading-none">申請中: {dayPending.start_time}〜{dayPending.end_time}</span>}
                 </div>
               </div>
             </div>
