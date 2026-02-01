@@ -7,6 +7,13 @@ import { format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import DashboardCalendar from '@/components/DashboardCalendar';
 
+// ✨ 型を明示的に指定して波線を解消
+const TIME_OPTIONS: string[] = [];
+for (let h = 11; h <= 23; h++) {
+  TIME_OPTIONS.push(`${h}:00`);
+  if (h !== 23) TIME_OPTIONS.push(`${h}:30`);
+}
+
 export default function Page() {
   const router = useRouter();
   const [supabase] = useState(() => createBrowserClient(
@@ -20,7 +27,7 @@ export default function Page() {
   const [viewDate, setViewDate] = useState(new Date()); 
   const [loading, setLoading] = useState(true);
 
-  // --- Ver 2.0 申請機能用ステート ---
+  // 申請・実績用ステート
   const [isRequestMode, setIsRequestMode] = useState(false);
   const [singleDate, setSingleDate] = useState<Date | undefined>(new Date());
   const [multiDates, setMultiDates] = useState<Date[]>([]);
@@ -47,15 +54,24 @@ export default function Page() {
     setLoading(false);
   }
 
+  // 申請時の初期値インテリジェンス
   useEffect(() => {
     const newDetails = { ...requestDetails };
     multiDates.forEach(d => {
       const key = format(d, 'yyyy-MM-dd');
-      if (!newDetails[key]) newDetails[key] = { s: '11:00', e: '23:00' };
+      if (!newDetails[key]) {
+        const existing = shifts.find(s => s.shift_date === key && s.status === 'official');
+        if (existing) {
+          newDetails[key] = { s: existing.start_time, e: existing.end_time };
+        } else {
+          newDetails[key] = { s: '11:00', e: '23:00' };
+        }
+      }
     });
     setRequestDetails(newDetails);
-  }, [multiDates]);
+  }, [multiDates, shifts]);
 
+  // 実績読み込み
   useEffect(() => {
     if (isRequestMode || !singleDate) return;
     const dateStr = format(singleDate, 'yyyy-MM-dd');
@@ -82,7 +98,16 @@ export default function Page() {
   const handleBulkSubmit = async () => {
     const requests = multiDates.map(date => {
       const key = format(date, 'yyyy-MM-dd');
-      return { login_id: castProfile.login_id, shift_date: key, start_time: requestDetails[key].s, end_time: requestDetails[key].e, status: 'requested', is_official: false };
+      const isOfficialExist = shifts.some(s => s.shift_date === key && s.status === 'official');
+      return { 
+        login_id: castProfile.login_id, 
+        shift_date: key, 
+        start_time: requestDetails[key].s, 
+        end_time: requestDetails[key].e, 
+        status: 'requested', 
+        is_official: false,
+        is_official_pre_exist: isOfficialExist
+      };
     });
     await supabase.from('shifts').upsert(requests, { onConflict: 'login_id,shift_date' });
     alert(`${multiDates.length}日分の申請を送信しました！🚀`);
@@ -100,9 +125,9 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFF9FA] text-gray-800 pb-40 font-sans overflow-x-hidden">
       
-      {/* ⛄️ Ver 1.4.1 ヘッダー */}
+      {/* ⛄️ Sanctuary Header */}
       <header className="bg-white px-5 pt-12 pb-5 rounded-b-[30px] shadow-sm border-b border-pink-100">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.2.4</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1">KarintoCastManager ver 2.3.1</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'Cast'}
           <span className="text-[24px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
@@ -110,6 +135,7 @@ export default function Page() {
         <p className="text-[13px] font-bold text-gray-500 mt-1 ml-0.5 tracking-tighter leading-none">お疲れ様です🍵</p>
       </header>
 
+      {/* Tabs */}
       <div className="flex p-1 bg-gray-100 mx-5 mt-4 rounded-xl border border-gray-200 shadow-inner">
         <button onClick={() => { setIsRequestMode(false); setMultiDates([]); }} className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
         <button onClick={() => { setIsRequestMode(true); setSingleDate(undefined); }} className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${isRequestMode ? 'bg-white text-purple-500 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
@@ -117,23 +143,18 @@ export default function Page() {
 
       <main className="px-3 mt-3 space-y-3">
         
-        {/* 📊 実績合計：1.4.1ベース ＆ 行間極限凝縮 ＆ バッジ大型化 */}
+        {/* 📊 Sanctuary Summary Box (Ver 2.2.4) */}
         <section className="bg-[#FFE9ED] rounded-[22px] p-3 border border-pink-300 relative overflow-hidden shadow-sm">
           <span className="absolute -right-2 -top-6 text-[100px] font-black text-pink-200/20 italic select-none leading-none">{format(viewDate, 'M')}</span>
           <div className="relative z-10 flex flex-col items-center">
-            
             <div className="flex items-center justify-between gap-1 w-full leading-none mb-1.5">
-              <h2 className="text-[13px] font-black text-pink-500 whitespace-nowrap tracking-tighter shrink-0">
-                {format(viewDate, 'M月')}の実績合計
-              </h2>
+              <h2 className="text-[13px] font-black text-pink-500 whitespace-nowrap tracking-tighter shrink-0">{format(viewDate, 'M月')}の実績合計</h2>
               <div className="flex gap-1.5">
-                {/* 出勤バッジ：サイズアップ ＆ 日本語 */}
                 <div className="bg-white/95 border border-pink-200 px-3 py-1.5 rounded-xl flex items-baseline gap-0.5 shadow-sm shrink-0">
                   <span className="text-[10px] font-black text-gray-900 leading-none">出勤</span>
                   <span className="text-[20px] font-black text-pink-500 leading-none tracking-tighter">{monthlyTotals.count}</span>
                   <span className="text-[10px] font-black text-gray-900 leading-none italic font-bold">日</span>
                 </div>
-                {/* 稼働バッジ：サイズアップ ＆ 日本語 */}
                 <div className="bg-white/95 border border-pink-200 px-3 py-1.5 rounded-xl flex items-baseline gap-0.5 shadow-sm shrink-0">
                   <span className="text-[10px] font-black text-gray-900 leading-none">稼働</span>
                   <span className="text-[20px] font-black text-pink-500 leading-none tracking-tighter">{Math.round(monthlyTotals.hours * 10) / 10}</span>
@@ -141,11 +162,9 @@ export default function Page() {
                 </div>
               </div>
             </div>
-
             <p className="text-[48px] font-black text-pink-500 text-center mb-2 leading-none tracking-tighter">
               <span className="text-xl mr-0.5 leading-none">¥</span>{monthlyTotals.amount.toLocaleString()}
             </p>
-
             <div className="grid grid-cols-3 gap-0.5 w-full bg-white/80 rounded-xl py-2 border border-pink-200 text-center shadow-inner">
               <div className="leading-none"><p className="text-[11px] text-pink-400 font-black mb-1">フリー</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.f}</p></div>
               <div className="border-x border-pink-100 leading-none"><p className="text-[11px] text-pink-400 font-black mb-1 tracking-tighter">初指名</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.first}</p></div>
@@ -154,29 +173,44 @@ export default function Page() {
           </div>
         </section>
 
-        {/* 📅 カレンダー */}
+        {/* Calendar */}
         <section className="bg-white p-1 rounded-[22px] border border-pink-200 shadow-sm overflow-hidden text-center">
           <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={(v:any)=>isRequestMode?setMultiDates(v||[]):setSingleDate(v)} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
         </section>
 
         {isRequestMode ? (
-          /* シフト申請 */
+          /* Shift Request Panel */
           <section className="bg-white rounded-[24px] border border-purple-200 p-4 shadow-xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-black text-purple-600 text-[13px] uppercase tracking-widest leading-none">選択中: {multiDates.length}日</h3>
+            <div className="flex justify-between items-center mb-4 leading-none">
+              <h3 className="font-black text-purple-600 text-[13px] uppercase tracking-widest">選択中: {multiDates.length}日</h3>
               {multiDates.length > 0 && <button onClick={() => setMultiDates([])} className="text-[9px] font-black text-gray-300 uppercase border border-gray-200 px-2 py-1 rounded-md leading-none">リセット</button>}
             </div>
             <div className="max-h-48 overflow-y-auto space-y-2 mb-4 pr-1 custom-scrollbar">
               {multiDates.sort((a,b)=>a.getTime()-b.getTime()).map(d => {
                 const key = format(d, 'yyyy-MM-dd');
+                const isOff = requestDetails[key]?.s === 'OFF';
                 return (
                   <div key={key} className="flex items-center justify-between bg-purple-50/50 p-2 rounded-xl border border-purple-100">
                     <span className="text-[11px] font-black text-purple-500 w-12">{format(d, 'M/d(ee)', {locale: ja})}</span>
                     <div className="flex items-center gap-1">
-                      <input type="time" value={requestDetails[key]?.s || '11:00'} onChange={e=>setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} className="bg-white text-[11px] font-black border-purple-100 rounded-md p-1 focus:ring-0" />
+                      <select 
+                        value={requestDetails[key]?.s} 
+                        onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})}
+                        className="bg-white text-[11px] font-black border-purple-100 rounded-md p-1 focus:ring-0 appearance-none text-center min-w-[60px]"
+                      >
+                        {isOff && <option value="OFF">OFF</option>}
+                        {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
                       <span className="text-purple-300">~</span>
-                      <input type="time" value={requestDetails[key]?.e || '23:00'} onChange={e=>setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} className="bg-white text-[11px] font-black border-purple-100 rounded-md p-1 focus:ring-0" />
-                      <button onClick={()=>setRequestDetails({...requestDetails,[key]:{s:'OFF',e:'OFF'}})} className="ml-1 text-[9px] font-bold text-purple-400 uppercase leading-none px-1">OFF</button>
+                      <select 
+                        value={requestDetails[key]?.e} 
+                        onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})}
+                        className="bg-white text-[11px] font-black border-purple-100 rounded-md p-1 focus:ring-0 appearance-none text-center min-w-[60px]"
+                      >
+                        {isOff && <option value="OFF">OFF</option>}
+                        {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <button onClick={()=>setRequestDetails({...requestDetails,[key]:{s:'OFF',e:'OFF'}})} className={`ml-1 text-[9px] font-bold uppercase leading-none px-1 ${isOff ? 'text-purple-300' : 'text-purple-500'}`}>OFF</button>
                     </div>
                   </div>
                 );
@@ -185,7 +219,7 @@ export default function Page() {
             <button disabled={multiDates.length === 0} onClick={handleBulkSubmit} className="w-full bg-purple-600 text-white font-black py-4 rounded-xl text-lg shadow-lg active:scale-95 transition-all uppercase tracking-widest disabled:opacity-30 leading-none">申請を送信する 🚀</button>
           </section>
         ) : (
-          /* 実績入力 */
+          /* Reward Form (Ver 2.2.4 design) */
           <section className="bg-white rounded-[24px] border border-pink-300 shadow-xl overflow-hidden text-center">
             <div className="bg-[#FFF5F6] p-3 px-4 flex justify-center items-center h-[42px] border-b border-pink-100 relative leading-none">
               <h3 className="text-[17px] font-black text-gray-800">{singleDate ? format(singleDate, 'M/d (eee)', { locale: ja }) : ''}</h3>
@@ -202,7 +236,7 @@ export default function Page() {
                   ))}
                 </div>
                 <div className="bg-pink-50/30 p-3 rounded-xl border border-pink-100 flex items-center justify-between h-[64px]">
-                  <label className="text-[13px] font-black shrink-0 text-gray-900 uppercase tracking-widest leading-none">本日の報酬</label>
+                  <label className="text-[13px] font-black shrink-0 text-gray-900 uppercase tracking-widest leading-none text-left">本日の報酬</label>
                   <div className="flex items-center flex-1 justify-end pl-4 leading-none">
                     <span className="text-pink-200 text-2xl font-black mr-1 translate-y-[2px]">¥</span>
                     <input type="text" inputMode="numeric" placeholder="0" value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} onFocus={e=>e.target.select()} onChange={e=>{const v=e.target.value.replace(/,/g,''); if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});}} className={`w-full text-right bg-transparent font-black text-[32px] focus:ring-0 border-none ${editReward.amount===''?'text-gray-200':'text-pink-500'}`} />
@@ -218,6 +252,7 @@ export default function Page() {
           </section>
         )}
 
+        {/* News & Footer */}
         <section className="bg-white rounded-[22px] border border-pink-100 shadow-sm overflow-hidden opacity-90 text-left">
           <div className="bg-gray-50 p-2 px-4 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Shop News</div>
           {newsList.map((n) => (
@@ -227,7 +262,7 @@ export default function Page() {
             </div>
           ))}
         </section>
-        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase leading-none">Karinto Cast Manager ver 2.2.4</p>
+        <p className="text-center text-[10px] font-bold text-gray-200 tracking-widest pb-8 uppercase leading-none">Karinto Cast Manager ver 2.3.1</p>
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-[9999] bg-white/95 backdrop-blur-md border-t border-pink-100 pb-6 pt-3 shadow-sm">
