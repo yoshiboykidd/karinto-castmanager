@@ -28,7 +28,7 @@ export default function Page() {
   const [newsList, setNewsList] = useState<any[]>([]);
   const [viewDate, setViewDate] = useState(new Date()); 
   const [loading, setLoading] = useState(true);
-  const [lastSync, setLastSync] = useState<string>(''); // 同期ログ用
+  const [lastSync, setLastSync] = useState<string>('');
 
   const [isRequestMode, setIsRequestMode] = useState(false);
   const [singleDate, setSingleDate] = useState<Date | undefined>(new Date());
@@ -51,20 +51,31 @@ export default function Page() {
         supabase.from('shop_master').select('*').eq('shop_id', myShopId).single(),
         supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
         supabase.from('news').select('*').or(`shop_id.eq.${myShopId},shop_id.eq.all`).order('created_at', { ascending: false }).limit(3),
-        supabase.from('sync_logs').select('last_sync_at').eq('id', 1).single() // 💡 生存確認ログを取得
+        supabase.from('sync_logs').select('last_sync_at').eq('id', 1).single()
       ]);
       
       setShopInfo(shopRes.data);
       setShifts(shiftRes.data || []);
       setNewsList(newsRes.data || []);
-      
-      // 💡 HP同期チェック時刻をセット
       if (syncRes.data) {
         setLastSync(format(parseISO(syncRes.data.last_sync_at), 'HH:mm'));
       }
     }
     setLoading(false);
   }
+
+  // 💡 重要: 申請モードで日付を選択した際の初期値をセットするロジック
+  useEffect(() => {
+    const newDetails = { ...requestDetails };
+    multiDates.forEach(d => {
+      const key = format(d, 'yyyy-MM-dd');
+      if (!newDetails[key]) {
+        const existing = (shifts || []).find(s => s.shift_date === key);
+        newDetails[key] = existing ? { s: existing.start_time, e: existing.end_time } : { s: '11:00', e: '23:00' };
+      }
+    });
+    setRequestDetails(newDetails);
+  }, [multiDates, shifts]);
 
   const monthlyTotals = useMemo(() => {
     return (shifts || [])
@@ -116,11 +127,11 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
       
-      {/* 1. ヘッダー (生存確認時刻を表示) */}
+      {/* 1. ヘッダー */}
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50 relative">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.5</p>
+            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.6</p>
             <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
           </div>
           {lastSync && (
@@ -134,14 +145,14 @@ export default function Page() {
         <p className="text-[14px] font-black text-gray-500 mt-1 italic opacity-80">お疲れ様です🍵</p>
       </header>
 
-      {/* 2. タブ (固定) */}
+      {/* 2. タブ */}
       <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200 shadow-inner">
         <button onClick={() => { setIsRequestMode(false); setMultiDates([]); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
         <button onClick={() => { setIsRequestMode(true); setSingleDate(undefined); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
       </div>
 
       <main className="px-4 mt-3 space-y-2">
-        {/* 3. 月間実績 */}
+        {/* 3. 月間実績 (稼働時間を復活) */}
         {!isRequestMode && (
           <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-5 border border-pink-200 relative overflow-hidden shadow-sm flex flex-col space-y-0.5">
             <div className="flex items-center justify-between">
@@ -149,6 +160,9 @@ export default function Page() {
               <div className="flex gap-1.5">
                 <div className="bg-white/90 px-2.5 py-1 h-8 rounded-xl flex items-center border border-pink-50 shadow-sm gap-0.5">
                   <span className="text-[9px] font-black text-gray-400">出勤</span><span className="text-[18px] font-black text-pink-500">{monthlyTotals.count}</span><span className="text-[9px] font-black text-gray-400">日</span>
+                </div>
+                <div className="bg-white/90 px-2.5 py-1 h-8 rounded-xl flex items-center border border-pink-50 shadow-sm gap-0.5">
+                  <span className="text-[9px] font-black text-gray-400">稼働</span><span className="text-[18px] font-black text-pink-500">{Math.round(monthlyTotals.hours * 10) / 10}</span><span className="text-[9px] font-black text-gray-400">h</span>
                 </div>
               </div>
             </div>
@@ -188,10 +202,8 @@ export default function Page() {
             {dayOfficial ? (
               <>
                 <div className="flex flex-col space-y-0.5 pt-1">
-                  <div className="grid grid-cols-3 gap-2 px-1 text-center">
-                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest">フリー</label>
-                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest">初指名</label>
-                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest">本指名</label>
+                  <div className="grid grid-cols-3 gap-2 px-1 text-center font-black text-gray-400 text-[11px] uppercase tracking-widest">
+                    <span>フリー</span><span>初指名</span><span>本指名</span>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     {(['f', 'first', 'main'] as const).map((key) => (
@@ -211,6 +223,39 @@ export default function Page() {
             ) : (
               <div className="py-8 text-center text-gray-300 font-bold italic text-xs">{dayRequested ? "確定をお待ちください⛄️" : "確定シフトなし⛄️"}</div>
             )}
+          </section>
+        )}
+
+        {/* 5. 日付詳細 (シフト申請モード - 選択・プルダウン修正済) */}
+        {isRequestMode && (
+          <section className="bg-white rounded-[32px] border border-purple-100 p-5 shadow-xl space-y-3">
+             <h3 className="font-black text-purple-600 text-[14px] uppercase tracking-widest flex items-center gap-2"><span className="w-1.5 h-4 bg-purple-500 rounded-full"></span>申請リスト ({multiDates.length}件)</h3>
+            <div className="max-h-[450px] overflow-y-auto pr-1">
+              {multiDates.length === 0 ? ( <p className="text-center py-8 text-gray-300 text-xs font-bold italic">カレンダーから日付を選んでください📅</p> ) : (
+                <div className="flex flex-col">
+                  {multiDates.map(d => {
+                    const key = format(d, 'yyyy-MM-dd');
+                    const officialShift = (shifts || []).find(s => s.shift_date === key && s.status === 'official');
+                    const isOff = requestDetails[key]?.s === 'OFF';
+                    return (
+                      <div key={key} className="py-3.5 border-b border-gray-100 last:border-0 flex flex-col space-y-2">
+                        <div className="flex items-center justify-between px-1">
+                          <span className="text-[16px] font-black text-gray-800">{format(d, 'M/d')} <span className="text-xs opacity-60">({format(d, 'E', {locale: ja})})</span></span>
+                          {officialShift && ( <div className="flex items-center gap-1.5"><span className="text-[12px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 leading-none">確定</span><span className="text-[17px] font-black text-gray-600 leading-none">{officialShift.start_time}〜{officialShift.end_time}</span></div> )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <select disabled={isOff} value={requestDetails[key]?.s || '11:00'} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none flex items-center justify-center" style={{ textAlignLast: 'center' }}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                          <span className="text-gray-300 font-black text-lg">~</span>
+                          <select disabled={isOff} value={requestDetails[key]?.e || '23:00'} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none flex items-center justify-center" style={{ textAlignLast: 'center' }}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                          <button onClick={() => { if (isOff) { setRequestDetails({...requestDetails, [key]: {s: '11:00', e: '23:00'}}); } else { setRequestDetails({...requestDetails, [key]: {s: 'OFF', e: 'OFF'}}); } }} className={`flex-1 py-2.5 rounded-lg font-black text-[12px] transition-all border ${isOff ? 'bg-purple-500 text-white border-purple-500 shadow-md' : 'bg-white text-gray-400 border-gray-200'}`}>お休み</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            {multiDates.length > 0 && ( <button onClick={() => handleBulkSubmit()} className="w-full bg-purple-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg active:scale-95 transition-all">申請を確定する 🚀</button> )}
           </section>
         )}
 
