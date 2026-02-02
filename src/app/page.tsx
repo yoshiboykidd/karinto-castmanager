@@ -113,8 +113,7 @@ export default function Page() {
       return { date, isSame, key, reqS, reqE };
     });
     if (checkResults.some(r => r.isSame)) {
-      const sameDates = checkResults.filter(r => r.isSame).map(r => format(r.date, 'M/d')).join(', ');
-      alert(`エラー：${sameDates} は確定シフトと同じ時間です。変更してから申請してください。🙅‍♀️`);
+      alert("エラー：確定シフトと同じ時間の申請が含まれています。");
       return;
     }
     const finalRequests = checkResults.map(r => ({
@@ -147,10 +146,7 @@ export default function Page() {
   const targetDateStr = singleDate ? format(singleDate, 'yyyy-MM-dd') : '';
   const dayOfficial = (shifts || []).find(s => s.shift_date === targetDateStr && s.status === 'official');
   const dayRequested = (shifts || []).find(s => s.shift_date === targetDateStr && s.status === 'requested');
-
-  // 特定日判定用
   const dayNum = singleDate?.getDate();
-  const isSpecialDay = dayNum === 10 || dayNum === 11 || dayNum === 20;
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
@@ -158,7 +154,7 @@ export default function Page() {
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50 relative">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.9.15</p>
+            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.9.16</p>
             <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
           </div>
           {lastSync && (
@@ -181,19 +177,19 @@ export default function Page() {
           <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-5 border border-pink-200 relative overflow-hidden shadow-sm flex flex-col space-y-0.5">
             <div className="flex items-center justify-between">
               <h2 className="text-[18px] font-black text-pink-500 tracking-tighter leading-none h-8 flex items-center">{format(viewDate, 'M月')}の実績</h2>
-              <div className="flex gap-1.5">
-                <div className="bg-white/90 px-2.5 py-1 h-8 rounded-xl flex items-center border border-pink-50 shadow-sm gap-0.5">
-                  <span className="text-[9px] font-black text-gray-400">出勤</span><span className="text-[18px] font-black text-pink-500">{monthlyTotals.count}</span><span className="text-[9px] font-black text-gray-400">日</span>
+              <div className="flex gap-1.5 text-center">
+                <div className="bg-white/90 px-2 py-1 h-8 rounded-xl border border-pink-50 shadow-sm min-w-[50px]">
+                  <span className="text-[9px] block text-gray-400 leading-none mb-0.5">出勤</span><span className="text-[16px] font-black text-pink-500 leading-none">{monthlyTotals.count}</span>
                 </div>
-                <div className="bg-white/90 px-2.5 py-1 h-8 rounded-xl flex items-center border border-pink-50 shadow-sm gap-0.5">
-                  <span className="text-[9px] font-black text-gray-400">稼働</span><span className="text-[18px] font-black text-pink-500">{Math.round(monthlyTotals.hours * 10) / 10}</span><span className="text-[9px] font-black text-gray-400">h</span>
+                <div className="bg-white/90 px-2 py-1 h-8 rounded-xl border border-pink-50 shadow-sm min-w-[50px]">
+                  <span className="text-[9px] block text-gray-400 leading-none mb-0.5">稼働</span><span className="text-[16px] font-black text-pink-500 leading-none">{Math.round(monthlyTotals.hours * 10) / 10}</span>
                 </div>
               </div>
             </div>
             <div className="text-center"><p className="text-[52px] font-black text-pink-600 leading-none tracking-tighter"><span className="text-2xl mr-1 opacity-40 translate-y-[-4px] inline-block">¥</span>{monthlyTotals.amount.toLocaleString()}</p></div>
             <div className="grid grid-cols-3 gap-0.5 bg-white/40 rounded-2xl border border-white/60 text-center py-2">
               <div><p className="text-[10px] text-pink-400 font-black leading-tight">フリー</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.f || 0}</p></div>
-              <div className="border-x border-pink-100/50"><p className="text-[10px] text-pink-400 font-black leading-tight">初指名</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.first || 0}</p></div>
+              <div><p className="text-[10px] text-pink-400 font-black leading-tight">初指名</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.first || 0}</p></div>
               <div><p className="text-[10px] text-pink-400 font-black leading-tight">本指名</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.main || 0}</p></div>
             </div>
           </section>
@@ -206,14 +202,14 @@ export default function Page() {
         {!isRequestMode && (
           <section className={`rounded-[32px] border shadow-xl p-5 flex flex-col space-y-1 transition-all duration-300
             ${dayNum === 10 ? 'bg-orange-50 border-orange-200' : 
-              (dayNum === 11 || dayNum === 20) ? 'bg-yellow-50 border-yellow-200' : 
+              (dayNum === 11 || dayNum === 22) ? 'bg-yellow-50 border-yellow-200' : 
               'bg-white border-pink-100'}`}
           >
-            {/* 特定日デカデカヘッダー */}
-            {isSpecialDay && (
-              <div className={`-mt-2 mb-2 py-1.5 px-4 rounded-full text-center font-black text-[11px] tracking-[0.2em] uppercase shadow-sm
+            {/* 特定日表示 (文言のみ) */}
+            {(dayNum === 10 || dayNum === 11 || dayNum === 22) && (
+              <div className={`-mt-2 mb-2 py-1.5 px-4 rounded-full text-center font-black text-[12px] tracking-[0.2em] shadow-sm
                 ${dayNum === 10 ? 'bg-orange-400 text-white' : 'bg-yellow-400 text-white'}`}>
-                ✨ {dayNum === 10 ? 'かりんとの日 (全額バックイベント)' : '添い寝の日 (衣装イベント)'} ✨
+                {dayNum === 10 ? 'かりんとの日' : '添い寝の日'}
               </div>
             )}
 
@@ -223,7 +219,7 @@ export default function Page() {
                 <span className="text-lg ml-1 opacity-70">({singleDate ? format(singleDate, 'E', { locale: ja }) : ''})</span>
               </h3>
               
-              <div className="flex items-center gap-1 flex-nowrap shrink-0 overflow-visible justify-end">
+              <div className="flex items-center gap-1 flex-nowrap shrink-0 justify-end">
                 {(!dayOfficial || dayOfficial.start_time === 'OFF') && !dayRequested ? (
                   <span className="whitespace-nowrap text-[12px] font-black text-gray-400 bg-gray-50 px-2 py-1.5 rounded-lg border border-gray-100 leading-none">お休み</span>
                 ) : dayOfficial ? (
