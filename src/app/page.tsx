@@ -140,9 +140,9 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
       
-      {/* 🏔️ ヘッダー (指示通りの並び順) */}
+      {/* 1. ヘッダー */}
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.8.1</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.8.2</p>
         <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-tight">
           {castProfile?.display_name || 'キャスト'}
@@ -151,50 +151,58 @@ export default function Page() {
         <p className="text-[14px] font-black text-gray-500 mt-1 italic opacity-80">お疲れ様です🍵</p>
       </header>
 
-      {/* 📱 タブ */}
+      {/* 2. 入力・申請切り替えタブ */}
       <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200 shadow-inner">
         <button onClick={() => { setIsRequestMode(false); setMultiDates([]); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
         <button onClick={() => { setIsRequestMode(true); setSingleDate(undefined); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
       </div>
 
       <main className="px-4 mt-3 space-y-2">
+        {/* 3. 月間実績セクション (修正済み) */}
         {!isRequestMode && (
-          <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-5 border border-pink-200 relative overflow-hidden shadow-sm">
-            <span className="absolute -right-4 -top-8 text-[120px] font-black text-pink-200/20 italic leading-none pointer-events-none">{format(viewDate, 'M')}</span>
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-[13px] font-black text-pink-500 tracking-tighter bg-white/60 px-3 py-1 rounded-full border border-pink-100">{format(viewDate, 'M月')}の実績</h2>
-                <div className="flex gap-1.5">
-                  <div className="bg-white/90 px-2.5 py-1 rounded-xl flex items-baseline gap-0.5 border border-pink-50 shadow-sm">
-                    <span className="text-[9px] font-black text-gray-400 mr-0.5">出勤</span>
-                    <span className="text-[18px] font-black text-pink-500">{monthlyTotals.count}</span>
-                    <span className="text-[9px] font-black text-gray-400">日</span>
-                  </div>
-                  <div className="bg-white/90 px-2.5 py-1 rounded-xl flex items-baseline gap-0.5 border border-pink-50 shadow-sm">
-                    <span className="text-[9px] font-black text-gray-400 mr-0.5">稼働</span>
-                    <span className="text-[18px] font-black text-pink-500">{Math.round(monthlyTotals.hours * 10) / 10}</span>
-                    <span className="text-[9px] font-black text-gray-400">h</span>
-                  </div>
+          <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-5 border border-pink-200 relative overflow-hidden shadow-sm flex flex-col space-y-0.5">
+            
+            {/* 1行目：タイトル・出勤数・稼働時間 */}
+            <div className="flex items-center justify-between">
+              <h2 className="text-[18px] font-black text-pink-500 tracking-tighter leading-none h-8 flex items-center">{format(viewDate, 'M月')}の実績</h2>
+              <div className="flex gap-1.5">
+                <div className="bg-white/90 px-2.5 py-1 h-8 rounded-xl flex items-center gap-0.5 border border-pink-50 shadow-sm">
+                  <span className="text-[9px] font-black text-gray-400 mr-0.5 leading-none">出勤</span>
+                  <span className="text-[18px] font-black text-pink-500 leading-none">{monthlyTotals.count}</span>
+                  <span className="text-[9px] font-black text-gray-400 leading-none">日</span>
+                </div>
+                <div className="bg-white/90 px-2.5 py-1 h-8 rounded-xl flex items-center gap-0.5 border border-pink-50 shadow-sm">
+                  <span className="text-[9px] font-black text-gray-400 mr-0.5 leading-none">稼働</span>
+                  <span className="text-[18px] font-black text-pink-500 leading-none">{Math.round(monthlyTotals.hours * 10) / 10}</span>
+                  <span className="text-[9px] font-black text-gray-400 leading-none">h</span>
                 </div>
               </div>
-              <p className="text-[52px] font-black text-pink-600 text-center leading-none tracking-tighter mb-4">
+            </div>
+
+            {/* 2行目：当月の合計金額 */}
+            <div className="text-center">
+              <p className="text-[52px] font-black text-pink-600 leading-none tracking-tighter">
                 <span className="text-2xl mr-1 opacity-40 translate-y-[-4px] inline-block">¥</span>{monthlyTotals.amount.toLocaleString()}
               </p>
-              <div className="grid grid-cols-3 gap-0.5 bg-white/40 rounded-2xl border border-white/60 text-center py-2">
-                <div><p className="text-[10px] text-pink-400 font-black">フリー</p><p className="text-xl font-black text-pink-600">{monthlyTotals.f || 0}</p></div>
-                <div className="border-x border-pink-100/50"><p className="text-[10px] text-pink-400 font-black">初指名</p><p className="text-xl font-black text-pink-600">{monthlyTotals.first || 0}</p></div>
-                <div><p className="text-[10px] text-pink-400 font-black">本指名</p><p className="text-xl font-black text-pink-600">{monthlyTotals.main || 0}</p></div>
-              </div>
             </div>
+
+            {/* 3行目：当月の本数詳細 */}
+            <div className="grid grid-cols-3 gap-0.5 bg-white/40 rounded-2xl border border-white/60 text-center py-2">
+              <div><p className="text-[10px] text-pink-400 font-black leading-tight">フリー</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.f || 0}</p></div>
+              <div className="border-x border-pink-100/50"><p className="text-[10px] text-pink-400 font-black leading-tight">初指名</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.first || 0}</p></div>
+              <div><p className="text-[10px] text-pink-400 font-black leading-tight">本指名</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.main || 0}</p></div>
+            </div>
+
           </section>
         )}
 
+        {/* 4. カレンダー */}
         <section className="bg-white p-2 rounded-[32px] border border-gray-100 shadow-sm text-center">
           <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={handleDateSelect} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
         </section>
 
+        {/* 5. 日付詳細 */}
         {!isRequestMode && (
-          /* 💖 実績入力 (文言を復旧、ボタン配置のみ維持) */
           <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-5 space-y-3">
             <div className="flex justify-between items-start mb-1">
               <h3 className="text-2xl font-black text-gray-800 tracking-tight">{singleDate ? format(singleDate, 'M/d (E)', { locale: ja }) : ''}</h3>
@@ -211,18 +219,8 @@ export default function Page() {
                 <div className="grid grid-cols-3 gap-2">
                   {(['f', 'first', 'main'] as const).map((key) => (
                     <div key={key} className="space-y-1 text-center">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                        {key==='f'?'フリー':key==='first'?'初指名':'本指名'}
-                      </label>
-                      <input 
-                        type="number" 
-                        inputMode="numeric" 
-                        value={editReward[key]} 
-                        placeholder="0"
-                        onFocus={e=>e.target.select()} 
-                        onChange={e => setEditReward({...editReward, [key]: e.target.value})} 
-                        className={`w-full text-center py-3 bg-white rounded-xl font-black text-2xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none transition-all ${editReward[key] === '' ? 'text-gray-200' : 'text-pink-500'}`} 
-                      />
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{key==='f'?'フリー':key==='first'?'初指名':'本指名'}</label>
+                      <input type="number" inputMode="numeric" value={editReward[key]} placeholder="0" onFocus={e=>e.target.select()} onChange={e => setEditReward({...editReward, [key]: e.target.value})} className={`w-full text-center py-3 bg-white rounded-xl font-black text-2xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none transition-all ${editReward[key] === '' ? 'text-gray-200' : 'text-pink-500'}`} />
                     </div>
                   ))}
                 </div>
@@ -231,54 +229,23 @@ export default function Page() {
                   <label className="text-[12px] font-black text-gray-900 uppercase">報酬合計</label>
                   <div className="flex items-center text-pink-500">
                     <span className="text-xl font-black mr-1 opacity-40 translate-y-[1px]">¥</span>
-                    <input 
-                      type="text" 
-                      inputMode="numeric" 
-                      value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} 
-                      placeholder="0"
-                      onFocus={e=>e.target.select()} 
-                      onChange={e=>{
-                        const v=e.target.value.replace(/,/g,''); 
-                        if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});
-                      }} 
-                      className={`w-36 text-right bg-transparent font-black text-[28px] border-none focus:ring-0 caret-pink-500 tracking-tighter ${editReward.amount === '' ? 'text-gray-200' : 'text-pink-500'}`} 
-                    />
+                    <input type="text" inputMode="numeric" value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} placeholder="0" onFocus={e=>e.target.select()} onChange={e=>{const v=e.target.value.replace(/,/g,''); if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});}} className={`w-36 text-right bg-transparent font-black text-[28px] border-none focus:ring-0 caret-pink-500 tracking-tighter ${editReward.amount === '' ? 'text-gray-200' : 'text-pink-500'}`} />
                   </div>
                 </div>
                 
-                {/* ボタン順序： [保存]左 / [クリア]右 */}
                 <div className="flex gap-2 pt-1">
-                  <button 
-                    onClick={() => {
-                      const dateStr = format(singleDate!, 'yyyy-MM-dd');
-                      supabase.from('shifts').update({ 
-                        f_count: Number(editReward.f) || 0, 
-                        first_request_count: Number(editReward.first) || 0, 
-                        main_request_count: Number(editReward.main) || 0, 
-                        reward_amount: Number(editReward.amount) || 0 
-                      }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { 
-                        fetchInitialData(); 
-                        alert('実績を保存しました💰'); 
-                      });
-                    }} 
-                    className="flex-[2.5] bg-pink-500 text-white font-black py-4 rounded-[20px] text-lg shadow-lg active:scale-95 transition-all tracking-[0.05em]"
-                  >
-                    実績を保存 💾
-                  </button>
-                  <button 
-                    onClick={() => setEditReward({ f: '', first: '', main: '', amount: '' })}
-                    className="flex-1 bg-gray-100 text-gray-400 font-black py-4 rounded-[18px] text-[13px] active:scale-95 transition-all shadow-sm border border-gray-200"
-                  >
-                    クリア 🗑️
-                  </button>
+                  <button onClick={() => {
+                    const dateStr = format(singleDate!, 'yyyy-MM-dd');
+                    supabase.from('shifts').update({ f_count: Number(editReward.f) || 0, first_request_count: Number(editReward.first) || 0, main_request_count: Number(editReward.main) || 0, reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('実績を保存しました💰'); });
+                  }} className="flex-[2.5] bg-pink-500 text-white font-black py-4 rounded-[20px] text-lg shadow-lg active:scale-95 transition-all tracking-[0.05em]">実績を保存 💾</button>
+                  <button onClick={() => setEditReward({ f: '', first: '', main: '', amount: '' })} className="flex-1 bg-gray-100 text-gray-400 font-black py-4 rounded-[18px] text-[13px] active:scale-95 transition-all shadow-sm border border-gray-200">クリア 🗑️</button>
                 </div>
               </>
-            ) : (
-              <div className="py-8 text-center text-gray-300 font-bold italic text-xs">確定シフトなし⛄️</div>
-            )}
+            ) : ( <div className="py-8 text-center text-gray-300 font-bold italic text-xs">確定シフトなし⛄️</div> )}
           </section>
         )}
 
+        {/* 6. NEWS */}
         <section className="bg-white rounded-[28px] border border-gray-100 shadow-sm overflow-hidden mb-8">
           <div className="bg-gray-50 p-2.5 px-6 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 flex justify-between items-center">
             <span>News</span>
@@ -294,6 +261,7 @@ export default function Page() {
         </section>
       </main>
 
+      {/* フッターメニュー */}
       <footer className="fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-xl border-t border-gray-100 pb-8 pt-4">
         <nav className="flex justify-around items-center max-md mx-auto px-6">
           <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1.5"><span className={`text-2xl ${!isRequestMode ? 'opacity-100' : 'opacity-30'}`}>🏠</span><span className={`text-[9px] font-black uppercase ${!isRequestMode ? 'text-pink-500' : 'text-gray-300'}`}>ホーム</span></button>
