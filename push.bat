@@ -2,4 +2,4 @@
 git add .
 git commit -m "update"
 git push
-npx vercel --prod --token [JBHlJKE6lvunwyiwyXiYokea]
+npx vercel --prod --token JBHlJKE6lvunwyiwyXiYokea
