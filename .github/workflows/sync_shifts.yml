@@ -1,9 +1,9 @@
-name: Hourly Shift Sync
+name: 5-Minute Shift Sync
 
 on:
   schedule:
-    - cron: '0 * * * *' # 1時間に1回実行
-  workflow_dispatch:      # 手動実行ボタンを出す設定
+    - cron: '*/5 * * * *'  # 5分に1回実行
+  workflow_dispatch:       # 手動実行ボタン
 
 jobs:
   sync:
@@ -11,5 +11,4 @@ jobs:
     steps:
       - name: Call Sync API
         run: |
-          # あなたのVercelのURLをここに貼ってください
           curl -X GET "https://karinto-castmanager.vercel.app/api/sync"
