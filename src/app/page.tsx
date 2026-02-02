@@ -66,7 +66,7 @@ export default function Page() {
         if (s.start_time && s.end_time && s.start_time !== 'OFF') {
           const [sH, sM] = s.start_time.split(':').map(Number);
           const [eH, eM] = s.end_time.split(':').map(Number);
-          dur = (eH < sH ? eH + 24 : eH) + eM / 60 - (sH + sM / 60);
+          dur = (eH < sH ? eH + 24 : eH) + eM / 60 - (sH + sM /60);
         }
         return {
           amount: acc.amount + (Number(s.reward_amount) || 0),
@@ -139,7 +139,7 @@ export default function Page() {
       
       {/* 1. ヘッダー (固定) */}
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.8.8</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.8.9</p>
         <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-tight">
           {castProfile?.display_name || 'キャスト'}
@@ -191,7 +191,7 @@ export default function Page() {
           <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={handleDateSelect} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
         </section>
 
-        {/* 5. 日付詳細 (実績入力モード - 固定) */}
+        {/* 5. 日付詳細 (実績入力モード) */}
         {!isRequestMode && (
           <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-5 flex flex-col space-y-1">
             {dayOfficial ? (
@@ -202,27 +202,27 @@ export default function Page() {
                     <span className="text-lg ml-1 opacity-70">({singleDate ? format(singleDate, 'E', { locale: ja }) : ''})</span>
                   </h3>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[12px] font-black text-blue-500 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 leading-none">確定シフト</span>
-                    <span className="text-xl font-black text-pink-500 leading-none">{dayOfficial.start_time}〜{dayOfficial.end_time}</span>
+                    <span className="text-[13px] font-black text-blue-500 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 leading-none">確定シフト</span>
+                    <span className="text-[22px] font-black text-pink-500 leading-none">{dayOfficial.start_time}〜{dayOfficial.end_time}</span>
                   </div>
                 </div>
                 <div className="flex flex-col space-y-0.5 pt-1">
                   <div className="grid grid-cols-3 gap-2 px-1">
-                    <label className="text-[10px] font-black text-gray-400 tracking-widest text-center">フリー</label>
-                    <label className="text-[10px] font-black text-gray-400 tracking-widest text-center">初指名</label>
-                    <label className="text-[10px] font-black text-gray-400 tracking-widest text-center">本指名</label>
+                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">フリー</label>
+                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">初指名</label>
+                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">本指名</label>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     {(['f', 'first', 'main'] as const).map((key) => (
-                      <input key={key} type="number" inputMode="numeric" value={editReward[key]} placeholder="0" onFocus={e=>e.target.select()} onChange={e => setEditReward({...editReward, [key]: e.target.value})} className={`w-full text-center py-2 bg-white rounded-xl font-black text-2xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none transition-all ${editReward[key] === '' ? 'text-gray-200' : 'text-pink-500'}`} />
+                      <input key={key} type="number" inputMode="numeric" value={editReward[key]} placeholder="0" onFocus={e=>e.target.select()} onChange={e => setEditReward({...editReward, [key]: e.target.value})} className={`w-full text-center py-2 bg-white rounded-xl font-black text-3xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none transition-all ${editReward[key] === '' ? 'text-gray-200' : 'text-pink-500'}`} />
                     ))}
                   </div>
                 </div>
                 <div className="bg-pink-50/40 p-3 rounded-[22px] border border-pink-100 flex items-center justify-between shadow-inner">
-                  <label className="text-[12px] font-black text-gray-900">報酬合計</label>
+                  <label className="text-[13px] font-black text-gray-900 uppercase">報酬合計</label>
                   <div className="flex items-center text-pink-500">
-                    <span className="text-xl font-black mr-1 opacity-40 translate-y-[1px]">¥</span>
-                    <input type="text" inputMode="numeric" value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} placeholder="0" onFocus={e=>e.target.select()} onChange={e=>{const v=e.target.value.replace(/,/g,''); if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});}} className={`w-36 text-right bg-transparent font-black text-[28px] border-none focus:ring-0 caret-pink-500 tracking-tighter ${editReward.amount === '' ? 'text-gray-200' : 'text-pink-500'}`} />
+                    <span className="text-2xl font-black mr-1 opacity-40 translate-y-[1px]">¥</span>
+                    <input type="text" inputMode="numeric" value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} placeholder="0" onFocus={e=>e.target.select()} onChange={e=>{const v=e.target.value.replace(/,/g,''); if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});}} className={`w-40 text-right bg-transparent font-black text-[32px] border-none focus:ring-0 caret-pink-500 tracking-tighter ${editReward.amount === '' ? 'text-gray-200' : 'text-pink-500'}`} />
                   </div>
                 </div>
                 <div className="flex gap-2 pt-0.5">
@@ -237,10 +237,10 @@ export default function Page() {
           </section>
         )}
 
-        {/* 5. 日付詳細 (シフト申請モード - 2行構成へ再設計) */}
+        {/* 5. 日付詳細 (シフト申請モード - 2行構成・文字拡大) */}
         {isRequestMode && (
           <section className="bg-white rounded-[32px] border border-purple-100 p-5 shadow-xl space-y-3">
-             <h3 className="font-black text-purple-600 text-[13px] uppercase tracking-widest flex items-center gap-2">
+             <h3 className="font-black text-purple-600 text-[14px] uppercase tracking-widest flex items-center gap-2">
               <span className="w-1.5 h-4 bg-purple-500 rounded-full"></span>
               申請リスト ({multiDates.length}件)
             </h3>
@@ -255,42 +255,44 @@ export default function Page() {
                     const isOff = requestDetails[key]?.s === 'OFF';
                     
                     return (
-                      <div key={key} className="py-3 border-b border-gray-100 last:border-0 flex flex-col space-y-1.5">
+                      <div key={key} className="py-3.5 border-b border-gray-100 last:border-0 flex flex-col space-y-2">
                         {/* 1行目：【日付】【確定シフト】 */}
                         <div className="flex items-center justify-between px-1">
-                          <span className="text-[15px] font-black text-gray-800">
+                          <span className="text-[16px] font-black text-gray-800">
                             {format(d, 'M/d')} <span className="text-xs opacity-60">({format(d, 'E', {locale: ja})})</span>
                           </span>
                           {officialShift && (
                             <div className="flex items-center gap-1.5">
-                              <span className="text-[11px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 leading-none">確定</span>
-                              <span className="text-[15px] font-black text-gray-600 leading-none">{officialShift.start_time}〜{officialShift.end_time}</span>
+                              <span className="text-[12px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 leading-none">確定</span>
+                              <span className="text-[17px] font-black text-gray-600 leading-none">{officialShift.start_time}〜{officialShift.end_time}</span>
                             </div>
                           )}
                         </div>
 
                         {/* 2行目：【バッジ】【in時間】～【out時間】【お休み】 */}
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-2">
                           {officialShift ? (
-                            <span className="bg-orange-50 text-orange-500 text-[11px] font-black px-2 py-2 rounded-lg border border-orange-100 leading-none shrink-0">修正</span>
+                            <span className="bg-orange-50 text-orange-500 text-[12px] font-black px-2.5 py-2 rounded-xl border border-orange-100 leading-none shrink-0">修正</span>
                           ) : (
-                            <span className="bg-green-50 text-green-500 text-[11px] font-black px-2 py-2 rounded-lg border border-green-100 leading-none shrink-0">新規</span>
+                            <span className="bg-green-50 text-green-500 text-[12px] font-black px-2.5 py-2 rounded-xl border border-green-100 leading-none shrink-0">新規</span>
                           )}
                           
                           <select 
                             disabled={isOff}
                             value={requestDetails[key]?.s} 
                             onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} 
-                            className={`w-20 bg-gray-50 py-2 rounded-lg text-center font-black text-sm border-none focus:ring-1 focus:ring-purple-200 ${isOff ? 'opacity-30' : ''}`}
+                            className={`w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none flex items-center justify-center ${isOff ? 'opacity-30' : ''}`}
+                            style={{ textAlignLast: 'center' }}
                           >
                             {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                           </select>
-                          <span className={`text-gray-300 ${isOff ? 'opacity-30' : ''}`}>~</span>
+                          <span className={`text-gray-300 font-black text-lg ${isOff ? 'opacity-30' : ''}`}>~</span>
                           <select 
                             disabled={isOff}
                             value={requestDetails[key]?.e} 
                             onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} 
-                            className={`w-20 bg-gray-50 py-2 rounded-lg text-center font-black text-sm border-none focus:ring-1 focus:ring-purple-200 ${isOff ? 'opacity-30' : ''}`}
+                            className={`w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none flex items-center justify-center ${isOff ? 'opacity-30' : ''}`}
+                            style={{ textAlignLast: 'center' }}
                           >
                             {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                           </select>
@@ -303,7 +305,7 @@ export default function Page() {
                                 setRequestDetails({...requestDetails, [key]: {s: 'OFF', e: 'OFF'}});
                               }
                             }}
-                            className={`flex-1 py-2 rounded-lg font-black text-[11px] transition-all border ${isOff ? 'bg-purple-500 text-white border-purple-500 shadow-sm' : 'bg-white text-gray-400 border-gray-200'}`}
+                            className={`flex-1 py-2.5 rounded-lg font-black text-[12px] transition-all border ${isOff ? 'bg-purple-500 text-white border-purple-500 shadow-md' : 'bg-white text-gray-400 border-gray-200'}`}
                           >
                             お休み
                           </button>
