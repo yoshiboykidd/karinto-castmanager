@@ -140,29 +140,18 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
       
-      {/* 🏔️ ヘッダー (指定の並び順に再構成) */}
+      {/* 🏔️ ヘッダー (指定の並び順 v2.8.0) */}
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50">
-        {/* 1. バージョン */}
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">
-          KarintoCastManager v2.7.9
-        </p>
-        
-        {/* 2. 所属店舗 */}
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.8.0</p>
         <p className="text-[13px] font-bold text-gray-400 mb-1 flex items-center gap-1.5">
           <span className="w-2 h-2 bg-green-400 rounded-full shadow-[0_0_8px_rgba(74,222,128,0.5)]"></span>
           {shopInfo?.shop_name || 'Karinto'}
         </p>
-
-        {/* 3. 名前さん */}
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-tight">
           {castProfile?.display_name || 'キャスト'}
           <span className="text-[22px] text-pink-400 font-bold italic translate-y-[1px]">さん</span>
         </h1>
-
-        {/* 4. お疲れ様です */}
-        <p className="text-[14px] font-black text-gray-500 mt-1 italic opacity-80">
-          お疲れ様です🍵
-        </p>
+        <p className="text-[14px] font-black text-gray-500 mt-1 italic opacity-80">お疲れ様です🍵</p>
       </header>
 
       {/* 📱 タブ */}
@@ -177,15 +166,15 @@ export default function Page() {
             <span className="absolute -right-4 -top-8 text-[120px] font-black text-pink-200/20 italic leading-none pointer-events-none">{format(viewDate, 'M')}</span>
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-[12px] font-black text-pink-500 tracking-tighter bg-white/60 px-3 py-0.5 rounded-full border border-pink-100">実績</h2>
+                <h2 className="text-[12px] font-black text-pink-500 tracking-tighter bg-white/60 px-3 py-0.5 rounded-full border border-pink-100">実績サマリー</h2>
                 <div className="flex gap-1">
-                  <div className="bg-white/90 px-2 py-0.5 rounded-lg flex items-baseline gap-0.5 border border-pink-50 shadow-sm">
+                  <div className="bg-white/90 px-2 py-0.5 rounded-lg border border-pink-50 shadow-sm flex items-baseline gap-0.5">
                     <span className="text-[8px] font-black text-gray-400">出勤</span>
                     <span className="text-[16px] font-black text-pink-500">{monthlyTotals.count}</span>
                   </div>
-                  <div className="bg-white/90 px-2 py-0.5 rounded-lg flex items-baseline gap-0.5 border border-pink-50 shadow-sm">
+                  <div className="bg-white/90 px-2 py-0.5 rounded-lg border border-pink-50 shadow-sm flex items-baseline gap-0.5">
                     <span className="text-[8px] font-black text-gray-400">稼働</span>
-                    <span className="text-[16px] font-black text-pink-500">{Math.round(monthlyTotals.hours * 10) / 10}</span>
+                    <span className="text-[16px] font-black text-pink-500">{Math.round(monthlyTotals.hours * 10) / 10}h</span>
                   </div>
                 </div>
               </div>
@@ -206,13 +195,13 @@ export default function Page() {
         </section>
 
         {!isRequestMode && (
+          /* 💖 実績入力 (最新UX: [保存]左 / [クリア]右 / 超詰め) */
           <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-4 space-y-2">
             <div className="flex justify-between items-center px-1">
               <h3 className="text-xl font-black text-gray-800">{singleDate ? format(singleDate, 'M/d (E)', { locale: ja }) : ''}</h3>
               {dayOfficial && (
-                <div className="flex items-baseline gap-1">
-                  <span className="text-[9px] font-black text-blue-400 uppercase tracking-tighter">Shift:</span>
-                  <span className="text-[15px] font-black text-pink-500">{dayOfficial.start_time}〜{dayOfficial.end_time}</span>
+                <div className="flex items-baseline gap-1 bg-pink-50 px-2 py-0.5 rounded-lg border border-pink-100">
+                  <span className="text-[14px] font-black text-pink-500">{dayOfficial.start_time}〜{dayOfficial.end_time}</span>
                 </div>
               )}
             </div>
@@ -239,7 +228,12 @@ export default function Page() {
                 <div className="flex gap-1.5 pt-1">
                   <button onClick={() => {
                     const dateStr = format(singleDate!, 'yyyy-MM-dd');
-                    supabase.from('shifts').update({ f_count: Number(editReward.f) || 0, first_request_count: Number(editReward.first) || 0, main_request_count: Number(editReward.main) || 0, reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('実績を保存しました💰'); });
+                    supabase.from('shifts').update({ 
+                      f_count: Number(editReward.f) || 0, 
+                      first_request_count: Number(editReward.first) || 0, 
+                      main_request_count: Number(editReward.main) || 0, 
+                      reward_amount: Number(editReward.amount) || 0 
+                    }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('実績を保存しました💰'); });
                   }} className="flex-[2.5] bg-pink-500 text-white font-black py-4 rounded-2xl text-[17px] shadow-lg active:scale-95 transition-all tracking-tighter">実績を保存 💾</button>
                   <button onClick={() => setEditReward({ f: '', first: '', main: '', amount: '' })} className="flex-1 bg-gray-100 text-gray-400 font-black py-4 rounded-2xl text-[12px] active:scale-95 transition-all border border-gray-200">クリア 🗑️</button>
                 </div>

@@ -1,4 +1,5 @@
 @echo off
 git add .
-git commit -m "fix calendar design"
+git commit -m "update"
 git push
+npx vercel --prod --token [JBHlJKE6lvunwyiwyXiYokea]
