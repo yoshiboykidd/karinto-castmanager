@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation'; 
 import { format, parseISO, startOfToday } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import DashboardCalendar from '@/components/DashboardCalendar';
@@ -13,12 +13,11 @@ for (let h = 11; h <= 23; h++) {
   if (h !== 23) TIME_OPTIONS.push(`${h}:30`);
 }
 
-// ✅ Webhook URL 固定済み
 const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1467395577829523487/oQUEYdVA4oSbkAb53WYNMCnVIiOa0Tsi25WRPVWDtxF2UsnJFGrsU_gb-qG37gdyTQaQ";
 
 export default function Page() {
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname = usePathname(); // 💡 現在のURLパスを取得 (波線対策)
   const [supabase] = useState(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -105,7 +104,6 @@ export default function Page() {
 
   const handleBulkSubmit = async () => {
     if (!castProfile) return;
-
     const checkResults = multiDates.map(date => {
       const key = format(date, 'yyyy-MM-dd');
       const reqS = requestDetails[key]?.s || '11:00';
@@ -114,13 +112,11 @@ export default function Page() {
       const isSame = official && official.start_time === reqS && official.end_time === reqE;
       return { date, isSame, key, reqS, reqE };
     });
-
     if (checkResults.some(r => r.isSame)) {
       const sameDates = checkResults.filter(r => r.isSame).map(r => format(r.date, 'M/d')).join(', ');
       alert(`エラー：${sameDates} は確定シフトと同じ時間です。変更してから申請してください。🙅‍♀️`);
       return;
     }
-
     const finalRequests = checkResults.map(r => ({
       login_id: castProfile.login_id,
       hp_display_name: castProfile.display_name || 'キャスト',
@@ -130,9 +126,7 @@ export default function Page() {
       status: 'requested',
       is_official: false
     }));
-
     const { error } = await supabase.from('shifts').upsert(finalRequests as any, { onConflict: 'login_id,shift_date' });
-    
     if (!error) {
       const messageLines = finalRequests.map(r => {
         const d = parseISO(r.shift_date);
@@ -142,17 +136,9 @@ export default function Page() {
         const timeStr = r.start_time === 'OFF' ? 'OFF' : `${r.start_time}〜${r.end_time}`;
         return `📅 ${dateStr}: ${timeStr}${typeStr}`;
       });
-
       const content = `🔔 **シフト申請がありました**\nキャスト: **${castProfile.display_name}** さん\n${messageLines.join('\n')}`;
-
-      await fetch(DISCORD_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content })
-      });
-
-      alert(`${finalRequests.length}件の申請を送信しました！🚀`);
-      setMultiDates([]); fetchInitialData();
+      await fetch(DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) });
+      alert(`${finalRequests.length}件の申請を送信しました！🚀`); setMultiDates([]); fetchInitialData();
     } else { alert(`エラー: ${error.message}`); }
   };
 
@@ -165,11 +151,11 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
       
-      {/* 1. ヘッダー */}
+      {/* 1. ヘッダー (同期時刻) */}
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50 relative">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.9.7</p>
+            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.9.9</p>
             <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
           </div>
           {lastSync && (
@@ -180,7 +166,6 @@ export default function Page() {
           )}
         </div>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-tight">{castProfile?.display_name || 'キャスト'}<span className="text-[22px] text-pink-400 font-bold italic translate-y-[1px]">さん</span></h1>
-        <p className="text-[14px] font-black text-gray-500 mt-1 italic opacity-80">お疲れ様です🍵</p>
       </header>
 
       {/* 2. タブ */}
@@ -218,30 +203,34 @@ export default function Page() {
           <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={handleDateSelect} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
         </section>
 
-        {/* 5. 日付詳細 (実績入力・お休み統合版) */}
+        {/* 5. 日付詳細 (実績入力・バッジ崩れ修正版) */}
         {!isRequestMode && (
           <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-5 flex flex-col space-y-1">
-            <div className="flex items-center justify-between px-1">
-              <h3 className="text-2xl font-black text-gray-800 tracking-tight leading-none flex items-baseline">{singleDate ? format(singleDate, 'M/d') : ''}<span className="text-lg ml-1 opacity-70">({singleDate ? format(singleDate, 'E', { locale: ja }) : ''})</span></h3>
-              <div className="flex items-center gap-1.5">
-                {/* 💡 お休み統合ロジック: 確定お休み または データなし の場合 */}
+            <div className="flex items-center justify-between px-1 gap-2">
+              {/* 日付表記の復旧 */}
+              <h3 className="text-2xl font-black text-gray-800 tracking-tight leading-none flex items-baseline whitespace-nowrap">
+                {singleDate ? format(singleDate, 'M/d') : ''}
+                <span className="text-lg ml-1 opacity-70">({singleDate ? format(singleDate, 'E', { locale: ja }) : ''})</span>
+              </h3>
+              
+              {/* バッジ崩れ対策 (flex-nowrap) */}
+              <div className="flex items-center gap-1 flex-nowrap shrink-0 overflow-visible justify-end">
                 {(!dayOfficial || dayOfficial.start_time === 'OFF') && !dayRequested ? (
-                  <span className="text-[13px] font-black text-gray-400 bg-gray-50 px-2.5 py-1.5 rounded-lg border border-gray-100 leading-none">お休み</span>
+                  <span className="whitespace-nowrap text-[12px] font-black text-gray-400 bg-gray-50 px-2 py-1.5 rounded-lg border border-gray-100 leading-none">お休み</span>
                 ) : dayOfficial ? (
                   <>
-                    <span className="text-[13px] font-black text-blue-500 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 leading-none">確定シフト</span>
-                    <span className="text-[22px] font-black text-pink-500 leading-none">{dayOfficial.start_time}〜{dayOfficial.end_time}</span>
+                    <span className="whitespace-nowrap text-[12px] font-black text-blue-500 bg-blue-50 px-2 py-1.5 rounded-lg border border-blue-100 leading-none">確定シフト</span>
+                    <span className="whitespace-nowrap text-[20px] font-black text-pink-500 leading-none ml-1">{dayOfficial.start_time}〜{dayOfficial.end_time}</span>
                   </>
                 ) : dayRequested ? (
                   <>
-                    <span className="text-[13px] font-black text-purple-500 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-100 leading-none">申請中</span>
-                    <span className="text-[22px] font-black text-purple-400 leading-none">{dayRequested.start_time === 'OFF' ? 'お休み' : `${dayRequested.start_time}〜${dayRequested.end_time}`}</span>
+                    <span className="whitespace-nowrap text-[12px] font-black text-purple-500 bg-purple-50 px-2 py-1.5 rounded-lg border border-purple-100 leading-none">申請中</span>
+                    <span className="whitespace-nowrap text-[20px] font-black text-purple-400 leading-none ml-1">{dayRequested.start_time === 'OFF' ? 'お休み' : `${dayRequested.start_time}〜${dayRequested.end_time}`}</span>
                   </>
                 ) : null}
               </div>
             </div>
 
-            {/* 出勤実績の入力欄（確定シフトがある時のみ） */}
             {dayOfficial && dayOfficial.start_time !== 'OFF' ? (
               <>
                 <div className="flex flex-col space-y-0.5 pt-1 text-center font-black text-gray-400 text-[11px] uppercase tracking-widest">
@@ -261,18 +250,81 @@ export default function Page() {
                   supabase.from('shifts').update({ f_count: Number(editReward.f) || 0, first_request_count: Number(editReward.first) || 0, main_request_count: Number(editReward.main) || 0, reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('実績を保存しました💰'); });
                 }} className="w-full bg-pink-500 text-white font-black py-4 rounded-[20px] text-lg shadow-lg active:scale-95 transition-all mt-1">実績を保存 💾</button>
               </>
-            ) : ( 
-              <div className="py-8 text-center text-gray-300 font-bold italic text-xs">
-                {dayRequested ? "確定をお待ちください⛄️" : "お休みです☕️"}
-              </div> 
-            )}
+            ) : ( <div className="py-8 text-center text-gray-300 font-bold italic text-xs">{dayRequested ? "確定をお待ちください⛄️" : "お休みです☕️"}</div> )}
           </section>
         )}
 
-        {/* 6. NEWS 等は変更なしのため省略 */}
+        {/* 申請モード */}
+        {isRequestMode && (
+          <section className="bg-white rounded-[32px] border border-purple-100 p-5 shadow-xl space-y-3">
+             <h3 className="font-black text-purple-600 text-[14px] uppercase tracking-widest flex items-center gap-2"><span className="w-1.5 h-4 bg-purple-500 rounded-full"></span>申請リスト ({multiDates.length}件)</h3>
+            <div className="flex flex-col">
+              {multiDates.length === 0 ? ( <p className="text-center py-8 text-gray-300 text-xs font-bold italic">カレンダーから日付を選んでください📅</p> ) : (
+                multiDates.map(d => {
+                  const key = format(d, 'yyyy-MM-dd');
+                  const officialShift = (shifts || []).find(s => s.shift_date === key && s.status === 'official');
+                  const isOff = requestDetails[key]?.s === 'OFF';
+                  return (
+                    <div key={key} className="py-3.5 border-b border-gray-100 last:border-0 flex flex-col space-y-2">
+                      <div className="flex items-center justify-between px-1">
+                        <span className="text-[16px] font-black text-gray-800">{format(d, 'M/d')} <span className="text-xs opacity-60">({format(d, 'E', {locale: ja})})</span></span>
+                        {officialShift && ( <div className="flex items-center gap-1.5 flex-nowrap"><span className="text-[12px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 leading-none whitespace-nowrap">確定</span><span className="text-[17px] font-black text-gray-600 leading-none whitespace-nowrap">{officialShift.start_time === 'OFF' ? 'お休み' : `${officialShift.start_time}〜${officialShift.end_time}`}</span></div> )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {officialShift ? ( <span className="bg-orange-50 text-orange-500 text-[12px] font-black px-2.5 py-2 rounded-xl border border-orange-100 leading-none shrink-0">変更</span> ) : ( <span className="bg-green-50 text-green-500 text-[12px] font-black px-2.5 py-2 rounded-xl border border-green-100 leading-none shrink-0">新規</span> )}
+                        {isOff ? ( <div className="flex-1 bg-gray-50 py-2.5 rounded-lg text-center font-black text-gray-400 tracking-widest text-sm border border-dashed border-gray-200">OFF (お休み)</div> ) : (
+                          <>
+                            <select value={requestDetails[key]?.s || '11:00'} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none flex items-center justify-center" style={{ textAlignLast: 'center' }}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                            <span className="text-gray-300 font-black text-lg">~</span>
+                            <select value={requestDetails[key]?.e || '23:00'} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none flex items-center justify-center" style={{ textAlignLast: 'center' }}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                          </>
+                        )}
+                        <button onClick={() => { if (isOff) { setRequestDetails({...requestDetails, [key]: {s: '11:00', e: '23:00'}}); } else { setRequestDetails({...requestDetails, [key]: {s: 'OFF', e: 'OFF'}}); } }} className={`px-4 py-2.5 rounded-lg font-black text-[12px] transition-all border shrink-0 ${isOff ? 'bg-purple-500 text-white border-purple-500 shadow-md' : 'bg-white text-gray-400 border-gray-200'}`}>{isOff ? '出勤にする' : 'お休み'}</button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            {multiDates.length > 0 && ( <button onClick={() => handleBulkSubmit()} className="w-full bg-purple-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg active:scale-95 transition-all">申請を確定する 🚀</button> )}
+          </section>
+        )}
+
+        {/* ニュース (復旧) */}
+        <section className="bg-white rounded-[28px] border border-gray-100 shadow-sm overflow-hidden mb-8">
+          <div className="bg-gray-50 p-2.5 px-6 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">News</div>
+          <div className="divide-y divide-gray-50">
+            {newsList.length === 0 ? (
+              <div className="p-8 text-center text-gray-300 text-xs font-bold italic">お知らせはありません</div>
+            ) : (
+              newsList.map((n) => (
+                <div key={n.id} className="p-4 px-6 flex gap-4 items-start">
+                  <span className="text-[10px] text-pink-400 font-black shrink-0 bg-pink-50 px-2 py-1 rounded leading-none mt-0.5">{format(parseISO(n.created_at), 'MM/dd')}</span>
+                  <p className="text-[13px] font-bold text-gray-700 leading-relaxed">{n.content}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
       </main>
-      
-      {/* 7. フッター等は変更なし */}
+
+      {/* フッター (波線修正済) */}
+      <footer className="fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-xl border-t border-gray-100 pb-8 pt-4">
+        <nav className="flex justify-around items-center max-md mx-auto px-6">
+          <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1.5">
+            <span className={`text-2xl ${(pathname === '/' || !pathname) ? 'opacity-100' : 'opacity-30'}`}>🏠</span>
+            <span className={`text-[9px] font-black uppercase ${(pathname === '/' || !pathname) ? 'text-pink-500' : 'text-gray-300'}`}>ホーム</span>
+          </button>
+          <button onClick={() => router.push('/salary')} className="flex flex-col items-center gap-1.5">
+            <span className={`text-2xl ${pathname === '/salary' ? 'opacity-100' : 'opacity-30'}`}>💰</span>
+            <span className={`text-[9px] font-black uppercase ${pathname === '/salary' ? 'text-pink-500' : 'text-gray-300'}`}>給与明細</span>
+          </button>
+          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center gap-1.5 text-gray-300">
+            <span className="text-2xl opacity-30">🚪</span>
+            <span className="text-[9px] font-black uppercase">ログアウト</span>
+          </button>
+        </nav>
+      </footer>
     </div>
   );
 }
