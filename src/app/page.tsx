@@ -14,7 +14,7 @@ for (let h = 11; h <= 23; h++) {
 }
 
 // ⚠️ シフト申請通知用のWebhook URL
-const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1467395577829523487/oQUEYdVA4oSbkAb53WYNMCnVIiOa0Tsi25WRPVWDtxF2UsnJFGrsU_gb-qG37gdyTQaQß";
+const DISCORD_WEBHOOK_URL = "ここにURLを貼ってください";
 
 export default function Page() {
   const router = useRouter();
@@ -29,6 +29,7 @@ export default function Page() {
   const [newsList, setNewsList] = useState<any[]>([]);
   const [viewDate, setViewDate] = useState(new Date()); 
   const [loading, setLoading] = useState(true);
+  const [lastSync, setLastSync] = useState<string>(''); // 💡 同期時刻用
 
   const [isRequestMode, setIsRequestMode] = useState(false);
   const [singleDate, setSingleDate] = useState<Date | undefined>(new Date());
@@ -44,6 +45,7 @@ export default function Page() {
     const loginId = session.user.email?.replace('@karinto-internal.com', '');
     const { data: castData } = await supabase.from('cast_members').select('*').eq('login_id', loginId).single();
     setCastProfile(castData);
+    
     if (castData) {
       const myShopId = castData.home_shop_id || 'main';
       const [shopRes, shiftRes, newsRes] = await Promise.all([
@@ -51,9 +53,19 @@ export default function Page() {
         supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
         supabase.from('news').select('*').or(`shop_id.eq.${myShopId},shop_id.eq.all`).order('created_at', { ascending: false }).limit(3)
       ]);
+      
       setShopInfo(shopRes.data);
       setShifts(shiftRes.data || []);
       setNewsList(newsRes.data || []);
+
+      // 💡 最新の同期時刻を official シフトの最終更新日時から取得
+      const officialShifts = (shiftRes.data || []).filter((s: any) => s.status === 'official');
+      if (officialShifts.length > 0) {
+        const latestUpdate = officialShifts.reduce((max: string, s: any) => 
+          (s.updated_at > max ? s.updated_at : max), officialShifts[0].updated_at
+        );
+        setLastSync(format(parseISO(latestUpdate), 'HH:mm'));
+      }
     }
     setLoading(false);
   }
@@ -140,10 +152,21 @@ export default function Page() {
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
-      {/* 1. ヘッダー (固定) */}
-      <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.3</p>
-        <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
+      
+      {/* 1. ヘッダー (データ更新時間を追加) */}
+      <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50 relative">
+        <div className="flex justify-between items-start">
+          <div>
+            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.4</p>
+            <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
+          </div>
+          {lastSync && (
+            <div className="bg-gray-50 px-2 py-1 rounded-lg border border-gray-100 flex items-center gap-1">
+              <span className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></span>
+              <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">HP同期: {lastSync}</span>
+            </div>
+          )}
+        </div>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-tight">{castProfile?.display_name || 'キャスト'}<span className="text-[22px] text-pink-400 font-bold italic translate-y-[1px]">さん</span></h1>
         <p className="text-[14px] font-black text-gray-500 mt-1 italic opacity-80">お疲れ様です🍵</p>
       </header>
@@ -188,8 +211,6 @@ export default function Page() {
           <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-5 flex flex-col space-y-1">
             <div className="flex items-center justify-between px-1">
               <h3 className="text-2xl font-black text-gray-800 tracking-tight leading-none flex items-baseline">{singleDate ? format(singleDate, 'M/d') : ''}<span className="text-lg ml-1 opacity-70">({singleDate ? format(singleDate, 'E', { locale: ja }) : ''})</span></h3>
-              
-              {/* 💡 申請中情報の表示を追加 */}
               <div className="flex items-center gap-1.5">
                 {dayOfficial ? (
                   <>
@@ -204,7 +225,6 @@ export default function Page() {
                 ) : null}
               </div>
             </div>
-
             {dayOfficial ? (
               <>
                 <div className="flex flex-col space-y-0.5 pt-1">
