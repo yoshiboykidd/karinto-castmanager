@@ -77,6 +77,9 @@ export async function GET() {
       }
     }
 
+    // 💡 4. 生存確認時刻（データが変わらなくてもチェックした時間）を保存
+    await supabase.from('sync_logs').upsert({ id: 1, last_sync_at: new Date().toISOString() });
+
     return NextResponse.json({ success: true, count: results.length });
 
   } catch (err: any) {
