@@ -140,15 +140,28 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
       
-      {/* 🏔️ ヘッダー (v2.7.8) */}
-      <header className="bg-white px-6 pt-10 pb-3 rounded-b-[40px] shadow-sm border-b border-pink-50">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.7.8</p>
-        <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
-          {castProfile?.display_name || 'キャスト'}<span className="text-[22px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
+      {/* 🏔️ ヘッダー (指定の並び順に再構成) */}
+      <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50">
+        {/* 1. バージョン */}
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">
+          KarintoCastManager v2.7.9
+        </p>
+        
+        {/* 2. 所属店舗 */}
+        <p className="text-[13px] font-bold text-gray-400 mb-1 flex items-center gap-1.5">
+          <span className="w-2 h-2 bg-green-400 rounded-full shadow-[0_0_8px_rgba(74,222,128,0.5)]"></span>
+          {shopInfo?.shop_name || 'Karinto'}
+        </p>
+
+        {/* 3. 名前さん */}
+        <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-tight">
+          {castProfile?.display_name || 'キャスト'}
+          <span className="text-[22px] text-pink-400 font-bold italic translate-y-[1px]">さん</span>
         </h1>
-        <p className="text-[13px] font-bold text-gray-400 mt-2 flex items-center gap-1">
-          <span className="w-2 h-2 bg-green-400 rounded-full"></span>
-          {shopInfo?.shop_name || 'Karinto'} お疲れ様です🍵
+
+        {/* 4. お疲れ様です */}
+        <p className="text-[14px] font-black text-gray-500 mt-1 italic opacity-80">
+          お疲れ様です🍵
         </p>
       </header>
 
@@ -188,13 +201,11 @@ export default function Page() {
           </section>
         )}
 
-        {/* 📅 カレンダー (パディング詰め) */}
         <section className="bg-white p-1 rounded-[32px] border border-gray-100 shadow-sm text-center">
           <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={handleDateSelect} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
         </section>
 
         {!isRequestMode && (
-          /* 💖 実績入力 (ボタン逆転 & 超高密度) */
           <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-4 space-y-2">
             <div className="flex justify-between items-center px-1">
               <h3 className="text-xl font-black text-gray-800">{singleDate ? format(singleDate, 'M/d (E)', { locale: ja }) : ''}</h3>
@@ -208,20 +219,11 @@ export default function Page() {
 
             {dayOfficial ? (
               <>
-                {/* 項目間の隙間を gap-1 に最小化 */}
                 <div className="grid grid-cols-3 gap-1">
                   {(['f', 'first', 'main'] as const).map((key) => (
                     <div key={key} className="space-y-0.5 text-center bg-pink-50/20 rounded-xl py-1">
                       <label className="text-[9px] font-black text-gray-400 uppercase">{key==='f'?'フリー':key==='first'?'初指名':'本指名'}</label>
-                      <input 
-                        type="number" 
-                        inputMode="numeric" 
-                        value={editReward[key]} 
-                        placeholder="0"
-                        onFocus={e=>e.target.select()} 
-                        onChange={e => setEditReward({...editReward, [key]: e.target.value})} 
-                        className={`w-full text-center py-2 bg-transparent font-black text-2xl focus:outline-none caret-pink-500 transition-all ${editReward[key] === '' ? 'text-gray-200' : 'text-pink-500'}`} 
-                      />
+                      <input type="number" inputMode="numeric" value={editReward[key]} placeholder="0" onFocus={e=>e.target.select()} onChange={e => setEditReward({...editReward, [key]: e.target.value})} className={`w-full text-center py-2 bg-transparent font-black text-2xl focus:outline-none caret-pink-500 transition-all ${editReward[key] === '' ? 'text-gray-200' : 'text-pink-500'}`} />
                     </div>
                   ))}
                 </div>
@@ -230,55 +232,22 @@ export default function Page() {
                   <label className="text-[11px] font-black text-gray-900 uppercase">報酬合計</label>
                   <div className="flex items-center text-pink-500">
                     <span className="text-lg font-black mr-0.5 opacity-40">¥</span>
-                    <input 
-                      type="text" 
-                      inputMode="numeric" 
-                      value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} 
-                      placeholder="0"
-                      onFocus={e=>e.target.select()} 
-                      onChange={e=>{
-                        const v=e.target.value.replace(/,/g,''); 
-                        if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});
-                      }} 
-                      className={`w-32 text-right bg-transparent font-black text-2xl border-none focus:ring-0 caret-pink-500 tracking-tighter ${editReward.amount === '' ? 'text-gray-200' : 'text-pink-500'}`} 
-                    />
+                    <input type="text" inputMode="numeric" value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} placeholder="0" onFocus={e=>e.target.select()} onChange={e=>{const v=e.target.value.replace(/,/g,''); if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});}} className={`w-32 text-right bg-transparent font-black text-2xl border-none focus:ring-0 caret-pink-500 tracking-tighter ${editReward.amount === '' ? 'text-gray-200' : 'text-pink-500'}`} />
                   </div>
                 </div>
                 
-                {/* ✨ ボタン順序を逆転： [実績を保存] が左、[クリア] が右 */}
                 <div className="flex gap-1.5 pt-1">
-                  <button 
-                    onClick={() => {
-                      const dateStr = format(singleDate!, 'yyyy-MM-dd');
-                      supabase.from('shifts').update({ 
-                        f_count: Number(editReward.f) || 0, 
-                        first_request_count: Number(editReward.first) || 0, 
-                        main_request_count: Number(editReward.main) || 0, 
-                        reward_amount: Number(editReward.amount) || 0 
-                      }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { 
-                        fetchInitialData(); 
-                        alert('実績を保存しました💰'); 
-                      });
-                    }} 
-                    className="flex-[2.5] bg-pink-500 text-white font-black py-4 rounded-2xl text-[17px] shadow-lg active:scale-95 transition-all tracking-tighter"
-                  >
-                    実績を保存 💾
-                  </button>
-                  <button 
-                    onClick={() => setEditReward({ f: '', first: '', main: '', amount: '' })}
-                    className="flex-1 bg-gray-100 text-gray-400 font-black py-4 rounded-2xl text-[12px] active:scale-95 transition-all border border-gray-200"
-                  >
-                    クリア 🗑️
-                  </button>
+                  <button onClick={() => {
+                    const dateStr = format(singleDate!, 'yyyy-MM-dd');
+                    supabase.from('shifts').update({ f_count: Number(editReward.f) || 0, first_request_count: Number(editReward.first) || 0, main_request_count: Number(editReward.main) || 0, reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('実績を保存しました💰'); });
+                  }} className="flex-[2.5] bg-pink-500 text-white font-black py-4 rounded-2xl text-[17px] shadow-lg active:scale-95 transition-all tracking-tighter">実績を保存 💾</button>
+                  <button onClick={() => setEditReward({ f: '', first: '', main: '', amount: '' })} className="flex-1 bg-gray-100 text-gray-400 font-black py-4 rounded-2xl text-[12px] active:scale-95 transition-all border border-gray-200">クリア 🗑️</button>
                 </div>
               </>
-            ) : (
-              <div className="py-8 text-center text-gray-300 font-bold italic text-xs">確定シフトなし⛄️</div>
-            )}
+            ) : ( <div className="py-8 text-center text-gray-300 font-bold italic text-xs">確定シフトなし⛄️</div> )}
           </section>
         )}
 
-        {/* シフト申請モード時のみ表示 */}
         {isRequestMode && (
           <section className="bg-white rounded-[32px] border border-gray-100 p-4 shadow-xl space-y-3">
              <h3 className="font-black text-purple-600 text-[13px] uppercase tracking-widest flex items-center gap-2">
@@ -293,13 +262,9 @@ export default function Page() {
                   <div key={key} className="flex items-center gap-1 pb-2 border-b border-gray-50 last:border-0">
                     <span className="text-[14px] font-black text-gray-800 w-16">{format(d, 'M/d(E)', {locale: ja})}</span>
                     <div className="flex-1 flex items-center gap-1">
-                      <select disabled={isOff} value={requestDetails[key]?.s} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} className="flex-1 bg-gray-50 py-2 rounded-lg text-center font-black text-sm border-none focus:ring-1 focus:ring-purple-200">
-                        {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
+                      <select disabled={isOff} value={requestDetails[key]?.s} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} className="flex-1 bg-gray-50 py-2 rounded-lg text-center font-black text-sm border-none focus:ring-1 focus:ring-purple-200">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
                       <span className="text-gray-300">~</span>
-                      <select disabled={isOff} value={requestDetails[key]?.e} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} className="flex-1 bg-gray-50 py-2 rounded-lg text-center font-black text-sm border-none focus:ring-1 focus:ring-purple-200">
-                        {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
+                      <select disabled={isOff} value={requestDetails[key]?.e} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} className="flex-1 bg-gray-50 py-2 rounded-lg text-center font-black text-sm border-none focus:ring-1 focus:ring-purple-200">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
                     </div>
                   </div>
                 );
@@ -309,7 +274,6 @@ export default function Page() {
           </section>
         )}
 
-        {/* News */}
         <section className="bg-white rounded-[28px] border border-gray-100 shadow-sm overflow-hidden mb-8">
           <div className="bg-gray-50 p-2 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">News</div>
           <div className="divide-y divide-gray-50">
