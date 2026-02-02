@@ -97,7 +97,6 @@ export default function Page() {
   const handleDateSelect = (dates: any) => {
     if (isRequestMode) {
       const tomorrow = startOfToday(); tomorrow.setDate(tomorrow.getDate() + 1);
-      // 💡 明日以降のみを選択可能にする
       const validDates = (Array.isArray(dates) ? dates : []).filter(d => d >= tomorrow);
       setMultiDates(validDates);
     } else { setSingleDate(dates as Date); }
@@ -115,7 +114,7 @@ export default function Page() {
     });
     if (checkResults.some(r => r.isSame)) {
       const sameDates = checkResults.filter(r => r.isSame).map(r => format(r.date, 'M/d')).join(', ');
-      alert(`エラー：${sameDates} は確定シフトと同じ時間です。🙅‍♀️`);
+      alert(`エラー：${sameDates} は確定シフトと同じ時間です。変更してから申請してください。🙅‍♀️`);
       return;
     }
     const finalRequests = checkResults.map(r => ({
@@ -149,13 +148,17 @@ export default function Page() {
   const dayOfficial = (shifts || []).find(s => s.shift_date === targetDateStr && s.status === 'official');
   const dayRequested = (shifts || []).find(s => s.shift_date === targetDateStr && s.status === 'requested');
 
+  // 特定日判定用
+  const dayNum = singleDate?.getDate();
+  const isSpecialDay = dayNum === 10 || dayNum === 11 || dayNum === 20;
+
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
       
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50 relative">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.9.11</p>
+            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.9.15</p>
             <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
           </div>
           {lastSync && (
@@ -190,7 +193,7 @@ export default function Page() {
             <div className="text-center"><p className="text-[52px] font-black text-pink-600 leading-none tracking-tighter"><span className="text-2xl mr-1 opacity-40 translate-y-[-4px] inline-block">¥</span>{monthlyTotals.amount.toLocaleString()}</p></div>
             <div className="grid grid-cols-3 gap-0.5 bg-white/40 rounded-2xl border border-white/60 text-center py-2">
               <div><p className="text-[10px] text-pink-400 font-black leading-tight">フリー</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.f || 0}</p></div>
-              <div className="border-x border-pink-100/50"><p className="text-[10px] text-pink-400 font-black leading-tight">初指名</p><p className="text-xl font-black text-pink-600貴-none">{monthlyTotals.first || 0}</p></div>
+              <div className="border-x border-pink-100/50"><p className="text-[10px] text-pink-400 font-black leading-tight">初指名</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.first || 0}</p></div>
               <div><p className="text-[10px] text-pink-400 font-black leading-tight">本指名</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.main || 0}</p></div>
             </div>
           </section>
@@ -201,13 +204,26 @@ export default function Page() {
         </section>
 
         {!isRequestMode && (
-          <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-5 flex flex-col space-y-1">
+          <section className={`rounded-[32px] border shadow-xl p-5 flex flex-col space-y-1 transition-all duration-300
+            ${dayNum === 10 ? 'bg-orange-50 border-orange-200' : 
+              (dayNum === 11 || dayNum === 20) ? 'bg-yellow-50 border-yellow-200' : 
+              'bg-white border-pink-100'}`}
+          >
+            {/* 特定日デカデカヘッダー */}
+            {isSpecialDay && (
+              <div className={`-mt-2 mb-2 py-1.5 px-4 rounded-full text-center font-black text-[11px] tracking-[0.2em] uppercase shadow-sm
+                ${dayNum === 10 ? 'bg-orange-400 text-white' : 'bg-yellow-400 text-white'}`}>
+                ✨ {dayNum === 10 ? 'かりんとの日 (全額バックイベント)' : '添い寝の日 (衣装イベント)'} ✨
+              </div>
+            )}
+
             <div className="flex items-center justify-between px-1 gap-2">
               <h3 className="text-2xl font-black text-gray-800 tracking-tight leading-none flex items-baseline whitespace-nowrap">
                 {singleDate ? format(singleDate, 'M/d') : ''}
                 <span className="text-lg ml-1 opacity-70">({singleDate ? format(singleDate, 'E', { locale: ja }) : ''})</span>
               </h3>
-              <div className="flex items-center gap-1 flex-nowrap shrink-0 justify-end">
+              
+              <div className="flex items-center gap-1 flex-nowrap shrink-0 overflow-visible justify-end">
                 {(!dayOfficial || dayOfficial.start_time === 'OFF') && !dayRequested ? (
                   <span className="whitespace-nowrap text-[12px] font-black text-gray-400 bg-gray-50 px-2 py-1.5 rounded-lg border border-gray-100 leading-none">お休み</span>
                 ) : dayOfficial ? (
@@ -223,6 +239,7 @@ export default function Page() {
                 ) : null}
               </div>
             </div>
+
             {dayOfficial && dayOfficial.start_time !== 'OFF' ? (
               <>
                 <div className="flex flex-col space-y-0.5 pt-1 text-center font-black text-gray-400 text-[11px] uppercase tracking-widest">
@@ -246,7 +263,6 @@ export default function Page() {
           </section>
         )}
 
-        {/* 💡 申請リストセクション (ここが重要) */}
         {isRequestMode && (
           <section className="bg-white rounded-[32px] border border-purple-100 p-5 shadow-xl space-y-3">
              <h3 className="font-black text-purple-600 text-[14px] uppercase tracking-widest flex items-center gap-2"><span className="w-1.5 h-4 bg-purple-500 rounded-full"></span>申請リスト ({multiDates.length}件)</h3>
