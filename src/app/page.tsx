@@ -141,7 +141,7 @@ export default function Page() {
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
       
       <header className="bg-white px-6 pt-10 pb-3 rounded-b-[40px] shadow-sm border-b border-pink-50">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.7.5</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.7.6</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'キャスト'}<span className="text-[22px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
         </h1>
@@ -222,7 +222,7 @@ export default function Page() {
                           {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                       </div>
-                      <button onClick={() => { const nextVal = isOff ? {s: '11:00', e: '23:00'} : {s: 'OFF', e: 'OFF'}; setRequestDetails({...requestDetails, [key]: nextVal}); }} className={`shrink-0 w-12 h-12 rounded-xl text-[12px] font-black transition-all ${isOff ? 'bg-gray-800 text-white shadow-inner' : 'bg-gray-100 text-gray-400 border border-gray-200'}`}>休み</button>
+                      <button onClick={() => { const nextVal = isOff ? {s: '11:00', e: '23:00'} : {s: 'OFF', e: 'OFF'}; setRequestDetails({...requestDetails, [key]: nextVal}); }} className={`shrink-0 w-12 h-12 rounded-xl text-[12px] font-black transition-all ${isOff ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-500'}`}>休み</button>
                     </div>
                   </div>
                 );
@@ -231,7 +231,7 @@ export default function Page() {
             <button onClick={() => handleBulkSubmit()} className="w-full bg-purple-600 text-white font-black py-5 rounded-[22px] text-lg shadow-lg active:scale-95 transition-all tracking-[0.2em]">申請を確定する 🚀</button>
           </section>
         ) : (
-          /* 💖 実績入力 (0の出し分け + クリアボタン) */
+          /* 💖 実績入力 (制限解除版) */
           <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-6 space-y-6">
             <div className="flex justify-between items-end">
               <h3 className="text-2xl font-black text-gray-800 tracking-tight">{singleDate ? format(singleDate, 'M/d (E)', { locale: ja }) : ''}</h3>
@@ -282,7 +282,6 @@ export default function Page() {
                   </div>
                 </div>
                 
-                {/* 保存 & クリアボタンの横並びエリア */}
                 <div className="flex gap-3">
                   <button 
                     onClick={() => setEditReward({ f: '', first: '', main: '', amount: '' })}
@@ -292,12 +291,17 @@ export default function Page() {
                   </button>
                   <button 
                     onClick={() => {
-                      const fCount = Number(editReward.f) || 0;
-                      const firstCount = Number(editReward.first) || 0;
-                      const mainCount = Number(editReward.main) || 0;
-                      if ((fCount + firstCount + mainCount) < 1) { alert('本数を入力してください'); return; }
+                      // 💡 バリデーションを完全に撤去し、入力値をそのままDBに送る
                       const dateStr = format(singleDate!, 'yyyy-MM-dd');
-                      supabase.from('shifts').update({ f_count: fCount, first_request_count: firstCount, main_request_count: mainCount, reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('実績を保存しました💰'); });
+                      supabase.from('shifts').update({ 
+                        f_count: Number(editReward.f) || 0, 
+                        first_request_count: Number(editReward.first) || 0, 
+                        main_request_count: Number(editReward.main) || 0, 
+                        reward_amount: Number(editReward.amount) || 0 
+                      }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { 
+                        fetchInitialData(); 
+                        alert('実績を保存しました💰'); 
+                      });
                     }} 
                     className="flex-[2] bg-pink-500 text-white font-black py-5 rounded-[22px] text-xl shadow-lg active:scale-95 transition-all tracking-[0.1em]"
                   >
