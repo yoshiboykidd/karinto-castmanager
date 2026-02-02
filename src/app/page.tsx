@@ -108,7 +108,7 @@ export default function Page() {
       
       {/* 1. ヘッダー (固定) */}
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.8.3</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.8.4</p>
         <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-tight">
           {castProfile?.display_name || 'キャスト'}
@@ -160,7 +160,7 @@ export default function Page() {
           <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={handleDateSelect} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
         </section>
 
-        {/* 5. 日付詳細 (指示に基づき再構築) */}
+        {/* 5. 日付詳細 (曜日・バッジ・時間を微修正) */}
         {!isRequestMode && (
           <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-5 flex flex-col space-y-1">
             
@@ -168,16 +168,19 @@ export default function Page() {
               <>
                 {/* 1行目：【日付】【バッジ】【シフト時間】 */}
                 <div className="flex items-center justify-between px-1">
-                  <h3 className="text-2xl font-black text-gray-800 tracking-tight leading-none">
-                    {singleDate ? format(singleDate, 'M/d (E)', { locale: ja }) : ''}
+                  <h3 className="text-2xl font-black text-gray-800 tracking-tight leading-none flex items-baseline">
+                    {singleDate ? format(singleDate, 'M/d') : ''}
+                    <span className="text-lg ml-1 opacity-70">
+                      ({singleDate ? format(singleDate, 'E', { locale: ja }) : ''})
+                    </span>
                   </h3>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-black text-blue-500 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 leading-none">確定シフト</span>
-                    <span className="text-lg font-black text-pink-500 leading-none">{dayOfficial.start_time}〜{dayOfficial.end_time}</span>
+                    <span className="text-[12px] font-black text-blue-500 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 leading-none">確定シフト</span>
+                    <span className="text-xl font-black text-pink-500 leading-none">{dayOfficial.start_time}〜{dayOfficial.end_time}</span>
                   </div>
                 </div>
 
-                {/* 2-3行目：【フリー】【初指名】【本指名】(表題とフォームを分離) */}
+                {/* 2-3行目：本数入力 */}
                 <div className="flex flex-col space-y-0.5 pt-1">
                   <div className="grid grid-cols-3 gap-2 px-1">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">フリー</label>
@@ -200,7 +203,7 @@ export default function Page() {
                   </div>
                 </div>
                 
-                {/* 4行目：【報酬合計】 */}
+                {/* 4行目：報酬合計 */}
                 <div className="bg-pink-50/40 p-3 rounded-[22px] border border-pink-100 flex items-center justify-between shadow-inner">
                   <label className="text-[12px] font-black text-gray-900 uppercase">報酬合計</label>
                   <div className="flex items-center text-pink-500">
@@ -220,7 +223,7 @@ export default function Page() {
                   </div>
                 </div>
                 
-                {/* 5行目：【実績保存】【クリア】 */}
+                {/* 5行目：保存・クリア */}
                 <div className="flex gap-2 pt-0.5">
                   <button 
                     onClick={() => {
