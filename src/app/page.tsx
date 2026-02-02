@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import { format, parseISO, startOfToday } from 'date-fns';
@@ -55,27 +55,29 @@ export default function Page() {
     setLoading(false);
   }
 
-  const monthlyTotals = (shifts || [])
-    .filter((s: any) => {
-      const d = parseISO(s.shift_date);
-      return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear() && s.status === 'official';
-    })
-    .reduce((acc, s: any) => {
-      let dur = 0;
-      if (s.start_time && s.end_time && s.start_time !== 'OFF') {
-        const [sH, sM] = s.start_time.split(':').map(Number);
-        const [eH, eM] = s.end_time.split(':').map(Number);
-        dur = (eH < sH ? eH + 24 : eH) + eM / 60 - (sH + sM / 60);
-      }
-      return {
-        amount: acc.amount + (Number(s.reward_amount) || 0),
-        f: acc.f + (Number(s.f_count) || 0),
-        first: acc.first + (Number(s.first_request_count) || 0),
-        main: acc.main + (Number(s.main_request_count) || 0),
-        count: acc.count + 1,
-        hours: acc.hours + dur,
-      };
-    }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
+  const monthlyTotals = useMemo(() => {
+    return (shifts || [])
+      .filter((s: any) => {
+        const d = parseISO(s.shift_date);
+        return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear() && s.status === 'official';
+      })
+      .reduce((acc, s: any) => {
+        let dur = 0;
+        if (s.start_time && s.end_time && s.start_time !== 'OFF') {
+          const [sH, sM] = s.start_time.split(':').map(Number);
+          const [eH, eM] = s.end_time.split(':').map(Number);
+          dur = (eH < sH ? eH + 24 : eH) + eM / 60 - (sH + sM / 60);
+        }
+        return {
+          amount: acc.amount + (Number(s.reward_amount) || 0),
+          f: acc.f + (Number(s.f_count) || 0),
+          first: acc.first + (Number(s.first_request_count) || 0),
+          main: acc.main + (Number(s.main_request_count) || 0),
+          count: acc.count + 1,
+          hours: acc.hours + dur,
+        };
+      }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
+  }, [shifts, viewDate]);
 
   useEffect(() => {
     const newDetails = { ...requestDetails };
@@ -110,7 +112,6 @@ export default function Page() {
     setEditReward({ f: v(shift?.f_count), first: v(shift?.first_request_count), main: v(shift?.main_request_count), amount: v(shift?.reward_amount) });
   }, [singleDate, shifts, isRequestMode]);
 
-  // ✨ 波線の原因だった箇所の安全性を強化
   const handleBulkSubmit = async () => {
     if (!castProfile) return;
     const requests = multiDates.map(date => {
@@ -127,15 +128,11 @@ export default function Page() {
       };
     });
     const { error } = await supabase.from('shifts').upsert(requests, { onConflict: 'login_id,shift_date' });
-    if (!error) {
-      alert('申請を送信しました！🚀');
-      setMultiDates([]); fetchInitialData();
-    } else { alert(`エラー: ${error.message}`); }
+    if (!error) { alert('申請を送信しました！🚀'); setMultiDates([]); fetchInitialData(); }
+    else { alert(`エラー: ${error.message}`); }
   };
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center font-black italic text-5xl text-pink-300 animate-pulse">KARINTO...</div>
-  );
+  if (loading) return ( <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center font-black italic text-5xl text-pink-300 animate-pulse">KARINTO...</div> );
 
   const targetDateStr = singleDate ? format(singleDate, 'yyyy-MM-dd') : '';
   const dayOfficial = (shifts || []).find(s => s.shift_date === targetDateStr && s.status === 'official');
@@ -143,9 +140,8 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
       
-      {/* 🏔️ ヘッダー */}
       <header className="bg-white px-6 pt-10 pb-3 rounded-b-[40px] shadow-sm border-b border-pink-50">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.7.2</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.7.5</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-none">
           {castProfile?.display_name || 'キャスト'}<span className="text-[22px] text-pink-400 font-bold italic translate-y-[1px]">さん⛄️</span>
         </h1>
@@ -155,15 +151,12 @@ export default function Page() {
         </p>
       </header>
 
-      {/* 📱 タブ */}
       <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200 shadow-inner">
         <button onClick={() => { setIsRequestMode(false); setMultiDates([]); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
         <button onClick={() => { setIsRequestMode(true); setSingleDate(undefined); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
       </div>
 
       <main className="px-4 mt-3 space-y-3">
-        
-        {/* 🏆 実績サマリー枠 */}
         {!isRequestMode && (
           <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-5 border border-pink-200 relative overflow-hidden shadow-sm">
             <span className="absolute -right-4 -top-8 text-[120px] font-black text-pink-200/20 italic leading-none pointer-events-none">{format(viewDate, 'M')}</span>
@@ -187,9 +180,9 @@ export default function Page() {
                 <span className="text-2xl mr-1 opacity-40 translate-y-[-4px] inline-block">¥</span>{monthlyTotals.amount.toLocaleString()}
               </p>
               <div className="grid grid-cols-3 gap-0.5 bg-white/40 rounded-2xl border border-white/60 text-center py-2">
-                <div><p className="text-[10px] text-pink-400 font-black">フリー</p><p className="text-xl font-black text-pink-600">{monthlyTotals.f}</p></div>
-                <div className="border-x border-pink-100/50"><p className="text-[10px] text-pink-400 font-black">初指名</p><p className="text-xl font-black text-pink-600">{monthlyTotals.first}</p></div>
-                <div><p className="text-[10px] text-pink-400 font-black">本指名</p><p className="text-xl font-black text-pink-600">{monthlyTotals.main}</p></div>
+                <div><p className="text-[10px] text-pink-400 font-black">フリー</p><p className="text-xl font-black text-pink-600">{monthlyTotals.f || 0}</p></div>
+                <div className="border-x border-pink-100/50"><p className="text-[10px] text-pink-400 font-black">初指名</p><p className="text-xl font-black text-pink-600">{monthlyTotals.first || 0}</p></div>
+                <div><p className="text-[10px] text-pink-400 font-black">本指名</p><p className="text-xl font-black text-pink-600">{monthlyTotals.main || 0}</p></div>
               </div>
             </div>
           </section>
@@ -200,53 +193,45 @@ export default function Page() {
         </section>
 
         {isRequestMode ? (
-          /* 💜 シフト申請パネル */
           <section className="bg-white rounded-[32px] border border-gray-100 p-4 shadow-xl space-y-3">
             <h3 className="font-black text-purple-600 text-[13px] uppercase tracking-widest flex items-center gap-2 ml-1">
               <span className="w-1.5 h-4 bg-purple-500 rounded-full"></span>
               申請リスト ({multiDates.length})
             </h3>
             <div className="max-h-[500px] overflow-y-auto space-y-7 pr-1 custom-scrollbar">
-              {multiDates.length === 0 ? (
-                <div className="py-12 text-center text-gray-300 font-bold italic text-sm">カレンダーから選択 🗓️</div>
-              ) : (
-                multiDates.sort((a,b)=>a.getTime()-b.getTime()).map(d => {
-                  const key = format(d, 'yyyy-MM-dd');
-                  const offS = (shifts || []).find(s => s.shift_date === key && s.status === 'official');
-                  const isOff = requestDetails[key]?.s === 'OFF';
-                  return (
-                    <div key={key} className="space-y-2 pb-1 border-b border-gray-50 last:border-0">
-                      <div className="px-1 flex items-center justify-between">
-                        <span className="text-[17px] font-black text-gray-800">{format(d, 'M/d', {locale: ja})}<span className="text-gray-400 ml-1 font-bold">({format(d, 'E', {locale: ja})})</span></span>
-                        {offS && <span className="text-[13px] font-black text-blue-500 bg-blue-50 px-3 py-1 rounded-lg border border-blue-100">確定：{offS.start_time} 〜 {offS.end_time}</span>}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className={`shrink-0 w-20 h-12 flex items-center justify-center text-[13px] font-black rounded-xl leading-none shadow-sm ${offS ? 'bg-blue-500 text-white' : 'bg-pink-400 text-white'}`}>{offS ? '変更申請' : '新規申請'}</div>
-                        <div className={`flex-1 h-12 relative ${isOff ? 'opacity-20' : ''}`}>
-                          <select disabled={isOff} value={requestDetails[key]?.s} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} style={{ textAlignLast: 'center' }} className="w-full h-full bg-gray-50 border border-gray-100 text-[20px] font-black rounded-xl text-center appearance-none focus:outline-none focus:border-purple-300">
-                            {requestDetails[key]?.s === 'OFF' && <option value="OFF">OFF</option>}
-                            {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                          </select>
-                        </div>
-                        <span className={`text-gray-300 font-bold ${isOff ? 'opacity-20' : ''}`}>～</span>
-                        <div className={`flex-1 h-12 relative ${isOff ? 'opacity-20' : ''}`}>
-                          <select disabled={isOff} value={requestDetails[key]?.e} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} style={{ textAlignLast: 'center' }} className="w-full h-full bg-gray-50 border border-gray-100 text-[20px] font-black rounded-xl text-center appearance-none focus:outline-none focus:border-purple-300">
-                            {requestDetails[key]?.e === 'OFF' && <option value="OFF">OFF</option>}
-                            {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                          </select>
-                        </div>
-                        <button onClick={() => { const nextVal = isOff ? {s: '11:00', e: '23:00'} : {s: 'OFF', e: 'OFF'}; setRequestDetails({...requestDetails, [key]: nextVal}); }} className={`shrink-0 w-12 h-12 rounded-xl text-[12px] font-black transition-all ${isOff ? 'bg-gray-800 text-white shadow-inner' : 'bg-gray-100 text-gray-400 border border-gray-200'}`}>休み</button>
-                      </div>
+              {multiDates.sort((a,b)=>a.getTime()-b.getTime()).map(d => {
+                const key = format(d, 'yyyy-MM-dd');
+                const offS = (shifts || []).find(s => s.shift_date === key && s.status === 'official');
+                const isOff = requestDetails[key]?.s === 'OFF';
+                return (
+                  <div key={key} className="space-y-2 pb-1 border-b border-gray-50 last:border-0">
+                    <div className="px-1 flex items-center justify-between">
+                      <span className="text-[17px] font-black text-gray-800">{format(d, 'M/d', {locale: ja})}<span className="text-gray-400 ml-1 font-bold">({format(d, 'E', {locale: ja})})</span></span>
+                      {offS && <span className="text-[13px] font-black text-blue-500 bg-blue-50 px-3 py-1 rounded-lg border border-blue-100">確定：{offS.start_time} 〜 {offS.end_time}</span>}
                     </div>
-                  );
-                })
-              )}
+                    <div className="flex items-center gap-1">
+                      <div className={`shrink-0 w-20 h-12 flex items-center justify-center text-[13px] font-black rounded-xl leading-none shadow-sm ${offS ? 'bg-blue-500 text-white' : 'bg-pink-400 text-white'}`}>{offS ? '変更申請' : '新規申請'}</div>
+                      <div className={`flex-1 h-12 relative ${isOff ? 'opacity-20' : ''}`}>
+                        <select disabled={isOff} value={requestDetails[key]?.s} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} style={{ textAlignLast: 'center' }} className="w-full h-full bg-gray-50 border border-gray-100 text-[20px] font-black rounded-xl text-center appearance-none focus:outline-none focus:border-purple-300">
+                          {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <span className={`text-gray-300 font-bold ${isOff ? 'opacity-20' : ''}`}>～</span>
+                      <div className={`flex-1 h-12 relative ${isOff ? 'opacity-20' : ''}`}>
+                        <select disabled={isOff} value={requestDetails[key]?.e} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} style={{ textAlignLast: 'center' }} className="w-full h-full bg-gray-50 border border-gray-100 text-[20px] font-black rounded-xl text-center appearance-none focus:outline-none focus:border-purple-300">
+                          {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <button onClick={() => { const nextVal = isOff ? {s: '11:00', e: '23:00'} : {s: 'OFF', e: 'OFF'}; setRequestDetails({...requestDetails, [key]: nextVal}); }} className={`shrink-0 w-12 h-12 rounded-xl text-[12px] font-black transition-all ${isOff ? 'bg-gray-800 text-white shadow-inner' : 'bg-gray-100 text-gray-400 border border-gray-200'}`}>休み</button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            {/* ✨ 波線が出ないよう onClick を関数として呼び出す形式に */}
             <button onClick={() => handleBulkSubmit()} className="w-full bg-purple-600 text-white font-black py-5 rounded-[22px] text-lg shadow-lg active:scale-95 transition-all tracking-[0.2em]">申請を確定する 🚀</button>
           </section>
         ) : (
-          /* 💖 実績入力 */
+          /* 💖 実績入力 (0の出し分け + クリアボタン) */
           <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-6 space-y-6">
             <div className="flex justify-between items-end">
               <h3 className="text-2xl font-black text-gray-800 tracking-tight">{singleDate ? format(singleDate, 'M/d (E)', { locale: ja }) : ''}</h3>
@@ -256,9 +241,7 @@ export default function Page() {
                     <span className="text-[11px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">確定シフト</span>
                     <span className="text-xl font-black text-pink-500 leading-none">{dayOfficial.start_time}〜{dayOfficial.end_time}</span>
                   </div>
-                ) : (
-                  <span className="text-sm text-gray-300 font-bold italic">確定シフトなし⛄️</span>
-                )}
+                ) : ( <span className="text-sm text-gray-300 font-bold italic">確定シフトなし⛄️</span> )}
               </div>
             </div>
 
@@ -268,7 +251,15 @@ export default function Page() {
                   {(['f', 'first', 'main'] as const).map((key) => (
                     <div key={key} className="space-y-2 text-center">
                       <label className="text-[12px] font-black text-gray-400 uppercase tracking-widest">{key==='f'?'フリー':key==='first'?'初指名':'本指名'}</label>
-                      <input type="number" inputMode="numeric" value={editReward[key]} onFocus={e=>e.target.select()} onChange={e=>setEditReward({...editReward,[key]:e.target.value})} className="w-full text-center py-4 bg-white rounded-2xl font-black text-3xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none caret-pink-500 text-pink-500 transition-all" />
+                      <input 
+                        type="number" 
+                        inputMode="numeric" 
+                        value={editReward[key]} 
+                        placeholder="0"
+                        onFocus={e=>e.target.select()} 
+                        onChange={e => setEditReward({...editReward, [key]: e.target.value})} 
+                        className={`w-full text-center py-4 bg-white rounded-2xl font-black text-3xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none caret-pink-500 transition-all ${editReward[key] === '' ? 'text-gray-200' : 'text-pink-500'}`} 
+                      />
                     </div>
                   ))}
                 </div>
@@ -276,23 +267,48 @@ export default function Page() {
                   <label className="text-[14px] font-black text-gray-900 uppercase">報酬合計</label>
                   <div className="flex items-center text-pink-500">
                     <span className="text-2xl font-black mr-1 opacity-40 translate-y-[2px]">¥</span>
-                    <input type="text" inputMode="numeric" value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} onFocus={e=>e.target.select()} onChange={e=>{const v=e.target.value.replace(/,/g,''); if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});}} className="w-40 text-right bg-transparent font-black text-[36px] border-none focus:ring-0 caret-pink-500 tracking-tighter" />
+                    <input 
+                      type="text" 
+                      inputMode="numeric" 
+                      value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} 
+                      placeholder="0"
+                      onFocus={e=>e.target.select()} 
+                      onChange={e=>{
+                        const v=e.target.value.replace(/,/g,''); 
+                        if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});
+                      }} 
+                      className={`w-40 text-right bg-transparent font-black text-[36px] border-none focus:ring-0 caret-pink-500 tracking-tighter ${editReward.amount === '' ? 'text-gray-200' : 'text-pink-500'}`} 
+                    />
                   </div>
                 </div>
-                <button onClick={() => {
-                  const fCount = Number(editReward.f) || 0;
-                  const firstCount = Number(editReward.first) || 0;
-                  const mainCount = Number(editReward.main) || 0;
-                  if ((fCount + firstCount + mainCount) < 1) { alert('本数を入力してください'); return; }
-                  const dateStr = format(singleDate!, 'yyyy-MM-dd');
-                  supabase.from('shifts').update({ f_count: fCount, first_request_count: firstCount, main_request_count: mainCount, reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('実績を保存しました💰'); });
-                }} className="w-full bg-pink-500 text-white font-black py-5 rounded-[22px] text-xl shadow-lg active:scale-95 transition-all">実績を保存 💾</button>
+                
+                {/* 保存 & クリアボタンの横並びエリア */}
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setEditReward({ f: '', first: '', main: '', amount: '' })}
+                    className="flex-1 bg-gray-100 text-gray-400 font-black py-5 rounded-[22px] text-lg active:scale-95 transition-all shadow-sm"
+                  >
+                    クリア 🗑️
+                  </button>
+                  <button 
+                    onClick={() => {
+                      const fCount = Number(editReward.f) || 0;
+                      const firstCount = Number(editReward.first) || 0;
+                      const mainCount = Number(editReward.main) || 0;
+                      if ((fCount + firstCount + mainCount) < 1) { alert('本数を入力してください'); return; }
+                      const dateStr = format(singleDate!, 'yyyy-MM-dd');
+                      supabase.from('shifts').update({ f_count: fCount, first_request_count: firstCount, main_request_count: mainCount, reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('実績を保存しました💰'); });
+                    }} 
+                    className="flex-[2] bg-pink-500 text-white font-black py-5 rounded-[22px] text-xl shadow-lg active:scale-95 transition-all tracking-[0.1em]"
+                  >
+                    実績を保存 💾
+                  </button>
+                </div>
               </>
             ) : null }
           </section>
         )}
 
-        {/* 📢 お知らせセクション */}
         <section className="bg-white rounded-[28px] border border-gray-100 shadow-sm overflow-hidden mb-8">
           <div className="bg-gray-50 p-3 px-6 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 flex justify-between items-center">
             <span>News / Shop Info</span>
