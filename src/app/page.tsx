@@ -79,6 +79,19 @@ export default function Page() {
       }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
   }, [shifts, viewDate]);
 
+  // シフト申請用の初期値セット
+  useEffect(() => {
+    const newDetails = { ...requestDetails };
+    multiDates.forEach(d => {
+      const key = format(d, 'yyyy-MM-dd');
+      if (!newDetails[key]) {
+        const existing = (shifts || []).find(s => s.shift_date === key);
+        newDetails[key] = existing ? { s: existing.start_time, e: existing.end_time } : { s: '11:00', e: '23:00' };
+      }
+    });
+    setRequestDetails(newDetails);
+  }, [multiDates, shifts]);
+
   const handleDateSelect = (dates: any) => {
     if (isRequestMode) {
       const tomorrow = startOfToday();
@@ -98,6 +111,25 @@ export default function Page() {
     setEditReward({ f: v(shift?.f_count), first: v(shift?.first_request_count), main: v(shift?.main_request_count), amount: v(shift?.reward_amount) });
   }, [singleDate, shifts, isRequestMode]);
 
+  const handleBulkSubmit = async () => {
+    if (!castProfile) return;
+    const requests = multiDates.map(date => {
+      const key = format(date, 'yyyy-MM-dd');
+      return { 
+        login_id: castProfile.login_id, 
+        hp_display_name: castProfile.display_name || 'キャスト',
+        shift_date: key, 
+        start_time: requestDetails[key]?.s || '11:00', 
+        end_time: requestDetails[key]?.e || '23:00', 
+        status: 'requested', 
+        is_official: false
+      };
+    });
+    const { error } = await supabase.from('shifts').upsert(requests, { onConflict: 'login_id,shift_date' });
+    if (!error) { alert('申請を送信しました！🚀'); setMultiDates([]); fetchInitialData(); }
+    else { alert(`エラー: ${error.message}`); }
+  };
+
   if (loading) return ( <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center font-black italic text-5xl text-pink-300 animate-pulse">KARINTO...</div> );
 
   const targetDateStr = singleDate ? format(singleDate, 'yyyy-MM-dd') : '';
@@ -108,7 +140,7 @@ export default function Page() {
       
       {/* 1. ヘッダー (固定) */}
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.8.4</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.8.5</p>
         <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-tight">
           {castProfile?.display_name || 'キャスト'}
@@ -117,14 +149,14 @@ export default function Page() {
         <p className="text-[14px] font-black text-gray-500 mt-1 italic opacity-80">お疲れ様です🍵</p>
       </header>
 
-      {/* 2. 入力・申請切り替えタブ (固定) */}
+      {/* 2. タブ (固定) */}
       <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200 shadow-inner">
         <button onClick={() => { setIsRequestMode(false); setMultiDates([]); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
         <button onClick={() => { setIsRequestMode(true); setSingleDate(undefined); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
       </div>
 
       <main className="px-4 mt-3 space-y-2">
-        {/* 3. 月間実績セクション (固定) */}
+        {/* 3. 月間実績 (固定 - 実績入力時のみ) */}
         {!isRequestMode && (
           <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-5 border border-pink-200 relative overflow-hidden shadow-sm flex flex-col space-y-0.5">
             <div className="flex items-center justify-between">
@@ -160,107 +192,87 @@ export default function Page() {
           <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={handleDateSelect} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
         </section>
 
-        {/* 5. 日付詳細 (曜日・バッジ・時間を微修正) */}
+        {/* 5. 日付詳細 (実績入力モード) */}
         {!isRequestMode && (
           <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-5 flex flex-col space-y-1">
-            
             {dayOfficial ? (
               <>
-                {/* 1行目：【日付】【バッジ】【シフト時間】 */}
                 <div className="flex items-center justify-between px-1">
                   <h3 className="text-2xl font-black text-gray-800 tracking-tight leading-none flex items-baseline">
                     {singleDate ? format(singleDate, 'M/d') : ''}
-                    <span className="text-lg ml-1 opacity-70">
-                      ({singleDate ? format(singleDate, 'E', { locale: ja }) : ''})
-                    </span>
+                    <span className="text-lg ml-1 opacity-70">({singleDate ? format(singleDate, 'E', { locale: ja }) : ''})</span>
                   </h3>
                   <div className="flex items-center gap-1.5">
                     <span className="text-[12px] font-black text-blue-500 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 leading-none">確定シフト</span>
                     <span className="text-xl font-black text-pink-500 leading-none">{dayOfficial.start_time}〜{dayOfficial.end_time}</span>
                   </div>
                 </div>
-
-                {/* 2-3行目：本数入力 */}
                 <div className="flex flex-col space-y-0.5 pt-1">
                   <div className="grid grid-cols-3 gap-2 px-1">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">フリー</label>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">初指名</label>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">本指名</label>
+                    <label className="text-[10px] font-black text-gray-400 tracking-widest text-center">フリー</label>
+                    <label className="text-[10px] font-black text-gray-400 tracking-widest text-center">初指名</label>
+                    <label className="text-[10px] font-black text-gray-400 tracking-widest text-center">本指名</label>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     {(['f', 'first', 'main'] as const).map((key) => (
-                      <input 
-                        key={key}
-                        type="number" 
-                        inputMode="numeric" 
-                        value={editReward[key]} 
-                        placeholder="0"
-                        onFocus={e=>e.target.select()} 
-                        onChange={e => setEditReward({...editReward, [key]: e.target.value})} 
-                        className={`w-full text-center py-2 bg-white rounded-xl font-black text-2xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none transition-all ${editReward[key] === '' ? 'text-gray-200' : 'text-pink-500'}`} 
-                      />
+                      <input key={key} type="number" inputMode="numeric" value={editReward[key]} placeholder="0" onFocus={e=>e.target.select()} onChange={e => setEditReward({...editReward, [key]: e.target.value})} className={`w-full text-center py-2 bg-white rounded-xl font-black text-2xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none transition-all ${editReward[key] === '' ? 'text-gray-200' : 'text-pink-500'}`} />
                     ))}
                   </div>
                 </div>
-                
-                {/* 4行目：報酬合計 */}
                 <div className="bg-pink-50/40 p-3 rounded-[22px] border border-pink-100 flex items-center justify-between shadow-inner">
-                  <label className="text-[12px] font-black text-gray-900 uppercase">報酬合計</label>
+                  <label className="text-[12px] font-black text-gray-900">報酬合計</label>
                   <div className="flex items-center text-pink-500">
                     <span className="text-xl font-black mr-1 opacity-40 translate-y-[1px]">¥</span>
-                    <input 
-                      type="text" 
-                      inputMode="numeric" 
-                      value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} 
-                      placeholder="0"
-                      onFocus={e=>e.target.select()} 
-                      onChange={e=>{
-                        const v=e.target.value.replace(/,/g,''); 
-                        if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});
-                      }} 
-                      className={`w-36 text-right bg-transparent font-black text-[28px] border-none focus:ring-0 caret-pink-500 tracking-tighter ${editReward.amount === '' ? 'text-gray-200' : 'text-pink-500'}`} 
-                    />
+                    <input type="text" inputMode="numeric" value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} placeholder="0" onFocus={e=>e.target.select()} onChange={e=>{const v=e.target.value.replace(/,/g,''); if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});}} className={`w-36 text-right bg-transparent font-black text-[28px] border-none focus:ring-0 caret-pink-500 tracking-tighter ${editReward.amount === '' ? 'text-gray-200' : 'text-pink-500'}`} />
                   </div>
                 </div>
-                
-                {/* 5行目：保存・クリア */}
                 <div className="flex gap-2 pt-0.5">
-                  <button 
-                    onClick={() => {
-                      const dateStr = format(singleDate!, 'yyyy-MM-dd');
-                      supabase.from('shifts').update({ 
-                        f_count: Number(editReward.f) || 0, 
-                        first_request_count: Number(editReward.first) || 0, 
-                        main_request_count: Number(editReward.main) || 0, 
-                        reward_amount: Number(editReward.amount) || 0 
-                      }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { 
-                        fetchInitialData(); 
-                        alert('実績を保存しました💰'); 
-                      });
-                    }} 
-                    className="flex-[2.5] bg-pink-500 text-white font-black py-4 rounded-[20px] text-lg shadow-lg active:scale-95 transition-all"
-                  >
-                    実績を保存 💾
-                  </button>
-                  <button 
-                    onClick={() => setEditReward({ f: '', first: '', main: '', amount: '' })}
-                    className="flex-1 bg-gray-100 text-gray-400 font-black py-4 rounded-[18px] text-[13px] active:scale-95 transition-all border border-gray-200"
-                  >
-                    クリア 🗑️
-                  </button>
+                  <button onClick={() => {
+                    const dateStr = format(singleDate!, 'yyyy-MM-dd');
+                    supabase.from('shifts').update({ f_count: Number(editReward.f) || 0, first_request_count: Number(editReward.first) || 0, main_request_count: Number(editReward.main) || 0, reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('実績を保存しました💰'); });
+                  }} className="flex-[2.5] bg-pink-500 text-white font-black py-4 rounded-[20px] text-lg shadow-lg active:scale-95 transition-all">実績を保存 💾</button>
+                  <button onClick={() => setEditReward({ f: '', first: '', main: '', amount: '' })} className="flex-1 bg-gray-100 text-gray-400 font-black py-4 rounded-[18px] text-[13px] active:scale-95 transition-all border border-gray-200">クリア 🗑️</button>
                 </div>
               </>
-            ) : (
-              <div className="py-8 text-center text-gray-300 font-bold italic text-xs">確定シフトなし⛄️</div>
+            ) : ( <div className="py-8 text-center text-gray-300 font-bold italic text-xs">確定シフトなし⛄️</div> )}
+          </section>
+        )}
+
+        {/* 5. 日付詳細 (シフト申請モード - 復活！) */}
+        {isRequestMode && (
+          <section className="bg-white rounded-[32px] border border-purple-100 p-5 shadow-xl space-y-3">
+             <h3 className="font-black text-purple-600 text-[13px] uppercase tracking-widest flex items-center gap-2">
+              <span className="w-1.5 h-4 bg-purple-500 rounded-full"></span>
+              申請リスト ({multiDates.length}件選択中)
+            </h3>
+            <div className="max-h-[300px] overflow-y-auto space-y-4 pr-1">
+              {multiDates.length === 0 ? (
+                <p className="text-center py-8 text-gray-300 text-xs font-bold italic">カレンダーから日付を選んでください📅</p>
+              ) : (
+                multiDates.map(d => {
+                  const key = format(d, 'yyyy-MM-dd');
+                  return (
+                    <div key={key} className="flex items-center gap-1 pb-2 border-b border-gray-50 last:border-0">
+                      <span className="text-[14px] font-black text-gray-800 w-16">{format(d, 'M/d(E)', {locale: ja})}</span>
+                      <div className="flex-1 flex items-center gap-1">
+                        <select value={requestDetails[key]?.s} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} className="flex-1 bg-gray-50 py-2 rounded-lg text-center font-black text-sm border-none focus:ring-1 focus:ring-purple-200">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                        <span className="text-gray-300">~</span>
+                        <select value={requestDetails[key]?.e} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} className="flex-1 bg-gray-50 py-2 rounded-lg text-center font-black text-sm border-none focus:ring-1 focus:ring-purple-200">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            {multiDates.length > 0 && (
+              <button onClick={() => handleBulkSubmit()} className="w-full bg-purple-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg active:scale-95 transition-all">申請を確定する 🚀</button>
             )}
           </section>
         )}
 
         {/* 6. NEWS (固定) */}
         <section className="bg-white rounded-[28px] border border-gray-100 shadow-sm overflow-hidden mb-8">
-          <div className="bg-gray-50 p-2.5 px-6 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
-            News
-          </div>
+          <div className="bg-gray-50 p-2.5 px-6 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">News</div>
           <div className="divide-y divide-gray-50">
             {newsList.map((n) => (
               <div key={n.id} className="p-4 px-6 flex gap-4 items-start">
