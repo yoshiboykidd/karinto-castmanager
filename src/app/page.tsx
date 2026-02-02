@@ -140,13 +140,10 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
       
-      {/* 🏔️ ヘッダー (指定の並び順 v2.8.0) */}
+      {/* 🏔️ ヘッダー (指示通りの並び順) */}
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.8.0</p>
-        <p className="text-[13px] font-bold text-gray-400 mb-1 flex items-center gap-1.5">
-          <span className="w-2 h-2 bg-green-400 rounded-full shadow-[0_0_8px_rgba(74,222,128,0.5)]"></span>
-          {shopInfo?.shop_name || 'Karinto'}
-        </p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.8.1</p>
+        <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-tight">
           {castProfile?.display_name || 'キャスト'}
           <span className="text-[22px] text-pink-400 font-bold italic translate-y-[1px]">さん</span>
@@ -162,119 +159,135 @@ export default function Page() {
 
       <main className="px-4 mt-3 space-y-2">
         {!isRequestMode && (
-          <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-4 border border-pink-200 relative overflow-hidden shadow-sm">
+          <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-5 border border-pink-200 relative overflow-hidden shadow-sm">
             <span className="absolute -right-4 -top-8 text-[120px] font-black text-pink-200/20 italic leading-none pointer-events-none">{format(viewDate, 'M')}</span>
             <div className="relative z-10">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-[12px] font-black text-pink-500 tracking-tighter bg-white/60 px-3 py-0.5 rounded-full border border-pink-100">実績サマリー</h2>
-                <div className="flex gap-1">
-                  <div className="bg-white/90 px-2 py-0.5 rounded-lg border border-pink-50 shadow-sm flex items-baseline gap-0.5">
-                    <span className="text-[8px] font-black text-gray-400">出勤</span>
-                    <span className="text-[16px] font-black text-pink-500">{monthlyTotals.count}</span>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-[13px] font-black text-pink-500 tracking-tighter bg-white/60 px-3 py-1 rounded-full border border-pink-100">{format(viewDate, 'M月')}の実績</h2>
+                <div className="flex gap-1.5">
+                  <div className="bg-white/90 px-2.5 py-1 rounded-xl flex items-baseline gap-0.5 border border-pink-50 shadow-sm">
+                    <span className="text-[9px] font-black text-gray-400 mr-0.5">出勤</span>
+                    <span className="text-[18px] font-black text-pink-500">{monthlyTotals.count}</span>
+                    <span className="text-[9px] font-black text-gray-400">日</span>
                   </div>
-                  <div className="bg-white/90 px-2 py-0.5 rounded-lg border border-pink-50 shadow-sm flex items-baseline gap-0.5">
-                    <span className="text-[8px] font-black text-gray-400">稼働</span>
-                    <span className="text-[16px] font-black text-pink-500">{Math.round(monthlyTotals.hours * 10) / 10}h</span>
+                  <div className="bg-white/90 px-2.5 py-1 rounded-xl flex items-baseline gap-0.5 border border-pink-50 shadow-sm">
+                    <span className="text-[9px] font-black text-gray-400 mr-0.5">稼働</span>
+                    <span className="text-[18px] font-black text-pink-500">{Math.round(monthlyTotals.hours * 10) / 10}</span>
+                    <span className="text-[9px] font-black text-gray-400">h</span>
                   </div>
                 </div>
               </div>
-              <p className="text-[48px] font-black text-pink-600 text-center leading-none tracking-tighter mb-3">
-                <span className="text-xl mr-0.5 opacity-40 translate-y-[-2px] inline-block">¥</span>{monthlyTotals.amount.toLocaleString()}
+              <p className="text-[52px] font-black text-pink-600 text-center leading-none tracking-tighter mb-4">
+                <span className="text-2xl mr-1 opacity-40 translate-y-[-4px] inline-block">¥</span>{monthlyTotals.amount.toLocaleString()}
               </p>
-              <div className="grid grid-cols-3 gap-0.5 bg-white/40 rounded-xl border border-white/60 text-center py-1.5">
-                <div><p className="text-[9px] text-pink-400 font-black">F</p><p className="text-lg font-black text-pink-600">{monthlyTotals.f || 0}</p></div>
-                <div className="border-x border-pink-100/50"><p className="text-[9px] text-pink-400 font-black">初</p><p className="text-lg font-black text-pink-600">{monthlyTotals.first || 0}</p></div>
-                <div><p className="text-[9px] text-pink-400 font-black">本</p><p className="text-lg font-black text-pink-600">{monthlyTotals.main || 0}</p></div>
+              <div className="grid grid-cols-3 gap-0.5 bg-white/40 rounded-2xl border border-white/60 text-center py-2">
+                <div><p className="text-[10px] text-pink-400 font-black">フリー</p><p className="text-xl font-black text-pink-600">{monthlyTotals.f || 0}</p></div>
+                <div className="border-x border-pink-100/50"><p className="text-[10px] text-pink-400 font-black">初指名</p><p className="text-xl font-black text-pink-600">{monthlyTotals.first || 0}</p></div>
+                <div><p className="text-[10px] text-pink-400 font-black">本指名</p><p className="text-xl font-black text-pink-600">{monthlyTotals.main || 0}</p></div>
               </div>
             </div>
           </section>
         )}
 
-        <section className="bg-white p-1 rounded-[32px] border border-gray-100 shadow-sm text-center">
+        <section className="bg-white p-2 rounded-[32px] border border-gray-100 shadow-sm text-center">
           <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={handleDateSelect} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
         </section>
 
         {!isRequestMode && (
-          /* 💖 実績入力 (最新UX: [保存]左 / [クリア]右 / 超詰め) */
-          <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-4 space-y-2">
-            <div className="flex justify-between items-center px-1">
-              <h3 className="text-xl font-black text-gray-800">{singleDate ? format(singleDate, 'M/d (E)', { locale: ja }) : ''}</h3>
+          /* 💖 実績入力 (文言を復旧、ボタン配置のみ維持) */
+          <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-5 space-y-3">
+            <div className="flex justify-between items-start mb-1">
+              <h3 className="text-2xl font-black text-gray-800 tracking-tight">{singleDate ? format(singleDate, 'M/d (E)', { locale: ja }) : ''}</h3>
               {dayOfficial && (
-                <div className="flex items-baseline gap-1 bg-pink-50 px-2 py-0.5 rounded-lg border border-pink-100">
-                  <span className="text-[14px] font-black text-pink-500">{dayOfficial.start_time}〜{dayOfficial.end_time}</span>
+                <div className="text-right">
+                  <span className="text-[10px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 mb-0.5 block">確定シフト</span>
+                  <span className="text-lg font-black text-pink-500 leading-none">{dayOfficial.start_time}〜{dayOfficial.end_time}</span>
                 </div>
               )}
             </div>
 
             {dayOfficial ? (
               <>
-                <div className="grid grid-cols-3 gap-1">
+                <div className="grid grid-cols-3 gap-2">
                   {(['f', 'first', 'main'] as const).map((key) => (
-                    <div key={key} className="space-y-0.5 text-center bg-pink-50/20 rounded-xl py-1">
-                      <label className="text-[9px] font-black text-gray-400 uppercase">{key==='f'?'フリー':key==='first'?'初指名':'本指名'}</label>
-                      <input type="number" inputMode="numeric" value={editReward[key]} placeholder="0" onFocus={e=>e.target.select()} onChange={e => setEditReward({...editReward, [key]: e.target.value})} className={`w-full text-center py-2 bg-transparent font-black text-2xl focus:outline-none caret-pink-500 transition-all ${editReward[key] === '' ? 'text-gray-200' : 'text-pink-500'}`} />
+                    <div key={key} className="space-y-1 text-center">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        {key==='f'?'フリー':key==='first'?'初指名':'本指名'}
+                      </label>
+                      <input 
+                        type="number" 
+                        inputMode="numeric" 
+                        value={editReward[key]} 
+                        placeholder="0"
+                        onFocus={e=>e.target.select()} 
+                        onChange={e => setEditReward({...editReward, [key]: e.target.value})} 
+                        className={`w-full text-center py-3 bg-white rounded-xl font-black text-2xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none transition-all ${editReward[key] === '' ? 'text-gray-200' : 'text-pink-500'}`} 
+                      />
                     </div>
                   ))}
                 </div>
                 
-                <div className="bg-pink-50/40 px-4 py-2 rounded-2xl border border-pink-100 flex items-center justify-between">
-                  <label className="text-[11px] font-black text-gray-900 uppercase">報酬合計</label>
+                <div className="bg-pink-50/40 p-3.5 rounded-[22px] border border-pink-100 flex items-center justify-between shadow-inner">
+                  <label className="text-[12px] font-black text-gray-900 uppercase">報酬合計</label>
                   <div className="flex items-center text-pink-500">
-                    <span className="text-lg font-black mr-0.5 opacity-40">¥</span>
-                    <input type="text" inputMode="numeric" value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} placeholder="0" onFocus={e=>e.target.select()} onChange={e=>{const v=e.target.value.replace(/,/g,''); if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});}} className={`w-32 text-right bg-transparent font-black text-2xl border-none focus:ring-0 caret-pink-500 tracking-tighter ${editReward.amount === '' ? 'text-gray-200' : 'text-pink-500'}`} />
+                    <span className="text-xl font-black mr-1 opacity-40 translate-y-[1px]">¥</span>
+                    <input 
+                      type="text" 
+                      inputMode="numeric" 
+                      value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} 
+                      placeholder="0"
+                      onFocus={e=>e.target.select()} 
+                      onChange={e=>{
+                        const v=e.target.value.replace(/,/g,''); 
+                        if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});
+                      }} 
+                      className={`w-36 text-right bg-transparent font-black text-[28px] border-none focus:ring-0 caret-pink-500 tracking-tighter ${editReward.amount === '' ? 'text-gray-200' : 'text-pink-500'}`} 
+                    />
                   </div>
                 </div>
                 
-                <div className="flex gap-1.5 pt-1">
-                  <button onClick={() => {
-                    const dateStr = format(singleDate!, 'yyyy-MM-dd');
-                    supabase.from('shifts').update({ 
-                      f_count: Number(editReward.f) || 0, 
-                      first_request_count: Number(editReward.first) || 0, 
-                      main_request_count: Number(editReward.main) || 0, 
-                      reward_amount: Number(editReward.amount) || 0 
-                    }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('実績を保存しました💰'); });
-                  }} className="flex-[2.5] bg-pink-500 text-white font-black py-4 rounded-2xl text-[17px] shadow-lg active:scale-95 transition-all tracking-tighter">実績を保存 💾</button>
-                  <button onClick={() => setEditReward({ f: '', first: '', main: '', amount: '' })} className="flex-1 bg-gray-100 text-gray-400 font-black py-4 rounded-2xl text-[12px] active:scale-95 transition-all border border-gray-200">クリア 🗑️</button>
+                {/* ボタン順序： [保存]左 / [クリア]右 */}
+                <div className="flex gap-2 pt-1">
+                  <button 
+                    onClick={() => {
+                      const dateStr = format(singleDate!, 'yyyy-MM-dd');
+                      supabase.from('shifts').update({ 
+                        f_count: Number(editReward.f) || 0, 
+                        first_request_count: Number(editReward.first) || 0, 
+                        main_request_count: Number(editReward.main) || 0, 
+                        reward_amount: Number(editReward.amount) || 0 
+                      }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { 
+                        fetchInitialData(); 
+                        alert('実績を保存しました💰'); 
+                      });
+                    }} 
+                    className="flex-[2.5] bg-pink-500 text-white font-black py-4 rounded-[20px] text-lg shadow-lg active:scale-95 transition-all tracking-[0.05em]"
+                  >
+                    実績を保存 💾
+                  </button>
+                  <button 
+                    onClick={() => setEditReward({ f: '', first: '', main: '', amount: '' })}
+                    className="flex-1 bg-gray-100 text-gray-400 font-black py-4 rounded-[18px] text-[13px] active:scale-95 transition-all shadow-sm border border-gray-200"
+                  >
+                    クリア 🗑️
+                  </button>
                 </div>
               </>
-            ) : ( <div className="py-8 text-center text-gray-300 font-bold italic text-xs">確定シフトなし⛄️</div> )}
-          </section>
-        )}
-
-        {isRequestMode && (
-          <section className="bg-white rounded-[32px] border border-gray-100 p-4 shadow-xl space-y-3">
-             <h3 className="font-black text-purple-600 text-[13px] uppercase tracking-widest flex items-center gap-2">
-              <span className="w-1.5 h-4 bg-purple-500 rounded-full"></span>
-              申請リスト ({multiDates.length})
-            </h3>
-            <div className="max-h-[300px] overflow-y-auto space-y-4 pr-1 custom-scrollbar">
-              {multiDates.map(d => {
-                const key = format(d, 'yyyy-MM-dd');
-                const isOff = requestDetails[key]?.s === 'OFF';
-                return (
-                  <div key={key} className="flex items-center gap-1 pb-2 border-b border-gray-50 last:border-0">
-                    <span className="text-[14px] font-black text-gray-800 w-16">{format(d, 'M/d(E)', {locale: ja})}</span>
-                    <div className="flex-1 flex items-center gap-1">
-                      <select disabled={isOff} value={requestDetails[key]?.s} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} className="flex-1 bg-gray-50 py-2 rounded-lg text-center font-black text-sm border-none focus:ring-1 focus:ring-purple-200">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
-                      <span className="text-gray-300">~</span>
-                      <select disabled={isOff} value={requestDetails[key]?.e} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} className="flex-1 bg-gray-50 py-2 rounded-lg text-center font-black text-sm border-none focus:ring-1 focus:ring-purple-200">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <button onClick={() => handleBulkSubmit()} className="w-full bg-purple-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg active:scale-95 transition-all">申請を確定する 🚀</button>
+            ) : (
+              <div className="py-8 text-center text-gray-300 font-bold italic text-xs">確定シフトなし⛄️</div>
+            )}
           </section>
         )}
 
         <section className="bg-white rounded-[28px] border border-gray-100 shadow-sm overflow-hidden mb-8">
-          <div className="bg-gray-50 p-2 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">News</div>
+          <div className="bg-gray-50 p-2.5 px-6 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 flex justify-between items-center">
+            <span>News</span>
+          </div>
           <div className="divide-y divide-gray-50">
             {newsList.map((n) => (
-              <div key={n.id} className="p-3 px-6 flex gap-3 items-start">
-                <span className="text-[9px] text-pink-400 font-black bg-pink-50 px-1.5 py-0.5 rounded shrink-0">{format(parseISO(n.created_at), 'MM/dd')}</span>
-                <p className="text-[12px] font-bold text-gray-700 leading-tight">{n.content}</p>
+              <div key={n.id} className="p-4 px-6 flex gap-4 items-start">
+                <span className="text-[10px] text-pink-400 font-black shrink-0 bg-pink-50 px-2 py-1 rounded leading-none mt-0.5">{format(parseISO(n.created_at), 'MM/dd')}</span>
+                <p className="text-[13px] font-bold text-gray-700 leading-relaxed">{n.content}</p>
               </div>
             ))}
           </div>
