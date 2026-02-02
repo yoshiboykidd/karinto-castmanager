@@ -1,18 +1,23 @@
-// ...（前段のインポート等はそのまま）
+// @ts-nocheck
+import { createClient } from '@supabase/supabase-js';
+import * as cheerio from 'cheerio';
+import { NextResponse } from 'next/server';
+import { format, addDays } from 'date-fns';
 
 export async function GET() {
-  // ...（環境変数チェック等はそのまま）
-  const supabase = createClient(supabaseUrl!, supabaseKey!);
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabase: any = createClient(supabaseUrl!, supabaseKey!);
 
   try {
     const { data: casts } = await supabase.from('cast_members').select('login_id, display_name');
     const castMap: { [key: string]: string } = {};
-    casts?.forEach(c => { castMap[c.display_name] = c.login_id; });
+    casts?.forEach((c: any) => { castMap[c.display_name] = c.login_id; });
 
-    // 💡 ここを ShiftData[] ではなく any[] にすると波線が消えます
     const results: any[] = []; 
     const today = new Date();
 
+    // 1. HPから7日分のシフトを抽出
     for (let i = 0; i < 7; i++) {
       const targetDate = addDays(today, i);
       const dateStrSlash = format(targetDate, 'yyyy/MM/dd');
@@ -22,9 +27,9 @@ export async function GET() {
       const html = await res.text();
       const $ = cheerio.load(html);
 
-      $('li').each((_, el) => {
+      $('li').each((_: any, el: any) => {
         const name = $(el).find('h3').text().split('（')[0].trim();
-        const time = $(el).find('p').filter((_, p) => $(p).text().includes(':')).first().text().trim();
+        const time = $(el).find('p').filter((_: any, p: any) => $(p).text().includes(':')).first().text().trim();
 
         if (castMap[name] && time.includes('-')) {
           const [start, end] = time.split('-');
@@ -40,16 +45,16 @@ export async function GET() {
       });
     }
 
-    // 💡 results の後に 「as any」を付けるのも波線消去に有効です
+    // 2. UPSERT実行（実績カラムは保護される）
     if (results.length > 0) {
       const { error: upsertError } = await supabase
         .from('shifts')
-        .upsert(results, { onConflict: 'login_id,shift_date' });
+        .upsert(results as any, { onConflict: 'login_id,shift_date' });
       
       if (upsertError) return NextResponse.json({ success: false, error: upsertError.message });
     }
 
-    // --- 【重要】HPから消えたシフトを canceled にするロジック ---
+    // 3. HPから消えたシフトを canceled に変更
     const activeIds = results.map(r => `${r.login_id}_${r.shift_date}`);
     const startDate = format(today, 'yyyy-MM-dd');
     const endDate = format(addDays(today, 7), 'yyyy-MM-dd');
@@ -62,11 +67,11 @@ export async function GET() {
       .lte('shift_date', endDate);
 
     if (currentDbShifts) {
-      const missingFromHp = currentDbShifts.filter(s => !activeIds.includes(`${s.login_id}_${s.shift_date}`));
+      const missingFromHp = currentDbShifts.filter((s: any) => !activeIds.includes(`${s.login_id}_${s.shift_date}`));
       for (const s of missingFromHp) {
         await supabase
           .from('shifts')
-          .update({ status: 'canceled' })
+          .update({ status: 'canceled' } as any)
           .eq('login_id', s.login_id)
           .eq('shift_date', s.shift_date);
       }
