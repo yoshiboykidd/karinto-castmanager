@@ -139,7 +139,7 @@ export default function Page() {
       
       {/* 1. ヘッダー (固定) */}
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.8.6</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.8.7</p>
         <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-tight">
           {castProfile?.display_name || 'キャスト'}
@@ -191,7 +191,7 @@ export default function Page() {
           <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={handleDateSelect} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
         </section>
 
-        {/* 5. 日付詳細 (実績入力モード) */}
+        {/* 5. 日付詳細 (実績入力モード - 固定) */}
         {!isRequestMode && (
           <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-5 flex flex-col space-y-1">
             {dayOfficial ? (
@@ -237,7 +237,7 @@ export default function Page() {
           </section>
         )}
 
-        {/* 5. 日付詳細 (シフト申請モード - 修正・お休みボタン復活版) */}
+        {/* 5. 日付詳細 (シフト申請モード - バッジ類を拡大) */}
         {isRequestMode && (
           <section className="bg-white rounded-[32px] border border-purple-100 p-5 shadow-xl space-y-3">
              <h3 className="font-black text-purple-600 text-[13px] uppercase tracking-widest flex items-center gap-2">
@@ -254,21 +254,21 @@ export default function Page() {
                   const isOff = requestDetails[key]?.s === 'OFF';
                   
                   return (
-                    <div key={key} className="pb-3 border-b border-gray-50 last:border-0 flex flex-col space-y-1.5">
-                      {/* 上段：日付とステータスバッジ */}
+                    <div key={key} className="pb-3 border-b border-gray-50 last:border-0 flex flex-col space-y-2">
+                      {/* 上段：日付とステータスバッジ (拡大) */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="text-[15px] font-black text-gray-800">{format(d, 'M/d')} <span className="text-xs opacity-60">({format(d, 'E', {locale: ja})})</span></span>
                           {officialShift ? (
-                            <span className="bg-orange-50 text-orange-500 text-[9px] font-black px-1.5 py-0.5 rounded border border-orange-100">修正申請</span>
+                            <span className="bg-orange-50 text-orange-500 text-[11px] font-black px-2 py-0.5 rounded-lg border border-orange-100 leading-none">修正申請</span>
                           ) : (
-                            <span className="bg-green-50 text-green-500 text-[9px] font-black px-1.5 py-0.5 rounded border border-green-100">新規申請</span>
+                            <span className="bg-green-50 text-green-500 text-[11px] font-black px-2 py-0.5 rounded-lg border border-green-100 leading-none">新規申請</span>
                           )}
                         </div>
                         {officialShift && (
-                          <div className="flex items-center gap-1 opacity-60 scale-90">
-                            <span className="text-[9px] font-black text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">確定</span>
-                            <span className="text-[11px] font-black text-gray-500">{officialShift.start_time}〜{officialShift.end_time}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-black text-blue-500 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 leading-none">確定</span>
+                            <span className="text-[13px] font-black text-gray-500 leading-none">{officialShift.start_time}〜{officialShift.end_time}</span>
                           </div>
                         )}
                       </div>
@@ -294,7 +294,6 @@ export default function Page() {
                         </select>
                         <button 
                           onClick={() => {
-                            const current = requestDetails[key];
                             if (isOff) {
                               setRequestDetails({...requestDetails, [key]: {s: '11:00', e: '23:00'}});
                             } else {
