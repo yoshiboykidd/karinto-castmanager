@@ -13,6 +13,7 @@ for (let h = 11; h <= 23; h++) {
   if (h !== 23) TIME_OPTIONS.push(`${h}:30`);
 }
 
+// ⚠️ Discord Webhook URL
 const DISCORD_WEBHOOK_URL = "ここにURLを貼ってください";
 
 export default function Page() {
@@ -131,7 +132,7 @@ export default function Page() {
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50 relative">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.9</p>
+            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.9.1</p>
             <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
           </div>
           {lastSync && (
@@ -152,6 +153,7 @@ export default function Page() {
       </div>
 
       <main className="px-4 mt-3 space-y-2">
+        {/* 3. 月間実績 */}
         {!isRequestMode && (
           <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-5 border border-pink-200 relative overflow-hidden shadow-sm flex flex-col space-y-0.5">
             <div className="flex items-center justify-between">
@@ -174,10 +176,12 @@ export default function Page() {
           </section>
         )}
 
+        {/* 4. カレンダー */}
         <section className="bg-white p-2 rounded-[32px] border border-gray-100 shadow-sm text-center">
           <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={handleDateSelect} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
         </section>
 
+        {/* 5. 日付詳細 (実績入力モード) */}
         {!isRequestMode && (
           <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-5 flex flex-col space-y-1">
             <div className="flex items-center justify-between px-1">
@@ -198,8 +202,10 @@ export default function Page() {
             </div>
             {dayOfficial ? (
               <>
-                <div className="flex flex-col space-y-0.5 pt-1 text-center font-black text-gray-400 text-[11px] uppercase tracking-widest">
-                  <div className="grid grid-cols-3 gap-2 px-1"><span>フリー</span><span>初指名</span><span>本指名</span></div>
+                <div className="flex flex-col space-y-0.5 pt-1">
+                  <div className="grid grid-cols-3 gap-2 px-1 text-center font-black text-gray-400 text-[11px] uppercase tracking-widest">
+                    <span>フリー</span><span>初指名</span><span>本指名</span>
+                  </div>
                   <div className="grid grid-cols-3 gap-2">
                     {(['f', 'first', 'main'] as const).map((key) => (
                       <input key={key} type="number" inputMode="numeric" value={editReward[key]} placeholder="0" onFocus={e=>e.target.select()} onChange={e => setEditReward({...editReward, [key]: e.target.value})} className={`w-full text-center py-2 bg-white rounded-xl font-black text-3xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none transition-all ${editReward[key] === '' ? 'text-gray-200' : 'text-pink-500'}`} />
@@ -215,16 +221,17 @@ export default function Page() {
                   supabase.from('shifts').update({ f_count: Number(editReward.f) || 0, first_request_count: Number(editReward.first) || 0, main_request_count: Number(editReward.main) || 0, reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('実績を保存しました💰'); });
                 }} className="w-full bg-pink-500 text-white font-black py-4 rounded-[20px] text-lg shadow-lg active:scale-95 transition-all mt-1">実績を保存 💾</button>
               </>
-            ) : ( <div className="py-8 text-center text-gray-300 font-bold italic text-xs">{dayRequested ? "確定をお待ちください⛄️" : "確定シフトなし⛄️"}</div> )}
+            ) : (
+              <div className="py-8 text-center text-gray-300 font-bold italic text-xs">{dayRequested ? "確定をお待ちください⛄️" : "確定シフトなし⛄️"}</div>
+            )}
           </section>
         )}
 
-        {/* 5. 日付詳細 (シフト申請モード - 自然な伸びに対応) */}
+        {/* 5. 日付詳細 (シフト申請モード - 伸びるリスト & OFF表示修正済) */}
         {isRequestMode && (
           <section className="bg-white rounded-[32px] border border-purple-100 p-5 shadow-xl space-y-3">
              <h3 className="font-black text-purple-600 text-[14px] uppercase tracking-widest flex items-center gap-2"><span className="w-1.5 h-4 bg-purple-500 rounded-full"></span>申請リスト ({multiDates.length}件)</h3>
             
-            {/* 💡 スクロール枠を撤廃し、自然に伸びるように修正 */}
             <div className="flex flex-col">
               {multiDates.length === 0 ? ( <p className="text-center py-8 text-gray-300 text-xs font-bold italic">カレンダーから日付を選んでください📅</p> ) : (
                 multiDates.map(d => {
@@ -239,10 +246,29 @@ export default function Page() {
                       </div>
                       <div className="flex items-center gap-2">
                         {officialShift ? ( <span className="bg-orange-50 text-orange-500 text-[12px] font-black px-2.5 py-2 rounded-xl border border-orange-100 leading-none shrink-0">変更</span> ) : ( <span className="bg-green-50 text-green-500 text-[12px] font-black px-2.5 py-2 rounded-xl border border-green-100 leading-none shrink-0">新規</span> )}
-                        <select disabled={isOff} value={requestDetails[key]?.s || '11:00'} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none flex items-center justify-center" style={{ textAlignLast: 'center' }}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
-                        <span className="text-gray-300 font-black text-lg">~</span>
-                        <select disabled={isOff} value={requestDetails[key]?.e || '23:00'} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none flex items-center justify-center" style={{ textAlignLast: 'center' }}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
-                        <button onClick={() => { if (isOff) { setRequestDetails({...requestDetails, [key]: {s: '11:00', e: '23:00'}}); } else { setRequestDetails({...requestDetails, [key]: {s: 'OFF', e: 'OFF'}}); } }} className={`flex-1 py-2.5 rounded-lg font-black text-[12px] transition-all border ${isOff ? 'bg-purple-500 text-white border-purple-500 shadow-md' : 'bg-white text-gray-400 border-gray-200'}`}>お休み</button>
+                        
+                        {/* 💡 お休みモードなら「OFF」テキストを表示 */}
+                        {isOff ? (
+                          <div className="flex-1 bg-gray-50 py-2.5 rounded-lg text-center font-black text-gray-400 tracking-widest text-sm border border-dashed border-gray-200">
+                            OFF (お休み)
+                          </div>
+                        ) : (
+                          <>
+                            <select value={requestDetails[key]?.s || '11:00'} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none flex items-center justify-center" style={{ textAlignLast: 'center' }}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                            <span className="text-gray-300 font-black text-lg">~</span>
+                            <select value={requestDetails[key]?.e || '23:00'} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none flex items-center justify-center" style={{ textAlignLast: 'center' }}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                          </>
+                        )}
+                        
+                        <button 
+                          onClick={() => {
+                            if (isOff) { setRequestDetails({...requestDetails, [key]: {s: '11:00', e: '23:00'}}); } 
+                            else { setRequestDetails({...requestDetails, [key]: {s: 'OFF', e: 'OFF'}}); }
+                          }} 
+                          className={`px-4 py-2.5 rounded-lg font-black text-[12px] transition-all border shrink-0 ${isOff ? 'bg-purple-500 text-white border-purple-500 shadow-md' : 'bg-white text-gray-400 border-gray-200'}`}
+                        >
+                          {isOff ? '出勤にする' : 'お休み'}
+                        </button>
                       </div>
                     </div>
                   );
@@ -253,17 +279,28 @@ export default function Page() {
           </section>
         )}
 
+        {/* 6. NEWS */}
         <section className="bg-white rounded-[28px] border border-gray-100 shadow-sm overflow-hidden mb-8">
           <div className="bg-gray-50 p-2.5 px-6 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">News</div>
           <div className="divide-y divide-gray-50">{newsList.map((n) => ( <div key={n.id} className="p-4 px-6 flex gap-4 items-start"><span className="text-[10px] text-pink-400 font-black shrink-0 bg-pink-50 px-2 py-1 rounded leading-none mt-0.5">{format(parseISO(n.created_at), 'MM/dd')}</span><p className="text-[13px] font-bold text-gray-700 leading-relaxed">{n.content}</p></div> ))}</div>
         </section>
       </main>
 
+      {/* フッター (現在のパス判定を usePathname で修正済) */}
       <footer className="fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-xl border-t border-gray-100 pb-8 pt-4">
         <nav className="flex justify-around items-center max-md mx-auto px-6">
-          <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1.5"><span className={`text-2xl ${pathname === '/' ? 'opacity-100' : 'opacity-30'}`}>🏠</span><span className={`text-[9px] font-black uppercase ${pathname === '/' ? 'text-pink-500' : 'text-gray-300'}`}>ホーム</span></button>
-          <button onClick={() => router.push('/salary')} className="flex flex-col items-center gap-1.5 text-gray-300"><span className="text-2xl opacity-30">💰</span><span className="text-[9px] font-black uppercase">給与明細</span></button>
-          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center gap-1.5 text-gray-300"><span className="text-2xl opacity-30">🚪</span><span className="text-[9px] font-black uppercase">ログアウト</span></button>
+          <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1.5">
+            <span className={`text-2xl ${pathname === '/' ? 'opacity-100' : 'opacity-30'}`}>🏠</span>
+            <span className={`text-[9px] font-black uppercase ${pathname === '/' ? 'text-pink-500' : 'text-gray-300'}`}>ホーム</span>
+          </button>
+          <button onClick={() => router.push('/salary')} className="flex flex-col items-center gap-1.5">
+            <span className={`text-2xl ${pathname === '/salary' ? 'opacity-100' : 'opacity-30'}`}>💰</span>
+            <span className={`text-[9px] font-black uppercase ${pathname === '/salary' ? 'text-pink-500' : 'text-gray-300'}`}>給与明細</span>
+          </button>
+          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center gap-1.5 text-gray-300">
+            <span className="text-2xl opacity-30">🚪</span>
+            <span className="text-[9px] font-black uppercase">ログアウト</span>
+          </button>
         </nav>
       </footer>
     </div>
