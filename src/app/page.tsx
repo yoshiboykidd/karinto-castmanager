@@ -139,7 +139,7 @@ export default function Page() {
       
       {/* 1. ヘッダー (固定) */}
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.8.7</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.8.8</p>
         <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-tight">
           {castProfile?.display_name || 'キャスト'}
@@ -237,77 +237,81 @@ export default function Page() {
           </section>
         )}
 
-        {/* 5. 日付詳細 (シフト申請モード - バッジ類を拡大) */}
+        {/* 5. 日付詳細 (シフト申請モード - 2行構成へ再設計) */}
         {isRequestMode && (
           <section className="bg-white rounded-[32px] border border-purple-100 p-5 shadow-xl space-y-3">
              <h3 className="font-black text-purple-600 text-[13px] uppercase tracking-widest flex items-center gap-2">
               <span className="w-1.5 h-4 bg-purple-500 rounded-full"></span>
               申請リスト ({multiDates.length}件)
             </h3>
-            <div className="max-h-[400px] overflow-y-auto space-y-4 pr-1">
+            <div className="max-h-[450px] overflow-y-auto pr-1">
               {multiDates.length === 0 ? (
                 <p className="text-center py-8 text-gray-300 text-xs font-bold italic">カレンダーから日付を選んでください📅</p>
               ) : (
-                multiDates.map(d => {
-                  const key = format(d, 'yyyy-MM-dd');
-                  const officialShift = (shifts || []).find(s => s.shift_date === key && s.status === 'official');
-                  const isOff = requestDetails[key]?.s === 'OFF';
-                  
-                  return (
-                    <div key={key} className="pb-3 border-b border-gray-50 last:border-0 flex flex-col space-y-2">
-                      {/* 上段：日付とステータスバッジ (拡大) */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[15px] font-black text-gray-800">{format(d, 'M/d')} <span className="text-xs opacity-60">({format(d, 'E', {locale: ja})})</span></span>
-                          {officialShift ? (
-                            <span className="bg-orange-50 text-orange-500 text-[11px] font-black px-2 py-0.5 rounded-lg border border-orange-100 leading-none">修正申請</span>
-                          ) : (
-                            <span className="bg-green-50 text-green-500 text-[11px] font-black px-2 py-0.5 rounded-lg border border-green-100 leading-none">新規申請</span>
+                <div className="flex flex-col">
+                  {multiDates.map(d => {
+                    const key = format(d, 'yyyy-MM-dd');
+                    const officialShift = (shifts || []).find(s => s.shift_date === key && s.status === 'official');
+                    const isOff = requestDetails[key]?.s === 'OFF';
+                    
+                    return (
+                      <div key={key} className="py-3 border-b border-gray-100 last:border-0 flex flex-col space-y-1.5">
+                        {/* 1行目：【日付】【確定シフト】 */}
+                        <div className="flex items-center justify-between px-1">
+                          <span className="text-[15px] font-black text-gray-800">
+                            {format(d, 'M/d')} <span className="text-xs opacity-60">({format(d, 'E', {locale: ja})})</span>
+                          </span>
+                          {officialShift && (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 leading-none">確定</span>
+                              <span className="text-[15px] font-black text-gray-600 leading-none">{officialShift.start_time}〜{officialShift.end_time}</span>
+                            </div>
                           )}
                         </div>
-                        {officialShift && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-black text-blue-500 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 leading-none">確定</span>
-                            <span className="text-[13px] font-black text-gray-500 leading-none">{officialShift.start_time}〜{officialShift.end_time}</span>
-                          </div>
-                        )}
-                      </div>
 
-                      {/* 下段：時間選択とお休みボタン */}
-                      <div className="flex items-center gap-1.5">
-                        <select 
-                          disabled={isOff}
-                          value={requestDetails[key]?.s} 
-                          onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} 
-                          className={`flex-1 bg-gray-50 py-2 rounded-lg text-center font-black text-sm border-none focus:ring-1 focus:ring-purple-200 ${isOff ? 'opacity-30' : ''}`}
-                        >
-                          {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                        <span className={`text-gray-300 ${isOff ? 'opacity-30' : ''}`}>~</span>
-                        <select 
-                          disabled={isOff}
-                          value={requestDetails[key]?.e} 
-                          onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} 
-                          className={`flex-1 bg-gray-50 py-2 rounded-lg text-center font-black text-sm border-none focus:ring-1 focus:ring-purple-200 ${isOff ? 'opacity-30' : ''}`}
-                        >
-                          {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                        <button 
-                          onClick={() => {
-                            if (isOff) {
-                              setRequestDetails({...requestDetails, [key]: {s: '11:00', e: '23:00'}});
-                            } else {
-                              setRequestDetails({...requestDetails, [key]: {s: 'OFF', e: 'OFF'}});
-                            }
-                          }}
-                          className={`px-3 py-2 rounded-lg font-black text-[11px] transition-all border ${isOff ? 'bg-purple-500 text-white border-purple-500' : 'bg-white text-gray-400 border-gray-200'}`}
-                        >
-                          お休み
-                        </button>
+                        {/* 2行目：【バッジ】【in時間】～【out時間】【お休み】 */}
+                        <div className="flex items-center gap-1.5">
+                          {officialShift ? (
+                            <span className="bg-orange-50 text-orange-500 text-[11px] font-black px-2 py-2 rounded-lg border border-orange-100 leading-none shrink-0">修正</span>
+                          ) : (
+                            <span className="bg-green-50 text-green-500 text-[11px] font-black px-2 py-2 rounded-lg border border-green-100 leading-none shrink-0">新規</span>
+                          )}
+                          
+                          <select 
+                            disabled={isOff}
+                            value={requestDetails[key]?.s} 
+                            onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} 
+                            className={`w-20 bg-gray-50 py-2 rounded-lg text-center font-black text-sm border-none focus:ring-1 focus:ring-purple-200 ${isOff ? 'opacity-30' : ''}`}
+                          >
+                            {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                          <span className={`text-gray-300 ${isOff ? 'opacity-30' : ''}`}>~</span>
+                          <select 
+                            disabled={isOff}
+                            value={requestDetails[key]?.e} 
+                            onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} 
+                            className={`w-20 bg-gray-50 py-2 rounded-lg text-center font-black text-sm border-none focus:ring-1 focus:ring-purple-200 ${isOff ? 'opacity-30' : ''}`}
+                          >
+                            {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                          
+                          <button 
+                            onClick={() => {
+                              if (isOff) {
+                                setRequestDetails({...requestDetails, [key]: {s: '11:00', e: '23:00'}});
+                              } else {
+                                setRequestDetails({...requestDetails, [key]: {s: 'OFF', e: 'OFF'}});
+                              }
+                            }}
+                            className={`flex-1 py-2 rounded-lg font-black text-[11px] transition-all border ${isOff ? 'bg-purple-500 text-white border-purple-500 shadow-sm' : 'bg-white text-gray-400 border-gray-200'}`}
+                          >
+                            お休み
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })
+                    );
+                  })}
+                </div>
               )}
             </div>
             {multiDates.length > 0 && (
