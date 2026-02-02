@@ -13,8 +13,8 @@ for (let h = 11; h <= 23; h++) {
   if (h !== 23) TIME_OPTIONS.push(`${h}:30`);
 }
 
-// ⚠️ Discord Webhook URLをここに設定してください
-const DISCORD_WEBHOOK_URL = "ここにURLを貼ってください";
+// ✅ 提供いただいた Webhook URL を反映済み
+const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1467395577829523487/oQUEYdVA4oSbkAb53WYNMCnVIiOa0Tsi25WRPVWDtxF2UsnJFGrsU_gb-qG37gdyTQaQ";
 
 export default function Page() {
   const router = useRouter();
@@ -105,33 +105,56 @@ export default function Page() {
 
   const handleBulkSubmit = async () => {
     if (!castProfile) return;
-    const requests = multiDates.map(date => {
+
+    // 💡 エラーチェック: 変更がない申請が含まれていないか確認
+    const checkResults = multiDates.map(date => {
       const key = format(date, 'yyyy-MM-dd');
-      return { login_id: castProfile.login_id, hp_display_name: castProfile.display_name || 'キャスト', shift_date: key, start_time: requestDetails[key]?.s || '11:00', end_time: requestDetails[key]?.e || '23:00', status: 'requested', is_official: false };
+      const reqS = requestDetails[key]?.s || '11:00';
+      const reqE = requestDetails[key]?.e || '23:00';
+      const official = (shifts || []).find(s => s.shift_date === key && s.status === 'official');
+      const isSame = official && official.start_time === reqS && official.end_time === reqE;
+      return { date, isSame, key, reqS, reqE };
     });
-    
-    const { error } = await supabase.from('shifts').upsert(requests as any, { onConflict: 'login_id,shift_date' });
+
+    if (checkResults.some(r => r.isSame)) {
+      const sameDates = checkResults.filter(r => r.isSame).map(r => format(r.date, 'M/d')).join(', ');
+      alert(`エラー：${sameDates} は確定シフトと同じ時間です。変更してから申請してください。🙅‍♀️`);
+      return;
+    }
+
+    const finalRequests = checkResults.map(r => ({
+      login_id: castProfile.login_id,
+      hp_display_name: castProfile.display_name || 'キャスト',
+      shift_date: r.key,
+      start_time: r.reqS,
+      end_time: r.reqE,
+      status: 'requested',
+      is_official: false
+    }));
+
+    const { error } = await supabase.from('shifts').upsert(finalRequests as any, { onConflict: 'login_id,shift_date' });
     
     if (!error) {
-      if (DISCORD_WEBHOOK_URL && !DISCORD_WEBHOOK_URL.includes("ここに")) {
-        const messageLines = requests.map(r => {
-          const d = parseISO(r.shift_date);
-          const dateStr = format(d, 'M/d(E)', { locale: ja });
-          const isChange = (shifts || []).some(s => s.shift_date === r.shift_date && s.status === 'official');
-          const typeStr = isChange ? '(変更)' : '(新規)';
-          const timeStr = r.start_time === 'OFF' ? 'OFF' : `${r.start_time}〜${r.end_time}`;
-          return `📅 ${dateStr}: ${timeStr}${typeStr}`;
-        });
+      // 🚀 Discord通知
+      const messageLines = finalRequests.map(r => {
+        const d = parseISO(r.shift_date);
+        const dateStr = format(d, 'M/d(E)', { locale: ja });
+        const isOfficialExist = (shifts || []).some(s => s.shift_date === r.shift_date && s.status === 'official');
+        const typeStr = isOfficialExist ? '(変更)' : '(新規)';
+        const timeStr = r.start_time === 'OFF' ? 'OFF' : `${r.start_time}〜${r.end_time}`;
+        return `📅 ${dateStr}: ${timeStr}${typeStr}`;
+      });
 
-        const content = `🔔 **シフト申請がありました**\nキャスト: **${castProfile.display_name}** さん\n${messageLines.join('\n')}`;
+      const content = `🔔 **シフト申請がありました**\nキャスト: **${castProfile.display_name}** さん\n${messageLines.join('\n')}`;
 
-        await fetch(DISCORD_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content })
-        });
-      }
-      alert('申請を送信しました！🚀'); setMultiDates([]); fetchInitialData();
+      await fetch(DISCORD_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+      });
+
+      alert(`${finalRequests.length}件の申請を送信しました！🚀`);
+      setMultiDates([]); fetchInitialData();
     } else { alert(`エラー: ${error.message}`); }
   };
 
@@ -144,11 +167,10 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
       
-      {/* 1. ヘッダー */}
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50 relative">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.9.3</p>
+            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.9.5</p>
             <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
           </div>
           {lastSync && (
@@ -162,14 +184,12 @@ export default function Page() {
         <p className="text-[14px] font-black text-gray-500 mt-1 italic opacity-80">お疲れ様です🍵</p>
       </header>
 
-      {/* 2. タブ */}
       <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200 shadow-inner">
         <button onClick={() => { setIsRequestMode(false); setMultiDates([]); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
         <button onClick={() => { setIsRequestMode(true); setSingleDate(undefined); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
       </div>
 
       <main className="px-4 mt-3 space-y-2">
-        {/* 3. 月間実績 */}
         {!isRequestMode && (
           <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-5 border border-pink-200 relative overflow-hidden shadow-sm flex flex-col space-y-0.5">
             <div className="flex items-center justify-between">
@@ -208,7 +228,7 @@ export default function Page() {
                   </>
                 ) : dayRequested ? (
                   <>
-                    <span className="text-[13px] font-black text-purple-500 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-100 leading-none">申請中</span>
+                    <span className="text-[13px] font-black text-purple-500 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-100 durability-none">申請中</span>
                     <span className="text-[22px] font-black text-purple-400 leading-none">{dayRequested.start_time}〜{dayRequested.end_time}</span>
                   </>
                 ) : null}
@@ -254,26 +274,14 @@ export default function Page() {
                       </div>
                       <div className="flex items-center gap-2">
                         {officialShift ? ( <span className="bg-orange-50 text-orange-500 text-[12px] font-black px-2.5 py-2 rounded-xl border border-orange-100 leading-none shrink-0">変更</span> ) : ( <span className="bg-green-50 text-green-500 text-[12px] font-black px-2.5 py-2 rounded-xl border border-green-100 leading-none shrink-0">新規</span> )}
-                        
-                        {isOff ? (
-                          <div className="flex-1 bg-gray-50 py-2.5 rounded-lg text-center font-black text-gray-400 tracking-widest text-sm border border-dashed border-gray-200">OFF (お休み)</div>
-                        ) : (
+                        {isOff ? ( <div className="flex-1 bg-gray-50 py-2.5 rounded-lg text-center font-black text-gray-400 tracking-widest text-sm border border-dashed border-gray-200">OFF (お休み)</div> ) : (
                           <>
                             <select value={requestDetails[key]?.s || '11:00'} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none flex items-center justify-center" style={{ textAlignLast: 'center' }}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
                             <span className="text-gray-300 font-black text-lg">~</span>
                             <select value={requestDetails[key]?.e || '23:00'} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none flex items-center justify-center" style={{ textAlignLast: 'center' }}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
                           </>
                         )}
-                        
-                        <button 
-                          onClick={() => {
-                            if (isOff) { setRequestDetails({...requestDetails, [key]: {s: '11:00', e: '23:00'}}); } 
-                            else { setRequestDetails({...requestDetails, [key]: {s: 'OFF', e: 'OFF'}}); }
-                          }} 
-                          className={`px-4 py-2.5 rounded-lg font-black text-[12px] transition-all border shrink-0 ${isOff ? 'bg-purple-500 text-white border-purple-500 shadow-md' : 'bg-white text-gray-400 border-gray-200'}`}
-                        >
-                          {isOff ? '出勤にする' : 'お休み'}
-                        </button>
+                        <button onClick={() => { if (isOff) { setRequestDetails({...requestDetails, [key]: {s: '11:00', e: '23:00'}}); } else { setRequestDetails({...requestDetails, [key]: {s: 'OFF', e: 'OFF'}}); } }} className={`px-4 py-2.5 rounded-lg font-black text-[12px] transition-all border shrink-0 ${isOff ? 'bg-purple-500 text-white border-purple-500 shadow-md' : 'bg-white text-gray-400 border-gray-200'}`}>{isOff ? '出勤にする' : 'お休み'}</button>
                       </div>
                     </div>
                   );
@@ -292,18 +300,9 @@ export default function Page() {
 
       <footer className="fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-xl border-t border-gray-100 pb-8 pt-4">
         <nav className="flex justify-around items-center max-md mx-auto px-6">
-          <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1.5">
-            <span className={`text-2xl ${pathname === '/' ? 'opacity-100' : 'opacity-30'}`}>🏠</span>
-            <span className={`text-[9px] font-black uppercase ${pathname === '/' ? 'text-pink-500' : 'text-gray-300'}`}>ホーム</span>
-          </button>
-          <button onClick={() => router.push('/salary')} className="flex flex-col items-center gap-1.5">
-            <span className={`text-2xl ${pathname === '/salary' ? 'opacity-100' : 'opacity-30'}`}>💰</span>
-            <span className={`text-[9px] font-black uppercase ${pathname === '/salary' ? 'text-pink-500' : 'text-gray-300'}`}>給与明細</span>
-          </button>
-          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center gap-1.5 text-gray-300">
-            <span className="text-2xl opacity-30">🚪</span>
-            <span className="text-[9px] font-black uppercase">ログアウト</span>
-          </button>
+          <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1.5"><span className={`text-2xl ${pathname === '/' ? 'opacity-100' : 'opacity-30'}`}>🏠</span><span className={`text-[9px] font-black uppercase ${pathname === '/' ? 'text-pink-500' : 'text-gray-300'}`}>ホーム</span></button>
+          <button onClick={() => router.push('/salary')} className="flex flex-col items-center gap-1.5"><span className={`text-2xl ${pathname === '/salary' ? 'opacity-100' : 'opacity-30'}`}>💰</span><span className={`text-[9px] font-black uppercase ${pathname === '/salary' ? 'text-pink-500' : 'text-gray-300'}`}>給与明細</span></button>
+          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center gap-1.5 text-gray-300"><span className="text-2xl opacity-30">🚪</span><span className="text-[9px] font-black uppercase">ログアウト</span></button>
         </nav>
       </footer>
     </div>
