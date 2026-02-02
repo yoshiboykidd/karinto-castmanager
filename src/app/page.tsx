@@ -14,7 +14,7 @@ for (let h = 11; h <= 23; h++) {
 }
 
 // ⚠️ シフト申請通知用のWebhook URL
-const DISCORD_WEBHOOK_URL = "ここにURLを貼ってください";
+const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1467395577829523487/oQUEYdVA4oSbkAb53WYNMCnVIiOa0Tsi25WRPVWDtxF2UsnJFGrsU_gb-qG37gdyTQaQß";
 
 export default function Page() {
   const router = useRouter();
