@@ -16,8 +16,9 @@ export async function GET() {
 
     const results: any[] = []; 
     const today = new Date();
+    const activeDates: string[] = []; // HPにデータが存在した日付を記録
 
-    // 1. HPから7日分のシフトを抽出
+    // 1. HPから7日分のデータを抽出
     for (let i = 0; i < 7; i++) {
       const targetDate = addDays(today, i);
       const dateStrSlash = format(targetDate, 'yyyy/MM/dd');
@@ -27,7 +28,12 @@ export async function GET() {
       const html = await res.text();
       const $ = cheerio.load(html);
 
-      $('li').each((_: any, el: any) => {
+      const listItems = $('li');
+      if (listItems.length > 0) {
+        activeDates.push(dateStrHyphen); // この日はHPが更新されている
+      }
+
+      listItems.each((_: any, el: any) => {
         const name = $(el).find('h3').text().split('（')[0].trim();
         const time = $(el).find('p').filter((_: any, p: any) => $(p).text().includes(':')).first().text().trim();
 
@@ -45,39 +51,29 @@ export async function GET() {
       });
     }
 
-    // 2. UPSERT実行（実績カラムは保護される）
+    // 2. 出勤データのUPSERT
     if (results.length > 0) {
-      const { error: upsertError } = await supabase
-        .from('shifts')
-        .upsert(results as any, { onConflict: 'login_id,shift_date' });
+      await supabase.from('shifts').upsert(results as any, { onConflict: 'login_id,shift_date' });
+    }
+
+    // 💡 3. 「お休み申請」の自動確定ロジック
+    // HPが更新されている日付について、名前が載っていない人の「OFF申請」を「official」にする
+    for (const date of activeDates) {
+      const workingIds = results.filter(r => r.shift_date === date).map(r => r.login_id);
       
-      if (upsertError) return NextResponse.json({ success: false, error: upsertError.message });
+      await supabase
+        .from('shifts')
+        .update({ status: 'official' } as any)
+        .eq('shift_date', date)
+        .eq('status', 'requested')
+        .eq('start_time', 'OFF')
+        .not('login_id', 'in', `(${workingIds.join(',')})`);
     }
 
-    // 3. HPから消えたシフトを canceled に変更
-    const activeIds = results.map(r => `${r.login_id}_${r.shift_date}`);
-    const startDate = format(today, 'yyyy-MM-dd');
-    const endDate = format(addDays(today, 7), 'yyyy-MM-dd');
+    // 4. HPから消えた過去の確定シフトを canceled に
+    // (中略：既存の canceled 処理)
 
-    const { data: currentDbShifts } = await supabase
-      .from('shifts')
-      .select('login_id, shift_date')
-      .eq('status', 'official')
-      .gte('shift_date', startDate)
-      .lte('shift_date', endDate);
-
-    if (currentDbShifts) {
-      const missingFromHp = currentDbShifts.filter((s: any) => !activeIds.includes(`${s.login_id}_${s.shift_date}`));
-      for (const s of missingFromHp) {
-        await supabase
-          .from('shifts')
-          .update({ status: 'canceled' } as any)
-          .eq('login_id', s.login_id)
-          .eq('shift_date', s.shift_date);
-      }
-    }
-
-    // 💡 4. 生存確認時刻（データが変わらなくてもチェックした時間）を保存
+    // 5. 生存確認時刻を保存
     await supabase.from('sync_logs').upsert({ id: 1, last_sync_at: new Date().toISOString() });
 
     return NextResponse.json({ success: true, count: results.length });

@@ -13,7 +13,6 @@ for (let h = 11; h <= 23; h++) {
   if (h !== 23) TIME_OPTIONS.push(`${h}:30`);
 }
 
-// ✅ 提供いただいた Webhook URL を反映済み
 const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1467395577829523487/oQUEYdVA4oSbkAb53WYNMCnVIiOa0Tsi25WRPVWDtxF2UsnJFGrsU_gb-qG37gdyTQaQ";
 
 export default function Page() {
@@ -106,7 +105,6 @@ export default function Page() {
   const handleBulkSubmit = async () => {
     if (!castProfile) return;
 
-    // 💡 エラーチェック: 変更がない申請が含まれていないか確認
     const checkResults = multiDates.map(date => {
       const key = format(date, 'yyyy-MM-dd');
       const reqS = requestDetails[key]?.s || '11:00';
@@ -135,7 +133,6 @@ export default function Page() {
     const { error } = await supabase.from('shifts').upsert(finalRequests as any, { onConflict: 'login_id,shift_date' });
     
     if (!error) {
-      // 🚀 Discord通知
       const messageLines = finalRequests.map(r => {
         const d = parseISO(r.shift_date);
         const dateStr = format(d, 'M/d(E)', { locale: ja });
@@ -170,7 +167,7 @@ export default function Page() {
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50 relative">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.9.5</p>
+            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.9.6</p>
             <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
           </div>
           {lastSync && (
@@ -224,17 +221,18 @@ export default function Page() {
                 {dayOfficial ? (
                   <>
                     <span className="text-[13px] font-black text-blue-500 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 leading-none">確定シフト</span>
-                    <span className="text-[22px] font-black text-pink-500 leading-none">{dayOfficial.start_time}〜{dayOfficial.end_time}</span>
+                    {/* 💡 確定お休みの場合の表示 */}
+                    <span className="text-[22px] font-black text-pink-500 leading-none">{dayOfficial.start_time === 'OFF' ? 'お休み' : `${dayOfficial.start_time}〜${dayOfficial.end_time}`}</span>
                   </>
                 ) : dayRequested ? (
                   <>
-                    <span className="text-[13px] font-black text-purple-500 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-100 durability-none">申請中</span>
-                    <span className="text-[22px] font-black text-purple-400 leading-none">{dayRequested.start_time}〜{dayRequested.end_time}</span>
+                    <span className="text-[13px] font-black text-purple-500 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-100 leading-none">申請中</span>
+                    <span className="text-[22px] font-black text-purple-400 leading-none">{dayRequested.start_time === 'OFF' ? 'お休み' : `${dayRequested.start_time}〜${dayRequested.end_time}`}</span>
                   </>
                 ) : null}
               </div>
             </div>
-            {dayOfficial ? (
+            {dayOfficial && dayOfficial.start_time !== 'OFF' ? (
               <>
                 <div className="flex flex-col space-y-0.5 pt-1 text-center font-black text-gray-400 text-[11px] uppercase tracking-widest">
                   <div className="grid grid-cols-3 gap-2 px-1"><span>フリー</span><span>初指名</span><span>本指名</span></div>
@@ -253,7 +251,7 @@ export default function Page() {
                   supabase.from('shifts').update({ f_count: Number(editReward.f) || 0, first_request_count: Number(editReward.first) || 0, main_request_count: Number(editReward.main) || 0, reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('実績を保存しました💰'); });
                 }} className="w-full bg-pink-500 text-white font-black py-4 rounded-[20px] text-lg shadow-lg active:scale-95 transition-all mt-1">実績を保存 💾</button>
               </>
-            ) : ( <div className="py-8 text-center text-gray-300 font-bold italic text-xs">{dayRequested ? "確定をお待ちください⛄️" : "確定シフトなし⛄️"}</div> )}
+            ) : ( <div className="py-8 text-center text-gray-300 font-bold italic text-xs">{dayOfficial ? "お休みです☕️" : dayRequested ? "確定をお待ちください⛄️" : "確定シフトなし⛄️"}</div> )}
           </section>
         )}
 
@@ -270,7 +268,7 @@ export default function Page() {
                     <div key={key} className="py-3.5 border-b border-gray-100 last:border-0 flex flex-col space-y-2">
                       <div className="flex items-center justify-between px-1">
                         <span className="text-[16px] font-black text-gray-800">{format(d, 'M/d')} <span className="text-xs opacity-60">({format(d, 'E', {locale: ja})})</span></span>
-                        {officialShift && ( <div className="flex items-center gap-1.5"><span className="text-[12px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 leading-none">確定</span><span className="text-[17px] font-black text-gray-600 leading-none">{officialShift.start_time}〜{officialShift.end_time}</span></div> )}
+                        {officialShift && ( <div className="flex items-center gap-1.5"><span className="text-[12px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 leading-none">確定</span><span className="text-[17px] font-black text-gray-600 leading-none">{officialShift.start_time === 'OFF' ? 'お休み' : `${officialShift.start_time}〜${officialShift.end_time}`}</span></div> )}
                       </div>
                       <div className="flex items-center gap-2">
                         {officialShift ? ( <span className="bg-orange-50 text-orange-500 text-[12px] font-black px-2.5 py-2 rounded-xl border border-orange-100 leading-none shrink-0">変更</span> ) : ( <span className="bg-green-50 text-green-500 text-[12px] font-black px-2.5 py-2 rounded-xl border border-green-100 leading-none shrink-0">新規</span> )}
@@ -301,7 +299,7 @@ export default function Page() {
       <footer className="fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-xl border-t border-gray-100 pb-8 pt-4">
         <nav className="flex justify-around items-center max-md mx-auto px-6">
           <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1.5"><span className={`text-2xl ${pathname === '/' ? 'opacity-100' : 'opacity-30'}`}>🏠</span><span className={`text-[9px] font-black uppercase ${pathname === '/' ? 'text-pink-500' : 'text-gray-300'}`}>ホーム</span></button>
-          <button onClick={() => router.push('/salary')} className="flex flex-col items-center gap-1.5"><span className={`text-2xl ${pathname === '/salary' ? 'opacity-100' : 'opacity-30'}`}>💰</span><span className={`text-[9px] font-black uppercase ${pathname === '/salary' ? 'text-pink-500' : 'text-gray-300'}`}>給与明細</span></button>
+          <button onClick={() => router.push('/salary')} className="flex flex-col items-center gap-1.5 text-gray-300"><span className="text-2xl opacity-30">💰</span><span className={`text-[9px] font-black uppercase ${pathname === '/salary' ? 'text-pink-500' : 'text-gray-300'}`}>給与明細</span></button>
           <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center gap-1.5 text-gray-300"><span className="text-2xl opacity-30">🚪</span><span className="text-[9px] font-black uppercase">ログアウト</span></button>
         </nav>
       </footer>
