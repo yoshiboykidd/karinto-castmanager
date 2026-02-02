@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation'; // 💡 usePathname でエラー回避
 import { format, parseISO, startOfToday } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import DashboardCalendar from '@/components/DashboardCalendar';
@@ -17,6 +17,7 @@ const DISCORD_WEBHOOK_URL = "ここにURLを貼ってください";
 
 export default function Page() {
   const router = useRouter();
+  const pathname = usePathname(); // 💡 パス取得用のフック
   const [supabase] = useState(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -64,7 +65,7 @@ export default function Page() {
     setLoading(false);
   }
 
-  // 💡 重要: 申請モードで日付を選択した際の初期値をセットするロジック
+  // 申請モードの初期値セット
   useEffect(() => {
     const newDetails = { ...requestDetails };
     multiDates.forEach(d => {
@@ -108,7 +109,7 @@ export default function Page() {
       const key = format(date, 'yyyy-MM-dd');
       return { login_id: castProfile.login_id, hp_display_name: castProfile.display_name || 'キャスト', shift_date: key, start_time: requestDetails[key]?.s || '11:00', end_time: requestDetails[key]?.e || '23:00', status: 'requested', is_official: false };
     });
-    const { error } = await supabase.from('shifts').upsert(requests, { onConflict: 'login_id,shift_date' });
+    const { error } = await supabase.from('shifts').upsert(requests as any, { onConflict: 'login_id,shift_date' });
     if (!error) {
       if (DISCORD_WEBHOOK_URL && !DISCORD_WEBHOOK_URL.includes("ここに")) {
         const content = requests.map(r => `📅 ${r.shift_date}: ${r.start_time}〜${r.end_time}`).join('\n');
@@ -131,7 +132,7 @@ export default function Page() {
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50 relative">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.6</p>
+            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.8</p>
             <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
           </div>
           {lastSync && (
@@ -152,7 +153,7 @@ export default function Page() {
       </div>
 
       <main className="px-4 mt-3 space-y-2">
-        {/* 3. 月間実績 (稼働時間を復活) */}
+        {/* 3. 月間実績 */}
         {!isRequestMode && (
           <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-5 border border-pink-200 relative overflow-hidden shadow-sm flex flex-col space-y-0.5">
             <div className="flex items-center justify-between">
@@ -180,7 +181,7 @@ export default function Page() {
           <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={handleDateSelect} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
         </section>
 
-        {/* 5. 日付詳細 (実績入力モード) */}
+        {/* 5. 日付詳細 (実績入力) */}
         {!isRequestMode && (
           <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-5 flex flex-col space-y-1">
             <div className="flex items-center justify-between px-1">
@@ -226,7 +227,7 @@ export default function Page() {
           </section>
         )}
 
-        {/* 5. 日付詳細 (シフト申請モード - 選択・プルダウン修正済) */}
+        {/* 5. 日付詳細 (シフト申請) */}
         {isRequestMode && (
           <section className="bg-white rounded-[32px] border border-purple-100 p-5 shadow-xl space-y-3">
              <h3 className="font-black text-purple-600 text-[14px] uppercase tracking-widest flex items-center gap-2"><span className="w-1.5 h-4 bg-purple-500 rounded-full"></span>申請リスト ({multiDates.length}件)</h3>
@@ -244,6 +245,11 @@ export default function Page() {
                           {officialShift && ( <div className="flex items-center gap-1.5"><span className="text-[12px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 leading-none">確定</span><span className="text-[17px] font-black text-gray-600 leading-none">{officialShift.start_time}〜{officialShift.end_time}</span></div> )}
                         </div>
                         <div className="flex items-center gap-2">
+                          {officialShift ? (
+                            <span className="bg-orange-50 text-orange-500 text-[12px] font-black px-2.5 py-2 rounded-xl border border-orange-100 leading-none shrink-0">変更</span>
+                          ) : (
+                            <span className="bg-green-50 text-green-500 text-[12px] font-black px-2.5 py-2 rounded-xl border border-green-100 leading-none shrink-0">新規</span>
+                          )}
                           <select disabled={isOff} value={requestDetails[key]?.s || '11:00'} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none flex items-center justify-center" style={{ textAlignLast: 'center' }}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
                           <span className="text-gray-300 font-black text-lg">~</span>
                           <select disabled={isOff} value={requestDetails[key]?.e || '23:00'} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none flex items-center justify-center" style={{ textAlignLast: 'center' }}>{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
@@ -268,9 +274,18 @@ export default function Page() {
 
       <footer className="fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-xl border-t border-gray-100 pb-8 pt-4">
         <nav className="flex justify-around items-center max-md mx-auto px-6">
-          <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1.5"><span className={`text-2xl ${!isRequestMode ? 'opacity-100' : 'opacity-30'}`}>🏠</span><span className={`text-[9px] font-black uppercase ${!isRequestMode ? 'text-pink-500' : 'text-gray-300'}`}>ホーム</span></button>
-          <button onClick={() => router.push('/salary')} className="flex flex-col items-center gap-1.5 text-gray-300"><span className="text-2xl opacity-30">💰</span><span className="text-[9px] font-black uppercase">給与明細</span></button>
-          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center gap-1.5 text-gray-300"><span className="text-2xl opacity-30">🚪</span><span className="text-[9px] font-black uppercase">ログアウト</span></button>
+          <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1.5">
+            <span className={`text-2xl ${pathname === '/' ? 'opacity-100' : 'opacity-30'}`}>🏠</span>
+            <span className={`text-[9px] font-black uppercase ${pathname === '/' ? 'text-pink-500' : 'text-gray-300'}`}>ホーム</span>
+          </button>
+          <button onClick={() => router.push('/salary')} className="flex flex-col items-center gap-1.5">
+            <span className={`text-2xl ${pathname === '/salary' ? 'opacity-100' : 'opacity-30'}`}>💰</span>
+            <span className={`text-[9px] font-black uppercase ${pathname === '/salary' ? 'text-pink-500' : 'text-gray-300'}`}>給与明細</span>
+          </button>
+          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center gap-1.5 text-gray-300">
+            <span className="text-2xl opacity-30">🚪</span>
+            <span className="text-[9px] font-black uppercase">ログアウト</span>
+          </button>
         </nav>
       </footer>
     </div>
