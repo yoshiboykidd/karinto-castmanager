@@ -1,33 +1,36 @@
 @echo off
 
-:: --- ここにメモした情報を貼り付けてください ---
+:: --- ここにメモした情報を貼り付けてください（カッコは絶対に入れない） ---
 
-set VERCEL_TOKEN=【JBHlJKE6lvunwyiwyXiYokea】
+set VERCEL_TOKEN=JANyr7PMAkWuYqsUycbHuGNN
 
-set VERCEL_ORG_ID=【team_LeEOFVqgpSOToSYVJZqqVrIw】
+set VERCEL_ORG_ID=team_LeEOFVqgpSOToSYVJZqqVrIw
 
-set VERCEL_PROJECT_ID=【prj_qQnOy6pnoPn8OwUmWqza1fnTFUSb】
+set VERCEL_PROJECT_ID=prj_qQnOy6pnoPn8OwUmWqza1fnTFUSb
 
 :: --------------------------------------------
 
 
 
-:: Node.jsの「日本語PC名エラー」を回避するために、一時的に英語名を名乗る
+:: Node.js v24の潔癖症（日本語PC名エラー）を回避する魔法の1行
 
 set COMPUTERNAME=Karinto-PC
 
 
 
-echo 🚀 Git Pushを開始します...
+echo 🚀 1/2: GitHubへプッシュ中...
 
 git add .
 
-git commit -m "fix header and UI v2.8.0"
+git commit -m "update v2.8.0"
 
 git push
 
 
 
-echo 🚀 Vercelへの本番デプロイを開始します...
+echo 🚀 2/2: Vercel本番デプロイ中...
 
-npx vercel --prod
+:: ログイン処理を介さず、トークンとIDで直接住所を叩く
+
+npx vercel --prod --token %VERCEL_TOKEN% --scope %VERCEL_ORG_ID%
+
