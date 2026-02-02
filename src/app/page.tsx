@@ -14,7 +14,7 @@ for (let h = 11; h <= 23; h++) {
 }
 
 // ⚠️ シフト申請通知用のWebhook URL
-const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1467395577829523487/oQUEYdVA4oSbkAb53WYNMCnVIiOa0Tsi25WRPVWDtxF2UsnJFGrsU_gb-qG37gdyTQaQ";
+const DISCORD_WEBHOOK_URL = "ここにURLを貼ってください";
 
 export default function Page() {
   const router = useRouter();
@@ -108,8 +108,6 @@ export default function Page() {
 
   const handleBulkSubmit = async () => {
     if (!castProfile) return;
-
-    // 🛑 バリデーションチェック: 確定シフトと同じ内容の申請を弾く
     for (const date of multiDates) {
       const key = format(date, 'yyyy-MM-dd');
       const official = (shifts || []).find(s => s.shift_date === key && s.status === 'official');
@@ -118,23 +116,15 @@ export default function Page() {
         return;
       }
     }
-
     const requests = multiDates.map(date => {
       const key = format(date, 'yyyy-MM-dd');
       return { login_id: castProfile.login_id, hp_display_name: castProfile.display_name || 'キャスト', shift_date: key, start_time: requestDetails[key]?.s || '11:00', end_time: requestDetails[key]?.e || '23:00', status: 'requested', is_official: false };
     });
-
     const { error } = await supabase.from('shifts').upsert(requests, { onConflict: 'login_id,shift_date' });
-    
     if (!error) {
-      // 🚀 Discordへの通知 (申請時のみ)
       if (DISCORD_WEBHOOK_URL && !DISCORD_WEBHOOK_URL.includes("ここに")) {
         const content = requests.map(r => `📅 ${r.shift_date}: ${r.start_time}〜${r.end_time}`).join('\n');
-        await fetch(DISCORD_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: `🔔 **シフト申請がありました**\nキャスト: ${castProfile.display_name}さん\n${content}` })
-        });
+        await fetch(DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `🔔 **シフト申請がありました**\nキャスト: ${castProfile.display_name}さん\n${content}` }) });
       }
       alert('申請を送信しました！🚀');
       setMultiDates([]);
@@ -146,12 +136,13 @@ export default function Page() {
 
   const targetDateStr = singleDate ? format(singleDate, 'yyyy-MM-dd') : '';
   const dayOfficial = (shifts || []).find(s => s.shift_date === targetDateStr && s.status === 'official');
+  const dayRequested = (shifts || []).find(s => s.shift_date === targetDateStr && s.status === 'requested');
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
       {/* 1. ヘッダー (固定) */}
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.2</p>
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.3</p>
         <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}</p>
         <h1 className="text-3xl font-black flex items-baseline gap-1.5 leading-tight">{castProfile?.display_name || 'キャスト'}<span className="text-[22px] text-pink-400 font-bold italic translate-y-[1px]">さん</span></h1>
         <p className="text-[14px] font-black text-gray-500 mt-1 italic opacity-80">お疲れ様です🍵</p>
@@ -195,14 +186,27 @@ export default function Page() {
         {/* 5. 日付詳細 (実績入力モード) */}
         {!isRequestMode && (
           <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-5 flex flex-col space-y-1">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-2xl font-black text-gray-800 tracking-tight leading-none flex items-baseline">{singleDate ? format(singleDate, 'M/d') : ''}<span className="text-lg ml-1 opacity-70">({singleDate ? format(singleDate, 'E', { locale: ja }) : ''})</span></h3>
+              
+              {/* 💡 申請中情報の表示を追加 */}
+              <div className="flex items-center gap-1.5">
+                {dayOfficial ? (
+                  <>
+                    <span className="text-[13px] font-black text-blue-500 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 leading-none">確定シフト</span>
+                    <span className="text-[22px] font-black text-pink-500 leading-none">{dayOfficial.start_time}〜{dayOfficial.end_time}</span>
+                  </>
+                ) : dayRequested ? (
+                  <>
+                    <span className="text-[13px] font-black text-purple-500 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-100 leading-none">申請中</span>
+                    <span className="text-[22px] font-black text-purple-400 leading-none">{dayRequested.start_time}〜{dayRequested.end_time}</span>
+                  </>
+                ) : null}
+              </div>
+            </div>
+
             {dayOfficial ? (
               <>
-                <div className="flex items-center justify-between px-1">
-                  <h3 className="text-2xl font-black text-gray-800 tracking-tight leading-none flex items-baseline">{singleDate ? format(singleDate, 'M/d') : ''}<span className="text-lg ml-1 opacity-70">({singleDate ? format(singleDate, 'E', { locale: ja }) : ''})</span></h3>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[13px] font-black text-blue-500 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 leading-none">確定シフト</span><span className="text-[22px] font-black text-pink-500 leading-none">{dayOfficial.start_time}〜{dayOfficial.end_time}</span>
-                  </div>
-                </div>
                 <div className="flex flex-col space-y-0.5 pt-1">
                   <div className="grid grid-cols-3 gap-2 px-1">
                     <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">フリー</label><label className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">初指名</label><label className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">本指名</label>
@@ -225,7 +229,11 @@ export default function Page() {
                   <button onClick={() => setEditReward({ f: '', first: '', main: '', amount: '' })} className="flex-1 bg-gray-100 text-gray-400 font-black py-4 rounded-[18px] text-[13px] active:scale-95 transition-all border border-gray-200">クリア 🗑️</button>
                 </div>
               </>
-            ) : ( <div className="py-8 text-center text-gray-300 font-bold italic text-xs">確定シフトなし⛄️</div> )}
+            ) : (
+              <div className="py-8 text-center text-gray-300 font-bold italic text-xs">
+                {dayRequested ? "確定をお待ちください⛄️" : "確定シフトなし⛄️"}
+              </div>
+            )}
           </section>
         )}
 
