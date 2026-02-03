@@ -24,30 +24,20 @@ export default function DailyDetail({
 }: DailyDetailProps) {
   if (!date) return null;
 
-  // 1. ステータス判定
   const isOfficial = shift?.status === 'official';
   const isRequested = shift?.status === 'requested';
-  const isModified = isRequested && shift?.is_official_pre_exist; // 確定後の変更申請
-
-  // 2. 特定日判定
+  const isModified = isRequested && shift?.is_official_pre_exist;
   const isKarin = dayNum === 10;
   const isSoine = dayNum === 11 || dayNum === 22;
 
-  // 3. 配色テーマの動的切り替え（カレンダーと同期）
   let themeClass = "bg-white border-pink-100";
-  let modTextClass = "text-green-600";
-  let modBadgeClass = "bg-green-600";
-
-  if (isModified) {
-    themeClass = "bg-green-50/40 border-green-200";
-  } else if (isRequested) {
-    themeClass = "bg-purple-50/40 border-purple-200";
-  }
+  if (isModified) themeClass = "bg-green-50/40 border-green-200";
+  else if (isRequested) themeClass = "bg-purple-50/40 border-purple-200";
 
   return (
-    <section className={`relative overflow-hidden rounded-[32px] border shadow-xl p-4 pt-6 flex flex-col space-y-1.5 transition-all duration-300 ${themeClass}`}>
+    <section className={`relative overflow-hidden rounded-[32px] border shadow-xl p-4 pt-6 flex flex-col space-y-2 transition-all duration-300 ${themeClass}`}>
       
-      {/* 特定日バッジ（最上段） */}
+      {/* 特定日バッジ */}
       {(isKarin || isSoine) && (
         <div className={`absolute top-0 left-0 right-0 py-0.5 text-center font-black text-[10px] tracking-[0.2em] shadow-sm z-20
           ${isKarin ? 'bg-gradient-to-r from-orange-400 to-orange-500 text-white' : 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white'}`}>
@@ -55,53 +45,55 @@ export default function DailyDetail({
         </div>
       )}
 
-      {/* 1行目：日付 ＆ 変更申請情報（緑色に変更） */}
+      {/* 1行目：日付 ＆ 変更申請情報（時間をより大きく） */}
       <div className="flex items-center justify-between px-1 h-7">
-        <h3 className="text-xl font-black text-gray-800 tracking-tight leading-none flex items-baseline">
+        <h3 className="text-xl font-black text-gray-800 tracking-tight leading-none flex items-baseline shrink-0">
           {format(date, 'M/d')}
           <span className="text-base ml-1 opacity-70">({format(date, 'E', { locale: ja })})</span>
         </h3>
 
         {isModified && (
-          <div className="flex items-center gap-1.5">
-            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md text-white shadow-sm ${modBadgeClass}`}>
+          <div className="flex items-center gap-1.5 overflow-hidden">
+            <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-green-600 text-white shadow-sm shrink-0">
               変更申請中
             </span>
-            <span className={`text-[16px] font-black tracking-tighter ${modTextClass}`}>
+            <span className="text-[20px] font-black text-green-600 tracking-tighter whitespace-nowrap">
               {shift.start_time}〜{shift.end_time}
             </span>
           </div>
         )}
       </div>
 
-      {/* 2行目：メイン時間表示（確定＝青、新規＝紫） */}
-      <div className="flex items-center gap-3 px-1 h-10">
+      {/* 2行目：メイン時間表示（ラベル左 / 時間右詰め） */}
+      <div className="flex items-center justify-between px-1 h-10 gap-2">
         {shift && shift.start_time !== 'OFF' ? (
           <>
+            {/* ラベルを左に配置 */}
             {isOfficial || isModified ? (
               <span className="text-[13px] font-black px-3 py-1.5 rounded-xl bg-blue-500 text-white shadow-md shrink-0">
-                確定
+                確定シフト
               </span>
             ) : isRequested ? (
               <span className="text-[13px] font-black px-3 py-1.5 rounded-xl bg-purple-500 text-white shadow-md shrink-0">
-                新規
+                新規申請中
               </span>
             ) : null}
 
-            <span className={`text-[32px] font-black leading-none tracking-tighter 
+            {/* 時間を右に大きく配置 */}
+            <span className={`text-[36px] font-black leading-none tracking-tighter text-right
               ${isRequested && !isModified ? 'text-purple-500' : 'text-pink-500'}`}>
               {shift.start_time}〜{shift.end_time}
             </span>
           </>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between w-full">
             <span className="text-[13px] font-black px-3 py-1.5 rounded-xl bg-gray-400 text-white shadow-sm">休み</span>
-            <span className="text-xs font-black text-gray-300 italic uppercase tracking-widest opacity-50">No Schedule</span>
+            <span className="text-lg font-black text-gray-300 italic uppercase tracking-widest opacity-40">No Schedule</span>
           </div>
         )}
       </div>
 
-      {/* 3行目以降：実績入力フォーム（確定 または 変更申請中の場合に表示） */}
+      {/* 3行目以降：実績入力フォーム */}
       {(isOfficial || isModified) && shift?.start_time !== 'OFF' ? (
         <div className="space-y-2 pt-2 border-t border-gray-100/50">
           <div className="grid grid-cols-3 gap-2">
