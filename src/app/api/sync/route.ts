@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // 日本時間（JST）への調整
+  // 日本時間（JST）への調整用（シフトの日付計算に使用）
   const JST_OFFSET = 9 * 60 * 60 * 1000;
   let debugLog: any[] = [];
 
@@ -40,7 +40,6 @@ export async function GET(request: NextRequest) {
 
     for (const dateStr of dates) {
       // --- Step A: 生存確認のリセット ---
-      // その日の全キャストの「今HPに載っているフラグ」を一旦折る
       await supabase.from('shifts').update({ is_official: false }).eq('shift_date', dateStr);
 
       // --- Step B: HPから最新情報を取得 ---
@@ -72,9 +71,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // --- Step C: 幽霊データの掃除（店長がHPから消した人を反映） ---
-      // 「status=official」なのに「is_official=false（今回のHPスキャンで見当たらなかった）」人
-      // つまり店長が承認してHPから消した（＝休みになった）ので、申請中(requested)に戻す
+      // --- Step C: 幽霊データの掃除 ---
       await supabase.from('shifts')
         .update({ status: 'requested' })
         .eq('shift_date', dateStr)
@@ -84,17 +81,18 @@ export async function GET(request: NextRequest) {
       debugLog.push({ date: dateStr, status: "ok" });
     }
 
-    // 3. 同期完了時刻をDBに記録（マイページ表示用）
-    const nowJST = new Date(Date.now() + JST_OFFSET).toISOString();
+    // 3. 同期完了時刻をDBに記録
+    // ★重要：JST_OFFSETを足さずにUTCのまま送ることで、ブラウザ側の自動変換に任せる
+    const nowUTC = new Date().toISOString(); 
     await supabase.from('sync_logs').upsert({ 
       id: 1, 
-      last_sync_at: nowJST 
+      last_sync_at: nowUTC 
     });
 
     return NextResponse.json({ 
-      version: "v3.3.1", 
+      version: "v3.3.2", 
       success: true, 
-      last_sync: nowJST,
+      last_sync: nowUTC,
       debug: debugLog 
     });
 
