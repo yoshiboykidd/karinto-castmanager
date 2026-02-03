@@ -3,8 +3,10 @@
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
+// Vercelエラーを防ぐため、page.tsxから渡されている dayNum を型に含めます
 type DailyDetailProps = {
   date: Date;
+  dayNum: number; // page.tsxの selected.single.getDate() を受け取る
   shift: any; 
   editReward: { f: string; first: string; main: string; amount: string };
   setEditReward: (val: any) => void;
@@ -45,7 +47,7 @@ export default function DailyDetail({
         
         <div className="flex flex-col items-end gap-1">
           {isModified ? (
-            <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-orange-500 text-white uppercase tracking-tighter shadow-sm">
+            <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-orange-500 text-white uppercase tracking-tighter shadow-sm animate-pulse">
               変更申請中
             </span>
           ) : isOfficial ? (
@@ -64,23 +66,22 @@ export default function DailyDetail({
         </div>
       </div>
 
-      {/* 時間表示エリア：ここが対比表示の肝 */}
-      <div className="px-1 py-2">
+      {/* 時間表示エリア：対比表示 */}
+      <div className="px-1 py-1">
         {isModified ? (
           <div className="flex flex-col space-y-1">
             <div className="flex items-center gap-2 opacity-50">
-              <span className="text-[11px] font-black text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">元々の予定</span>
-              <span className="text-lg font-black text-gray-600 line-through decoration-gray-400">
-                {/* DBに元の時間を残す設計が必要ですが、一旦現在の値を表示 */}
+              <span className="text-[10px] font-black text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded uppercase">Before</span>
+              <span className="text-base font-black text-gray-500 line-through decoration-gray-400">
+                {/* 確定時の時間を表示（DBに保存されている現在の値） */}
                 {shift.start_time}〜{shift.end_time}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-black text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded">変更希望</span>
-              <span className="text-2xl font-black text-orange-500 animate-pulse">
+              <span className="text-[10px] font-black text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded uppercase">After</span>
+              <span className="text-2xl font-black text-orange-500">
                 {shift.start_time}〜{shift.end_time}
               </span>
-              <span className="text-xs font-bold text-orange-400 ml-auto">承認待ち...</span>
             </div>
           </div>
         ) : shift && shift.start_time !== 'OFF' ? (
@@ -95,12 +96,14 @@ export default function DailyDetail({
       </div>
 
       {/* 入力フォーム（確定 または 変更申請中の実績入力用） */}
-      {(isOfficial || isModified) && shift?.start_time !== 'OFF' && (
-        <div className="space-y-3 pt-2 border-t border-gray-100/50">
+      {(isOfficial || isModified) && shift?.start_time !== 'OFF' ? (
+        <div className="space-y-3 pt-2 border-t border-gray-100/30">
           <div className="grid grid-cols-3 gap-2">
             {(['f', 'first', 'main'] as const).map((key) => (
               <div key={key} className="flex flex-col space-y-1">
-                <label className="text-[10px] font-black text-gray-400 text-center uppercase">{key === 'f' ? 'フリー' : key === 'first' ? '初指名' : '本指名'}</label>
+                <label className="text-[10px] font-black text-gray-400 text-center uppercase tracking-tighter">
+                  {key === 'f' ? 'フリー' : key === 'first' ? '初指名' : '本指名'}
+                </label>
                 <input
                   type="number"
                   inputMode="numeric"
@@ -123,6 +126,7 @@ export default function DailyDetail({
                 inputMode="numeric"
                 value={editReward.amount !== '' ? Number(editReward.amount).toLocaleString() : ''}
                 placeholder="0"
+                onFocus={(e) => e.target.select()}
                 onChange={(e) => {
                   const v = e.target.value.replace(/,/g, '');
                   if (/^\d*$/.test(v)) setEditReward({ ...editReward, amount: v });
@@ -132,16 +136,26 @@ export default function DailyDetail({
             </div>
           </div>
 
-          <button onClick={onSave} className="w-full bg-pink-500 text-white font-black py-4 rounded-2xl text-lg shadow-lg active:scale-95 transition-all">
-            実績を保存 💾
-          </button>
+          <div className="flex gap-2">
+            <button onClick={onSave} className="flex-[2.5] bg-pink-500 text-white font-black py-4 rounded-2xl text-lg shadow-lg active:scale-95 transition-all">
+              実績を保存 💾
+            </button>
+            <button
+              onClick={() => setEditReward({ f: '', first: '', main: '', amount: '' })}
+              className="flex-1 bg-gray-50 text-gray-400 font-black py-4 rounded-2xl text-[12px] active:scale-95 transition-all border border-gray-100"
+            >
+              クリア 🗑️
+            </button>
+          </div>
         </div>
-      )}
-
-      {/* 新規申請中（承認前）のメッセージ */}
-      {isRequested && !isModified && (
-        <div className="bg-purple-50 rounded-2xl p-4 text-center">
-          <p className="text-purple-500 font-black text-sm italic">店長の承認後に実績入力が可能になります✨</p>
+      ) : isRequested && !isModified ? (
+        <div className="bg-purple-50/50 rounded-2xl p-6 text-center border border-purple-100">
+          <p className="text-purple-500 font-black text-sm italic">店長の承認をお待ちください✨</p>
+          <p className="text-[10px] text-purple-300 font-bold uppercase tracking-widest mt-1">Pending Approval</p>
+        </div>
+      ) : (
+        <div className="py-6 text-center opacity-30">
+          <p className="text-gray-400 font-black text-sm italic">お休み🍵</p>
         </div>
       )}
     </section>
