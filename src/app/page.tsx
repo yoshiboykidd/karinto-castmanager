@@ -5,6 +5,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { useRouter, usePathname } from 'next/navigation'; 
 import { format, parseISO, startOfToday, isAfter } from 'date-fns';
 
+// --- すでに切り出し済みのコンポーネント群 ---
 import CastHeader from '@/components/dashboard/CastHeader';
 import MonthlySummary from '@/components/dashboard/MonthlySummary';
 import DashboardCalendar from '@/components/DashboardCalendar';
@@ -51,9 +52,10 @@ export default function Page() {
     setLoading(false);
   }
 
+  // 実績サマリー計算（三すくみ対応：申請中でも公式枠があれば合算）
   const monthlyTotals = useMemo(() => {
     const today = startOfToday();
-    return data.shifts
+    return (data.shifts || [])
       .filter((s: any) => {
         const d = parseISO(s.shift_date);
         const isPastOrToday = !isAfter(d, today);
@@ -66,7 +68,7 @@ export default function Page() {
         first: acc.first + (Number(s.first_request_count) || 0), 
         main: acc.main + (Number(s.main_request_count) || 0), 
         count: acc.count + 1, 
-        hours: acc.hours + 8 // 仮の計算
+        hours: acc.hours + 8 // 必要に応じて時間計算ロジックを追加
       }), { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
   }, [data.shifts, viewDate]);
 
@@ -78,22 +80,43 @@ export default function Page() {
 
   const handleSaveAchievement = async () => {
     if (!selected.single || !data.profile) return;
-    const { error } = await supabase.from('shifts').update({ f_count: Number(editReward.f), first_request_count: Number(editReward.first), main_request_count: Number(editReward.main), reward_amount: Number(editReward.amount), is_official: true }).eq('login_id', data.profile.login_id).eq('shift_date', format(selected.single, 'yyyy-MM-dd'));
-    if (!error) { fetchInitialData(); alert('保存完了'); }
+    const dateStr = format(selected.single, 'yyyy-MM-dd');
+    const { error } = await supabase.from('shifts').update({ 
+      f_count: Number(editReward.f), 
+      first_request_count: Number(editReward.first), 
+      main_request_count: Number(editReward.main), 
+      reward_amount: Number(editReward.amount), 
+      status: 'official', // HPから消えていても実績保存で「確定」に昇格
+      is_official: true 
+    }).eq('login_id', data.profile.login_id).eq('shift_date', dateStr);
+    if (!error) { fetchInitialData(); alert('実績を保存しました💰'); }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse text-5xl italic">KARINTO...</div>;
 
   return (
-    <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans">
+    <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden">
       <CastHeader shopName={data.shop?.shop_name} syncTime={data.syncAt} displayName={data.profile?.display_name} version="v2.9.9.28" />
-      <div className="flex p-1 bg-gray-100 mx-6 mt-2 rounded-2xl">
-        <button onClick={() => { setIsRequestMode(false); setSelected({ single: new Date(), multi: [] }); }} className={`flex-1 py-2 text-xs font-black rounded-xl ${!isRequestMode ? 'bg-white text-pink-500' : 'text-gray-400'}`}>実績入力</button>
-        <button onClick={() => { setIsRequestMode(true); setSelected({ single: undefined, multi: [] }); }} className={`flex-1 py-2 text-xs font-black rounded-xl ${isRequestMode ? 'bg-white text-purple-600' : 'text-gray-400'}`}>シフト申請</button>
+      
+      <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200 shadow-inner">
+        <button onClick={() => { setIsRequestMode(false); setSelected({ single: new Date(), multi: [] }); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
+        <button onClick={() => { setIsRequestMode(true); setSelected({ single: undefined, multi: [] }); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
       </div>
+
       <main className="px-4 mt-3 space-y-2">
         {!isRequestMode && <MonthlySummary month={format(viewDate, 'M月')} totals={monthlyTotals} />}
-        <DashboardCalendar shifts={data.shifts} selectedDates={isRequestMode ? selected.multi : selected.single} onSelect={(d: any) => isRequestMode ? setSelected(p => ({...p, multi: d})) : setSelected({single: d, multi: []})} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
+        
+        <section className="bg-white p-2 rounded-[32px] border border-gray-100 shadow-sm text-center">
+          <DashboardCalendar 
+            shifts={data.shifts} 
+            selectedDates={isRequestMode ? selected.multi : selected.single} 
+            onSelect={(d: any) => isRequestMode ? setSelected(p => ({...p, multi: d})) : setSelected({single: d, multi: []})} 
+            month={viewDate} 
+            onMonthChange={setViewDate} 
+            isRequestMode={isRequestMode} 
+          />
+        </section>
+
         {!isRequestMode && selected.single && (
           <DailyDetail 
             date={selected.single} 
@@ -107,7 +130,7 @@ export default function Page() {
         )}
         <NewsSection newsList={data.news} />
       </main>
-      <FixedFooter pathname={pathname} onHome={() => router.push('/')} onSalary={() => router.push('/salary')} onLogout={() => {}} />
+      <FixedFooter pathname={pathname} onHome={() => router.push('/')} onSalary={() => router.push('/salary')} onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} />
     </div>
   );
 }
