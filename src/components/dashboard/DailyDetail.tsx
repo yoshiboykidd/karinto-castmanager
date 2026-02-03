@@ -24,15 +24,33 @@ export default function DailyDetail({
 }: DailyDetailProps) {
   if (!date) return null;
 
+  // 1. ステータス判定（開始・終了の両方をHPと比較）
   const isOfficial = shift?.status === 'official';
   const isRequested = shift?.status === 'requested';
-  const isModified = isRequested && shift?.is_official_pre_exist;
+  
+  // ★重要：開始・終了どちらか一箇所でもHPの真実とズレていれば「変更中」とみなす
+  const isTimeDiff = 
+    shift.start_time !== shift.hp_start_time || 
+    shift.end_time !== shift.hp_end_time;
+  
+  // 確定済みだった履歴があり、かつ今時間がズレている場合は「変更申請中」
+  const isModified = isRequested && shift?.is_official_pre_exist && isTimeDiff;
+
   const isKarin = dayNum === 10;
   const isSoine = dayNum === 11 || dayNum === 22;
 
+  // 2. 配色テーマ
   let themeClass = "bg-white border-pink-100";
   if (isModified) themeClass = "bg-green-50/40 border-green-200";
   else if (isRequested) themeClass = "bg-purple-50/40 border-purple-200";
+
+  // 3. 表示時間の切り分け（開始・終了ペアで扱う）
+  // 確定枠には「HP上の現在の真実」を、申請枠には「アプリで送った希望」を表示
+  const displayOfficialS = isModified ? (shift.hp_start_time || shift.start_time) : shift.start_time;
+  const displayOfficialE = isModified ? (shift.hp_end_time || shift.end_time) : shift.end_time;
+  
+  const displayRequestS = shift.start_time;
+  const displayRequestE = shift.end_time;
 
   return (
     <section className={`relative overflow-hidden rounded-[32px] border shadow-xl p-4 pt-6 flex flex-col space-y-1.5 transition-all duration-300 ${themeClass}`}>
@@ -45,7 +63,7 @@ export default function DailyDetail({
         </div>
       )}
 
-      {/* 1行目：日付 ＆ 変更申請情報 */}
+      {/* 1行目：日付 ＆ 変更申請中の時間 */}
       <div className="flex items-center justify-between px-1 h-7 mt-0.5">
         <h3 className="text-xl font-black text-gray-800 tracking-tight leading-none flex items-baseline shrink-0">
           {format(date, 'M/d')}
@@ -58,17 +76,16 @@ export default function DailyDetail({
               変更申請中
             </span>
             <span className="text-[19px] font-black text-green-600 tracking-tighter whitespace-nowrap">
-              {shift.start_time}〜{shift.end_time}
+              {displayRequestS}〜{displayRequestE}
             </span>
           </div>
         )}
       </div>
 
-      {/* 2行目：メイン時間（絶対に1行に収める設定） */}
+      {/* 2行目：メイン時間（確定シフト：HPの最新 / 新規申請中：本人の希望） */}
       <div className="flex items-center justify-between px-1 h-10 gap-1">
         {shift && shift.start_time !== 'OFF' ? (
           <>
-            {/* ラベル：幅を取らないようフォントとパディングを微調整 */}
             <div className="shrink-0">
               {isOfficial || isModified ? (
                 <span className="text-[12px] font-black px-2.5 py-1.5 rounded-xl bg-blue-500 text-white shadow-md whitespace-nowrap">
@@ -81,11 +98,10 @@ export default function DailyDetail({
               ) : null}
             </div>
 
-            {/* 時間：右詰め & 改行禁止 & サイズ微調整 */}
             <div className="flex-1 text-right overflow-hidden">
               <span className={`text-[31px] font-black leading-none tracking-tighter whitespace-nowrap inline-block align-middle
                 ${isRequested && !isModified ? 'text-purple-500' : 'text-pink-500'}`}>
-                {shift.start_time}〜{shift.end_time}
+                {displayOfficialS}〜{displayOfficialE}
               </span>
             </div>
           </>
@@ -97,7 +113,7 @@ export default function DailyDetail({
         )}
       </div>
 
-      {/* 3行目以降：実績入力フォーム（さらに間隔を詰めてコンパクトに） */}
+      {/* 実績入力フォーム */}
       {(isOfficial || isModified) && shift?.start_time !== 'OFF' ? (
         <div className="space-y-1.5 pt-2 border-t border-gray-100/50">
           <div className="grid grid-cols-3 gap-2">
@@ -150,9 +166,9 @@ export default function DailyDetail({
             </button>
           </div>
         </div>
-      ) : isRequested && !isModified ? (
+      ) : (isRequested && !isModified) ? (
         <div className="bg-purple-100/30 rounded-2xl py-3 text-center border border-purple-200">
-          <p className="text-purple-500 font-black text-sm italic">店長の承認をお待ちください☕️</p>
+          <p className="text-purple-500 font-black text-sm italic">承認をお待ちください☕️</p>
         </div>
       ) : null}
     </section>
