@@ -7,12 +7,12 @@ import { format, parseISO, startOfToday, isBefore } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
 // --- 自作コンポーネントのインポート ---
-import CastHeader from '@/components/CastHeader';
-import MonthlySummary from '@/components/MonthlySummary';
-import DashboardCalendar from '@/components/DashboardCalendar';
-import DailyDetail from '@/components/DailyDetail';
-import NewsSection from '@/components/NewsSection';
-import FixedFooter from '@/components/FixedFooter';
+import CastHeader from '@/components/dashboard/CastHeader';
+import MonthlySummary from '@/components/dashboard/MonthlySummary';
+import DashboardCalendar from '@/components/DashboardCalendar'; // ※ここが dashboard/ 内なら追加
+import DailyDetail from '@/components/dashboard/DailyDetail';
+import NewsSection from '@/components/dashboard/NewsSection';
+import FixedFooter from '@/components/dashboard/FixedFooter';
 
 // --- 定数設定 ---
 const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1467395577829523487/oQUEYdVA4oSbkAb53WYNMCnVIiOa0Tsi25WRPVWDtxF2UsnJFGrsU_gb-qG37gdyTQaQ";
