@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation'; 
 import { format, startOfToday } from 'date-fns';
 
-// ★ 三種の神器（カスタムフック）
+// ★ 四種の神器（カスタムフック）
 import { useShiftData } from '@/hooks/useShiftData';
 import { useAchievement } from '@/hooks/useAchievement';
 import { useRequestManager } from '@/hooks/useRequestManager';
+import { useNavigation } from '@/hooks/useNavigation';
 
 import CastHeader from '@/components/dashboard/CastHeader';
 import MonthlySummary from '@/components/dashboard/MonthlySummary';
@@ -21,20 +22,18 @@ export default function Page() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // 1. データ基盤
+  // 1. データ基盤（読み込み担当）
   const { data, loading, fetchInitialData, getMonthlyTotals, supabase } = useShiftData();
 
-  // 2. ナビゲーション・選択状態（ここも後で切り離し可能）
-  const [isRequestMode, setIsRequestMode] = useState(false);
-  const [viewDate, setViewDate] = useState(new Date()); 
-  const [selected, setSelected] = useState<{single?: Date, multi: Date[]}>({ single: new Date(), multi: [] });
+  // 2. ナビゲーション（選択・切替担当）
+  const { isRequestMode, toggleMode, viewDate, setViewDate, selected, handleDateSelect, setSelected } = useNavigation();
 
-  // 3. 実績入力ロジック
+  // 3. 実績入力ロジック（過去の保存担当）
   const { editReward, setEditReward, handleSaveAchievement, isEditable, selectedShift } = useAchievement(
     supabase, data.profile, data.shifts, selected.single, () => fetchInitialData(router)
   );
 
-  // 4. シフト申請ロジック (ステップ3で追加)
+  // 4. シフト申請ロジック（未来の送信担当）
   const { requestDetails, setRequestDetails, handleBulkSubmit } = useRequestManager(
     supabase, data.profile, data.shifts, selected.multi, 
     () => fetchInitialData(router), 
@@ -45,28 +44,16 @@ export default function Page() {
 
   const monthlyTotals = useMemo(() => getMonthlyTotals(viewDate), [data.shifts, viewDate]);
 
-  // 日付選択の交通整理
-  const handleDateSelect = (dates: any) => {
-    if (isRequestMode) {
-      const tomorrow = startOfToday();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const filtered = (Array.isArray(dates) ? dates : []).filter(d => d >= tomorrow);
-      setSelected({ single: undefined, multi: filtered });
-    } else {
-      const d = Array.isArray(dates) ? dates[0] : dates;
-      setSelected({ single: d instanceof Date ? d : undefined, multi: [] });
-    }
-  };
-
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse text-5xl italic">KARINTO...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse text-5xl italic tracking-tighter">KARINTO...</div>;
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
-      <CastHeader shopName={data.shop?.shop_name} syncTime={data.syncAt} displayName={data.profile?.display_name} version="v2.9.9.34" />
+      <CastHeader shopName={data.shop?.shop_name} syncTime={data.syncAt} displayName={data.profile?.display_name} version="v3.0.0" />
       
-      <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200">
-        <button onClick={() => { setIsRequestMode(false); setSelected({ single: new Date(), multi: [] }); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
-        <button onClick={() => { setIsRequestMode(true); setSelected({ single: undefined, multi: [] }); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
+      {/* モード切替タブ */}
+      <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200 shadow-inner">
+        <button onClick={() => toggleMode(false)} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
+        <button onClick={() => toggleMode(true)} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
       </div>
 
       <main className="px-4 mt-3 space-y-2">
@@ -83,6 +70,7 @@ export default function Page() {
           />
         </section>
 
+        {/* --- 条件分岐：実績入力 or 申請リスト --- */}
         {!isRequestMode ? (
           selected.single && (
             <DailyDetail 
@@ -104,6 +92,7 @@ export default function Page() {
             onSubmit={handleBulkSubmit} 
           />
         )}
+        
         <NewsSection newsList={data.news} />
       </main>
 
