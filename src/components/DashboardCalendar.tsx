@@ -18,7 +18,7 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
 
   return (
     <div className="w-full">
-      {/* 1. カレンダーヘッダー */}
+      {/* 1. ヘッダー */}
       <div className="flex items-center justify-between mb-4 px-4 font-black text-slate-700">
         <button onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>
           <ChevronLeft className="text-pink-300" />
@@ -29,7 +29,7 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
         </button>
       </div>
 
-      {/* 2. 曜日表示 */}
+      {/* 2. 曜日 */}
       <div className="grid grid-cols-7 gap-1 px-1">
         {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(d => (
           <div key={d} className="text-[9px] font-black text-slate-300 pb-2 text-center tracking-widest">{d}</div>
@@ -40,17 +40,18 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const dateStr = format(day, 'yyyy-MM-dd');
           const s = Array.isArray(shifts) ? shifts.find((x: any) => x.shift_date === dateStr) : null;
           
-          // ステータス判定の適正化
+          // --- 判定ロジック ---
           const isOfficial = s?.status === 'official';
           const isRequested = s?.status === 'requested';
-          // ★ 確定済みだったが、現在「申請中（requested）」になっている＝変更申請中
-          const isModified = isRequested && s?.is_official_pre_exist;
+          const isModified = isRequested && s?.is_official_pre_exist; // 確定後の変更
           
+          // 「確定ベースの予定」があるかどうか（ピンクの丸を出す条件）
+          const hasOfficialBase = isOfficial || isModified;
+
           const isSelected = Array.isArray(selectedDates) 
             ? selectedDates.some(d => isSameDay(d, day)) 
             : selectedDates && isSameDay(selectedDates, day);
 
-          // 特定日（かりんとの日: 10日 / 添い寝の日: 11日・22日）の判定
           const dNum = day.getDate();
           const isKarin = dNum === 10;
           const isSoine = dNum === 11 || dNum === 22;
@@ -63,27 +64,30 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
               ${isKarin ? 'bg-orange-50/50' : isSoine ? 'bg-yellow-50/50' : 'bg-transparent'} 
               ${isSelected ? 'bg-white shadow-lg ring-2 ring-pink-400 z-10' : ''}`}
             >
+              {/* 日付の数字 */}
               <span className={`z-10 text-[13px] font-black 
-                ${isOfficial ? 'text-white' : isSelected ? 'text-pink-500' : 'text-slate-600'}`}>
+                ${hasOfficialBase ? 'text-white' : isSelected ? 'text-pink-500' : 'text-slate-600'}`}>
                 {dNum}
               </span>
 
-              {/* 背景装飾（優先順位順） */}
-              {isOfficial && (
+              {/* A. 確定ベースがある場合：ピンクの塗りつぶし丸 */}
+              {hasOfficialBase && (
                 <div className="absolute inset-1 rounded-full bg-gradient-to-br from-pink-400 to-rose-400 shadow-sm" />
               )}
               
-              {isModified ? (
-                // 変更申請中：オレンジの点線
-                <div className="absolute inset-1 rounded-full border-2 border-orange-300 border-dashed animate-pulse" />
-              ) : isRequested ? (
-                // 新規申請中：紫の点線
+              {/* B. 変更申請中の場合：確定の丸の外側にオレンジの枠線を追加 */}
+              {isModified && (
+                <div className="absolute inset-0 rounded-full border-[3px] border-white ring-2 ring-orange-400 z-[5] animate-pulse" />
+              )}
+              
+              {/* C. 新規申請（確定なし）の場合：紫の点線のみ */}
+              {isRequested && !isModified && (
                 <div className="absolute inset-1 rounded-full border-2 border-purple-300 border-dashed animate-pulse" />
-              ) : null}
+              )}
 
               {/* 特定日ドット */}
-              {isKarin && <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-orange-400 shadow-sm" />}
-              {isSoine && <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-yellow-400 shadow-sm" />}
+              {isKarin && <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-orange-400 shadow-sm z-20" />}
+              {isSoine && <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-yellow-400 shadow-sm z-20" />}
             </div>
           );
         })}
