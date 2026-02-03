@@ -54,10 +54,7 @@ export default function Page() {
       ]);
       
       setData({
-        shifts: shifts.data || [],
-        profile: profile,
-        shop: shop.data,
-        news: news.data || [],
+        shifts: shifts.data || [], profile, shop: shop.data, news: news.data || [],
         syncAt: sync.data ? format(parseISO(sync.data.last_sync_at), 'HH:mm') : ''
       });
     }
@@ -76,16 +73,18 @@ export default function Page() {
     });
   }, [selected.single, data.shifts]);
 
-  // --- 3. 実績集計 ---
+  // --- 3. 【三すくみ対応】実績集計ロジック ---
   const monthlyTotals = useMemo(() => {
     const today = startOfToday();
     return data.shifts
       .filter((s: any) => {
         const d = parseISO(s.shift_date);
-        return d.getMonth() === viewDate.getMonth() && 
-               d.getFullYear() === viewDate.getFullYear() && 
-               (s.status === 'official' || s.is_official_pre_exist) &&
-               !isAfter(d, today);
+        return (
+          d.getMonth() === viewDate.getMonth() && 
+          d.getFullYear() === viewDate.getFullYear() && 
+          s.is_official === true && // ★確定しているもののみ
+          !isAfter(d, today)        // ★当日までのみ（申請は明日以降なので影響しない）
+        );
       })
       .reduce((acc, s: any) => {
         let dur = 0;
@@ -108,7 +107,7 @@ export default function Page() {
   // --- 4. イベントハンドラ ---
   const handleDateSelect = (dates: any) => {
     if (isRequestMode) {
-      // ★明日以降の日付のみを選択可能にする
+      // ★明日以降の日付のみを選択可能にするガード
       const filtered = (Array.isArray(dates) ? dates : []).filter(d => isAfter(d, startOfToday()));
       setSelected(prev => ({ ...prev, multi: filtered }));
     } else {
@@ -129,8 +128,8 @@ export default function Page() {
         start_time: requestDetails[key]?.s || '11:00',
         end_time: requestDetails[key]?.e || '23:00',
         status: 'requested',
-        is_official: false,
-        is_official_pre_exist: existing?.is_official_pre_exist || false,
+        is_official: false, // 申請なので false
+        is_official_pre_exist: existing?.is_official_pre_exist || false, // 元の枠の有無を継承
         reward_amount: existing?.reward_amount || 0,
         f_count: existing?.f_count || 0,
         first_request_count: existing?.first_request_count || 0,
@@ -140,7 +139,7 @@ export default function Page() {
 
     const { error } = await supabase.from('shifts').upsert(finalRequests as any, { onConflict: 'login_id,shift_date' });
     if (!error) {
-      await fetch(DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: `🔔 **シフト申請がありました**\nキャスト: **${data.profile.display_name}** さん` }) });
+      await fetch(DISCORD_WEBHOOK_URL, { method: 'POST', body: JSON.stringify({ content: `🔔 シフト申請: **${data.profile.display_name}**` }) });
       alert('申請を送信しました🚀'); setSelected(p => ({ ...p, multi: [] })); fetchInitialData();
     }
   };
@@ -165,6 +164,7 @@ export default function Page() {
       
       <CastHeader shopName={data.shop?.shop_name || 'Karinto'} syncTime={data.syncAt} displayName={data.profile?.display_name || 'キャスト'} version="v2.9.9.26" />
 
+      {/* モード切替 */}
       <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200">
         <button onClick={() => { setIsRequestMode(false); setSelected(p => ({ ...p, multi: [] })); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
         <button onClick={() => { setIsRequestMode(true); setSelected(p => ({ ...p, single: undefined })); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
@@ -184,11 +184,14 @@ export default function Page() {
           />
         </section>
 
+        {/* --- 【修正ポイント】日付詳細へのデータの渡し方 --- */}
         {!isRequestMode && selected.single ? (
           <DailyDetail 
             date={selected.single} 
             dayNum={selected.single.getDate()} 
-            dayOfficial={data.shifts.find(s => s.shift_date === format(selected.single!, 'yyyy-MM-dd') && s.status === 'official')} 
+            // 公式枠（pre_existがtrue）ならそのデータを渡す
+            dayOfficial={data.shifts.find(s => s.shift_date === format(selected.single!, 'yyyy-MM-dd') && s.is_official_pre_exist === true)} 
+            // 申請中（statusがrequested）ならそのデータを渡す
             dayRequested={data.shifts.find(s => s.shift_date === format(selected.single!, 'yyyy-MM-dd') && s.status === 'requested')} 
             editReward={editReward} 
             setEditReward={setEditReward} 
