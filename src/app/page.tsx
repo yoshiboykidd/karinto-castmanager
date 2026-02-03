@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation'; 
-import { format, startOfToday, isAfter } from 'date-fns';
+import { format, startOfToday } from 'date-fns';
 
-// ★ ステップ1で作成したカスタムフック
+// ★ 作成したフックたち
 import { useShiftData } from '@/hooks/useShiftData';
+import { useAchievement } from '@/hooks/useAchievement';
 
-// --- コンポーネント群 ---
 import CastHeader from '@/components/dashboard/CastHeader';
 import MonthlySummary from '@/components/dashboard/MonthlySummary';
 import DashboardCalendar from '@/components/DashboardCalendar';
@@ -22,38 +22,24 @@ export default function Page() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // ★ データ読み込みロジックをフックへ委託
+  // 1. データ取得フック
   const { data, loading, fetchInitialData, getMonthlyTotals, supabase } = useShiftData();
 
-  // --- 状態管理（ここは順次フックへ移行可能） ---
+  // --- 状態管理 ---
   const [isRequestMode, setIsRequestMode] = useState(false);
   const [viewDate, setViewDate] = useState(new Date()); 
   const [selected, setSelected] = useState<{single?: Date, multi: Date[]}>({ single: new Date(), multi: [] });
-  const [editReward, setEditReward] = useState({ f: '', first: '', main: '', amount: '' });
   const [requestDetails, setRequestDetails] = useState<{[key: string]: {s: string, e: string}}>({});
 
-  // 初期データ取得
-  useEffect(() => {
-    fetchInitialData(router);
-  }, []);
+  // 2. 実績入力ロジックフック (ステップ2で追加)
+  const { editReward, setEditReward, handleSaveAchievement, isEditable, selectedShift } = useAchievement(
+    supabase, data.profile, data.shifts, selected.single, () => fetchInitialData(router)
+  );
 
-  // 月間合計の計算（フック内のロジックを使用）
+  useEffect(() => { fetchInitialData(router); }, []);
+
   const monthlyTotals = useMemo(() => getMonthlyTotals(viewDate), [data.shifts, viewDate]);
 
-  // 実績入力フォームの同期
-  useEffect(() => {
-    if (isRequestMode || !selected.single) return;
-    const dateStr = format(selected.single!, 'yyyy-MM-dd');
-    const shift = data.shifts.find(s => s.shift_date === dateStr);
-    setEditReward({ 
-      f: String(shift?.f_count || ''), 
-      first: String(shift?.first_request_count || ''), 
-      main: String(shift?.main_request_count || ''), 
-      amount: String(shift?.reward_amount || '') 
-    });
-  }, [selected.single, data.shifts, isRequestMode]);
-
-  // 日付選択ハンドラ
   const handleDateSelect = (dates: any) => {
     if (isRequestMode) {
       const tomorrow = startOfToday();
@@ -66,28 +52,6 @@ export default function Page() {
     }
   };
 
-  // 実績保存ロジック（HP情報が絶対正解）
-  const handleSaveAchievement = async () => {
-    if (!selected.single || !data.profile) return;
-    const dateStr = format(selected.single, 'yyyy-MM-dd');
-    const selectedShift = data.shifts.find(s => s.shift_date === dateStr);
-
-    if (!selectedShift || selectedShift.start_time === 'OFF') {
-      return alert('HPにシフトがない日は実績を入力できません');
-    }
-
-    const { error } = await supabase.from('shifts').update({ 
-      f_count: Number(editReward.f) || 0, 
-      first_request_count: Number(editReward.first) || 0, 
-      main_request_count: Number(editReward.main) || 0, 
-      reward_amount: Number(editReward.amount) || 0,
-      is_official: true 
-    }).eq('login_id', data.profile.login_id).eq('shift_date', dateStr);
-    
-    if (!error) { fetchInitialData(router); alert('実績を保存しました💰'); }
-  };
-
-  // シフト一括申請ロジック
   const handleBulkSubmit = async () => {
     if (!data.profile || selected.multi.length === 0) return;
     const requests = selected.multi.map(date => {
@@ -99,7 +63,7 @@ export default function Page() {
         shift_date: key,
         start_time: requestDetails[key]?.s || '11:00',
         end_time: requestDetails[key]?.e || '23:00',
-        status: 'requested', // スクレイパー保護用
+        status: 'requested',
         is_official: false,
         is_official_pre_exist: existing?.is_official_pre_exist || existing?.status === 'official'
       };
@@ -116,16 +80,11 @@ export default function Page() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse text-5xl italic">KARINTO...</div>;
 
-  const today = startOfToday();
-  const selectedShift = selected.single ? data.shifts.find(s => s.shift_date === format(selected.single!, 'yyyy-MM-dd')) : null;
-  const isEditable = selected.single && !isAfter(selected.single, today) && selectedShift && selectedShift.start_time !== 'OFF';
-
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
-      <CastHeader shopName={data.shop?.shop_name} syncTime={data.syncAt} displayName={data.profile?.display_name} version="v2.9.9.32" />
+      <CastHeader shopName={data.shop?.shop_name} syncTime={data.syncAt} displayName={data.profile?.display_name} version="v2.9.9.33" />
       
-      {/* モード切替 */}
-      <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200 shadow-inner">
+      <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200">
         <button onClick={() => { setIsRequestMode(false); setSelected({ single: new Date(), multi: [] }); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
         <button onClick={() => { setIsRequestMode(true); setSelected({ single: undefined, multi: [] }); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
       </div>
@@ -144,7 +103,6 @@ export default function Page() {
           />
         </section>
 
-        {/* --- メインコンテンツ --- */}
         {!isRequestMode ? (
           selected.single && (
             <DailyDetail 
@@ -166,7 +124,6 @@ export default function Page() {
             onSubmit={handleBulkSubmit} 
           />
         )}
-
         <NewsSection newsList={data.news} />
       </main>
 
