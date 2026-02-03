@@ -14,14 +14,13 @@ export async function GET(request: NextRequest) {
   let debugLog: any[] = [];
 
   try {
-    const { data: allCasts } = await supabase
-      .from('cast_members')
-      .select('login_id, hp_display_name');
+    // 1. キャスト名簿の取得
+    const { data: allCasts } = await supabase.from('cast_members').select('login_id, hp_display_name');
 
-    // ★ 修正点：str が null や undefined の場合でもエラーにならないように保護
-    const normalize = (str: string | null | undefined) => {
-      const safeStr = str || ""; // null なら空文字にする
-      return safeStr
+    // ★ どんなゴミデータが来ても絶対にエラーにしない normalize 関数
+    const normalize = (str: any): string => {
+      if (!str || typeof str !== 'string') return ""; // 文字列以外はすべて空文字にする
+      return str
         .replace(/\s+/g, '') 
         .replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s: string) => {
           return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
@@ -33,6 +32,7 @@ export async function GET(request: NextRequest) {
       matchName: normalize(c.hp_display_name)
     })) || [];
 
+    // 2. HP情報の取得
     const targetDate = new Date(Date.now() + JST_OFFSET);
     const dateStr = targetDate.toISOString().split('T')[0];
     const hpDateStr = dateStr.replace(/-/g, '/');
@@ -44,17 +44,22 @@ export async function GET(request: NextRequest) {
     const listItems = html.match(/<li[^>]*>[\s\S]*?<\/li>/g) || [];
 
     for (const item of listItems) {
+      // 正規表現の実行結果を安全に変数に入れる
       const nameMatch = item.match(/<h3>(.*?)<\/h3>/);
       const timeMatch = item.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
-      if (!nameMatch || !timeMatch) continue;
+      
+      // マッチしない項目（広告など）はスルー
+      if (!nameMatch || !nameMatch[1] || !timeMatch) continue;
 
-      const hpNameRaw = nameMatch[1].replace(/[（\(\[].*?[）\)\]]/g, '').trim();
-      const cleanHPName = normalize(hpNameRaw);
+      // ★ .replace を呼ぶ前に、確実に文字列であることを保証する
+      const hpNameRaw: string = nameMatch[1];
+      const hpNameCleaned = hpNameRaw.replace(/[（\(\[].*?[）\)\]]/g, '').trim();
+      const cleanHPName = normalize(hpNameCleaned);
 
       const targetCast = cleanCastList.find(c => c.matchName === cleanHPName);
 
       if (targetCast) {
-        await supabase.from('shifts').upsert({ 
+        const { error: upsertError } = await supabase.from('shifts').upsert({ 
           login_id: targetCast.login_id, 
           shift_date: dateStr, 
           hp_display_name: targetCast.hp_display_name, 
@@ -64,9 +69,13 @@ export async function GET(request: NextRequest) {
           is_official: true 
         }, { onConflict: 'login_id,shift_date' });
         
-        debugLog.push({ 状態: "✅一致", HP名: cleanHPName, DB名: targetCast.hp_display_name });
+        debugLog.push({ 
+          状態: "✅一致", 
+          名前: cleanHPName, 
+          DB反映: upsertError ? "失敗" : "成功" 
+        });
       } else {
-        debugLog.push({ 状態: "❌不一致", HP名: cleanHPName, 理由: "DBに対応する名前がありません" });
+        debugLog.push({ 状態: "❌不一致", HP名: cleanHPName, 理由: "DBにこの名前がいません" });
       }
     }
 
@@ -75,12 +84,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       date: dateStr,
-      debug: debugLog, 
-      db_registered_count: cleanCastList.length 
+      debug: debugLog,
+      db_registered_cast_count: cleanCastList.length
     });
 
   } catch (error: any) {
-    // ここでエラーが出た場合、詳細をブラウザに返します
-    return NextResponse.json({ error: error.message, stack: error.stack }, { status: 500 });
+    // どこで死んだか特定するための詳細出力
+    return NextResponse.json({ 
+      success: false,
+      error_message: error.message,
+      error_stack: error.stack?.split('\n').slice(0, 3) // 最初の3行だけ
+    }, { status: 500 });
   }
 }
