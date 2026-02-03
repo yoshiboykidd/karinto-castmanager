@@ -1,8 +1,6 @@
 'use client';
 
-// --- キャッシュを無効化し、常に最新のDBを読みに行く設定 ---
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+
 
 import { useEffect, useState, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
