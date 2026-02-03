@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
 import { useRouter, usePathname } from 'next/navigation'; 
-import { format, parseISO, startOfToday, isAfter } from 'date-fns';
+import { format, startOfToday, isAfter } from 'date-fns';
+
+// ★ ステップ1で作成したカスタムフック
+import { useShiftData } from '@/hooks/useShiftData';
 
 // --- コンポーネント群 ---
 import CastHeader from '@/components/dashboard/CastHeader';
@@ -19,95 +21,73 @@ const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/146739557782952348
 export default function Page() {
   const router = useRouter();
   const pathname = usePathname();
-  const [supabase] = useState(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ));
 
-  const [data, setData] = useState<{shifts: any[], profile: any, shop: any, news: any[], syncAt: string}>({
-    shifts: [], profile: null, shop: null, news: [], syncAt: ''
-  });
-  const [loading, setLoading] = useState(true);
+  // ★ データ読み込みロジックをフックへ委託
+  const { data, loading, fetchInitialData, getMonthlyTotals, supabase } = useShiftData();
+
+  // --- 状態管理（ここは順次フックへ移行可能） ---
   const [isRequestMode, setIsRequestMode] = useState(false);
   const [viewDate, setViewDate] = useState(new Date()); 
   const [selected, setSelected] = useState<{single?: Date, multi: Date[]}>({ single: new Date(), multi: [] });
   const [editReward, setEditReward] = useState({ f: '', first: '', main: '', amount: '' });
   const [requestDetails, setRequestDetails] = useState<{[key: string]: {s: string, e: string}}>({});
 
-  useEffect(() => { fetchInitialData(); }, []);
+  // 初期データ取得
+  useEffect(() => {
+    fetchInitialData(router);
+  }, []);
 
-  async function fetchInitialData() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return router.push('/login');
-    const loginId = session.user.email?.replace('@karinto-internal.com', '');
-    const { data: profile } = await supabase.from('cast_members').select('*').eq('login_id', loginId).single();
-    
-    if (profile) {
-      const myShopId = profile.home_shop_id || 'main';
-      const [shop, shifts, news, sync] = await Promise.all([
-        supabase.from('shop_master').select('*').eq('shop_id', myShopId).single(),
-        supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
-        supabase.from('news').select('*').or(`shop_id.eq.${myShopId},shop_id.eq.all`).order('created_at', { ascending: false }).limit(3),
-        supabase.from('sync_logs').select('last_sync_at').eq('id', 1).single()
-      ]);
-      setData({ shifts: shifts.data || [], profile, shop: shop.data, news: news.data || [], syncAt: sync.data ? format(parseISO(sync.data.last_sync_at), 'HH:mm') : '' });
-    }
-    setLoading(false);
-  }
+  // 月間合計の計算（フック内のロジックを使用）
+  const monthlyTotals = useMemo(() => getMonthlyTotals(viewDate), [data.shifts, viewDate]);
 
-  const monthlyTotals = useMemo(() => {
-    const today = startOfToday();
-    return (data.shifts || [])
-      .filter((s: any) => {
-        const d = parseISO(s.shift_date);
-        const isPastOrToday = !isAfter(d, today);
-        const isOfficialInfo = s.status === 'official' || s.is_official_pre_exist === true;
-        return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear() && isPastOrToday && isOfficialInfo;
-      })
-      .reduce((acc, s: any) => ({ 
-        amount: acc.amount + (Number(s.reward_amount) || 0), 
-        f: acc.f + (Number(s.f_count) || 0), 
-        first: acc.first + (Number(s.first_request_count) || 0), 
-        main: acc.main + (Number(s.main_request_count) || 0), 
-        count: acc.count + 1, 
-        hours: acc.hours + 8 
-      }), { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
-  }, [data.shifts, viewDate]);
+  // 実績入力フォームの同期
+  useEffect(() => {
+    if (isRequestMode || !selected.single) return;
+    const dateStr = format(selected.single!, 'yyyy-MM-dd');
+    const shift = data.shifts.find(s => s.shift_date === dateStr);
+    setEditReward({ 
+      f: String(shift?.f_count || ''), 
+      first: String(shift?.first_request_count || ''), 
+      main: String(shift?.main_request_count || ''), 
+      amount: String(shift?.reward_amount || '') 
+    });
+  }, [selected.single, data.shifts, isRequestMode]);
 
-  // 日付選択ハンドラ：モードに応じて単一/複数を切り分け
+  // 日付選択ハンドラ
   const handleDateSelect = (dates: any) => {
     if (isRequestMode) {
-      // 申請モード：今日より後の日付のみ選択可能
       const tomorrow = startOfToday();
       tomorrow.setDate(tomorrow.getDate() + 1);
       const filtered = (Array.isArray(dates) ? dates : []).filter(d => d >= tomorrow);
       setSelected({ single: undefined, multi: filtered });
     } else {
-      // 実績モード：単一選択
       const d = Array.isArray(dates) ? dates[0] : dates;
       setSelected({ single: d instanceof Date ? d : undefined, multi: [] });
     }
   };
 
-  useEffect(() => {
-    if (isRequestMode || !selected.single) return;
-    const dateStr = format(selected.single!, 'yyyy-MM-dd');
-    const shift = data.shifts.find(s => s.shift_date === dateStr);
-    setEditReward({ f: String(shift?.f_count || ''), first: String(shift?.first_request_count || ''), main: String(shift?.main_request_count || ''), amount: String(shift?.reward_amount || '') });
-  }, [selected.single, data.shifts, isRequestMode]);
-
+  // 実績保存ロジック（HP情報が絶対正解）
   const handleSaveAchievement = async () => {
     if (!selected.single || !data.profile) return;
     const dateStr = format(selected.single, 'yyyy-MM-dd');
     const selectedShift = data.shifts.find(s => s.shift_date === dateStr);
-    if (!selectedShift || selectedShift.start_time === 'OFF') return alert('シフトがない日は実績を入力できません');
+
+    if (!selectedShift || selectedShift.start_time === 'OFF') {
+      return alert('HPにシフトがない日は実績を入力できません');
+    }
 
     const { error } = await supabase.from('shifts').update({ 
-      f_count: Number(editReward.f), first_request_count: Number(editReward.first), main_request_count: Number(editReward.main), reward_amount: Number(editReward.amount), is_official: true 
+      f_count: Number(editReward.f) || 0, 
+      first_request_count: Number(editReward.first) || 0, 
+      main_request_count: Number(editReward.main) || 0, 
+      reward_amount: Number(editReward.amount) || 0,
+      is_official: true 
     }).eq('login_id', data.profile.login_id).eq('shift_date', dateStr);
-    if (!error) { fetchInitialData(); alert('実績を保存しました💰'); }
+    
+    if (!error) { fetchInitialData(router); alert('実績を保存しました💰'); }
   };
 
+  // シフト一括申請ロジック
   const handleBulkSubmit = async () => {
     if (!data.profile || selected.multi.length === 0) return;
     const requests = selected.multi.map(date => {
@@ -119,7 +99,7 @@ export default function Page() {
         shift_date: key,
         start_time: requestDetails[key]?.s || '11:00',
         end_time: requestDetails[key]?.e || '23:00',
-        status: 'requested', // ★ これがスクレイパーの上書きを防ぐフラグ
+        status: 'requested', // スクレイパー保護用
         is_official: false,
         is_official_pre_exist: existing?.is_official_pre_exist || existing?.status === 'official'
       };
@@ -127,18 +107,22 @@ export default function Page() {
 
     const { error } = await supabase.from('shifts').upsert(requests, { onConflict: 'login_id,shift_date' });
     if (!error) {
-      await fetch(DISCORD_WEBHOOK_URL, { method: 'POST', body: JSON.stringify({ content: `🔔 シフト申請: **${data.profile.display_name}** (${requests.length}件)` }) });
+      await fetch(DISCORD_WEBHOOK_URL, { method: 'POST', body: JSON.stringify({ content: `🔔 シフト申請: **${data.profile.display_name}**` }) });
       alert('申請を送信しました！🚀');
       setSelected({ single: undefined, multi: [] });
-      fetchInitialData();
+      fetchInitialData(router);
     }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse text-5xl italic">KARINTO...</div>;
 
+  const today = startOfToday();
+  const selectedShift = selected.single ? data.shifts.find(s => s.shift_date === format(selected.single!, 'yyyy-MM-dd')) : null;
+  const isEditable = selected.single && !isAfter(selected.single, today) && selectedShift && selectedShift.start_time !== 'OFF';
+
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
-      <CastHeader shopName={data.shop?.shop_name} syncTime={data.syncAt} displayName={data.profile?.display_name} version="v2.9.9.31" />
+      <CastHeader shopName={data.shop?.shop_name} syncTime={data.syncAt} displayName={data.profile?.display_name} version="v2.9.9.32" />
       
       {/* モード切替 */}
       <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200 shadow-inner">
@@ -160,22 +144,20 @@ export default function Page() {
           />
         </section>
 
-        {/* --- 表示エリアの切り替え --- */}
+        {/* --- メインコンテンツ --- */}
         {!isRequestMode ? (
-          /* 実績入力：選択中の日の詳細を表示 */
           selected.single && (
             <DailyDetail 
               date={selected.single} 
               dayNum={selected.single.getDate()} 
-              shift={data.shifts.find(s => s.shift_date === format(selected.single!, 'yyyy-MM-dd'))} 
+              shift={selectedShift} 
               editReward={editReward} 
               setEditReward={setEditReward} 
               onSave={handleSaveAchievement} 
-              isEditable={!isAfter(selected.single, startOfToday()) && !!data.shifts.find(s => s.shift_date === format(selected.single!, 'yyyy-MM-dd') && s.start_time !== 'OFF')} 
+              isEditable={!!isEditable} 
             />
           )
         ) : (
-          /* シフト申請：カレンダーで選んだ日付のリストを表示 */
           <RequestList 
             multiDates={selected.multi} 
             requestDetails={requestDetails} 
