@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+'use client';
+
+import { useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { format, parseISO, startOfToday, isAfter } from 'date-fns';
 
@@ -39,24 +41,49 @@ export function useShiftData() {
     setLoading(false);
   };
 
-  // 月間集計ロジック（三すくみ対応）もここへ移動
+  /**
+   * 月間集計ロジック (v3.3.4)
+   * 「過去かつ確定済み」のシフトを、正確な時間計算で集計します。
+   */
   const getMonthlyTotals = (viewDate: Date) => {
     const today = startOfToday();
+    
     return (data.shifts || [])
       .filter((s: any) => {
         const d = parseISO(s.shift_date);
         const isPastOrToday = !isAfter(d, today);
+        
+        // 実績としてカウントする条件:
+        // 1. ステータスが 'official' である
+        // 2. または、以前確定していたが現在は変更申請中 ('is_official_pre_exist' が true)
         const isOfficialInfo = s.status === 'official' || s.is_official_pre_exist === true;
-        return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear() && isPastOrToday && isOfficialInfo;
+        
+        return (
+          d.getMonth() === viewDate.getMonth() && 
+          d.getFullYear() === viewDate.getFullYear() && 
+          isPastOrToday && 
+          isOfficialInfo
+        );
       })
-      .reduce((acc, s: any) => ({ 
-        amount: acc.amount + (Number(s.reward_amount) || 0), 
-        f: acc.f + (Number(s.f_count) || 0), 
-        first: acc.first + (Number(s.first_request_count) || 0), 
-        main: acc.main + (Number(s.main_request_count) || 0), 
-        count: acc.count + 1, 
-        hours: acc.hours + 8 
-      }), { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
+      .reduce((acc, s: any) => {
+        // 精密な時間計算ロジックを復元
+        let dur = 0;
+        if (s.start_time && s.end_time && s.start_time !== 'OFF') {
+          const [sH, sM] = s.start_time.split(':').map(Number);
+          const [eH, eM] = s.end_time.split(':').map(Number);
+          // 24時を跨ぐ場合も考慮
+          dur = (eH < sH ? eH + 24 : eH) + eM / 60 - (sH + sM / 60);
+        }
+
+        return { 
+          amount: acc.amount + (Number(s.reward_amount) || 0), 
+          f: acc.f + (Number(s.f_count) || 0), 
+          first: acc.first + (Number(s.first_request_count) || 0), 
+          main: acc.main + (Number(s.main_request_count) || 0), 
+          count: acc.count + 1, 
+          hours: acc.hours + dur 
+        };
+      }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
   };
 
   return { data, loading, fetchInitialData, getMonthlyTotals, supabase };
