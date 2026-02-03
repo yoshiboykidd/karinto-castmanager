@@ -24,28 +24,38 @@ export default function DailyDetail({
 }: DailyDetailProps) {
   if (!date) return null;
 
+  // 1. ステータス判定
   const isOfficial = shift?.status === 'official';
   const isRequested = shift?.status === 'requested';
-  const isModified = isRequested && shift?.is_official_pre_exist;
+  const isModified = isRequested && shift?.is_official_pre_exist; // 確定後の変更申請
+
+  // 2. 特定日判定
   const isKarin = dayNum === 10;
   const isSoine = dayNum === 11 || dayNum === 22;
 
+  // 3. 配色テーマの動的切り替え（カレンダーと同期）
   let themeClass = "bg-white border-pink-100";
-  if (isModified) themeClass = "bg-orange-50/40 border-orange-200";
-  else if (isRequested) themeClass = "bg-purple-50/40 border-purple-200";
+  let modTextClass = "text-green-600";
+  let modBadgeClass = "bg-green-600";
+
+  if (isModified) {
+    themeClass = "bg-green-50/40 border-green-200";
+  } else if (isRequested) {
+    themeClass = "bg-purple-50/40 border-purple-200";
+  }
 
   return (
     <section className={`relative overflow-hidden rounded-[32px] border shadow-xl p-4 pt-6 flex flex-col space-y-1.5 transition-all duration-300 ${themeClass}`}>
       
-      {/* 特定日バッジ */}
+      {/* 特定日バッジ（最上段） */}
       {(isKarin || isSoine) && (
-        <div className={`absolute top-0 left-0 right-0 py-0.5 text-center font-black text-[10px] tracking-[0.2em] shadow-sm
+        <div className={`absolute top-0 left-0 right-0 py-0.5 text-center font-black text-[10px] tracking-[0.2em] shadow-sm z-20
           ${isKarin ? 'bg-gradient-to-r from-orange-400 to-orange-500 text-white' : 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white'}`}>
           {isKarin ? 'かりんとの日' : '添い寝の日'}
         </div>
       )}
 
-      {/* A. 1行目：日付 ＆ 変更申請情報 */}
+      {/* 1行目：日付 ＆ 変更申請情報（緑色に変更） */}
       <div className="flex items-center justify-between px-1 h-7">
         <h3 className="text-xl font-black text-gray-800 tracking-tight leading-none flex items-baseline">
           {format(date, 'M/d')}
@@ -54,17 +64,17 @@ export default function DailyDetail({
 
         {isModified && (
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-orange-500 text-white">
+            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md text-white shadow-sm ${modBadgeClass}`}>
               変更申請中
             </span>
-            <span className="text-[16px] font-black text-orange-500 tracking-tighter">
+            <span className={`text-[16px] font-black tracking-tighter ${modTextClass}`}>
               {shift.start_time}〜{shift.end_time}
             </span>
           </div>
         )}
       </div>
 
-      {/* B. メイン時間表示（高さを少し圧縮） */}
+      {/* 2行目：メイン時間表示（確定＝青、新規＝紫） */}
       <div className="flex items-center gap-3 px-1 h-10">
         {shift && shift.start_time !== 'OFF' ? (
           <>
@@ -78,19 +88,20 @@ export default function DailyDetail({
               </span>
             ) : null}
 
-            <span className={`text-[32px] font-black leading-none tracking-tighter ${isRequested && !isModified ? 'text-purple-500' : 'text-pink-500'}`}>
+            <span className={`text-[32px] font-black leading-none tracking-tighter 
+              ${isRequested && !isModified ? 'text-purple-500' : 'text-pink-500'}`}>
               {shift.start_time}〜{shift.end_time}
             </span>
           </>
         ) : (
           <div className="flex items-center gap-2">
             <span className="text-[13px] font-black px-3 py-1.5 rounded-xl bg-gray-400 text-white shadow-sm">休み</span>
-            <span className="text-xs font-black text-gray-300 italic uppercase tracking-widest">No Schedule</span>
+            <span className="text-xs font-black text-gray-300 italic uppercase tracking-widest opacity-50">No Schedule</span>
           </div>
         )}
       </div>
 
-      {/* C. 実績入力フォーム（上下の余白を最小化） */}
+      {/* 3行目以降：実績入力フォーム（確定 または 変更申請中の場合に表示） */}
       {(isOfficial || isModified) && shift?.start_time !== 'OFF' ? (
         <div className="space-y-2 pt-2 border-t border-gray-100/50">
           <div className="grid grid-cols-3 gap-2">

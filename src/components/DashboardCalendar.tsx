@@ -42,7 +42,7 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           
           const isOfficial = s?.status === 'official';
           const isRequested = s?.status === 'requested';
-          const isModified = isRequested && s?.is_official_pre_exist;
+          const isModified = isRequested && s?.is_official_pre_exist; // 確定後の変更
           const hasOfficialBase = isOfficial || isModified;
 
           const isSelected = Array.isArray(selectedDates) 
@@ -61,7 +61,7 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
               ${isKarin ? 'bg-orange-50/50' : isSoine ? 'bg-yellow-50/50' : 'bg-transparent'} 
               ${isSelected ? 'bg-white shadow-lg ring-2 ring-pink-400 z-10' : ''}`}
             >
-              {/* 日付数字：確定ベースがある日は白文字 */}
+              {/* 日付数字 */}
               <span className={`z-20 text-[13px] font-black 
                 ${hasOfficialBase ? 'text-white' : isSelected ? 'text-pink-500' : 'text-slate-600'}`}>
                 {dNum}
@@ -72,14 +72,14 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
                 <div className="absolute inset-1.5 rounded-full bg-gradient-to-br from-pink-400 to-rose-400 shadow-sm z-10" />
               )}
               
-              {/* B. 変更中：ピンクの丸の外側に太いオレンジ枠 */}
+              {/* B. 変更申請中：極太の「緑」枠線 */}
               {isModified && (
-                <div className="absolute inset-0.5 rounded-full border-[3.5px] border-orange-500 z-[15] animate-pulse" />
+                <div className="absolute inset-0.5 rounded-full border-[5px] border-green-500 z-[15] animate-pulse" />
               )}
               
               {/* C. 新規申請：紫の点線 */}
               {isRequested && !isModified && (
-                <div className="absolute inset-1 rounded-full border-2 border-purple-300 border-dashed animate-pulse z-10" />
+                <div className="absolute inset-1 rounded-full border-2 border-purple-400 border-dashed animate-pulse z-10" />
               )}
 
               {/* 特定日ドット */}
