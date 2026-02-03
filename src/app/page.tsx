@@ -60,7 +60,6 @@ export default function Page() {
     setLoading(false);
   }
 
-  // 【実績サマリー計算】当日までの公式枠、または「実績として残すべき申請中(pre_exist)」を合計
   const monthlyTotals = useMemo(() => {
     const today = startOfToday();
     return data.shifts
@@ -69,7 +68,6 @@ export default function Page() {
         const isThisMonth = d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
         const isPastOrToday = !isAfter(d, today);
         const isCountable = s.status === 'official' || (s.status === 'requested' && s.is_official_pre_exist === true);
-        
         return isThisMonth && isPastOrToday && isCountable;
       })
       .reduce((acc, s: any) => {
@@ -90,7 +88,6 @@ export default function Page() {
       }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
   }, [data.shifts, viewDate]);
 
-  // 実績入力フォームの同期
   useEffect(() => {
     if (isRequestMode || !selected.single) return;
     const dateStr = format(selected.single!, 'yyyy-MM-dd');
@@ -114,7 +111,6 @@ export default function Page() {
   const handleSaveAchievement = async () => {
     if (!selected.single || !data.profile) return;
     const dateStr = format(selected.single, 'yyyy-MM-dd');
-    // 実績保存時は is_official: true を立てて、公式データとして確定させる
     const { error } = await supabase.from('shifts').update({ 
       f_count: Number(editReward.f) || 0, 
       first_request_count: Number(editReward.first) || 0, 
@@ -122,7 +118,6 @@ export default function Page() {
       reward_amount: Number(editReward.amount) || 0,
       is_official: true 
     }).eq('login_id', data.profile.login_id).eq('shift_date', dateStr);
-    
     if (!error) { fetchInitialData(); alert('実績を保存しました💰'); }
   };
 
@@ -142,7 +137,6 @@ export default function Page() {
         is_official_pre_exist: existing?.is_official_pre_exist || existing?.status === 'official'
       };
     });
-
     const { error } = await supabase.from('shifts').upsert(requests, { onConflict: 'login_id,shift_date' });
     if (!error) {
       await fetch(DISCORD_WEBHOOK_URL, { method: 'POST', body: JSON.stringify({ content: `🔔 シフト申請: **${data.profile.display_name}**` }) });
@@ -154,6 +148,7 @@ export default function Page() {
 
   const today = startOfToday();
   const isPastOrToday = selected.single && !isAfter(selected.single, today);
+  const selectedShift = selected.single ? data.shifts.find(s => s.shift_date === format(selected.single!, 'yyyy-MM-dd')) : null;
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
@@ -174,26 +169,37 @@ export default function Page() {
         </section>
 
         {!isRequestMode ? (
-          /* 実績入力セクション */
           selected.single && (
             isPastOrToday ? (
               <DailyDetail 
                 date={selected.single} 
                 dayNum={selected.single.getDate()} 
-                shift={data.shifts.find(s => s.shift_date === format(selected.single!, 'yyyy-MM-dd'))} 
+                shift={selectedShift} 
                 editReward={editReward} 
                 setEditReward={setEditReward} 
                 onSave={handleSaveAchievement} 
               />
             ) : (
-              <div className="bg-white rounded-[32px] border border-pink-50 p-8 text-center shadow-sm">
-                <p className="text-gray-300 font-black italic text-xs">未来の日付の実績入力はできません⛄️</p>
-                <p className="text-[10px] text-pink-300 font-bold mt-1">シフト申請モードへ切り替えてください</p>
+              /* ★ 未来日の表示：余計なことは書かずシフト時間だけ */
+              <div className="bg-white rounded-[32px] border border-pink-100 p-7 shadow-sm flex flex-col items-center justify-center space-y-2 animate-in fade-in duration-500">
+                <div className="text-center">
+                  <span className="text-sm font-black text-gray-400">
+                    {format(selected.single, 'M/d')} ({format(selected.single, 'E', { locale: ja })})
+                  </span>
+                  <p className="text-[10px] font-black text-pink-300 uppercase tracking-[0.2em] mt-1">Scheduled Shift</p>
+                </div>
+                <div className="text-4xl font-black text-pink-500 tracking-tight">
+                  {selectedShift && selectedShift.start_time !== 'OFF' 
+                    ? `${selectedShift.start_time} 〜 ${selectedShift.end_time}` 
+                    : 'お休み'}
+                </div>
+                {selectedShift?.status === 'requested' && (
+                  <span className="text-[10px] font-black text-orange-400 bg-orange-50 px-3 py-1 rounded-full border border-orange-100">変更申請中</span>
+                )}
               </div>
             )
           )
         ) : (
-          /* シフト申請セクション */
           <RequestList 
             multiDates={selected.multi} 
             requestDetails={requestDetails} 
