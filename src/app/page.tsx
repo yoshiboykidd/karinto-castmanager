@@ -6,10 +6,10 @@ import { useRouter, usePathname } from 'next/navigation';
 import { format, parseISO, startOfToday, isBefore } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
-// --- 自作コンポーネントのインポート ---
+// --- 自作コンポーネントのインポート（dashboardフォルダ内） ---
 import CastHeader from '@/components/dashboard/CastHeader';
 import MonthlySummary from '@/components/dashboard/MonthlySummary';
-import DashboardCalendar from '@/components/DashboardCalendar'; // ※ここが dashboard/ 内なら追加
+import DashboardCalendar from '@/components/DashboardCalendar';
 import DailyDetail from '@/components/dashboard/DailyDetail';
 import NewsSection from '@/components/dashboard/NewsSection';
 import FixedFooter from '@/components/dashboard/FixedFooter';
@@ -40,7 +40,7 @@ export default function Page() {
   const [requestDetails, setRequestDetails] = useState<{[key: string]: {s: string, e: string}}>({});
   const [editReward, setEditReward] = useState({ f: '', first: '', main: '', amount: '' });
 
-  // 【波線対策：型を明示的に指定】
+  // 型エラー回避のための型定義
   const activeTab: 'achievement' | 'request' = isRequestMode ? 'request' : 'achievement';
 
   useEffect(() => { fetchInitialData(); }, []);
@@ -66,14 +66,34 @@ export default function Page() {
       setShopInfo(shopRes.data);
       setShifts(shiftRes.data || []);
       setNewsList(newsRes.data || []);
-      if (syncRes.data) {
-        setLastSync(format(parseISO(syncRes.data.last_sync_at), 'HH:mm'));
-      }
+      if (syncRes.data) setLastSync(format(parseISO(syncRes.data.last_sync_at), 'HH:mm'));
     }
     setLoading(false);
   }
 
-  // --- 2. 実績計算ロジック（昨日まで） ---
+  // --- 2. 【重要】データ同期ロジック（残像問題を解決） ---
+  useEffect(() => {
+    if (!singleDate) return;
+    const dateStr = format(singleDate, 'yyyy-MM-dd');
+    
+    // 選択した日の確定データを検索
+    const dayData = (shifts || []).find(s => s.shift_date === dateStr && s.status === 'official');
+
+    if (dayData) {
+      // 保存済みデータがあれば入力欄にセット
+      setEditReward({
+        f: dayData.f_count?.toString() || '',
+        first: dayData.first_request_count?.toString() || '',
+        main: dayData.main_request_count?.toString() || '',
+        amount: dayData.reward_amount?.toString() || ''
+      });
+    } else {
+      // データがない日は入力をリセット
+      setEditReward({ f: '', first: '', main: '', amount: '' });
+    }
+  }, [singleDate, shifts]);
+
+  // --- 3. 実績計算ロジック（昨日までを合算） ---
   const monthlyTotals = useMemo(() => {
     const today = startOfToday();
     return (shifts || [])
@@ -103,7 +123,7 @@ export default function Page() {
       }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
   }, [shifts, viewDate]);
 
-  // --- 3. イベントハンドラ ---
+  // --- 4. イベントハンドラ ---
   const handleDateSelect = (dates: any) => {
     if (isRequestMode) {
       const tomorrow = startOfToday(); tomorrow.setDate(tomorrow.getDate() + 1);
@@ -113,7 +133,7 @@ export default function Page() {
   };
 
   const handleSaveReward = async () => {
-    if (!singleDate) return;
+    if (!singleDate || !castProfile) return;
     const dateStr = format(singleDate, 'yyyy-MM-dd');
     const { error } = await supabase.from('shifts').update({ 
       f_count: Number(editReward.f) || 0, 
@@ -122,7 +142,10 @@ export default function Page() {
       reward_amount: Number(editReward.amount) || 0 
     }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr);
 
-    if (!error) { fetchInitialData(); alert('実績を保存しました💰'); }
+    if (!error) {
+      fetchInitialData();
+      alert('実績を保存しました💰');
+    }
   };
 
   if (loading) return <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center font-black italic text-5xl text-pink-300 animate-pulse">KARINTO...</div>;
@@ -130,11 +153,12 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
       
+      {/* 司令塔から各部品へデータを渡す */}
       <CastHeader 
         shopName={shopInfo?.shop_name || 'Karinto'} 
         syncTime={lastSync} 
         displayName={castProfile?.display_name || 'キャスト'} 
-        version="KarintoCastManager v2.9.9.19" 
+        version="KarintoCastManager v2.9.9.20" 
       />
 
       <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200 shadow-inner">
@@ -148,7 +172,14 @@ export default function Page() {
         )}
 
         <section className="bg-white p-2 rounded-[32px] border border-gray-100 shadow-sm text-center">
-          <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={handleDateSelect} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
+          <DashboardCalendar 
+            shifts={shifts} 
+            selectedDates={isRequestMode ? multiDates : singleDate} 
+            onSelect={handleDateSelect} 
+            month={viewDate} 
+            onMonthChange={setViewDate} 
+            isRequestMode={isRequestMode} 
+          />
         </section>
 
         {!isRequestMode && singleDate && (
