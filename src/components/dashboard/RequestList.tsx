@@ -24,7 +24,10 @@ export default function RequestList({
   shifts,
   onSubmit
 }: RequestListProps) {
-  if (multiDates.length === 0) {
+  // ★ 追加：選択された日付をコピーし、日付の早い順（昇順）にソートします
+  const sortedDates = [...multiDates].sort((a, b) => a.getTime() - b.getTime());
+
+  if (sortedDates.length === 0) {
     return (
       <section className="bg-white rounded-[32px] border border-purple-100 p-8 shadow-xl text-center">
         <p className="text-gray-300 text-xs font-bold italic">カレンダーから日付を選んでください📅</p>
@@ -36,10 +39,11 @@ export default function RequestList({
     <section className="bg-white rounded-[32px] border border-purple-100 p-5 shadow-xl space-y-3">
       <h3 className="font-black text-purple-600 text-[14px] uppercase tracking-widest flex items-center gap-2">
         <span className="w-1.5 h-4 bg-purple-500 rounded-full"></span>
-        申請リスト ({multiDates.length}件)
+        申請リスト ({sortedDates.length}件)
       </h3>
       <div className="flex flex-col">
-        {multiDates.map((d) => {
+        {/* ★ multiDates ではなく、ソート済みの sortedDates をループさせます */}
+        {sortedDates.map((d) => {
           const key = format(d, 'yyyy-MM-dd');
           const officialShift = (shifts || []).find(s => s.shift_date === key && s.status === 'official');
           const isOff = requestDetails[key]?.s === 'OFF';
