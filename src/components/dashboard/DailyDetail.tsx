@@ -1,7 +1,8 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { Edit3, hoshi, Sparkles, YenSign } from 'lucide-react'; // アイコンはお好みで
+// 正確なアイコン名に修正しました
+import { Edit3, Star, Sparkles, JapaneseYen } from 'lucide-react';
 
 export default function DailyDetail({ 
   date, 
@@ -13,14 +14,12 @@ export default function DailyDetail({
   isEditable 
 }: any) {
   
-  // 入力値の変更ハンドラー
   const handleChange = (field: string, value: string) => {
     setEditReward({ ...editReward, [field]: value });
   };
 
   return (
     <section className="bg-white rounded-[32px] p-6 border-2 border-pink-100 shadow-sm animate-in slide-in-from-bottom-4 duration-300">
-      {/* ヘッダー部分 */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h3 className="text-xl font-black text-slate-700">
@@ -36,7 +35,6 @@ export default function DailyDetail({
       </div>
 
       <div className="space-y-6">
-        {/* 現在のシフト表示 */}
         <div className="bg-pink-50/50 p-4 rounded-2xl border border-pink-100">
           <p className="text-[10px] font-bold text-pink-400 mb-1 uppercase tracking-tighter">Current Shift</p>
           <p className="text-2xl font-black text-slate-700">
@@ -44,7 +42,6 @@ export default function DailyDetail({
           </p>
         </div>
 
-        {/* ★実績入力エリア */}
         {isEditable ? (
           <div className="space-y-4">
             <div className="flex items-center gap-2 px-1">
@@ -52,9 +49,7 @@ export default function DailyDetail({
               <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Achievement Entry</p>
             </div>
 
-            {/* 数値入力グリッド */}
             <div className="grid grid-cols-2 gap-3">
-              {/* フリー本数 */}
               <div className="bg-white border-2 border-slate-100 p-3 rounded-2xl focus-within:border-pink-300 transition-colors">
                 <p className="text-[10px] font-bold text-slate-400 mb-1">フリー本数</p>
                 <input 
@@ -65,7 +60,6 @@ export default function DailyDetail({
                   className="w-full text-xl font-black text-slate-700 outline-none bg-transparent"
                 />
               </div>
-              {/* 初指名本数 */}
               <div className="bg-white border-2 border-slate-100 p-3 rounded-2xl focus-within:border-pink-300 transition-colors">
                 <p className="text-[10px] font-bold text-slate-400 mb-1">初指名本数</p>
                 <input 
@@ -76,7 +70,6 @@ export default function DailyDetail({
                   className="w-full text-xl font-black text-slate-700 outline-none bg-transparent"
                 />
               </div>
-              {/* 本指名本数 */}
               <div className="bg-white border-2 border-slate-100 p-3 rounded-2xl focus-within:border-pink-300 transition-colors">
                 <p className="text-[10px] font-bold text-slate-400 mb-1">本指名本数</p>
                 <input 
@@ -87,7 +80,6 @@ export default function DailyDetail({
                   className="w-full text-xl font-black text-slate-700 outline-none bg-transparent"
                 />
               </div>
-              {/* 報酬額 */}
               <div className="bg-white border-2 border-pink-200 p-3 rounded-2xl focus-within:border-pink-400 transition-colors">
                 <p className="text-[10px] font-bold text-pink-400 mb-1">報酬額 (¥)</p>
                 <input 
@@ -100,7 +92,6 @@ export default function DailyDetail({
               </div>
             </div>
 
-            {/* 保存ボタン */}
             <button 
               onClick={onSave}
               className="w-full bg-gradient-to-r from-pink-400 to-rose-400 py-4 rounded-2xl text-white font-black text-lg shadow-lg shadow-pink-100 active:scale-95 transition-all flex items-center justify-center gap-2"
@@ -112,7 +103,7 @@ export default function DailyDetail({
         ) : (
           <div className="py-10 text-center space-y-2">
             <div className="inline-block p-4 rounded-full bg-slate-50 text-slate-200">
-              <YenSign className="w-8 h-8" />
+              <JapaneseYen className="w-8 h-8" />
             </div>
             <p className="text-sm font-bold text-slate-300">本日の実績はまだ入力できません</p>
           </div>
