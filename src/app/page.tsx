@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter, usePathname } from 'next/navigation'; 
-import { format, parseISO, startOfToday } from 'date-fns';
+import { format, parseISO, startOfToday, isBefore } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import DashboardCalendar from '@/components/DashboardCalendar';
 
@@ -65,23 +65,28 @@ export default function Page() {
     setLoading(false);
   }
 
-  // --- 【重要】実績計算ロジックの修正 ---
+  // --- 【重要】実績計算ロジック：昨日までの合計にする ---
   const monthlyTotals = useMemo(() => {
+    const today = startOfToday();
+    
     return (shifts || [])
       .filter((s: any) => {
         const d = parseISO(s.shift_date);
-        // 表示中の月・年と一致し、かつステータスが確定(official)のものだけ
-        return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear() && s.status === 'official';
+        // 1. 表示中の月・年と一致
+        // 2. ステータスが確定(official)
+        // 3. 日付が今日より前（昨日まで）
+        return d.getMonth() === viewDate.getMonth() && 
+               d.getFullYear() === viewDate.getFullYear() && 
+               s.status === 'official' &&
+               isBefore(d, today); 
       })
       .reduce((acc, s: any) => {
         let dur = 0;
         let isWorking = 0;
 
-        // 「OFF」でない場合のみ、稼働時間と出勤日数をカウント
         if (s.start_time && s.end_time && s.start_time !== 'OFF') {
           const [sH, sM] = s.start_time.split(':').map(Number);
           const [eH, eM] = s.end_time.split(':').map(Number);
-          // 24時間跨ぎ対応の計算
           dur = (eH < sH ? eH + 24 : eH) + eM / 60 - (sH + sM / 60);
           isWorking = 1; 
         }
@@ -91,7 +96,7 @@ export default function Page() {
           f: acc.f + (Number(s.f_count) || 0), 
           first: acc.first + (Number(s.first_request_count) || 0), 
           main: acc.main + (Number(s.main_request_count) || 0), 
-          count: acc.count + isWorking, // 実際に働いた日だけ足す
+          count: acc.count + isWorking, 
           hours: acc.hours + dur 
         };
       }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
@@ -158,7 +163,7 @@ export default function Page() {
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50 relative">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.9.18</p>
+            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.9.19</p>
             <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}店</p>
           </div>
           {lastSync && (
@@ -186,16 +191,16 @@ export default function Page() {
               <h2 className="text-[18px] font-black text-pink-500 tracking-tighter leading-none">
                 {format(viewDate, 'M月')}の実績
               </h2>
-              {/* 【修正】バッジ：出勤○日、稼働○h 表記 */}
+              {/* 【修正】バッジデザイン：文字は小さく黒、数字を強調 */}
               <div className="flex gap-1.5">
                 <div className="bg-white/90 px-3 py-2 rounded-xl border border-pink-50 shadow-sm flex items-center justify-center min-w-[70px]">
-                  <span className="text-[13px] font-black text-pink-500 leading-none">
-                    出勤<span className="text-[16px] mx-0.5">{monthlyTotals.count}</span>日
+                  <span className="text-[10px] font-bold text-black leading-none">
+                    出勤<span className="text-[18px] mx-1 font-black text-pink-500">{monthlyTotals.count}</span>日
                   </span>
                 </div>
                 <div className="bg-white/90 px-3 py-2 rounded-xl border border-pink-50 shadow-sm flex items-center justify-center min-w-[70px]">
-                  <span className="text-[13px] font-black text-pink-500 leading-none">
-                    稼働<span className="text-[16px] mx-0.5">{Math.round(monthlyTotals.hours * 10) / 10}</span>h
+                  <span className="text-[10px] font-bold text-black leading-none">
+                    稼働<span className="text-[18px] mx-1 font-black text-pink-500">{Math.round(monthlyTotals.hours * 10) / 10}</span>h
                   </span>
                 </div>
               </div>
