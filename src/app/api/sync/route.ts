@@ -1,72 +1,82 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
-// 1. 【最重要】タイムアウトを 30秒 に延長 (Vercel Hobbyの限界値)
-export const maxDuration = 30; 
-// キャッシュを無効化
+// Vercelに30秒まで待機を許可（Hobbyプラン最大値）
+export const maxDuration = 30;
+// キャッシュを一切使わない設定
+export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
-  // 2. cookies() を使わず、直接 Supabase クライアントを作成（高速化）
+  // 1. 高速化のため、ブラウザ用のライブラリではなく標準のSupabaseクライアントを使用
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
   const JST_OFFSET = 9 * 60 * 60 * 1000;
-  console.log("🚀 同期ジョブ開始");
+  console.log("🚀 同期ジョブ開始 (Parallel Mode)");
 
   try {
-    // 3. 負荷軽減のため、取得範囲を「今日〜7日後」に絞る（11日間は重すぎたため）
-    for (let i = 0; i <= 7; i++) {
-      const targetDate = new Date(Date.now() + JST_OFFSET + i * 24 * 60 * 60 * 1000);
-      const dateStr = targetDate.toISOString().split('T')[0];
+    // 2. 7日間分の日付リストを作成
+    const dates = Array.from({ length: 8 }, (_, i) => {
+      const d = new Date(Date.now() + JST_OFFSET + i * 24 * 60 * 60 * 1000);
+      return d.toISOString().split('T')[0];
+    });
+
+    // 3. 【高速化の肝】1日ずつ待たず、全日程を一気に並列で取得・処理する
+    await Promise.all(dates.map(async (dateStr) => {
       const hpDateStr = dateStr.replace(/-/g, '/');
-
-      // fetch にタイムアウトを設定し、1日が詰まっても次に進めるようにする
-      const hpRes = await fetch(`https://ikekari.com/attend.php?date_get=${hpDateStr}`, { 
-        cache: 'no-store',
-        signal: AbortSignal.timeout(5000) // 5秒で諦める
-      });
       
-      const html = await hpRes.text();
-      const listItems = html.match(/<li>[\s\S]*?<\/li>/g) || [];
+      try {
+        const hpRes = await fetch(`https://ikekari.com/attend.php?date_get=${hpDateStr}`, { 
+          cache: 'no-store' // 常に最新を強制
+        });
+        const html = await hpRes.text();
+        const listItems = html.match(/<li>[\s\S]*?<\/li>/g) || [];
 
-      for (const item of listItems) {
-        const nameMatch = item.match(/<h3>(.*?)<\/h3>/);
-        const timeMatch = item.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
-        if (!nameMatch || !timeMatch) continue;
+        for (const item of listItems) {
+          const nameMatch = item.match(/<h3>(.*?)<\/h3>/);
+          const timeMatch = item.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
+          if (!nameMatch || !timeMatch) continue;
 
-        const hpName = nameMatch[1].replace(/（\d+）/g, '').trim();
-        
-        // キャストID取得
-        const { data: cast } = await supabase.from('cast_members').select('login_id').eq('hp_display_name', hpName).single();
-        if (!cast) continue;
+          const hpName = nameMatch[1].replace(/（\d+）/g, '').trim();
 
-        // 今のステータス確認
-        const { data: existing } = await supabase.from('shifts').select('status').eq('login_id', cast.login_id).eq('shift_date', dateStr).maybeSingle();
-        
-        const updateData: any = { login_id: cast.login_id, shift_date: dateStr, hp_display_name: hpName, is_official_pre_exist: true };
+          // キャスト特定
+          const { data: cast } = await supabase.from('cast_members').select('login_id').eq('hp_display_name', hpName).single();
+          if (!cast) continue;
 
-        // 申請中(requested)なら時間を守る（三すくみ）
-        if (existing?.status === 'requested') {
-          // 何もしない（is_official_pre_exist だけ更新される）
-        } else {
-          updateData.start_time = timeMatch[1];
-          updateData.end_time = timeMatch[2];
-          updateData.status = 'official';
-          updateData.is_official = true;
+          // 現状のステータス確認
+          const { data: current } = await supabase.from('shifts').select('status').eq('login_id', cast.login_id).eq('shift_date', dateStr).maybeSingle();
+
+          const updateData: any = { 
+            login_id: cast.login_id, 
+            shift_date: dateStr, 
+            hp_display_name: hpName, 
+            is_official_pre_exist: true 
+          };
+
+          // 三すくみ（申請保護）
+          if (current?.status !== 'requested') {
+            updateData.start_time = timeMatch[1];
+            updateData.end_time = timeMatch[2];
+            updateData.status = 'official';
+            updateData.is_official = true;
+          }
+
+          await supabase.from('shifts').upsert(updateData, { onConflict: 'login_id,shift_date' });
         }
-        await supabase.from('shifts').upsert(updateData, { onConflict: 'login_id,shift_date' });
+      } catch (err) {
+        console.error(`Error on ${dateStr}:`, err);
       }
-    }
+    }));
 
-    // 4. 同期ログを更新（Page.tsx の「最終同期」に反映させる）
+    // 4. 最後に「同期完了時刻」をDBに刻む（これでPage.tsxの表示が更新される）
     await supabase.from('sync_logs').upsert({ id: 1, last_sync_at: new Date().toISOString() });
 
-    return NextResponse.json({ success: true, time: new Date().toISOString() });
+    return NextResponse.json({ success: true, timestamp: new Date().toISOString() });
   } catch (error: any) {
-    console.error("❌ Sync Error:", error.message);
+    console.error("❌ Overall Sync Error:", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
