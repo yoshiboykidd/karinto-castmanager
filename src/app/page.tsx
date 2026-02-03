@@ -65,32 +65,35 @@ export default function Page() {
     setLoading(false);
   }
 
-  useEffect(() => {
-    const newDetails = { ...requestDetails };
-    multiDates.forEach(d => {
-      const key = format(d, 'yyyy-MM-dd');
-      if (!newDetails[key]) {
-        const existing = (shifts || []).find(s => s.shift_date === key);
-        newDetails[key] = existing ? { s: existing.start_time, e: existing.end_time } : { s: '11:00', e: '23:00' };
-      }
-    });
-    setRequestDetails(newDetails);
-  }, [multiDates, shifts]);
-
+  // --- 【重要】実績計算ロジックの修正 ---
   const monthlyTotals = useMemo(() => {
     return (shifts || [])
       .filter((s: any) => {
         const d = parseISO(s.shift_date);
+        // 表示中の月・年と一致し、かつステータスが確定(official)のものだけ
         return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear() && s.status === 'official';
       })
       .reduce((acc, s: any) => {
         let dur = 0;
+        let isWorking = 0;
+
+        // 「OFF」でない場合のみ、稼働時間と出勤日数をカウント
         if (s.start_time && s.end_time && s.start_time !== 'OFF') {
           const [sH, sM] = s.start_time.split(':').map(Number);
           const [eH, eM] = s.end_time.split(':').map(Number);
+          // 24時間跨ぎ対応の計算
           dur = (eH < sH ? eH + 24 : eH) + eM / 60 - (sH + sM / 60);
+          isWorking = 1; 
         }
-        return { amount: acc.amount + (Number(s.reward_amount) || 0), f: acc.f + (Number(s.f_count) || 0), first: acc.first + (Number(s.first_request_count) || 0), main: acc.main + (Number(s.main_request_count) || 0), count: acc.count + 1, hours: acc.hours + dur };
+
+        return { 
+          amount: acc.amount + (Number(s.reward_amount) || 0), 
+          f: acc.f + (Number(s.f_count) || 0), 
+          first: acc.first + (Number(s.first_request_count) || 0), 
+          main: acc.main + (Number(s.main_request_count) || 0), 
+          count: acc.count + isWorking, // 実際に働いた日だけ足す
+          hours: acc.hours + dur 
+        };
       }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
   }, [shifts, viewDate]);
 
@@ -151,11 +154,11 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
       
-      {/* 1. ヘッダー (修正：名前とさんのバランス) */}
+      {/* 1. ヘッダー (名前とさんのバランス修正) */}
       <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50 relative">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.9.17</p>
+            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.9.18</p>
             <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}店</p>
           </div>
           {lastSync && (
@@ -183,21 +186,17 @@ export default function Page() {
               <h2 className="text-[18px] font-black text-pink-500 tracking-tighter leading-none">
                 {format(viewDate, 'M月')}の実績
               </h2>
-              {/* 実績バッジ：崩れない3カラム等幅 */}
-              <div className="grid grid-cols-2 gap-1.5">
-                <div className="bg-white/90 px-2 py-1.5 rounded-xl border border-pink-50 shadow-sm flex flex-col items-center min-w-[55px]">
-                  <span className="text-[8px] block text-gray-400 leading-none mb-1 font-bold">出勤日数</span>
-                  <div className="flex items-baseline gap-0.5 leading-none">
-                    <span className="text-[16px] font-black text-pink-500">{monthlyTotals.count}</span>
-                    <span className="text-[8px] font-bold text-gray-400">日</span>
-                  </div>
+              {/* 【修正】バッジ：出勤○日、稼働○h 表記 */}
+              <div className="flex gap-1.5">
+                <div className="bg-white/90 px-3 py-2 rounded-xl border border-pink-50 shadow-sm flex items-center justify-center min-w-[70px]">
+                  <span className="text-[13px] font-black text-pink-500 leading-none">
+                    出勤<span className="text-[16px] mx-0.5">{monthlyTotals.count}</span>日
+                  </span>
                 </div>
-                <div className="bg-white/90 px-2 py-1.5 rounded-xl border border-pink-50 shadow-sm flex flex-col items-center min-w-[55px]">
-                  <span className="text-[8px] block text-gray-400 leading-none mb-1 font-bold">累計稼働</span>
-                  <div className="flex items-baseline gap-0.5 leading-none">
-                    <span className="text-[16px] font-black text-pink-500">{Math.round(monthlyTotals.hours * 10) / 10}</span>
-                    <span className="text-[8px] font-bold text-gray-400">h</span>
-                  </div>
+                <div className="bg-white/90 px-3 py-2 rounded-xl border border-pink-50 shadow-sm flex items-center justify-center min-w-[70px]">
+                  <span className="text-[13px] font-black text-pink-500 leading-none">
+                    稼働<span className="text-[16px] mx-0.5">{Math.round(monthlyTotals.hours * 10) / 10}</span>h
+                  </span>
                 </div>
               </div>
             </div>
