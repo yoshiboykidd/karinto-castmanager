@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation'; 
-import { format, startOfToday } from 'date-fns';
+import { format } from 'date-fns';
 
 // ★ 四種の神器（カスタムフック）
 import { useShiftData } from '@/hooks/useShiftData';
@@ -10,6 +10,7 @@ import { useAchievement } from '@/hooks/useAchievement';
 import { useRequestManager } from '@/hooks/useRequestManager';
 import { useNavigation } from '@/hooks/useNavigation';
 
+// ★ フォルダ構成に基づいたインポート
 import CastHeader from '@/components/dashboard/CastHeader';
 import MonthlySummary from '@/components/dashboard/MonthlySummary';
 import DashboardCalendar from '@/components/DashboardCalendar';
@@ -23,6 +24,7 @@ export default function Page() {
   const pathname = usePathname();
 
   // 1. データ基盤（読み込み担当）
+  // data.syncAt には v3.3.3 の API が更新した最新の UTC 時刻が入ります
   const { data, loading, fetchInitialData, getMonthlyTotals, supabase } = useShiftData();
 
   // 2. ナビゲーション（選択・切替担当）
@@ -40,28 +42,55 @@ export default function Page() {
     () => setSelected({ single: undefined, multi: [] })
   );
 
-  useEffect(() => { fetchInitialData(router); }, []);
+  useEffect(() => { 
+    fetchInitialData(router); 
+  }, []);
 
+  // 今月の集計データ
   const monthlyTotals = useMemo(() => getMonthlyTotals(viewDate), [data.shifts, viewDate]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse text-5xl italic tracking-tighter">KARINTO...</div>;
+  // ローディング画面
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse text-5xl italic tracking-tighter">
+      KARINTO...
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
-      <CastHeader shopName={data.shop?.shop_name} syncTime={data.syncAt} displayName={data.profile?.display_name} version="v3.0.0" />
       
-      {/* モード切替タブ */}
+      {/* セクション1: ヘッダー (v3.3.3) */}
+      <CastHeader 
+        shopName={data.shop?.shop_name || "かりんと 池袋東口店"} 
+        syncTime={data.syncAt} 
+        displayName={data.profile?.display_name} 
+        version="v3.3.3" 
+      />
+      
+      {/* セクション2: モード切替タブ */}
       <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200 shadow-inner">
-        <button onClick={() => toggleMode(false)} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
-        <button onClick={() => toggleMode(true)} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
+        <button 
+          onClick={() => toggleMode(false)} 
+          className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}
+        >
+          実績入力
+        </button>
+        <button 
+          onClick={() => toggleMode(true)} 
+          className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}
+        >
+          シフト申請
+        </button>
       </div>
 
       <main className="px-4 mt-3 space-y-2">
+        {/* セクション3: 実績サマリー */}
         {!isRequestMode && <MonthlySummary month={format(viewDate, 'M月')} totals={monthlyTotals} />}
         
+        {/* セクション4: インタラクティブ・カレンダー */}
         <section className="bg-white p-2 rounded-[32px] border border-gray-100 shadow-sm text-center">
           <DashboardCalendar 
-            shifts={data.shifts} 
+            shifts={data.shifts as any} 
             selectedDates={isRequestMode ? selected.multi : selected.single} 
             onSelect={handleDateSelect} 
             month={viewDate} 
@@ -70,7 +99,7 @@ export default function Page() {
           />
         </section>
 
-        {/* --- 条件分岐：実績入力 or 申請リスト --- */}
+        {/* --- セクション5: 実績入力詳細 or セクション6: 申請リスト --- */}
         {!isRequestMode ? (
           selected.single && (
             <DailyDetail 
@@ -93,10 +122,17 @@ export default function Page() {
           />
         )}
         
+        {/* セクション7: 店舗内お知らせ */}
         <NewsSection newsList={data.news} />
       </main>
 
-      <FixedFooter pathname={pathname} onHome={() => router.push('/')} onSalary={() => router.push('/salary')} onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} />
+      {/* セクション8: 固定フッター */}
+      <FixedFooter 
+        pathname={pathname} 
+        onHome={() => router.push('/')} 
+        onSalary={() => router.push('/salary')} 
+        onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} 
+      />
     </div>
   );
 }

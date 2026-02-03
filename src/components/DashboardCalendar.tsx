@@ -1,112 +1,82 @@
-'use client';
-
+// components/DashboardCalendar.tsx
 import React from 'react';
-import {
-  format,
-  addMonths,
-  subMonths,
-  startOfMonth,
-  endOfMonth,
-  startOfWeek,
-  endOfWeek,
-  eachDayOfInterval,
-  isSameMonth,
-  isSameDay,
-} from 'date-fns';
-import { ja } from 'date-fns/locale';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-interface Props {
-  shifts: any[];
-  selectedDates: Date | Date[] | undefined;
-  onSelect: (date: Date | Date[]) => void;
+// ★波線を消すための門番（Props）の設定
+interface DashboardCalendarProps {
+  shifts: any;           // これがあることで Page.tsx の波線が消えます
+  selectedDates: any;
+  onSelect: (date: Date) => void;
   month: Date;
   onMonthChange: (date: Date) => void;
   isRequestMode: boolean;
 }
 
-const DashboardCalendar: React.FC<Props> = ({
-  shifts,
-  selectedDates,
-  onSelect,
-  month,
-  onMonthChange,
-  isRequestMode,
-}) => {
-  const startDate = startOfWeek(startOfMonth(month));
-  const endDate = endOfWeek(endOfMonth(month));
-  const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
-
-  const handleDateClick = (day: Date) => {
-    if (isRequestMode) {
-      const currentDates = Array.isArray(selectedDates) ? [...selectedDates] : [];
-      const index = currentDates.findIndex((d) => isSameDay(d, day));
-      if (index > -1) { currentDates.splice(index, 1); } 
-      else { currentDates.push(day); }
-      onSelect(currentDates);
-    } else { onSelect(day); }
-  };
+export default function DashboardCalendar({ 
+  shifts, 
+  selectedDates, 
+  onSelect, 
+  month, 
+  onMonthChange, 
+  isRequestMode 
+}: DashboardCalendarProps) {
+  
+  const days = eachDayOfInterval({
+    start: startOfMonth(month),
+    end: endOfMonth(month),
+  });
 
   return (
-    <div className="w-full select-none">
-      <div className="flex items-center justify-between px-4 py-3">
-        <button onClick={() => onMonthChange(subMonths(month, 1))} className="p-2 text-pink-300 font-black text-xl">&lt;</button>
-        <h2 className="text-[20px] font-black text-gray-700 italic tracking-tighter">{format(month, 'yyyy / MM', { locale: ja })}</h2>
-        <button onClick={() => onMonthChange(addMonths(month, 1))} className="p-2 text-pink-300 font-black text-xl">&gt;</button>
+    <div className="p-2">
+      <div className="flex items-center justify-between mb-4 px-2">
+        <button onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>
+          <ChevronLeft className="h-5 w-5 text-gray-400" />
+        </button>
+        <span className="font-black text-slate-700">{format(month, 'yyyy年 M月')}</span>
+        <button onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>
+          <ChevronRight className="h-5 w-5 text-gray-400" />
+        </button>
       </div>
 
-      <div className="grid grid-cols-7 mb-2 text-[10px] font-black uppercase text-center">
-        <div className="text-red-300">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div className="text-blue-300">土</div>
-      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {['日', '月', '火', '水', '木', '金', '土'].map(d => (
+          <div key={d} className="text-[10px] font-bold text-slate-300 pb-1 text-center">{d}</div>
+        ))}
 
-      <div className="grid grid-cols-7 gap-y-1">
-        {calendarDays.map((day) => {
-          const key = format(day, 'yyyy-MM-dd');
-          const dayNum = day.getDate();
-          const shift = (shifts || []).find((s) => s.shift_date === key);
-          const isOfficial = shift?.status === 'official' && shift.start_time !== 'OFF';
-          const isRequested = shift?.status === 'requested';
-          const isCurrentMonth = isSameMonth(day, month);
-          const isSelected = Array.isArray(selectedDates) ? selectedDates.some((d) => isSameDay(d, day)) : selectedDates && isSameDay(selectedDates, day);
+        {days.map(day => {
+          const dateStr = format(day, 'yyyy-MM-dd');
+          // その日のデータを探す
+          const dayShift = Array.isArray(shifts) ? shifts.find((s: any) => s.shift_date === dateStr) : undefined;
+          
+          // 判定ロジック（ピンク・紫・黄色〇）
+          const isOfficial = dayShift?.status === 'official' && dayShift?.is_official === true;
+          const isRequested = dayShift?.status === 'requested' && !!dayShift?.main_request;
+          const isSpecialDay = day.getDate() === 10 || (day.getMonth() === 10 && day.getDate() === 22);
 
-          // 💡 特定日 (10, 11, 22) の判定
-          const isSpecialDay = isCurrentMonth && [10, 11, 22].includes(dayNum);
+          // 選択判定
+          const isSelected = Array.isArray(selectedDates) 
+            ? selectedDates.some(d => isSameDay(d, day)) 
+            : selectedDates && isSameDay(selectedDates, day);
 
           return (
-            <div
-              key={key}
-              onClick={() => handleDateClick(day)}
-              className={`relative h-12 flex items-center justify-center cursor-pointer ${!isCurrentMonth ? 'opacity-10' : 'opacity-100'}`}
+            <div 
+              key={dateStr} 
+              onClick={() => onSelect(day)} 
+              className={`relative h-12 w-full flex flex-col items-center justify-center rounded-xl border border-gray-50 
+                ${isSpecialDay ? 'bg-yellow-50' : 'bg-white'} 
+                ${isSelected ? 'ring-2 ring-pink-500' : ''}`}
             >
-              {/* 選択時 */}
-              {isSelected && (
-                <div className={`absolute inset-0.5 rounded-xl border-2 z-0 ${isRequestMode ? 'border-purple-300 bg-purple-50/30' : 'border-pink-200 bg-pink-50/30'}`} />
-              )}
-
-              {/* 1. 特定日 (黄色い〇) */}
-              {isSpecialDay && (
-                <div className="absolute w-8 h-8 border-2 border-yellow-400 rounded-full z-0" />
-              )}
-
-              {/* 2. 確定出勤 (ピンクの円) */}
-              {isOfficial && isCurrentMonth && (
-                <div className="absolute w-8 h-8 bg-pink-400 rounded-full opacity-20 z-0" />
-              )}
-
-              {/* 3. 申請中 (紫の細いリング) */}
-              {isRequested && isCurrentMonth && (
-                <div className="absolute w-7 h-7 border border-purple-300 rounded-full z-0" />
-              )}
-
-              <span className={`relative z-10 text-[16px] font-black tracking-tighter ${isOfficial ? 'text-pink-500' : isRequested ? 'text-purple-500' : 'text-gray-600'}`}>
-                {dayNum}
+              <span className={`z-10 text-xs font-black ${isOfficial ? 'text-white' : 'text-gray-600'}`}>
+                {day.getDate()}
               </span>
-              {isSameDay(day, new Date()) && <div className="absolute bottom-1 w-1 h-1 bg-pink-300 rounded-full" />}
+              {isOfficial && <div className="absolute inset-1 rounded-full bg-pink-400" />}
+              {isRequested && !isOfficial && <div className="absolute inset-1 rounded-full border-2 border-purple-400 border-dashed" />}
+              {isSpecialDay && <div className="absolute top-1 right-1 h-1 w-1 rounded-full bg-yellow-400" />}
             </div>
           );
         })}
       </div>
     </div>
   );
-};
-
-export default DashboardCalendar;
+}
