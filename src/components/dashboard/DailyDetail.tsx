@@ -15,18 +15,14 @@ export default function DailyDetail({ date, dayNum, shift, editReward, setEditRe
           {format(date, 'M / d', { locale: ja })}
           <span className="text-xs ml-2 text-slate-300 font-bold uppercase">{format(date, 'eeee', { locale: ja })}</span>
         </h3>
-        {shift?.status === 'official' ? (
-          <div className="flex items-center gap-1 bg-pink-50 px-3 py-1 rounded-full border border-pink-100">
-            <Sparkles size={10} className="text-pink-400" />
-            <span className="text-pink-500 text-[10px] font-black tracking-widest uppercase">Confirmed</span>
+        {shift?.status === 'official' && (
+          <div className="flex items-center gap-1 bg-pink-50 px-3 py-1 rounded-full border border-pink-100 text-pink-500 text-[10px] font-black tracking-widest uppercase shadow-sm shadow-pink-50">
+            <Sparkles size={10} /> <span>Confirmed</span>
           </div>
-        ) : (
-          <span className="bg-slate-50 text-slate-300 text-[10px] px-3 py-1 rounded-full font-black tracking-widest uppercase">Off Day</span>
         )}
       </div>
 
       <div className="space-y-5">
-        {/* 現在のシフト：パステルピンクの背景 */}
         <div className="bg-[#FFF5F8] p-4 rounded-3xl border border-pink-50">
           <p className="text-[10px] font-black text-pink-300 mb-1 uppercase tracking-widest">Shift Schedule</p>
           <p className="text-2xl font-black text-slate-700">
@@ -36,11 +32,6 @@ export default function DailyDetail({ date, dayNum, shift, editReward, setEditRe
 
         {isEditable ? (
           <div className="space-y-4">
-            <div className="flex items-center gap-2 px-1">
-              <Edit3 className="w-4 h-4 text-pink-300" />
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Result Entry</p>
-            </div>
-
             <div className="grid grid-cols-2 gap-3">
               {[
                 { label: 'フリー', key: 'free_count' },
@@ -55,18 +46,13 @@ export default function DailyDetail({ date, dayNum, shift, editReward, setEditRe
                     value={editReward?.[item.key] || ''}
                     onChange={(e) => handleChange(item.key, e.target.value)}
                     placeholder="0"
-                    className="w-full text-xl font-black text-slate-700 outline-none bg-transparent placeholder:text-slate-200"
+                    className="w-full text-xl font-black text-slate-700 outline-none bg-transparent"
                   />
                 </div>
               ))}
             </div>
-
-            <button 
-              onClick={onSave}
-              className="w-full bg-gradient-to-r from-pink-400 to-rose-400 py-4 rounded-[24px] text-white font-black text-lg shadow-lg shadow-pink-100 active:scale-95 transition-all flex items-center justify-center gap-3"
-            >
-              <Star size={18} fill="currentColor" />
-              実績を保存する
+            <button onClick={onSave} className="w-full bg-gradient-to-r from-pink-400 to-rose-400 py-4 rounded-[24px] text-white font-black text-lg shadow-lg shadow-pink-100 active:scale-95 transition-all flex items-center justify-center gap-3">
+              <Star size={18} fill="currentColor" /> 実績を保存する
             </button>
           </div>
         ) : (
