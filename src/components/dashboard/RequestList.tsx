@@ -45,6 +45,11 @@ export default function RequestList({
         {sortedDates.map((d) => {
           const key = format(d, 'yyyy-MM-dd');
           const officialShift = (shifts || []).find(s => s.shift_date === key && s.status === 'official');
+          
+          // ★ 追加：確定シフトがある場合はその時間を、なければデフォルト値を設定
+          const defaultS = officialShift?.start_time && officialShift.start_time !== 'OFF' ? officialShift.start_time : '11:00';
+          const defaultE = officialShift?.end_time && officialShift.end_time !== 'OFF' ? officialShift.end_time : '23:00';
+
           const isOff = requestDetails[key]?.s === 'OFF';
 
           return (
@@ -76,19 +81,19 @@ export default function RequestList({
                 ) : (
                   <>
                     <select
-                      value={requestDetails[key]?.s || '11:00'}
+                      value={requestDetails[key]?.s || defaultS} // ★ 修正：defaultSを参照
                       onChange={(e) => setRequestDetails({ ...requestDetails, [key]: { ...requestDetails[key], s: e.target.value } })}
                       className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none"
-                      style={{ textAlignLast: 'center' }} // ★追加：文字を中央に固定
+                      style={{ textAlignLast: 'center' }}
                     >
                       {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                     <span className="text-gray-300 font-black text-lg">~</span>
                     <select
-                      value={requestDetails[key]?.e || '23:00'}
+                      value={requestDetails[key]?.e || defaultE} // ★ 修正：defaultEを参照
                       onChange={(e) => setRequestDetails({ ...requestDetails, [key]: { ...requestDetails[key], e: e.target.value } })}
                       className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none"
-                      style={{ textAlignLast: 'center' }} // ★追加：文字を中央に固定
+                      style={{ textAlignLast: 'center' }}
                     >
                       {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
@@ -96,7 +101,8 @@ export default function RequestList({
                 )}
                 <button
                   onClick={() => {
-                    const nextVal = isOff ? { s: '11:00', e: '23:00' } : { s: 'OFF', e: 'OFF' };
+                    // お休みから復帰させる際も、確定シフトがあればその時間に戻す
+                    const nextVal = isOff ? { s: defaultS, e: defaultE } : { s: 'OFF', e: 'OFF' };
                     setRequestDetails({ ...requestDetails, [key]: nextVal });
                   }}
                   className={`px-4 py-2.5 rounded-lg font-black text-[12px] transition-all border shrink-0 ${isOff ? 'bg-purple-500 text-white border-purple-500 shadow-md' : 'bg-white text-gray-400 border-gray-200'}`}
