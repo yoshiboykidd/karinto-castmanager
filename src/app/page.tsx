@@ -1,216 +1,351 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Calendar as CalendarIcon, DollarSign, LogOut, Megaphone } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import { createBrowserClient } from '@supabase/ssr';
+import { useRouter, usePathname } from 'next/navigation'; 
+import { format, parseISO, startOfToday } from 'date-fns';
+import { ja } from 'date-fns/locale';
+import DashboardCalendar from '@/components/DashboardCalendar';
 
-// --- 1. 型定義と特定日の設定 (波線エラーを解消) ---
-const SPECIFIC_DAYS: Record<number, string> = { 
-  10: "かりんとの日", 
-  11: "添い寝の日", 
-  22: "添い寝の日" 
-};
+const TIME_OPTIONS: string[] = [];
+for (let h = 11; h <= 23; h++) {
+  TIME_OPTIONS.push(`${h}:00`);
+  if (h !== 23) TIME_OPTIONS.push(`${h}:30`);
+}
 
-export default function CastDashboard() {
-  const [activeTab, setActiveTab] = useState<'achievement' | 'request'>('achievement');
-  // selectedDate.getDate() を安全に使用するための状態管理
-  const [selectedDate] = useState(new Date());
-  const currentDay = selectedDate.getDate();
-  
-  // 仮のキャスト・店舗データ (Supabase取得値を想定)
-  const cast = {
-    display_name: "つき",
-    shop_name: "池袋西口",
-    sync_time: "12:57"
+const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1467395577829523487/oQUEYdVA4oSbkAb53WYNMCnVIiOa0Tsi25WRPVWDtxF2UsnJFGrsU_gb-qG37gdyTQaQ";
+
+export default function Page() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [supabase] = useState(() => createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ));
+
+  const [shifts, setShifts] = useState<any[]>([]);
+  const [castProfile, setCastProfile] = useState<any>(null);
+  const [shopInfo, setShopInfo] = useState<any>(null);
+  const [newsList, setNewsList] = useState<any[]>([]);
+  const [viewDate, setViewDate] = useState(new Date()); 
+  const [loading, setLoading] = useState(true);
+  const [lastSync, setLastSync] = useState<string>('');
+
+  const [isRequestMode, setIsRequestMode] = useState(false);
+  const [singleDate, setSingleDate] = useState<Date | undefined>(new Date());
+  const [multiDates, setMultiDates] = useState<Date[]>([]);
+  const [requestDetails, setRequestDetails] = useState<{[key: string]: {s: string, e: string}}>({});
+  const [editReward, setEditReward] = useState({ f: '', first: '', main: '', amount: '' });
+
+  useEffect(() => { fetchInitialData(); }, []);
+
+  async function fetchInitialData() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { router.push('/login'); return; }
+    const loginId = session.user.email?.replace('@karinto-internal.com', '');
+    const { data: castData } = await supabase.from('cast_members').select('*').eq('login_id', loginId).single();
+    setCastProfile(castData);
+    
+    if (castData) {
+      const myShopId = castData.home_shop_id || 'main';
+      const [shopRes, shiftRes, newsRes, syncRes] = await Promise.all([
+        supabase.from('shop_master').select('*').eq('shop_id', myShopId).single(),
+        supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
+        supabase.from('news').select('*').or(`shop_id.eq.${myShopId},shop_id.eq.all`).order('created_at', { ascending: false }).limit(3),
+        supabase.from('sync_logs').select('last_sync_at').eq('id', 1).single()
+      ]);
+      
+      setShopInfo(shopRes.data);
+      setShifts(shiftRes.data || []);
+      setNewsList(newsRes.data || []);
+      if (syncRes.data) {
+        setLastSync(format(parseISO(syncRes.data.last_sync_at), 'HH:mm'));
+      }
+    }
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    const newDetails = { ...requestDetails };
+    multiDates.forEach(d => {
+      const key = format(d, 'yyyy-MM-dd');
+      if (!newDetails[key]) {
+        const existing = (shifts || []).find(s => s.shift_date === key);
+        newDetails[key] = existing ? { s: existing.start_time, e: existing.end_time } : { s: '11:00', e: '23:00' };
+      }
+    });
+    setRequestDetails(newDetails);
+  }, [multiDates, shifts]);
+
+  const monthlyTotals = useMemo(() => {
+    return (shifts || [])
+      .filter((s: any) => {
+        const d = parseISO(s.shift_date);
+        return d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear() && s.status === 'official';
+      })
+      .reduce((acc, s: any) => {
+        let dur = 0;
+        if (s.start_time && s.end_time && s.start_time !== 'OFF') {
+          const [sH, sM] = s.start_time.split(':').map(Number);
+          const [eH, eM] = s.end_time.split(':').map(Number);
+          dur = (eH < sH ? eH + 24 : eH) + eM / 60 - (sH + sM / 60);
+        }
+        return { amount: acc.amount + (Number(s.reward_amount) || 0), f: acc.f + (Number(s.f_count) || 0), first: acc.first + (Number(s.first_request_count) || 0), main: acc.main + (Number(s.main_request_count) || 0), count: acc.count + 1, hours: acc.hours + dur };
+      }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
+  }, [shifts, viewDate]);
+
+  const handleDateSelect = (dates: any) => {
+    if (isRequestMode) {
+      const tomorrow = startOfToday(); tomorrow.setDate(tomorrow.getDate() + 1);
+      const validDates = (Array.isArray(dates) ? dates : []).filter(d => d >= tomorrow);
+      setMultiDates(validDates);
+    } else { setSingleDate(dates as Date); }
   };
 
+  const handleBulkSubmit = async () => {
+    if (!castProfile) return;
+    const checkResults = multiDates.map(date => {
+      const key = format(date, 'yyyy-MM-dd');
+      const reqS = requestDetails[key]?.s || '11:00';
+      const reqE = requestDetails[key]?.e || '23:00';
+      const official = (shifts || []).find(s => s.shift_date === key && s.status === 'official');
+      const isSame = official && official.start_time === reqS && official.end_time === reqE;
+      return { date, isSame, key, reqS, reqE };
+    });
+    if (checkResults.some(r => r.isSame)) {
+      alert("エラー：確定シフトと同じ時間の申請が含まれています。");
+      return;
+    }
+    const finalRequests = checkResults.map(r => ({
+      login_id: castProfile.login_id,
+      hp_display_name: castProfile.display_name || 'キャスト',
+      shift_date: r.key,
+      start_time: r.reqS,
+      end_time: r.reqE,
+      status: 'requested',
+      is_official: false
+    }));
+    const { error } = await supabase.from('shifts').upsert(finalRequests as any, { onConflict: 'login_id,shift_date' });
+    if (!error) {
+      const messageLines = finalRequests.map(r => {
+        const d = parseISO(r.shift_date);
+        const dateStr = format(d, 'M/d(E)', { locale: ja });
+        const isOfficialExist = (shifts || []).some(s => s.shift_date === r.shift_date && s.status === 'official');
+        const typeStr = isOfficialExist ? '(変更)' : '(新規)';
+        const timeStr = r.start_time === 'OFF' ? 'OFF' : `${r.start_time}〜${r.end_time}`;
+        return `📅 ${dateStr}: ${timeStr}${typeStr}`;
+      });
+      const content = `🔔 **シフト申請がありました**\nキャスト: **${castProfile.display_name}** さん\n${messageLines.join('\n')}`;
+      await fetch(DISCORD_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) });
+      alert(`${finalRequests.length}件の申請を送信しました！🚀`); setMultiDates([]); fetchInitialData();
+    } else { alert(`エラー: ${error.message}`); }
+  };
+
+  if (loading) return ( <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center font-black italic text-5xl text-pink-300 animate-pulse">KARINTO...</div> );
+
+  const targetDateStr = singleDate ? format(singleDate, 'yyyy-MM-dd') : '';
+  const dayOfficial = (shifts || []).find(s => s.shift_date === targetDateStr && s.status === 'official');
+  const dayRequested = (shifts || []).find(s => s.shift_date === targetDateStr && s.status === 'requested');
+  const dayNum = singleDate?.getDate();
+
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 font-sans text-gray-800">
+    <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
       
       {/* 1. ヘッダー (修正：名前とさんのバランス) */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-pink-100 px-4 py-3 flex justify-between items-center">
-        <div className="flex flex-col">
-          <span className="text-[10px] text-pink-400 font-bold tracking-wider uppercase">
-            {cast.shop_name}店
-          </span>
-          <span className="text-[9px] text-gray-400">Sync: {cast.sync_time}</span>
-        </div>
-        <div className="flex items-baseline font-bold text-gray-700">
-          <span className="text-lg">{cast.display_name}</span>
-          <span className="text-[10px] ml-0.5 font-normal text-gray-500">さん</span>
-        </div>
-      </header>
-
-      <main className="max-w-md mx-auto space-y-4 p-4">
-
-        {/* 2. 実績or申請切り替えタブ */}
-        <div className="flex bg-gray-200/50 p-1 rounded-xl">
-          <button
-            onClick={() => setActiveTab('achievement')}
-            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-              activeTab === 'achievement' ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-500'
-            }`}
-          >
-            実績入力
-          </button>
-          <button
-            onClick={() => setActiveTab('request')}
-            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-              activeTab === 'request' ? 'bg-white text-purple-500 shadow-sm' : 'text-gray-500'
-            }`}
-          >
-            シフト申請
-          </button>
-        </div>
-
-        {/* 3. 実績合計 (修正：崩れない3カラム固定バッジ) */}
-        {activeTab === 'achievement' && (
-          <div className="grid grid-cols-3 gap-0 px-1 py-3 bg-white rounded-2xl shadow-sm border border-pink-50">
-            <div className="flex flex-col items-center">
-              <span className="text-[9px] text-gray-400 mb-1 font-medium">今月の報酬</span>
-              <div className="flex items-baseline">
-                <span className="text-xl font-black text-pink-500 leading-none">128,500</span>
-                <span className="text-[9px] ml-0.5 text-gray-400 font-bold">円</span>
-              </div>
-            </div>
-            <div className="flex flex-col items-center border-x border-pink-50">
-              <span className="text-[9px] text-gray-400 mb-1 font-medium">出勤日数</span>
-              <div className="flex items-baseline">
-                <span className="text-xl font-black text-gray-700 leading-none">12</span>
-                <span className="text-[9px] ml-0.5 text-gray-400 font-bold">日</span>
-              </div>
-            </div>
-            <div className="flex flex-col items-center">
-              <span className="text-[9px] text-gray-400 mb-1 font-medium">累計稼働</span>
-              <div className="flex items-baseline">
-                <span className="text-xl font-black text-gray-700 leading-none">64.5</span>
-                <span className="text-[9px] ml-0.5 text-gray-400 font-bold">h</span>
-              </div>
-            </div>
+      <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50 relative">
+        <div className="flex justify-between items-start">
+          <div>
+            <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">KarintoCastManager v2.9.9.17</p>
+            <p className="text-[13px] font-bold text-gray-400 mb-1">{shopInfo?.shop_name || 'Karinto'}店</p>
           </div>
-        )}
-
-        {/* 4. カレンダー (マーカー仕様固定) */}
-        <section className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <div className="flex justify-between items-center mb-4 px-1">
-            <h3 className="font-black text-gray-700 text-sm">2026.02</h3>
-            <div className="text-[9px] text-gray-400 flex gap-2">
-              <span className="flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full border border-yellow-400"></span>特定日</span>
-              <span className="flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-pink-400"></span>確定</span>
-              <span className="flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full border border-purple-400 border-dashed"></span>申請</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-7 gap-y-3 text-center">
-            {['日','月','火','水','木','金','土'].map(d => (
-              <span key={d} className="text-[10px] font-bold text-gray-300">{d}</span>
-            ))}
-            {[...Array(28)].map((_, i) => {
-              const day = i + 1;
-              const isEvent = SPECIFIC_DAYS[day];
-              return (
-                <div key={day} className="relative py-2 flex flex-col items-center justify-center cursor-pointer">
-                  <span className={`text-sm font-bold z-10 ${day === 3 ? 'text-pink-500' : 'text-gray-700'}`}>
-                    {day}
-                  </span>
-                  {isEvent && <div className="absolute inset-0 m-auto w-8 h-8 border-2 border-yellow-300 rounded-full" />}
-                  {day === 3 && <div className="absolute inset-0 m-auto w-7 h-7 bg-pink-50 border border-pink-400 rounded-full" />}
-                  {day === 15 && <div className="absolute inset-0 m-auto w-7 h-7 border border-purple-400 border-dashed rounded-full" />}
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* 5. 日付詳細 (波線エラー修正箇所) */}
-        <section className={`rounded-2xl p-5 shadow-sm border transition-colors ${
-          SPECIFIC_DAYS[currentDay] ? 'bg-yellow-50/50 border-yellow-200' : 'bg-white border-gray-100'
-        }`}>
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <span className="text-[10px] font-bold text-gray-400">2026.02.{currentDay} (火)</span>
-              <h4 className="text-lg font-black text-gray-800">
-                {SPECIFIC_DAYS[currentDay] || "通常稼働"}
-              </h4>
-            </div>
-            <span className={`text-[10px] px-2 py-1 rounded-full font-bold text-white ${activeTab === 'achievement' ? 'bg-pink-500' : 'bg-purple-500'}`}>
-              {activeTab === 'achievement' ? '実績入力' : 'シフト申請'}
-            </span>
-          </div>
-
-          {activeTab === 'achievement' ? (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 ml-1">本指名本数</label>
-                  <input type="number" className="w-full bg-gray-50 border-none rounded-xl p-3 focus:ring-2 focus:ring-pink-200" placeholder="0" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 ml-1">報酬額</label>
-                  <input type="number" className="w-full bg-gray-50 border-none rounded-xl p-3 focus:ring-2 focus:ring-pink-200" placeholder="¥" />
-                </div>
-              </div>
-              <button className="w-full bg-pink-500 text-white font-black py-3 rounded-xl shadow-lg shadow-pink-100 active:scale-95 transition-transform">
-                実績を保存する
-              </button>
-            </div>
-          ) : (
-            <div className="p-4 bg-purple-50 rounded-xl border border-purple-100 text-center">
-              <p className="text-sm text-purple-600 font-bold italic">タップして申請時間を選択</p>
+          {lastSync && (
+            <div className="bg-gray-50 px-2 py-1 rounded-lg border border-gray-100 flex items-center gap-1">
+              <span className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></span>
+              <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">HP同期: {lastSync}</span>
             </div>
           )}
-        </section>
+        </div>
+        <h1 className="text-3xl font-black flex items-baseline gap-0.5 leading-tight">
+          {castProfile?.display_name || 'キャスト'}
+          <span className="text-[14px] text-pink-400 font-bold ml-0.5">さん</span>
+        </h1>
+      </header>
 
-        {/* 6. 申請リスト */}
-        {activeTab === 'request' && (
-          <section className="bg-white rounded-2xl p-4 shadow-sm border border-purple-100">
-            <h5 className="text-[10px] font-bold text-purple-400 mb-3 uppercase tracking-widest">Selected List</h5>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center p-3 bg-purple-50/50 rounded-lg border border-purple-50">
-                <span className="text-sm font-bold text-gray-600">02.15 (日)</span>
-                <span className="text-sm font-black text-purple-600">11:00 - 22:00</span>
+      <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200 shadow-inner">
+        <button onClick={() => { setIsRequestMode(false); setMultiDates([]); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
+        <button onClick={() => { setIsRequestMode(true); setSingleDate(undefined); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
+      </div>
+
+      <main className="px-4 mt-3 space-y-2">
+        {!isRequestMode && (
+          <section className="bg-gradient-to-br from-[#FFE9ED] to-[#FFF5F7] rounded-[32px] p-5 border border-pink-200 relative overflow-hidden shadow-sm flex flex-col space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-[18px] font-black text-pink-500 tracking-tighter leading-none">
+                {format(viewDate, 'M月')}の実績
+              </h2>
+              {/* 実績バッジ：崩れない3カラム等幅 */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <div className="bg-white/90 px-2 py-1.5 rounded-xl border border-pink-50 shadow-sm flex flex-col items-center min-w-[55px]">
+                  <span className="text-[8px] block text-gray-400 leading-none mb-1 font-bold">出勤日数</span>
+                  <div className="flex items-baseline gap-0.5 leading-none">
+                    <span className="text-[16px] font-black text-pink-500">{monthlyTotals.count}</span>
+                    <span className="text-[8px] font-bold text-gray-400">日</span>
+                  </div>
+                </div>
+                <div className="bg-white/90 px-2 py-1.5 rounded-xl border border-pink-50 shadow-sm flex flex-col items-center min-w-[55px]">
+                  <span className="text-[8px] block text-gray-400 leading-none mb-1 font-bold">累計稼働</span>
+                  <div className="flex items-baseline gap-0.5 leading-none">
+                    <span className="text-[16px] font-black text-pink-500">{Math.round(monthlyTotals.hours * 10) / 10}</span>
+                    <span className="text-[8px] font-bold text-gray-400">h</span>
+                  </div>
+                </div>
               </div>
+            </div>
+            
+            <div className="text-center">
+              <p className="text-[52px] font-black text-pink-600 leading-none tracking-tighter">
+                <span className="text-2xl mr-1 opacity-40 translate-y-[-4px] inline-block">¥</span>
+                {monthlyTotals.amount.toLocaleString()}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-0.5 bg-white/40 rounded-2xl border border-white/60 text-center py-2">
+              <div><p className="text-[10px] text-pink-400 font-black leading-tight">フリー</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.f || 0}</p></div>
+              <div><p className="text-[10px] text-pink-400 font-black leading-tight">初指名</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.first || 0}</p></div>
+              <div><p className="text-[10px] text-pink-400 font-black leading-tight">本指名</p><p className="text-xl font-black text-pink-600 leading-none">{monthlyTotals.main || 0}</p></div>
             </div>
           </section>
         )}
 
-        {/* 7. NEWS */}
-        <section className="space-y-3">
-          <div className="flex items-center gap-2 px-1">
-            <Megaphone size={16} className="text-pink-400" />
-            <h3 className="font-black text-gray-700 text-sm">NEWS</h3>
-          </div>
-          <div className="space-y-2">
-            {[1, 2].map(i => (
-              <div key={i} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50">
-                <div className="flex justify-between items-start mb-1">
-                  <span className="text-[9px] font-bold text-pink-400 bg-pink-50 px-2 py-0.5 rounded">{i === 1 ? "重要" : "通知"}</span>
-                  <span className="text-[9px] text-gray-400 font-medium">2026.02.01</span>
-                </div>
-                <p className="text-xs font-bold text-gray-700 leading-relaxed">
-                  {i === 1 ? "【全店】2月度の特定日およびイベントスケジュールについて" : "システムメンテナンスのお知らせ（2/15）"}
-                </p>
-              </div>
-            ))}
-          </div>
+        <section className="bg-white p-2 rounded-[32px] border border-gray-100 shadow-sm text-center">
+          <DashboardCalendar shifts={shifts} selectedDates={isRequestMode ? multiDates : singleDate} onSelect={handleDateSelect} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
         </section>
 
+        {!isRequestMode && (
+          <section className={`rounded-[32px] border shadow-xl p-5 flex flex-col space-y-1 transition-all duration-300
+            ${dayNum === 10 ? 'bg-orange-50 border-orange-200' : 
+              (dayNum === 11 || dayNum === 22) ? 'bg-yellow-50 border-yellow-200' : 
+              'bg-white border-pink-100'}`}
+          >
+            {(dayNum === 10 || dayNum === 11 || dayNum === 22) && (
+              <div className={`-mt-2 mb-2 py-1.5 px-4 rounded-full text-center font-black text-[12px] tracking-[0.2em] shadow-sm
+                ${dayNum === 10 ? 'bg-orange-400 text-white' : 'bg-yellow-400 text-white'}`}>
+                {dayNum === 10 ? 'かりんとの日' : '添い寝の日'}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between px-1 gap-2">
+              <h3 className="text-2xl font-black text-gray-800 tracking-tight leading-none flex items-baseline whitespace-nowrap">
+                {singleDate ? format(singleDate, 'M/d') : ''}
+                <span className="text-lg ml-1 opacity-70">({singleDate ? format(singleDate, 'E', { locale: ja }) : ''})</span>
+              </h3>
+              
+              <div className="flex items-center gap-1 flex-nowrap shrink-0 justify-end">
+                {(!dayOfficial || dayOfficial.start_time === 'OFF') && !dayRequested ? (
+                  <span className="whitespace-nowrap text-[12px] font-black text-gray-400 bg-gray-50 px-2 py-1.5 rounded-lg border border-gray-100 leading-none">お休み</span>
+                ) : dayOfficial ? (
+                  <>
+                    <span className="whitespace-nowrap text-[12px] font-black text-blue-500 bg-blue-50 px-2 py-1.5 rounded-lg border border-blue-100 leading-none">確定シフト</span>
+                    <span className="whitespace-nowrap text-[20px] font-black text-pink-500 leading-none ml-1">{dayOfficial.start_time}〜{dayOfficial.end_time}</span>
+                  </>
+                ) : dayRequested ? (
+                  <>
+                    <span className="whitespace-nowrap text-[12px] font-black text-purple-500 bg-purple-50 px-2 py-1.5 rounded-lg border border-purple-100 leading-none">申請中</span>
+                    <span className="whitespace-nowrap text-[20px] font-black text-purple-400 leading-none ml-1">{dayRequested.start_time === 'OFF' ? 'お休み' : `${dayRequested.start_time}〜${dayRequested.end_time}`}</span>
+                  </>
+                ) : null}
+              </div>
+            </div>
+
+            {dayOfficial && dayOfficial.start_time !== 'OFF' ? (
+              <>
+                <div className="flex flex-col space-y-0.5 pt-1 text-center font-black text-gray-400 text-[11px] uppercase tracking-widest">
+                  <div className="grid grid-cols-3 gap-2 px-1"><span>フリー</span><span>初指名</span><span>本指名</span></div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['f', 'first', 'main'] as const).map((key) => (
+                      <input key={key} type="number" inputMode="numeric" value={editReward[key]} placeholder="0" onFocus={e=>e.target.select()} onChange={e => setEditReward({...editReward, [key]: e.target.value})} className={`w-full text-center py-2 bg-white rounded-xl font-black text-3xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none transition-all ${editReward[key] === '' ? 'text-gray-200' : 'text-pink-500'}`} />
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-pink-50/40 p-3 rounded-[22px] border border-pink-100 flex items-center justify-between shadow-inner">
+                  <label className="text-[13px] font-black text-gray-900 uppercase">報酬合計</label>
+                  <div className="flex items-center text-pink-500"><span className="text-2xl font-black mr-1 opacity-40 translate-y-[1px]">¥</span><input type="text" inputMode="numeric" value={editReward.amount!==''?Number(editReward.amount).toLocaleString():''} placeholder="0" onFocus={e=>e.target.select()} onChange={e=>{const v=e.target.value.replace(/,/g,''); if(/^\d*$/.test(v))setEditReward({...editReward,amount:v});}} className={`w-40 text-right bg-transparent font-black text-[32px] border-none focus:ring-0 caret-pink-500 tracking-tighter ${editReward.amount === '' ? 'text-gray-200' : 'text-pink-500'}`} /></div>
+                </div>
+                <button onClick={() => {
+                  const dateStr = format(singleDate!, 'yyyy-MM-dd');
+                  supabase.from('shifts').update({ f_count: Number(editReward.f) || 0, first_request_count: Number(editReward.first) || 0, main_request_count: Number(editReward.main) || 0, reward_amount: Number(editReward.amount) || 0 }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr).then(() => { fetchInitialData(); alert('実績を保存しました💰'); });
+                }} className="w-full bg-pink-500 text-white font-black py-4 rounded-[20px] text-lg shadow-lg active:scale-95 transition-all mt-1">実績を保存 💾</button>
+              </>
+            ) : ( <div className="py-8 text-center text-gray-300 font-bold italic text-xs">{dayRequested ? "確定をお待ちください⛄️" : "お休みです☕️"}</div> )}
+          </section>
+        )}
+
+        {isRequestMode && (
+          <section className="bg-white rounded-[32px] border border-purple-100 p-5 shadow-xl space-y-3">
+             <h3 className="font-black text-purple-600 text-[14px] uppercase tracking-widest flex items-center gap-2"><span className="w-1.5 h-4 bg-purple-500 rounded-full"></span>申請リスト ({multiDates.length}件)</h3>
+            <div className="flex flex-col">
+              {multiDates.length === 0 ? ( <p className="text-center py-8 text-gray-300 text-xs font-bold italic">カレンダーから日付を選んでください📅</p> ) : (
+                multiDates.map(d => {
+                  const key = format(d, 'yyyy-MM-dd');
+                  const officialShift = (shifts || []).find(s => s.shift_date === key && s.status === 'official');
+                  const isOff = requestDetails[key]?.s === 'OFF';
+                  return (
+                    <div key={key} className="py-3.5 border-b border-gray-100 last:border-0 flex flex-col space-y-2">
+                      <div className="flex items-center justify-between px-1">
+                        <span className="text-[16px] font-black text-gray-800">{format(d, 'M/d')} <span className="text-xs opacity-60">({format(d, 'E', {locale: ja})})</span></span>
+                        {officialShift && ( <div className="flex items-center gap-1.5 flex-nowrap"><span className="text-[12px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 leading-none whitespace-nowrap">確定</span><span className="text-[17px] font-black text-gray-600 leading-none whitespace-nowrap">{officialShift.start_time === 'OFF' ? 'お休み' : `${officialShift.start_time}〜${officialShift.end_time}`}</span></div> )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {officialShift ? ( <span className="bg-orange-50 text-orange-500 text-[12px] font-black px-2.5 py-2 rounded-xl border border-orange-100 leading-none shrink-0">変更</span> ) : ( <span className="bg-green-50 text-green-500 text-[12px] font-black px-2.5 py-2 rounded-xl border border-green-100 leading-none shrink-0">新規</span> )}
+                        {isOff ? ( <div className="flex-1 bg-gray-50 py-2.5 rounded-lg text-center font-black text-gray-400 tracking-widest text-sm border border-dashed border-gray-200">OFF (お休み)</div> ) : (
+                          <>
+                            <select value={requestDetails[key]?.s || '11:00'} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],s:e.target.value}})} className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none flex items-center justify-center">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                            <span className="text-gray-300 font-black text-lg">~</span>
+                            <select value={requestDetails[key]?.e || '23:00'} onChange={e => setRequestDetails({...requestDetails,[key]:{...requestDetails[key],e:e.target.value}})} className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none flex items-center justify-center">{TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+                          </>
+                        )}
+                        <button onClick={() => { if (isOff) { setRequestDetails({...requestDetails, [key]: {s: '11:00', e: '23:00'}}); } else { setRequestDetails({...requestDetails, [key]: {s: 'OFF', e: 'OFF'}}); } }} className={`px-4 py-2.5 rounded-lg font-black text-[12px] transition-all border shrink-0 ${isOff ? 'bg-purple-500 text-white border-purple-500 shadow-md' : 'bg-white text-gray-400 border-gray-200'}`}>{isOff ? '出勤にする' : 'お休み'}</button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            {multiDates.length > 0 && ( <button onClick={() => handleBulkSubmit()} className="w-full bg-purple-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg active:scale-95 transition-all">申請を確定する 🚀</button> )}
+          </section>
+        )}
+
+        <section className="bg-white rounded-[28px] border border-gray-100 shadow-sm overflow-hidden mb-8">
+          <div className="bg-gray-50 p-2.5 px-6 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">News</div>
+          <div className="divide-y divide-gray-50">
+            {newsList.length === 0 ? ( <div className="p-8 text-center text-gray-300 text-xs font-bold italic">お知らせはありません</div> ) : (
+              newsList.map((n) => (
+                <div key={n.id} className="p-4 px-6 flex gap-4 items-start">
+                  <span className="text-[10px] text-pink-400 font-black shrink-0 bg-pink-50 px-2 py-1 rounded leading-none mt-0.5">{format(parseISO(n.created_at), 'MM/dd')}</span>
+                  <p className="text-[13px] font-bold text-gray-700 leading-relaxed">{n.content}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
       </main>
 
-      {/* 8. 固定フッター */}
-      <nav className="fixed bottom-0 w-full max-w-md left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-lg border-t border-gray-100 px-6 py-3 flex justify-between items-center z-50">
-        <button className="flex flex-col items-center gap-1 text-pink-500">
-          <CalendarIcon size={20} />
-          <span className="text-[9px] font-black">ホーム</span>
-        </button>
-        <button className="flex flex-col items-center gap-1 text-gray-300">
-          <DollarSign size={20} />
-          <span className="text-[9px] font-black">月間成績</span>
-        </button>
-        <button className="flex flex-col items-center gap-1 text-gray-300">
-          <LogOut size={20} />
-          <span className="text-[9px] font-black">終了</span>
-        </button>
-      </nav>
-
+      <footer className="fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-xl border-t border-gray-100 pb-8 pt-4">
+        <nav className="flex justify-around items-center max-md mx-auto px-6">
+          <button onClick={() => router.push('/')} className="flex flex-col items-center gap-1.5">
+            <span className={`text-2xl ${(pathname === '/' || !pathname) ? 'opacity-100' : 'opacity-30'}`}>🏠</span>
+            <span className={`text-[9px] font-black uppercase ${(pathname === '/' || !pathname) ? 'text-pink-500' : 'text-gray-300'}`}>ホーム</span>
+          </button>
+          <button onClick={() => router.push('/salary')} className="flex flex-col items-center gap-1.5">
+            <span className={`text-2xl ${pathname === '/salary' ? 'opacity-100' : 'opacity-30'}`}>💰</span>
+            <span className={`text-[9px] font-black uppercase ${pathname === '/salary' ? 'text-pink-500' : 'text-gray-300'}`}>給与明細</span>
+          </button>
+          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex flex-col items-center gap-1.5 text-gray-300">
+            <span className="text-2xl opacity-30">🚪</span>
+            <span className="text-[9px] font-black uppercase">ログアウト</span>
+          </button>
+        </nav>
+      </footer>
     </div>
   );
 }
