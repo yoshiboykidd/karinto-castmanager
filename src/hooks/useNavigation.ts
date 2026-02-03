@@ -1,43 +1,40 @@
 import { useState } from 'react';
-import { startOfToday } from 'date-fns';
+import { isSameDay } from 'date-fns';
 
 export function useNavigation() {
-  // モード（実績入力：false / シフト申請：true）
   const [isRequestMode, setIsRequestMode] = useState(false);
+  const [viewDate, setViewDate] = useState(new Date());
   
-  // カレンダーの表示月
-  const [viewDate, setViewDate] = useState(new Date()); 
-  
-  // 選択中の日付（単一 or 複数）
-  const [selected, setSelected] = useState<{single?: Date, multi: Date[]}>({ 
-    single: new Date(), 
-    multi: [] 
+  // 選択状態の管理
+  const [selected, setSelected] = useState<{
+    single: Date | undefined;
+    multi: Date[];
+  }>({
+    single: new Date(), // 初期値は今日
+    multi: [],
   });
 
-  // モード切り替え時の初期化
   const toggleMode = (mode: boolean) => {
     setIsRequestMode(mode);
-    if (mode) {
-      // 申請モードへ：単一選択をクリア
-      setSelected({ single: undefined, multi: [] });
-    } else {
-      // 実績モードへ：今日を選択
-      setSelected({ single: new Date(), multi: [] });
-    }
+    // モード切り替え時に選択をリセット（混乱を防ぐため）
+    setSelected({ single: undefined, multi: [] });
   };
 
-  // 日付選択の交通整理ロジック
-  const handleDateSelect = (dates: any) => {
+  // ★ここがカレンダーの onClick から呼ばれる関数
+  const handleDateSelect = (date: Date) => {
     if (isRequestMode) {
-      // 申請モード：明日以降のみ選択可能
-      const tomorrow = startOfToday();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const filtered = (Array.isArray(dates) ? dates : []).filter(d => d >= tomorrow);
-      setSelected({ single: undefined, multi: filtered });
+      // 申請モード：タップするたびに追加・削除（複数選択）
+      setSelected(prev => {
+        const isAlreadySelected = prev.multi.some(d => isSameDay(d, date));
+        if (isAlreadySelected) {
+          return { ...prev, multi: prev.multi.filter(d => !isSameDay(d, date)) };
+        } else {
+          return { ...prev, multi: [...prev.multi, date] };
+        }
+      });
     } else {
-      // 実績モード：単一選択のみ
-      const d = Array.isArray(dates) ? dates[0] : dates;
-      setSelected({ single: d instanceof Date ? d : undefined, multi: [] });
+      // 実績入力モード：1日だけ選択
+      setSelected({ single: date, multi: [] });
     }
   };
 
@@ -47,7 +44,7 @@ export function useNavigation() {
     viewDate,
     setViewDate,
     selected,
-    handleDateSelect,
-    setSelected // 必要に応じて直接更新用
+    setSelected,
+    handleDateSelect
   };
 }

@@ -1,11 +1,10 @@
-// components/DashboardCalendar.tsx
 import React from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-// ★波線を消すための門番（Props）の設定
+// ★ Page.tsx の波線を消し去るための定義
 interface DashboardCalendarProps {
-  shifts: any;           // これがあることで Page.tsx の波線が消えます
+  shifts: any;
   selectedDates: any;
   onSelect: (date: Date) => void;
   month: Date;
@@ -29,6 +28,7 @@ export default function DashboardCalendar({
 
   return (
     <div className="p-2">
+      {/* 月切り替え */}
       <div className="flex items-center justify-between mb-4 px-2">
         <button onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>
           <ChevronLeft className="h-5 w-5 text-gray-400" />
@@ -46,15 +46,14 @@ export default function DashboardCalendar({
 
         {days.map(day => {
           const dateStr = format(day, 'yyyy-MM-dd');
-          // その日のデータを探す
           const dayShift = Array.isArray(shifts) ? shifts.find((s: any) => s.shift_date === dateStr) : undefined;
           
-          // 判定ロジック（ピンク・紫・黄色〇）
+          // 色出し分けロジック
           const isOfficial = dayShift?.status === 'official' && dayShift?.is_official === true;
           const isRequested = dayShift?.status === 'requested' && !!dayShift?.main_request;
           const isSpecialDay = day.getDate() === 10 || (day.getMonth() === 10 && day.getDate() === 22);
 
-          // 選択判定
+          // ★選択状態の判定（ここが反応しないと選んだ感が出ない）
           const isSelected = Array.isArray(selectedDates) 
             ? selectedDates.some(d => isSameDay(d, day)) 
             : selectedDates && isSameDay(selectedDates, day);
@@ -62,17 +61,20 @@ export default function DashboardCalendar({
           return (
             <div 
               key={dateStr} 
+              // ★ここが「反応」の正体です
               onClick={() => onSelect(day)} 
-              className={`relative h-12 w-full flex flex-col items-center justify-center rounded-xl border border-gray-50 
+              className={`
+                relative h-12 w-full flex flex-col items-center justify-center rounded-xl border border-gray-50 transition-all active:scale-90
                 ${isSpecialDay ? 'bg-yellow-50' : 'bg-white'} 
-                ${isSelected ? 'ring-2 ring-pink-500' : ''}`}
+                ${isSelected ? 'ring-2 ring-pink-500 z-20 shadow-md' : ''}
+              `}
             >
-              <span className={`z-10 text-xs font-black ${isOfficial ? 'text-white' : 'text-gray-600'}`}>
+              <span className={`z-10 text-xs font-black ${isOfficial ? 'text-white' : isSelected ? 'text-pink-600' : 'text-gray-600'}`}>
                 {day.getDate()}
               </span>
-              {isOfficial && <div className="absolute inset-1 rounded-full bg-pink-400" />}
+              {isOfficial && <div className="absolute inset-1 rounded-full bg-pink-400 shadow-sm" />}
               {isRequested && !isOfficial && <div className="absolute inset-1 rounded-full border-2 border-purple-400 border-dashed" />}
-              {isSpecialDay && <div className="absolute top-1 right-1 h-1 w-1 rounded-full bg-yellow-400" />}
+              {isSpecialDay && <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-yellow-400" />}
             </div>
           );
         })}
