@@ -36,36 +36,31 @@ export default function DailyDetail({
   return (
     <section className={`rounded-[32px] border shadow-xl p-5 flex flex-col space-y-3 transition-all duration-300 ${themeClass}`}>
       
-      {/* A. 日付ヘッダー */}
+      {/* A. 日付ヘッダー（余計なテキストを削除） */}
       <div className="flex items-center justify-between px-1">
         <h3 className="text-2xl font-black text-gray-800 tracking-tight leading-none flex items-baseline">
           {format(date, 'M/d')}
           <span className="text-lg ml-1 opacity-70">({format(date, 'E', { locale: ja })})</span>
         </h3>
-        {/* 右上の小さな補助ラベル */}
-        {isModified && <span className="text-[10px] font-black text-orange-400 uppercase italic animate-pulse">Update Pending</span>}
       </div>
 
-      {/* B. 変更申請中の場合のみ表示される「依頼内容」セクション */}
+      {/* B. 変更申請中セクション（バッジと時間のみに簡略化） */}
       {isModified && (
-        <div className="flex items-center gap-2 px-2 py-2 bg-white/60 rounded-2xl border border-orange-100 shadow-sm">
-          <span className="text-[10px] font-black px-2 py-1 rounded-lg bg-orange-500 text-white shadow-sm shrink-0">
+        <div className="flex items-center gap-3 px-3 py-2 bg-white/60 rounded-2xl border border-orange-100 shadow-sm">
+          <span className="text-[11px] font-black px-2.5 py-1 rounded-lg bg-orange-500 text-white shadow-sm shrink-0">
             変更申請中
           </span>
-          <div className="flex items-baseline gap-1">
-            <span className="text-[16px] font-black text-orange-500">
-              {shift.start_time}〜{shift.end_time}
-            </span>
-            <span className="text-[10px] font-bold text-orange-400">へ修正依頼を出しています</span>
-          </div>
+          <span className="text-[20px] font-black text-orange-500 tracking-tighter">
+            {shift.start_time}〜{shift.end_time}
+          </span>
         </div>
       )}
 
-      {/* C. メイン時間表示（確定シフト・新規申請共通の配置） */}
+      {/* C. メイン時間表示 */}
       <div className="flex items-center gap-4 px-1 py-1">
         {shift && shift.start_time !== 'OFF' ? (
           <>
-            {/* バッジ：左側に大きく配置 */}
+            {/* バッジ：左側に配置 */}
             {isOfficial || isModified ? (
               <span className="text-[15px] font-black px-4 py-2 rounded-xl bg-blue-500 text-white shadow-md shrink-0">
                 確定
@@ -76,16 +71,15 @@ export default function DailyDetail({
               </span>
             ) : null}
 
-            {/* 時間表示：右側に大きく配置 */}
+            {/* 時間表示：右側に大きく表示 */}
             <span className={`text-[36px] font-black leading-none tracking-tighter ${isRequested && !isModified ? 'text-purple-500' : 'text-pink-500'}`}>
-              {/* 変更中の場合でも、一旦現在の確定（または最新）時間を表示 */}
               {shift.start_time}〜{shift.end_time}
             </span>
           </>
         ) : (
           <div className="flex items-center gap-3 py-2">
             <span className="text-[15px] font-black px-4 py-2 rounded-xl bg-gray-400 text-white shadow-sm">休み</span>
-            <span className="text-xl font-black text-gray-300 italic">No scheduled shift</span>
+            <span className="text-xl font-black text-gray-300 italic opacity-50">Day Off</span>
           </div>
         )}
       </div>
@@ -145,7 +139,7 @@ export default function DailyDetail({
         </div>
       ) : isRequested && !isModified ? (
         <div className="bg-purple-100/30 rounded-2xl p-6 text-center border border-purple-200 mt-2">
-          <p className="text-purple-500 font-black text-sm italic">承認されるまでお待ちください☕️</p>
+          <p className="text-purple-500 font-black text-sm italic">店長の承認をお待ちください☕️</p>
         </div>
       ) : null}
     </section>
