@@ -3,10 +3,10 @@
 import { useEffect, useState, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter, usePathname } from 'next/navigation'; 
-import { format, parseISO, startOfToday, isBefore } from 'date-fns';
+import { format, parseISO, startOfToday, isAfter } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
-// --- 自作コンポーネントのインポート（dashboardフォルダ内） ---
+// --- 自作コンポーネントのインポート ---
 import CastHeader from '@/components/dashboard/CastHeader';
 import MonthlySummary from '@/components/dashboard/MonthlySummary';
 import DashboardCalendar from '@/components/DashboardCalendar';
@@ -40,7 +40,7 @@ export default function Page() {
   const [requestDetails, setRequestDetails] = useState<{[key: string]: {s: string, e: string}}>({});
   const [editReward, setEditReward] = useState({ f: '', first: '', main: '', amount: '' });
 
-  // 型エラー回避のための型定義
+  // モード判定用
   const activeTab: 'achievement' | 'request' = isRequestMode ? 'request' : 'achievement';
 
   useEffect(() => { fetchInitialData(); }, []);
@@ -71,16 +71,13 @@ export default function Page() {
     setLoading(false);
   }
 
-  // --- 2. 【重要】データ同期ロジック（残像問題を解決） ---
+  // --- 2. データ同期ロジック（日付選択時の残像防止） ---
   useEffect(() => {
     if (!singleDate) return;
     const dateStr = format(singleDate, 'yyyy-MM-dd');
-    
-    // 選択した日の確定データを検索
     const dayData = (shifts || []).find(s => s.shift_date === dateStr && s.status === 'official');
 
     if (dayData) {
-      // 保存済みデータがあれば入力欄にセット
       setEditReward({
         f: dayData.f_count?.toString() || '',
         first: dayData.first_request_count?.toString() || '',
@@ -88,21 +85,21 @@ export default function Page() {
         amount: dayData.reward_amount?.toString() || ''
       });
     } else {
-      // データがない日は入力をリセット
       setEditReward({ f: '', first: '', main: '', amount: '' });
     }
   }, [singleDate, shifts]);
 
-  // --- 3. 実績計算ロジック（昨日までを合算） ---
+  // --- 3. 【修正】実績計算ロジック（当日分を含める） ---
   const monthlyTotals = useMemo(() => {
     const today = startOfToday();
     return (shifts || [])
       .filter((s: any) => {
         const d = parseISO(s.shift_date);
+        // 条件：同じ月 ＆ 確定(official) ＆ 未来（明日以降）ではない
         return d.getMonth() === viewDate.getMonth() && 
                d.getFullYear() === viewDate.getFullYear() && 
                s.status === 'official' &&
-               isBefore(d, today); 
+               !isAfter(d, today); // 「今日より後」でなければOK ＝ 今日を含む
       })
       .reduce((acc, s: any) => {
         let dur = 0; let isWorking = 0;
@@ -143,7 +140,7 @@ export default function Page() {
     }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr);
 
     if (!error) {
-      fetchInitialData();
+      fetchInitialData(); // データを再取得して合計値を更新
       alert('実績を保存しました💰');
     }
   };
@@ -153,12 +150,11 @@ export default function Page() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
       
-      {/* 司令塔から各部品へデータを渡す */}
       <CastHeader 
         shopName={shopInfo?.shop_name || 'Karinto'} 
         syncTime={lastSync} 
         displayName={castProfile?.display_name || 'キャスト'} 
-        version="KarintoCastManager v2.9.9.20" 
+        version="KarintoCastManager v2.9.9.21" 
       />
 
       <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200 shadow-inner">
