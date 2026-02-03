@@ -14,17 +14,17 @@ export async function GET(request: NextRequest) {
   let debugLog: any[] = [];
 
   try {
-    // 1. キャスト名簿を取得
     const { data: allCasts } = await supabase
       .from('cast_members')
       .select('login_id, hp_display_name');
 
-    // 型を明示して波線を消す（s: string）
-    const normalize = (str: string) => {
-      return str
-        .replace(/\s+/g, '') // スペース除去
+    // ★ 修正点：str が null や undefined の場合でもエラーにならないように保護
+    const normalize = (str: string | null | undefined) => {
+      const safeStr = str || ""; // null なら空文字にする
+      return safeStr
+        .replace(/\s+/g, '') 
         .replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s: string) => {
-          return String.fromCharCode(s.charCodeAt(0) - 0xFEE0); // 全角→半角
+          return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
         });
     };
 
@@ -33,7 +33,6 @@ export async function GET(request: NextRequest) {
       matchName: normalize(c.hp_display_name)
     })) || [];
 
-    // 2. 公式HPから今日の日付分を取得
     const targetDate = new Date(Date.now() + JST_OFFSET);
     const dateStr = targetDate.toISOString().split('T')[0];
     const hpDateStr = dateStr.replace(/-/g, '/');
@@ -49,7 +48,6 @@ export async function GET(request: NextRequest) {
       const timeMatch = item.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
       if (!nameMatch || !timeMatch) continue;
 
-      // HPの名前をクリーンアップ
       const hpNameRaw = nameMatch[1].replace(/[（\(\[].*?[）\)\]]/g, '').trim();
       const cleanHPName = normalize(hpNameRaw);
 
@@ -68,7 +66,6 @@ export async function GET(request: NextRequest) {
         
         debugLog.push({ 状態: "✅一致", HP名: cleanHPName, DB名: targetCast.hp_display_name });
       } else {
-        // ここに名前が出ているのに反映されない場合、DBの hp_display_name が間違っています
         debugLog.push({ 状態: "❌不一致", HP名: cleanHPName, 理由: "DBに対応する名前がありません" });
       }
     }
@@ -83,6 +80,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // ここでエラーが出た場合、詳細をブラウザに返します
+    return NextResponse.json({ error: error.message, stack: error.stack }, { status: 500 });
   }
 }
