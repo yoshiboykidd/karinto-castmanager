@@ -35,7 +35,7 @@ export default function DailyDetail({
   else if (isRequested) themeClass = "bg-purple-50/40 border-purple-200";
 
   return (
-    <section className={`relative overflow-hidden rounded-[32px] border shadow-xl p-4 pt-6 flex flex-col space-y-2 transition-all duration-300 ${themeClass}`}>
+    <section className={`relative overflow-hidden rounded-[32px] border shadow-xl p-4 pt-6 flex flex-col space-y-1.5 transition-all duration-300 ${themeClass}`}>
       
       {/* 特定日バッジ */}
       {(isKarin || isSoine) && (
@@ -45,57 +45,61 @@ export default function DailyDetail({
         </div>
       )}
 
-      {/* 1行目：日付 ＆ 変更申請情報（時間をより大きく） */}
-      <div className="flex items-center justify-between px-1 h-7">
+      {/* 1行目：日付 ＆ 変更申請情報 */}
+      <div className="flex items-center justify-between px-1 h-7 mt-0.5">
         <h3 className="text-xl font-black text-gray-800 tracking-tight leading-none flex items-baseline shrink-0">
           {format(date, 'M/d')}
           <span className="text-base ml-1 opacity-70">({format(date, 'E', { locale: ja })})</span>
         </h3>
 
         {isModified && (
-          <div className="flex items-center gap-1.5 overflow-hidden">
-            <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-green-600 text-white shadow-sm shrink-0">
+          <div className="flex items-center gap-1 overflow-hidden">
+            <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-green-600 text-white shrink-0">
               変更申請中
             </span>
-            <span className="text-[20px] font-black text-green-600 tracking-tighter whitespace-nowrap">
+            <span className="text-[19px] font-black text-green-600 tracking-tighter whitespace-nowrap">
               {shift.start_time}〜{shift.end_time}
             </span>
           </div>
         )}
       </div>
 
-      {/* 2行目：メイン時間表示（ラベル左 / 時間右詰め） */}
-      <div className="flex items-center justify-between px-1 h-10 gap-2">
+      {/* 2行目：メイン時間（絶対に1行に収める設定） */}
+      <div className="flex items-center justify-between px-1 h-10 gap-1">
         {shift && shift.start_time !== 'OFF' ? (
           <>
-            {/* ラベルを左に配置 */}
-            {isOfficial || isModified ? (
-              <span className="text-[13px] font-black px-3 py-1.5 rounded-xl bg-blue-500 text-white shadow-md shrink-0">
-                確定シフト
-              </span>
-            ) : isRequested ? (
-              <span className="text-[13px] font-black px-3 py-1.5 rounded-xl bg-purple-500 text-white shadow-md shrink-0">
-                新規申請中
-              </span>
-            ) : null}
+            {/* ラベル：幅を取らないようフォントとパディングを微調整 */}
+            <div className="shrink-0">
+              {isOfficial || isModified ? (
+                <span className="text-[12px] font-black px-2.5 py-1.5 rounded-xl bg-blue-500 text-white shadow-md whitespace-nowrap">
+                  確定シフト
+                </span>
+              ) : isRequested ? (
+                <span className="text-[12px] font-black px-2.5 py-1.5 rounded-xl bg-purple-500 text-white shadow-md whitespace-nowrap">
+                  新規申請中
+                </span>
+              ) : null}
+            </div>
 
-            {/* 時間を右に大きく配置 */}
-            <span className={`text-[36px] font-black leading-none tracking-tighter text-right
-              ${isRequested && !isModified ? 'text-purple-500' : 'text-pink-500'}`}>
-              {shift.start_time}〜{shift.end_time}
-            </span>
+            {/* 時間：右詰め & 改行禁止 & サイズ微調整 */}
+            <div className="flex-1 text-right overflow-hidden">
+              <span className={`text-[31px] font-black leading-none tracking-tighter whitespace-nowrap inline-block align-middle
+                ${isRequested && !isModified ? 'text-purple-500' : 'text-pink-500'}`}>
+                {shift.start_time}〜{shift.end_time}
+              </span>
+            </div>
           </>
         ) : (
           <div className="flex items-center justify-between w-full">
-            <span className="text-[13px] font-black px-3 py-1.5 rounded-xl bg-gray-400 text-white shadow-sm">休み</span>
-            <span className="text-lg font-black text-gray-300 italic uppercase tracking-widest opacity-40">No Schedule</span>
+            <span className="text-[12px] font-black px-3 py-1.5 rounded-xl bg-gray-400 text-white shadow-sm shrink-0">お休み</span>
+            <span className="text-xs font-black text-gray-300 italic uppercase tracking-widest opacity-40">Day Off</span>
           </div>
         )}
       </div>
 
-      {/* 3行目以降：実績入力フォーム */}
+      {/* 3行目以降：実績入力フォーム（さらに間隔を詰めてコンパクトに） */}
       {(isOfficial || isModified) && shift?.start_time !== 'OFF' ? (
-        <div className="space-y-2 pt-2 border-t border-gray-100/50">
+        <div className="space-y-1.5 pt-2 border-t border-gray-100/50">
           <div className="grid grid-cols-3 gap-2">
             {(['f', 'first', 'main'] as const).map((key) => (
               <div key={key} className="flex flex-col space-y-0.5">
@@ -109,16 +113,16 @@ export default function DailyDetail({
                   placeholder="0"
                   onFocus={(e) => e.target.select()}
                   onChange={(e) => setEditReward({ ...editReward, [key]: e.target.value })}
-                  className="w-full text-center py-2 bg-white rounded-xl font-black text-2xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none text-pink-500 shadow-sm"
+                  className="w-full text-center py-1.5 bg-white rounded-xl font-black text-2xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none text-pink-500 shadow-sm"
                 />
               </div>
             ))}
           </div>
 
-          <div className="bg-white/80 p-2.5 rounded-2xl border border-pink-100 flex items-center justify-between shadow-inner">
-            <span className="text-[11px] font-black text-gray-400 uppercase">報酬合計</span>
-            <div className="flex items-center text-pink-500">
-              <span className="text-xl font-black mr-1 opacity-30">¥</span>
+          <div className="bg-white/80 p-2 rounded-2xl border border-pink-100 flex items-center justify-between shadow-inner">
+            <span className="text-[10px] font-black text-gray-400 uppercase ml-1">報酬合計</span>
+            <div className="flex items-center text-pink-500 mr-1">
+              <span className="text-lg font-black mr-0.5 opacity-30">¥</span>
               <input
                 type="text"
                 inputMode="numeric"
@@ -147,8 +151,8 @@ export default function DailyDetail({
           </div>
         </div>
       ) : isRequested && !isModified ? (
-        <div className="bg-purple-100/30 rounded-2xl py-4 text-center border border-purple-200">
-          <p className="text-purple-500 font-black text-sm italic">承認をお待ちください☕️</p>
+        <div className="bg-purple-100/30 rounded-2xl py-3 text-center border border-purple-200">
+          <p className="text-purple-500 font-black text-sm italic">店長の承認をお待ちください☕️</p>
         </div>
       ) : null}
     </section>
