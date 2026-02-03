@@ -4,8 +4,9 @@ import { useEffect, useState, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter, usePathname } from 'next/navigation'; 
 import { format, parseISO, startOfToday, isAfter } from 'date-fns';
+import { ja } from 'date-fns/locale';
 
-// --- すでに切り出し済みのコンポーネント群 ---
+// --- コンポーネント群 ---
 import CastHeader from '@/components/dashboard/CastHeader';
 import MonthlySummary from '@/components/dashboard/MonthlySummary';
 import DashboardCalendar from '@/components/DashboardCalendar';
@@ -59,7 +60,7 @@ export default function Page() {
     setLoading(false);
   }
 
-  // 三すくみ対応：実績サマリー計算
+  // 【実績サマリー計算】当日までの公式枠、または「実績として残すべき申請中(pre_exist)」を合計
   const monthlyTotals = useMemo(() => {
     const today = startOfToday();
     return data.shifts
@@ -67,7 +68,6 @@ export default function Page() {
         const d = parseISO(s.shift_date);
         const isThisMonth = d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
         const isPastOrToday = !isAfter(d, today);
-        // ★三すくみ：確定済み、または「申請中だが元々公式枠があった（pre_exist）」ものを計算対象にする
         const isCountable = s.status === 'official' || (s.status === 'requested' && s.is_official_pre_exist === true);
         
         return isThisMonth && isPastOrToday && isCountable;
@@ -114,12 +114,13 @@ export default function Page() {
   const handleSaveAchievement = async () => {
     if (!selected.single || !data.profile) return;
     const dateStr = format(selected.single, 'yyyy-MM-dd');
+    // 実績保存時は is_official: true を立てて、公式データとして確定させる
     const { error } = await supabase.from('shifts').update({ 
       f_count: Number(editReward.f) || 0, 
       first_request_count: Number(editReward.first) || 0, 
       main_request_count: Number(editReward.main) || 0, 
       reward_amount: Number(editReward.amount) || 0,
-      is_official: true // 保存時は公式ステータスを維持
+      is_official: true 
     }).eq('login_id', data.profile.login_id).eq('shift_date', dateStr);
     
     if (!error) { fetchInitialData(); alert('実績を保存しました💰'); }
@@ -138,7 +139,6 @@ export default function Page() {
         end_time: requestDetails[key]?.e || '23:00',
         status: 'requested',
         is_official: false,
-        // 三すくみ：元々公式枠があった、または pre_exist が true なら継承
         is_official_pre_exist: existing?.is_official_pre_exist || existing?.status === 'official'
       };
     });
@@ -152,56 +152,48 @@ export default function Page() {
 
   if (loading) return <div className="min-h-screen bg-[#FFF9FA] flex items-center justify-center font-black italic text-5xl text-pink-300 animate-pulse">KARINTO...</div>;
 
+  const today = startOfToday();
+  const isPastOrToday = selected.single && !isAfter(selected.single, today);
+
   return (
     <div className="min-h-screen bg-[#FFFDFE] text-gray-800 pb-36 font-sans overflow-x-hidden">
       
-      <CastHeader 
-        shopName={data.shop?.shop_name || 'Karinto'} 
-        syncTime={data.syncAt} 
-        displayName={data.profile?.display_name || 'キャスト'} 
-        version="v2.9.9.26" 
-      />
+      <CastHeader shopName={data.shop?.shop_name || 'Karinto'} syncTime={data.syncAt} displayName={data.profile?.display_name || 'キャスト'} version="v2.9.9.16" />
 
-      {/* モード切替タブ：地続き構成の核 */}
+      {/* モード切替 */}
       <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200 shadow-inner">
         <button onClick={() => { setIsRequestMode(false); setSelected({ single: new Date(), multi: [] }); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
         <button onClick={() => { setIsRequestMode(true); setSelected({ single: undefined, multi: [] }); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
       </div>
 
       <main className="px-4 mt-3 space-y-2">
-        {/* 実績サマリー：v2.8.9の通り、モードに関わらず（あるいは実績モードで）常に上部に置くのが美しい */}
-        {!isRequestMode && (
-          <MonthlySummary 
-            month={format(viewDate, 'M月')} 
-            totals={monthlyTotals} 
-          />
-        )}
+        {!isRequestMode && <MonthlySummary month={format(viewDate, 'M月')} totals={monthlyTotals} />}
 
         <section className="bg-white p-2 rounded-[32px] border border-gray-100 shadow-sm text-center">
-          <DashboardCalendar 
-            shifts={data.shifts} 
-            selectedDates={isRequestMode ? selected.multi : selected.single} 
-            onSelect={handleDateSelect} 
-            month={viewDate} 
-            onMonthChange={setViewDate} 
-            isRequestMode={isRequestMode} 
-          />
+          <DashboardCalendar shifts={data.shifts} selectedDates={isRequestMode ? selected.multi : selected.single} onSelect={handleDateSelect} month={viewDate} onMonthChange={setViewDate} isRequestMode={isRequestMode} />
         </section>
 
-        {/* --- 条件によって切り替わる動的セクション --- */}
         {!isRequestMode ? (
+          /* 実績入力セクション */
           selected.single && (
-            <DailyDetail 
-              date={selected.single} 
-              dayNum={selected.single.getDate()} 
-              // 三すくみ：現在のシフト（公式・申請問わず）を渡す
-              shift={data.shifts.find(s => s.shift_date === format(selected.single!, 'yyyy-MM-dd'))} 
-              editReward={editReward} 
-              setEditReward={setEditReward} 
-              onSave={handleSaveAchievement} 
-            />
+            isPastOrToday ? (
+              <DailyDetail 
+                date={selected.single} 
+                dayNum={selected.single.getDate()} 
+                shift={data.shifts.find(s => s.shift_date === format(selected.single!, 'yyyy-MM-dd'))} 
+                editReward={editReward} 
+                setEditReward={setEditReward} 
+                onSave={handleSaveAchievement} 
+              />
+            ) : (
+              <div className="bg-white rounded-[32px] border border-pink-50 p-8 text-center shadow-sm">
+                <p className="text-gray-300 font-black italic text-xs">未来の日付の実績入力はできません⛄️</p>
+                <p className="text-[10px] text-pink-300 font-bold mt-1">シフト申請モードへ切り替えてください</p>
+              </div>
+            )
           )
         ) : (
+          /* シフト申請セクション */
           <RequestList 
             multiDates={selected.multi} 
             requestDetails={requestDetails} 
@@ -214,12 +206,7 @@ export default function Page() {
         <NewsSection newsList={data.news} />
       </main>
 
-      <FixedFooter 
-        pathname={pathname}
-        onHome={() => router.push('/')}
-        onSalary={() => router.push('/salary')}
-        onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))}
-      />
+      <FixedFooter pathname={pathname} onHome={() => router.push('/')} onSalary={() => router.push('/salary')} onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} />
     </div>
   );
 }
