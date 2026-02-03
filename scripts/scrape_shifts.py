@@ -34,19 +34,43 @@ def scrape_and_sync():
             time_match = re.search(r'(\d{2}:\d{2})-(\d{2}:\d{2})', item.get_text())
             if not time_match: continue
             
-            # 名簿からIDを取得
+            # 1. キャスト名から ID を取得
             res = supabase.table("cast_members").select("login_id").eq("hp_display_name", hp_name).execute()
             
             if res.data:
                 login_id = res.data[0]['login_id']
-                # ここが重要：on_conflict="login_id,shift_date" を必ず含める
+                
+                # 2. 【重要】現在のDBの状態を確認
+                # 申請中(requested)かどうか、現在のフラグの状態を取得します
+                existing_shift = supabase.table("shifts") \
+                    .select("status, is_official") \
+                    .eq("login_id", login_id) \
+                    .eq("shift_date", db_date_str) \
+                    .execute()
+
+                # 基本となるデータ（HPに存在するので pre_exist は常に True）
                 data = {
                     "login_id": login_id,
                     "hp_display_name": hp_name,
                     "shift_date": db_date_str,
-                    "start_time": time_match.group(1),
-                    "end_time": time_match.group(2)
+                    "is_official_pre_exist": True  # 公式HPに枠が存在することの証明
                 }
+
+                # 3. 三すくみロジックによる上書き判定
+                # すでにDBにデータがあり、かつステータスが 'requested'（申請中）の場合
+                if existing_shift.data and existing_shift.data[0].get('status') == 'requested':
+                    print(f"  ⚠️ {hp_name} ({db_date_str}) は申請中のため、時間は上書きせず pre_exist のみ更新します")
+                    # data には start_time, end_time, status, is_official を含めない（現在の申請値を保護）
+                else:
+                    # 新規データ、または既存データが 'official' の場合は、HPの内容で更新
+                    data.update({
+                        "start_time": time_match.group(1),
+                        "end_time": time_match.group(2),
+                        "status": "official",
+                        "is_official": True
+                    })
+
+                # 4. Upsert 実行 (on_conflict で ID と日付が一致する行を対象にする)
                 supabase.table("shifts").upsert(data, on_conflict="login_id,shift_date").execute()
                 print(f"  ✅ {hp_name} ({db_date_str}) 同期完了")
 
