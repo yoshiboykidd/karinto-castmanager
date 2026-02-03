@@ -1,5 +1,9 @@
 'use client';
 
+// --- キャッシュを無効化し、常に最新のDBを読みに行く設定 ---
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 import { useEffect, useState, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter, usePathname } from 'next/navigation'; 
@@ -40,15 +44,20 @@ export default function Page() {
   const [requestDetails, setRequestDetails] = useState<{[key: string]: {s: string, e: string}}>({});
   const [editReward, setEditReward] = useState({ f: '', first: '', main: '', amount: '' });
 
-  // 型エラー回避用
+  // 型エラー対策
   const activeTab: 'achievement' | 'request' = isRequestMode ? 'request' : 'achievement';
 
-  useEffect(() => { fetchInitialData(); }, []);
+  useEffect(() => {
+    fetchInitialData();
+  }, []);
 
-  // --- 1. データ取得 ---
+  // --- 1. データ取得ロジック ---
   async function fetchInitialData() {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { router.push('/login'); return; }
+    if (!session) {
+      router.push('/login');
+      return;
+    }
     const loginId = session.user.email?.replace('@karinto-internal.com', '');
     
     const { data: castData } = await supabase.from('cast_members').select('*').eq('login_id', loginId).single();
@@ -66,12 +75,14 @@ export default function Page() {
       setShopInfo(shopRes.data);
       setShifts(shiftRes.data || []);
       setNewsList(newsRes.data || []);
-      if (syncRes.data) setLastSync(format(parseISO(syncRes.data.last_sync_at), 'HH:mm'));
+      if (syncRes.data) {
+        setLastSync(format(parseISO(syncRes.data.last_sync_at), 'HH:mm'));
+      }
     }
     setLoading(false);
   }
 
-  // --- 2. データ同期ロジック（日付選択時にフォームを更新 / 残像防止） ---
+  // --- 2. データ同期ロジック（日付選択時にフォームを更新） ---
   useEffect(() => {
     if (!singleDate) return;
     const dateStr = format(singleDate, 'yyyy-MM-dd');
@@ -89,13 +100,26 @@ export default function Page() {
     }
   }, [singleDate, shifts]);
 
-  // --- 3. 肝：実績計算ロジック（フラグ活用版） ---
+  // シフト申請時の初期時間セット
+  useEffect(() => {
+    const newDetails = { ...requestDetails };
+    multiDates.forEach(d => {
+      const key = format(d, 'yyyy-MM-dd');
+      if (!newDetails[key]) {
+        const existing = (shifts || []).find(s => s.shift_date === key);
+        newDetails[key] = existing ? { s: existing.start_time, e: existing.end_time } : { s: '11:00', e: '23:00' };
+      }
+    });
+    setRequestDetails(newDetails);
+  }, [multiDates, shifts]);
+
+  // --- 3. 肝：実績計算ロジック（3フラグ活用） ---
   const monthlyTotals = useMemo(() => {
     const today = startOfToday();
     return (shifts || [])
       .filter((s: any) => {
         const d = parseISO(s.shift_date);
-        // 条件：同じ月 ＆ (HPで確定済み OR 過去に一度でも確定済み) ＆ 未来（明日以降）ではない
+        // 条件：同じ月 ＆ (HPで確定済み OR 過去に一度でも確定済み) ＆ 今日（当日）分まで
         return d.getMonth() === viewDate.getMonth() && 
                d.getFullYear() === viewDate.getFullYear() && 
                (s.status === 'official' || s.is_official_pre_exist === true) &&
@@ -120,7 +144,16 @@ export default function Page() {
       }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
   }, [shifts, viewDate]);
 
-  // --- 4. 申請ロジック（肝：フラグを維持して上書き） ---
+  // --- 4. イベントハンドラ ---
+  const handleDateSelect = (dates: any) => {
+    if (isRequestMode) {
+      setMultiDates(Array.isArray(dates) ? dates : []);
+    } else {
+      const d = Array.isArray(dates) ? dates[0] : dates;
+      setSingleDate(d instanceof Date ? d : undefined);
+    }
+  };
+
   const handleBulkSubmit = async () => {
     if (!castProfile) return;
     const finalRequests = multiDates.map(date => {
@@ -134,10 +167,9 @@ export default function Page() {
         start_time: requestDetails[key]?.s || '11:00',
         end_time: requestDetails[key]?.e || '23:00',
         status: 'requested',
-        is_official: false, // 申請を出した瞬間はHP未掲載なのでFALSE
-        // 元々確定枠なら TRUE を維持する（これが実績合計を守る鍵）
+        is_official: false,
         is_official_pre_exist: existing?.is_official_pre_exist || false,
-        // 実績データも引き継ぐ
+        // 実績も引き継いで上書き
         reward_amount: existing?.reward_amount || 0,
         f_count: existing?.f_count || 0,
         first_request_count: existing?.first_request_count || 0,
@@ -163,6 +195,7 @@ export default function Page() {
       main_request_count: Number(editReward.main) || 0, 
       reward_amount: Number(editReward.amount) || 0 
     }).eq('login_id', castProfile.login_id).eq('shift_date', dateStr);
+    
     if (!error) { fetchInitialData(); alert('実績を保存しました💰'); }
   };
 
@@ -175,10 +208,9 @@ export default function Page() {
         shopName={shopInfo?.shop_name || 'Karinto'} 
         syncTime={lastSync} 
         displayName={castProfile?.display_name || 'キャスト'} 
-        version="KarintoCastManager v2.9.9.25" 
+        version="KarintoCastManager v2.9.9.26" 
       />
 
-      {/* タブ切替 */}
       <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200 shadow-inner">
         <button onClick={() => { setIsRequestMode(false); setMultiDates([]); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}>実績入力</button>
         <button onClick={() => { setIsRequestMode(true); setSingleDate(undefined); }} className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}>シフト申請</button>
@@ -191,7 +223,7 @@ export default function Page() {
           <DashboardCalendar 
             shifts={shifts} 
             selectedDates={isRequestMode ? multiDates : singleDate} 
-            onSelect={(d) => isRequestMode ? setMultiDates(Array.isArray(d) ? d : []) : setSingleDate(Array.isArray(d) ? d[0] : d)} 
+            onSelect={handleDateSelect} 
             month={viewDate} 
             onMonthChange={setViewDate} 
             isRequestMode={isRequestMode} 
