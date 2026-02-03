@@ -3,30 +3,35 @@
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
-// --- Propsの定義を Page.tsx と完全に合わせる ---
-interface Props {
+// プロパティ定義を完全に固定します
+interface DailyDetailProps {
   date: Date;
   dayNum: number;
-  shift: any; // ★ ここが shift になっている必要があります
-  editReward: any;
+  shift: any;
+  editReward: {
+    f: string;
+    first: string;
+    main: string;
+    amount: string;
+  };
   setEditReward: (val: any) => void;
   onSave: () => void;
+  isEditable: boolean; // Page.tsxからの波線を消す鍵
 }
 
-export default function DailyDetail({ 
-  date, 
-  dayNum, 
-  shift, 
-  editReward, 
-  setEditReward, 
-  onSave 
-}: Props) {
+export default function DailyDetail({
+  date,
+  dayNum,
+  shift,
+  editReward,
+  setEditReward,
+  onSave,
+  isEditable
+}: DailyDetailProps) {
   const dateStr = format(date, 'M月d日(E)', { locale: ja });
 
   return (
-    <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-5 flex flex-col space-y-1 animate-in fade-in slide-in-from-bottom-4 duration-300">
-      
-      {/* 1. 日付とステータス表示 */}
+    <section className="bg-white rounded-[32px] border border-pink-100 shadow-xl p-5 flex flex-col space-y-1">
       <div className="flex items-center justify-between px-1">
         <h3 className="text-2xl font-black text-gray-800 tracking-tight leading-none flex items-baseline">
           {format(date, 'M/d')}
@@ -48,7 +53,6 @@ export default function DailyDetail({
         </div>
       </div>
 
-      {/* 2. 実績入力フォーム（三すくみ：申請中であっても入力可能） */}
       <div className="flex flex-col space-y-0.5 pt-1">
         <div className="grid grid-cols-3 gap-2 px-1">
           {(['f', 'first', 'main'] as const).map((key) => (
@@ -58,60 +62,43 @@ export default function DailyDetail({
               </label>
               <input 
                 type="number" 
-                inputMode="numeric" 
+                inputMode="numeric"
+                disabled={!isEditable}
                 value={editReward[key]} 
-                placeholder="0" 
-                onFocus={e => e.target.select()} 
                 onChange={e => setEditReward({...editReward, [key]: e.target.value})} 
-                className={`w-full text-center py-2 bg-white rounded-xl font-black text-3xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none transition-all ${editReward[key] === '' ? 'text-gray-200' : 'text-pink-500'}`} 
+                className={`w-full text-center py-2 bg-white rounded-xl font-black text-3xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none transition-all ${!isEditable ? 'opacity-30 cursor-not-allowed' : 'text-pink-500'}`} 
               />
             </div>
           ))}
         </div>
       </div>
 
-      {/* 3. 報酬合計入力 */}
       <div className="bg-pink-50/40 p-3 rounded-[22px] border border-pink-100 flex items-center justify-between shadow-inner">
         <label className="text-[13px] font-black text-gray-900 uppercase">報酬合計</label>
         <div className="flex items-center text-pink-500">
           <span className="text-2xl font-black mr-1 opacity-40 translate-y-[1px]">¥</span>
           <input 
             type="text" 
-            inputMode="numeric" 
+            disabled={!isEditable}
             value={editReward.amount !== '' ? Number(editReward.amount).toLocaleString() : ''} 
-            placeholder="0" 
-            onFocus={e => e.target.select()} 
             onChange={e => {
               const v = e.target.value.replace(/,/g, '');
               if (/^\d*$/.test(v)) setEditReward({ ...editReward, amount: v });
             }} 
-            className={`w-40 text-right bg-transparent font-black text-[32px] border-none focus:ring-0 caret-pink-500 tracking-tighter ${editReward.amount === '' ? 'text-gray-200' : 'text-pink-500'}`} 
+            className={`w-40 text-right bg-transparent font-black text-[32px] border-none focus:ring-0 ${!isEditable ? 'opacity-30 cursor-not-allowed' : 'text-pink-500'}`} 
           />
         </div>
       </div>
 
-      {/* 4. アクションボタン */}
       <div className="flex gap-2 pt-0.5">
         <button 
           onClick={onSave} 
-          className="flex-[2.5] bg-pink-500 text-white font-black py-4 rounded-[20px] text-lg shadow-lg active:scale-95 transition-all"
+          disabled={!isEditable}
+          className={`flex-[2.5] text-white font-black py-4 rounded-[20px] text-lg shadow-lg active:scale-95 transition-all ${isEditable ? 'bg-pink-500' : 'bg-gray-300 cursor-not-allowed'}`}
         >
-          実績を保存 💾
-        </button>
-        <button 
-          onClick={() => setEditReward({ f: '', first: '', main: '', amount: '' })} 
-          className="flex-1 bg-gray-100 text-gray-400 font-black py-4 rounded-[18px] text-[13px] active:scale-95 transition-all border border-gray-200"
-        >
-          クリア 🗑️
+          {isEditable ? '実績を保存 💾' : '未来日は保存不可'}
         </button>
       </div>
-
-      {/* 三すくみ補足：公式枠の存在を確認 */}
-      {shift?.is_official_pre_exist && shift?.status === 'requested' && (
-        <p className="text-[10px] text-orange-400 font-bold text-center mt-2 italic">
-          ※変更申請中ですが、元の公式枠をベースに実績集計されています
-        </p>
-      )}
     </section>
   );
 }
