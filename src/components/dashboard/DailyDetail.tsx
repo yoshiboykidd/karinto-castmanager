@@ -15,6 +15,7 @@ type DailyDetailProps = {
 
 export default function DailyDetail({
   date,
+  dayNum, // selected.single.getDate() が渡されている
   shift,
   editReward,
   setEditReward,
@@ -28,22 +29,33 @@ export default function DailyDetail({
   const isRequested = shift?.status === 'requested';
   const isModified = isRequested && shift?.is_official_pre_exist;
 
-  // 2. デザインテーマ設定
+  // 2. 特定日判定 (10日:かりんと / 11・22日:添い寝)
+  const isKarin = dayNum === 10;
+  const isSoine = dayNum === 11 || dayNum === 22;
+
+  // 3. デザインテーマ設定
   let themeClass = "bg-white border-pink-100";
   if (isModified) themeClass = "bg-orange-50/40 border-orange-200";
   else if (isRequested) themeClass = "bg-purple-50/40 border-purple-200";
 
   return (
-    <section className={`rounded-[32px] border shadow-xl p-5 flex flex-col space-y-4 transition-all duration-300 ${themeClass}`}>
+    <section className={`relative overflow-hidden rounded-[32px] border shadow-xl p-5 pt-7 flex flex-col space-y-4 transition-all duration-300 ${themeClass}`}>
       
-      {/* A. 1行目：日付 ＆ 変更申請情報（同じ高さに配置） */}
-      <div className="flex items-center justify-between px-1 h-8">
+      {/* ★ 特定日バッジ：最上段に配置 */}
+      {(isKarin || isSoine) && (
+        <div className={`absolute top-0 left-0 right-0 py-1 text-center font-black text-[11px] tracking-[0.3em] shadow-sm
+          ${isKarin ? 'bg-gradient-to-r from-orange-400 to-orange-500 text-white' : 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white'}`}>
+          {isKarin ? 'かりんとの日' : '添い寝の日'}
+        </div>
+      )}
+
+      {/* A. 1行目：日付 ＆ 変更申請情報 */}
+      <div className="flex items-center justify-between px-1 h-8 mt-1">
         <h3 className="text-2xl font-black text-gray-800 tracking-tight leading-none flex items-baseline">
           {format(date, 'M/d')}
           <span className="text-lg ml-1 opacity-70">({format(date, 'E', { locale: ja })})</span>
         </h3>
 
-        {/* 変更申請中がある場合のみ、日付の右側に表示 */}
         {isModified && (
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-black px-2 py-1 rounded-lg bg-orange-500 text-white shadow-sm">
@@ -56,12 +68,10 @@ export default function DailyDetail({
         )}
       </div>
 
-      {/* B. メイン時間表示（確定シフト・新規申請） */}
-      {/* このエリアの高さを固定することで、どの状態でもズレを防ぎます */}
+      {/* B. メイン時間表示（高さを固定してズレを防止） */}
       <div className="flex items-center gap-4 px-1 h-12">
         {shift && shift.start_time !== 'OFF' ? (
           <>
-            {/* バッジ：左側に大きく配置 */}
             {isOfficial || isModified ? (
               <span className="text-[15px] font-black px-4 py-2 rounded-xl bg-blue-500 text-white shadow-md shrink-0">
                 確定
@@ -72,21 +82,19 @@ export default function DailyDetail({
               </span>
             ) : null}
 
-            {/* 時間表示：右側に大きく表示 */}
             <span className={`text-[36px] font-black leading-none tracking-tighter ${isRequested && !isModified ? 'text-purple-500' : 'text-pink-500'}`}>
-              {/* ※変更申請中でも、メインには現在の確定（ベース）時間を表示 */}
               {shift.start_time}〜{shift.end_time}
             </span>
           </>
         ) : (
           <div className="flex items-center gap-3">
             <span className="text-[15px] font-black px-4 py-2 rounded-xl bg-gray-400 text-white shadow-sm">休み</span>
-            <span className="text-xl font-black text-gray-300 italic opacity-40 uppercase tracking-widest text-[12px]">No Schedule</span>
+            <span className="text-xl font-black text-gray-300 italic opacity-40 uppercase tracking-widest text-[11px]">No Schedule</span>
           </div>
         )}
       </div>
 
-      {/* C. 実績入力フォーム（確定 または 変更申請中の場合に表示） */}
+      {/* C. 実績入力フォーム */}
       {(isOfficial || isModified) && shift?.start_time !== 'OFF' ? (
         <div className="space-y-3 pt-3 border-t border-gray-100/50">
           <div className="grid grid-cols-3 gap-3">
