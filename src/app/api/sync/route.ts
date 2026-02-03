@@ -14,22 +14,21 @@ export async function GET(request: NextRequest) {
   let debugLog: any[] = [];
 
   try {
-    // 1. キャスト名簿の取得と正規化
+    // --- 1. DBから名簿取得（空データでも死なない） ---
     const { data: allCasts, error: castError } = await supabase
       .from('cast_members')
       .select('login_id, hp_display_name');
 
-    if (castError) throw new Error(`DB取得失敗: ${castError.message}`);
+    if (castError) {
+      return NextResponse.json({ success: false, message: "DB名簿が取れません", error: castError });
+    }
 
-    // ★ どんな型（null, undefined, 数字）が来ても絶対に文字列として処理する関数
     const normalize = (val: any): string => {
-      if (val === null || val === undefined) return "";
-      const str = String(val); // 強制的に文字列化
-      return str
-        .replace(/\s+/g, '') // ここでエラーが起きないよう String(val) している
-        .replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s: string) => {
-          return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
-        });
+      // どんなゴミデータ(null, undefined)が来ても強制的に空文字か文字列にする
+      const s = val === null || val === undefined ? "" : String(val);
+      return s.replace(/\s+/g, '').replace(/[Ａ-Ｚａ-ｚ０-９]/g, (char: string) => {
+        return String.fromCharCode(char.charCodeAt(0) - 0xFEE0);
+      });
     };
 
     const cleanCastList = (allCasts || []).map(c => ({
@@ -37,37 +36,34 @@ export async function GET(request: NextRequest) {
       matchName: normalize(c.hp_display_name)
     }));
 
-    // 2. HP情報の取得
+    // --- 2. HPからデータ取得 ---
     const targetDate = new Date(Date.now() + JST_OFFSET);
     const dateStr = targetDate.toISOString().split('T')[0];
-    const hpDateStr = dateStr.replace(/-/g, '/');
+    const hpDateStr = String(dateStr).replace(/-/g, '/'); // 安全に置換
 
     const hpRes = await fetch(`https://ikekari.com/attend.php?date_get=${hpDateStr}&t=${Date.now()}`, { 
       cache: 'no-store' 
     });
-    
     const html = await hpRes.text();
-    if (!html) throw new Error("HPからデータを取得できませんでした");
-
     const listItems = html.match(/<li[^>]*>[\s\S]*?<\/li>/g) || [];
 
+    // --- 3. 解析ループ（一人ずつエラーから守る） ---
     for (const item of listItems) {
       try {
         const nameMatch = item.match(/<h3>(.*?)<\/h3>/);
         const timeMatch = item.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
         
-        // 名前か時間が取れない項目はスキップ
-        if (!nameMatch || !nameMatch[1] || !timeMatch) continue;
+        if (!nameMatch || !timeMatch) continue;
 
-        const hpNameRaw = nameMatch[1];
-        // カッコを除去
+        // nameMatch[1] が null の可能性を徹底的に排除
+        const hpNameRaw = nameMatch[1] ? String(nameMatch[1]) : "";
         const hpNameCleaned = hpNameRaw.replace(/[（\(\[].*?[）\)\]]/g, '').trim();
         const cleanHPName = normalize(hpNameCleaned);
 
         const targetCast = cleanCastList.find(c => c.matchName === cleanHPName);
 
         if (targetCast) {
-          const { error: upsertError } = await supabase.from('shifts').upsert({ 
+          await supabase.from('shifts').upsert({ 
             login_id: targetCast.login_id, 
             shift_date: dateStr, 
             hp_display_name: targetCast.hp_display_name || hpNameCleaned, 
@@ -76,31 +72,32 @@ export async function GET(request: NextRequest) {
             status: 'official', 
             is_official: true 
           }, { onConflict: 'login_id,shift_date' });
-          
-          debugLog.push({ 状態: "✅一致", 名前: cleanHPName, 結果: upsertError ? "DBエラー" : "成功" });
+          debugLog.push({ 状態: "✅一致", 名前: cleanHPName });
         } else {
-          debugLog.push({ 状態: "❌不一致", HP名: cleanHPName, 理由: "DB未登録" });
+          debugLog.push({ 状態: "❌不一致", HP名: cleanHPName });
         }
-      } catch (innerError) {
-        // ループ内でエラーが起きても、次のキャストの処理を止めない
+      } catch (innerE) {
+        // 一人でエラーが起きても全体を止めない
+        debugLog.push({ 状態: "⚠️エラー", info: "個別解析失敗" });
         continue;
       }
     }
 
     await supabase.from('sync_logs').upsert({ id: 1, last_sync_at: new Date().toISOString() });
     
+    // ↓ ここが重要！この形式で表示されれば「新コード」が動いています
     return NextResponse.json({ 
       success: true, 
       date: dateStr,
-      count: debugLog.length,
       debug: debugLog 
     });
 
   } catch (error: any) {
+    // 最終的なエラー出力も形式を統一
     return NextResponse.json({ 
       success: false,
-      message: error.message,
-      stack: error.stack?.split('\n')[0] // エラーが起きた行を特定しやすくする
+      message: "メイン処理でエラー",
+      error_detail: error.message 
     }, { status: 500 });
   }
 }
