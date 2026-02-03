@@ -40,12 +40,9 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const dateStr = format(day, 'yyyy-MM-dd');
           const s = Array.isArray(shifts) ? shifts.find((x: any) => x.shift_date === dateStr) : null;
           
-          // --- 判定ロジック ---
           const isOfficial = s?.status === 'official';
           const isRequested = s?.status === 'requested';
-          const isModified = isRequested && s?.is_official_pre_exist; // 確定後の変更
-          
-          // 「確定ベースの予定」があるかどうか（ピンクの丸を出す条件）
+          const isModified = isRequested && s?.is_official_pre_exist;
           const hasOfficialBase = isOfficial || isModified;
 
           const isSelected = Array.isArray(selectedDates) 
@@ -64,30 +61,30 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
               ${isKarin ? 'bg-orange-50/50' : isSoine ? 'bg-yellow-50/50' : 'bg-transparent'} 
               ${isSelected ? 'bg-white shadow-lg ring-2 ring-pink-400 z-10' : ''}`}
             >
-              {/* 日付の数字 */}
-              <span className={`z-10 text-[13px] font-black 
+              {/* 日付数字：確定ベースがある日は白文字 */}
+              <span className={`z-20 text-[13px] font-black 
                 ${hasOfficialBase ? 'text-white' : isSelected ? 'text-pink-500' : 'text-slate-600'}`}>
                 {dNum}
               </span>
 
-              {/* A. 確定ベースがある場合：ピンクの塗りつぶし丸 */}
+              {/* A. 確定ベース：ピンクの丸 */}
               {hasOfficialBase && (
-                <div className="absolute inset-1 rounded-full bg-gradient-to-br from-pink-400 to-rose-400 shadow-sm" />
+                <div className="absolute inset-1.5 rounded-full bg-gradient-to-br from-pink-400 to-rose-400 shadow-sm z-10" />
               )}
               
-              {/* B. 変更申請中の場合：確定の丸の外側にオレンジの枠線を追加 */}
+              {/* B. 変更中：ピンクの丸の外側に太いオレンジ枠 */}
               {isModified && (
-                <div className="absolute inset-0 rounded-full border-[3px] border-white ring-2 ring-orange-400 z-[5] animate-pulse" />
+                <div className="absolute inset-0.5 rounded-full border-[3.5px] border-orange-500 z-[15] animate-pulse" />
               )}
               
-              {/* C. 新規申請（確定なし）の場合：紫の点線のみ */}
+              {/* C. 新規申請：紫の点線 */}
               {isRequested && !isModified && (
-                <div className="absolute inset-1 rounded-full border-2 border-purple-300 border-dashed animate-pulse" />
+                <div className="absolute inset-1 rounded-full border-2 border-purple-300 border-dashed animate-pulse z-10" />
               )}
 
               {/* 特定日ドット */}
-              {isKarin && <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-orange-400 shadow-sm z-20" />}
-              {isSoine && <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-yellow-400 shadow-sm z-20" />}
+              {isKarin && <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-orange-400 shadow-sm z-30" />}
+              {isSoine && <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-yellow-400 shadow-sm z-30" />}
             </div>
           );
         })}
