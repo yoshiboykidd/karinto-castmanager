@@ -24,7 +24,7 @@ export default function RequestList({
   shifts,
   onSubmit
 }: RequestListProps) {
-  // ★ 追加：選択された日付をコピーし、日付の早い順（昇順）にソートします
+  // 日付順にソート
   const sortedDates = [...multiDates].sort((a, b) => a.getTime() - b.getTime());
 
   if (sortedDates.length === 0) {
@@ -42,7 +42,6 @@ export default function RequestList({
         申請リスト ({sortedDates.length}件)
       </h3>
       <div className="flex flex-col">
-        {/* ★ multiDates ではなく、ソート済みの sortedDates をループさせます */}
         {sortedDates.map((d) => {
           const key = format(d, 'yyyy-MM-dd');
           const officialShift = (shifts || []).find(s => s.shift_date === key && s.status === 'official');
@@ -80,6 +79,7 @@ export default function RequestList({
                       value={requestDetails[key]?.s || '11:00'}
                       onChange={(e) => setRequestDetails({ ...requestDetails, [key]: { ...requestDetails[key], s: e.target.value } })}
                       className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none"
+                      style={{ textAlignLast: 'center' }} // ★追加：文字を中央に固定
                     >
                       {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
@@ -88,6 +88,7 @@ export default function RequestList({
                       value={requestDetails[key]?.e || '23:00'}
                       onChange={(e) => setRequestDetails({ ...requestDetails, [key]: { ...requestDetails[key], e: e.target.value } })}
                       className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none"
+                      style={{ textAlignLast: 'center' }} // ★追加：文字を中央に固定
                     >
                       {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
