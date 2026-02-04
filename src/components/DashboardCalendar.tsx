@@ -17,32 +17,37 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
   const [holidays, setHolidays] = useState<string[]>([]);
   const [mounted, setMounted] = useState(false);
 
-  // マウント後の処理を一元化（ハイドレーションエラーを物理的に防ぐ）
+  // 1. ハイドレーションエラー対策：マウント後に描画を許可
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  // 2. 祝日データの動的取得
+  useEffect(() => {
+    if (!month) return;
     const fetchHolidays = async () => {
       try {
-        const year = month?.getFullYear() || 2026;
+        const year = month.getFullYear();
         const res = await fetch(`https://holidays-jp.github.io/api/v1/${year}/date.json`);
         if (res.ok) {
           const data = await res.json();
           setHolidays(Object.keys(data));
         }
       } catch (e) {
-        console.error(e);
+        console.error("Holiday fetch error:", e);
       }
     };
     fetchHolidays();
   }, [month?.getFullYear()]);
 
-  // マウント前は「枠」だけ返して中身の計算をさせない（これがエラー回避のキモ）
-  if (!mounted || !month) return <div className="w-full h-[350px]" />;
+  // マウント前は空の枠を返してエラーを回避
+  if (!mounted || !month) return <div className="w-full h-[400px]" />;
 
   const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) });
 
   return (
     <div className="w-full">
-      {/* 1. ヘッダー */}
+      {/* ヘッダー：年月とナビゲーション */}
       <div className="flex items-center justify-between mb-4 px-4 font-black text-slate-700">
         <button onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>
           <ChevronLeft className="text-pink-300" />
@@ -53,7 +58,7 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
         </button>
       </div>
 
-      {/* 2. 曜日（日本語表記を維持） */}
+      {/* 曜日ラベル：日本語表記 ＆ 土日祝の色分け */}
       <div className="grid grid-cols-7 gap-1 px-1">
         {['日', '月', '火', '水', '木', '金', '土'].map((d, idx) => (
           <div key={d} className={`text-[10px] font-black pb-2 text-center tracking-widest
@@ -62,7 +67,7 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           </div>
         ))}
 
-        {/* 3. 日付セル */}
+        {/* 日付セル一覧 */}
         {days.map(day => {
           const dateStr = format(day, 'yyyy-MM-dd');
           const s = Array.isArray(shifts) ? shifts.find((x: any) => x.shift_date === dateStr) : null;
@@ -70,7 +75,10 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const isOfficial = s?.status === 'official';
           const isRequested = s?.status === 'requested';
           const isModified = isRequested && s?.is_official_pre_exist;
-          const hasOfficialBase = isOfficial || isModified;
+          
+          // ★今回の修正：時間が 'OFF' ではない場合のみ、確定（ピンク丸）の対象とする
+          const isNotOff = s?.start_time !== 'OFF';
+          const hasOfficialBase = (isOfficial || isModified) && isNotOff;
 
           const isSelected = selectedDates ? (
             Array.isArray(selectedDates) 
@@ -82,12 +90,17 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const dayOfWeek = getDay(day);
           const isHoliday = holidays.includes(dateStr);
 
-          // テキスト色の決定
+          // テキスト色の決定ロジック
           let textColor = 'text-slate-600';
-          if (hasOfficialBase) textColor = 'text-white';
-          else if (isHoliday || dayOfWeek === 0) textColor = 'text-red-500'; // 日・祝
-          else if (dayOfWeek === 6) textColor = 'text-blue-500'; // 土
-          else if (isSelected) textColor = 'text-pink-500';
+          if (hasOfficialBase) {
+            textColor = 'text-white'; // ピンク丸の上は白
+          } else if (isHoliday || dayOfWeek === 0) {
+            textColor = 'text-red-500'; // 日・祝は赤
+          } else if (dayOfWeek === 6) {
+            textColor = 'text-blue-500'; // 土曜は青
+          } else if (isSelected) {
+            textColor = 'text-pink-500'; // 選択中はピンク
+          }
 
           const isKarin = dNum === 10;
           const isSoine = dNum === 11 || dNum === 22;
@@ -100,22 +113,27 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
               ${isKarin ? 'bg-orange-50/50' : isSoine ? 'bg-yellow-50/50' : 'bg-transparent'} 
               ${isSelected ? 'bg-white shadow-lg ring-2 ring-pink-400 z-10' : ''}`}
             >
+              {/* 日付数字 */}
               <span className={`z-20 text-[13px] font-black ${textColor}`}>
                 {dNum}
               </span>
 
+              {/* 確定ベース：ピンクの塗りつぶし丸（OFFの日は表示されない） */}
               {hasOfficialBase && (
                 <div className="absolute inset-1.5 rounded-full bg-gradient-to-br from-pink-400 to-rose-400 shadow-sm z-10" />
               )}
               
+              {/* 変更申請中：緑の極太枠（OFFへの変更申請中も表示される） */}
               {isModified && (
                 <div className="absolute inset-0.5 rounded-full border-[5px] border-green-500 z-[15] animate-pulse" />
               )}
               
+              {/* 新規申請中：紫の点線枠 */}
               {isRequested && !isModified && (
                 <div className="absolute inset-1 rounded-full border-2 border-purple-400 border-dashed animate-pulse z-10" />
               )}
 
+              {/* 特定日ドット */}
               {isKarin && <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-orange-400 shadow-sm z-30" />}
               {isSoine && <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-yellow-400 shadow-sm z-30" />}
             </div>
