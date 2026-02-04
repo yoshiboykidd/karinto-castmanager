@@ -73,7 +73,7 @@ export default function DashboardContent() {
           <MonthlySummary month={format(safeViewDate, 'M月')} totals={monthlyTotals} />
         )}
 
-        {/* 2. 実績/申請の切り替えタブ（シンプルに戻す） */}
+        {/* 2. 実績/申請の切り替えタブ */}
         <div className="flex p-1 bg-gray-100/80 rounded-2xl border border-gray-200 shadow-inner">
           <button 
             onClick={() => nav.toggleMode(false)} 
@@ -83,9 +83,8 @@ export default function DashboardContent() {
                 : 'text-gray-400 hover:text-pink-300'}`
             }
           >
-            {!isRequest && <span className="text-base">📝</span>} 実績入力
+            実績入力
           </button>
-          
           <button 
             onClick={() => nav.toggleMode(true)} 
             className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all duration-300 flex items-center justify-center gap-1
@@ -94,13 +93,16 @@ export default function DashboardContent() {
                 : 'text-gray-400 hover:text-purple-400'}`
             }
           >
-            {isRequest && <span className="text-base">📅</span>} シフト申請
+            シフト申請
           </button>
         </div>
         
-        {/* 3. カレンダー（背景白固定、枠線だけほんのり色づけ） */}
-        <section className={`bg-white p-2 rounded-[32px] border shadow-sm text-center transition-colors duration-500
-          ${isRequest ? 'border-purple-100' : 'border-gray-100'}`}>
+        {/* 3. カレンダー（★ここが変更点） */}
+        <section className={`p-3 rounded-[32px] border shadow-sm text-center transition-colors duration-500
+          ${isRequest 
+            ? 'bg-cyan-50 border-cyan-100'   // 申請モード：水色
+            : 'bg-pink-50 border-pink-100'   // 実績モード：うすピンク
+          }`}>
           <DashboardCalendar 
             shifts={data.shifts as any} 
             selectedDates={isRequest ? nav.selected.multi : nav.selected.single} 
