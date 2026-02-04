@@ -1,170 +1,143 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
-import { useRouter } from 'next/navigation';
-import { format, parseISO } from 'date-fns';
+import Link from 'next/link';
+import { createBrowserClient } from '@supabase/ssr'; // ✨ ここを修正
+import { Users, Calendar, Bell, ArrowRight, Settings } from 'lucide-react';
 
-export default function AdminPage() {
+export default function AdminDashboard() {
+  const [profile, setProfile] = useState<any>(null);
+  
+  // ✨ クライアント作成方法を修正
   const [supabase] = useState(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ));
-  
-  const [content, setContent] = useState('');
-  const [targetShopId, setTargetShopId] = useState('all'); // ✨ 配信先店舗ID（初期値は全体）
-  const [newsList, setNewsList] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const router = useRouter();
-
-  // 🔐 管理者として許可するメールアドレス（あなたの管理用アドレス）
-  const ADMIN_EMAIL = "admin@karinto-internal.com"; 
-
-  // 店舗リスト（将来店舗が増えたらここに追加、またはDBから取得）
-  const SHOP_LIST = [
-    { id: 'all', name: '📢 全店舗共通' },
-    { id: 'ikebukuro', name: '📍 池袋店' },
-    { id: 'akasaka', name: '📍 赤坂店' },
-    { id: 'main', name: '📍 本店' },
-  ];
 
   useEffect(() => {
-    async function initAdmin() {
+    const fetchProfile = async () => {
+      // 1. セッション（ログイン中か）の確認
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session || session.user.email !== ADMIN_EMAIL) {
-        alert('管理者専用ページです');
-        router.push('/login');
-        return;
-      }
-      setIsAdmin(true);
-      fetchNews();
-    }
-    initAdmin();
-  }, [supabase, router]);
+      if (!session) return;
 
-  async function fetchNews() {
-    const { data } = await supabase
-      .from('news')
-      .select('*')
-      .order('created_at', { ascending: false }); // 全データを取得
-    setNewsList(data || []);
-    setLoading(false);
+      // 2. ログイン中のユーザー情報をDBから取得
+      const { data } = await supabase
+        .from('cast_members')
+        .select('*')
+        .eq('login_id', session.user.email?.split('@')[0])
+        .single();
+      
+      setProfile(data);
+    };
+    fetchProfile();
+  }, [supabase]);
+
+  // ロード中表示
+  if (!profile) {
+    return (
+      <div className="flex items-center justify-center h-[50vh] text-slate-400 font-bold">
+        Loading Dashboard...
+      </div>
+    );
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsProcessing(true);
-
-    const payload = { 
-      content, 
-      shop_id: targetShopId, // ✨ 選択した店舗IDを保存
-      display_date: new Date().toISOString().split('T')[0] 
-    };
-
-    if (editingId) {
-      await supabase.from('news').update(payload).eq('id', editingId);
-      alert('修正しました！');
-      setEditingId(null);
-    } else {
-      await supabase.from('news').insert([payload]);
-      alert('配信しました！🌸');
-    }
-
-    setContent('');
-    fetchNews();
-    setIsProcessing(false);
-  };
-
-  const startEdit = (news: any) => {
-    setEditingId(news.id);
-    setContent(news.content);
-    setTargetShopId(news.shop_id || 'all');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('削除しますか？')) return;
-    await supabase.from('news').delete().eq('id', id);
-    fetchNews();
-  };
-
-  if (!isAdmin || loading) return <div className="p-10 text-center font-bold text-pink-400">認証中...</div>;
+  // メニュー項目の定義
+  const menuCards = [
+    { 
+      title: 'シフト申請管理', 
+      desc: 'キャストからのシフト希望を確認し、HP転記用のリストを表示します。', 
+      icon: Calendar, 
+      href: '/admin/requests',
+      color: 'bg-purple-600',
+      shadow: 'shadow-purple-100'
+    },
+    { 
+      title: 'キャスト管理', 
+      desc: '新規入店登録、プロフィールの編集、パスワードリセットなど。', 
+      icon: Users, 
+      href: '/admin/casts',
+      color: 'bg-blue-600',
+      shadow: 'shadow-blue-100'
+    },
+    { 
+      title: 'お知らせ配信', 
+      desc: 'キャストアプリのトップに表示する「News」を作成・配信します。', 
+      icon: Bell, 
+      href: '/admin/news',
+      color: 'bg-orange-500',
+      shadow: 'shadow-orange-100'
+    },
+    { 
+      title: '店舗設定', 
+      desc: '店舗情報の確認や設定を行います。（開発中）', 
+      icon: Settings, 
+      href: '/admin/settings',
+      color: 'bg-slate-500',
+      shadow: 'shadow-slate-100'
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 p-4 font-sans text-gray-800">
-      <div className="max-w-md mx-auto space-y-6">
-        
-        <header className="flex justify-between items-center px-2">
-          <h1 className="text-xl font-black tracking-tighter">MANAGER CENTER ⚙️</h1>
-          <span className="text-[10px] font-bold bg-pink-100 text-pink-500 px-3 py-1 rounded-full uppercase">Top Admin</span>
-        </header>
+    <div className="max-w-6xl mx-auto space-y-8">
+      
+      {/* 1. ウェルカムヘッダー */}
+      <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200">
+        <h1 className="text-3xl font-black text-slate-800 tracking-tight">
+          Dashboard
+        </h1>
+        <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="text-lg font-bold text-slate-600">
+              Welcome back, {profile.display_name} 👋
+            </p>
+            <p className="text-sm text-slate-400 font-medium mt-1">
+              {profile.role === 'master' 
+                ? '👑 Master Admin (全店舗データアクセス権限)' 
+                : '👤 Shop Admin (担当店舗管理権限)'}
+            </p>
+          </div>
+          
+          {/* 所属店舗バッジ */}
+          {profile.home_shop_id && profile.role !== 'master' && (
+             <span className="inline-block bg-slate-100 text-slate-600 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border border-slate-200">
+               Shop ID: {profile.home_shop_id}
+             </span>
+          )}
+        </div>
+      </div>
 
-        {/* 📝 入力・編集フォーム */}
-        <section className={`p-6 rounded-[30px] shadow-xl border-2 transition-all bg-white ${editingId ? 'border-amber-200' : 'border-pink-100'}`}>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* ✨ 配信先店舗の選択ボタン */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 ml-1 uppercase tracking-widest">配信先を選択</label>
-              <div className="grid grid-cols-2 gap-2">
-                {SHOP_LIST.map((shop) => (
-                  <button
-                    key={shop.id}
-                    type="button"
-                    onClick={() => setTargetShopId(shop.id)}
-                    className={`text-xs py-2.5 rounded-xl font-bold transition-all border ${
-                      targetShopId === shop.id 
-                      ? 'bg-pink-500 text-white border-pink-500 shadow-md' 
-                      : 'bg-gray-50 text-gray-400 border-gray-100'
-                    }`}
-                  >
-                    {shop.name}
-                  </button>
-                ))}
+      {/* 2. メニューカードグリッド */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {menuCards.map((card) => (
+          <Link 
+            key={card.title} 
+            href={card.href}
+            className="group relative bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden"
+          >
+            {/* ホバー時の背景装飾 */}
+            <div className={`absolute top-0 right-0 w-32 h-32 ${card.color} opacity-5 rounded-full blur-3xl -mr-10 -mt-10 transition-all group-hover:opacity-10`} />
+
+            <div className="relative z-10">
+              {/* アイコン */}
+              <div className={`${card.color} w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-5 shadow-lg ${card.shadow} group-hover:scale-110 transition-transform duration-300`}>
+                <card.icon size={28} strokeWidth={2.5} />
               </div>
-            </div>
 
-            <textarea
-              className="w-full h-24 p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-pink-300 font-bold text-gray-700"
-              placeholder="メッセージを入力..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              required
-            />
-            
-            <button
-              type="submit"
-              disabled={isProcessing}
-              className={`w-full font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all text-white ${editingId ? 'bg-amber-500' : 'bg-pink-500'}`}
-            >
-              {editingId ? '内容を保存する' : 'この内容で配信する 🚀'}
-            </button>
-          </form>
-        </section>
-
-        {/* 📢 配信履歴（すべて表示） */}
-        <section className="space-y-3">
-          <p className="text-[10px] font-black text-gray-400 ml-2 uppercase tracking-[0.2em]">All Shop Feeds</p>
-          {newsList.map((news) => (
-            <div key={news.id} className="bg-white border border-gray-100 rounded-[22px] p-4 shadow-sm">
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full mr-2 ${news.shop_id === 'all' ? 'bg-pink-100 text-pink-500' : 'bg-blue-100 text-blue-500'}`}>
-                    {SHOP_LIST.find(s => s.id === news.shop_id)?.name || news.shop_id}
-                  </span>
-                  <span className="text-[9px] font-bold text-gray-300">{format(parseISO(news.created_at), 'MM/dd HH:mm')}</span>
-                </div>
-                <div className="flex space-x-1">
-                  <button onClick={() => startEdit(news)} className="text-[10px] font-bold text-blue-400 p-1 px-2">修正</button>
-                  <button onClick={() => handleDelete(news.id)} className="text-[10px] font-bold text-red-300 p-1 px-2">削除</button>
-                </div>
+              {/* タイトル & 矢印 */}
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xl font-bold text-slate-800">
+                  {card.title}
+                </h3>
+                <ArrowRight size={20} className="text-slate-300 group-hover:text-blue-500 group-hover:translate-x-2 transition-all duration-300" />
               </div>
-              <p className="text-sm font-bold text-gray-600 leading-relaxed">{news.content}</p>
+
+              {/* 説明文 */}
+              <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                {card.desc}
+              </p>
             </div>
-          ))}
-        </section>
+          </Link>
+        ))}
       </div>
     </div>
   );
