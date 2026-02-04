@@ -63,10 +63,10 @@ export default function DashboardCalendar({
         </button>
       </div>
 
-      {/* 曜日ヘッダー（平日＝黒） */}
+      {/* 曜日ヘッダー */}
       <div className="grid grid-cols-7 mb-2 border-b border-gray-100 pb-2">
         {weekDays.map((d, i) => {
-          let colorClass = "text-gray-900"; 
+          let colorClass = "text-gray-900"; // 平日は黒
           if (i === 5) colorClass = "text-blue-500";
           if (i === 6) colorClass = "text-red-500";
           return (
@@ -88,15 +88,13 @@ export default function DashboardCalendar({
           const isRequested = shift?.status === 'requested';
           const hasTime = isOfficial && shift?.start_time !== 'OFF';
           
-          // 特定日判定
           const isSpecific = shift?.is_specific_day || false;
 
           const selected = isSelected(day);
           const today = isToday(day);
 
-          // 背景色・文字色の決定ロジック
-          // 優先度： 選択中 > 本日 > 特定日 > 通常
-          let containerClass = "text-gray-900"; // デフォルト黒
+          // 色決定
+          let containerClass = "text-gray-900"; 
           
           if (selected) {
             containerClass = isRequestMode 
@@ -105,8 +103,9 @@ export default function DashboardCalendar({
           } else if (today) {
             containerClass = 'bg-pink-50 text-pink-600 font-bold border border-pink-100';
           } else if (isSpecific) {
-            // ★ここを変更：背景を濃い黄色(amber-200)にし、枠線(amber-300)も追加
-            containerClass = 'bg-amber-200 text-gray-900 font-bold border border-amber-300';
+            // ★修正：濃すぎない「パステルイエロー」＋「濃いめの枠線」
+            // これならデザインを崩さず、でもはっきり分かります
+            containerClass = 'bg-yellow-100 text-gray-900 font-bold border border-yellow-300';
           }
 
           return (
@@ -115,9 +114,9 @@ export default function DashboardCalendar({
               onClick={() => onSelect(day)}
               className="relative flex flex-col items-center justify-start h-[56px] cursor-pointer group"
             >
-              {/* ① 特定日マーカー（最上部にゴールドの点） */}
+              {/* ① 特定日マーカー（金色のドットは維持） */}
               {isSpecific && (
-                <div className="absolute -top-1 w-2 h-2 bg-amber-500 rounded-full shadow-sm z-20 animate-bounce-slow border border-white" />
+                <div className="absolute -top-1 w-2 h-2 bg-amber-400 rounded-full shadow-sm z-20 animate-bounce-slow border border-white" />
               )}
 
               {/* 日付数字コンテナ */}
@@ -127,19 +126,17 @@ export default function DashboardCalendar({
                 ${!isCurrentMonth && !selected && 'opacity-30'}
                 ${isRequestMode && !selected && !isCurrentMonth ? 'opacity-20' : ''}
               `}>
-                {/* 確定シフトがある場合の「ピンクの円」背景 */}
-                {/* 特定日の黄色と混ざらないよう、特定日かつ非選択の場合はピンクを少し濃くする等の調整も可能だが、現状は透過で重ねる */}
+                {/* 確定シフト（ピンク） */}
                 {hasTime && !selected && (
-                  <span className={`absolute inset-0 rounded-full opacity-60 scale-90 border border-pink-200 ${isSpecific ? 'bg-pink-200 mix-blend-multiply' : 'bg-pink-100'}`}></span>
+                  <span className={`absolute inset-0 rounded-full opacity-60 scale-90 border border-pink-200 ${isSpecific ? 'bg-pink-100 mix-blend-multiply' : 'bg-pink-100'}`}></span>
                 )}
 
-                {/* 日付数字 */}
                 <span className={`text-[19px] font-black leading-none ${!isCurrentMonth && !selected ? 'font-medium' : ''}`}>
                   {format(day, 'd')}
                 </span>
               </div>
 
-              {/* ② 申請中バッジ（緑の点） */}
+              {/* ② 申請中バッジ */}
               {isRequested && !isOfficial && (
                 <span className="absolute bottom-1 w-1.5 h-1.5 bg-green-500 rounded-full shadow-sm"></span>
               )}

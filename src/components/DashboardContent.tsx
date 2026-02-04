@@ -56,7 +56,7 @@ export default function DashboardContent() {
   }
 
   const safeViewDate = nav.viewDate || new Date();
-  const isRequest = nav.isRequestMode; // 短縮用
+  const isRequest = nav.isRequestMode;
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
@@ -73,36 +73,34 @@ export default function DashboardContent() {
           <MonthlySummary month={format(safeViewDate, 'M月')} totals={monthlyTotals} />
         )}
 
-        {/* 2. 実績/申請の切り替えタブ（色味でモードを強調） */}
-        <div className={`flex p-1.5 rounded-2xl border shadow-inner transition-colors duration-300 
-          ${isRequest ? 'bg-purple-50 border-purple-100' : 'bg-pink-50 border-pink-100'}`}
-        >
+        {/* 2. 実績/申請の切り替えタブ（シンプルに戻す） */}
+        <div className="flex p-1 bg-gray-100/80 rounded-2xl border border-gray-200 shadow-inner">
           <button 
             onClick={() => nav.toggleMode(false)} 
-            className={`flex-1 py-3 text-xs font-black rounded-xl transition-all duration-300 flex items-center justify-center gap-2
+            className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all duration-300 flex items-center justify-center gap-1
               ${!isRequest 
-                ? 'bg-white text-pink-500 shadow-sm translate-y-0 scale-100' 
-                : 'text-gray-400 hover:text-pink-300 scale-95'}`
+                ? 'bg-white text-pink-500 shadow-sm' 
+                : 'text-gray-400 hover:text-pink-300'}`
             }
           >
-            <span>📝</span> 実績入力
+            {!isRequest && <span className="text-base">📝</span>} 実績入力
           </button>
           
           <button 
             onClick={() => nav.toggleMode(true)} 
-            className={`flex-1 py-3 text-xs font-black rounded-xl transition-all duration-300 flex items-center justify-center gap-2
+            className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all duration-300 flex items-center justify-center gap-1
               ${isRequest 
-                ? 'bg-purple-600 text-white shadow-lg shadow-purple-200 translate-y-0 scale-100' 
-                : 'text-gray-400 hover:text-purple-400 scale-95'}`
+                ? 'bg-white text-purple-600 shadow-sm' 
+                : 'text-gray-400 hover:text-purple-400'}`
             }
           >
-            <span>📅</span> シフト申請
+            {isRequest && <span className="text-base">📅</span>} シフト申請
           </button>
         </div>
         
-        {/* 3. カレンダー */}
+        {/* 3. カレンダー（背景白固定、枠線だけほんのり色づけ） */}
         <section className={`bg-white p-2 rounded-[32px] border shadow-sm text-center transition-colors duration-500
-          ${isRequest ? 'border-purple-100 shadow-purple-50' : 'border-gray-100 shadow-gray-100'}`}>
+          ${isRequest ? 'border-purple-100' : 'border-gray-100'}`}>
           <DashboardCalendar 
             shifts={data.shifts as any} 
             selectedDates={isRequest ? nav.selected.multi : nav.selected.single} 
