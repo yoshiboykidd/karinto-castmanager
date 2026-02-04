@@ -1,13 +1,17 @@
-import { useState, useEffect } from 'react';
-import { format, startOfToday, isAfter } from 'date-fns';
+import { useState, useEffect, useMemo } from 'react'; // useMemoを追加
+import { format, isAfter, startOfToday } from 'date-fns';
 
-export function useAchievement(supabase: any, profile: any, shifts: any[], selectedSingle: Date | undefined, refreshData: () => void) {
+export function useAchievement(supabase: any, profile: any, shifts: any[] = [], selectedSingle: Date | undefined, refreshData: () => void) {
   // 実績入力用の状態
   const [editReward, setEditReward] = useState({ f: '', first: '', main: '', amount: '' });
+  
+  // 1. マウント状態を管理（時刻のズレを防ぐため）
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
-  // 選択された日付が変わったら、入力フォームの中身を同期する
+  // 選択された日付が変わったら、入力フォームの中身を同期
   useEffect(() => {
-    if (!selectedSingle) return;
+    if (!selectedSingle || !Array.isArray(shifts)) return;
     const dateStr = format(selectedSingle, 'yyyy-MM-dd');
     const shift = shifts.find(s => s.shift_date === dateStr);
     
@@ -19,11 +23,29 @@ export function useAchievement(supabase: any, profile: any, shifts: any[], selec
     });
   }, [selectedSingle, shifts]);
 
-  // 実績保存ロジック（HP情報が絶対）
+  // その日が編集可能かどうかの判定（useMemoで保護し、マウント前はfalseにする）
+  const { isEditable, selectedShift } = useMemo(() => {
+    // マウント前（サーバーサイド）は常に「編集不可」にして、ブラウザと表示を合わせる
+    if (!mounted || !selectedSingle || !Array.isArray(shifts)) {
+      return { isEditable: false, selectedShift: null };
+    }
+
+    const today = startOfToday(); // ブラウザ上での「今日」を取得
+    const dateStr = format(selectedSingle, 'yyyy-MM-dd');
+    const shift = shifts.find(s => s.shift_date === dateStr);
+
+    const editable = !isAfter(selectedSingle, today) && 
+                     shift && 
+                     shift.start_time && 
+                     shift.start_time !== 'OFF';
+
+    return { isEditable: editable, selectedShift: shift };
+  }, [mounted, selectedSingle, shifts]);
+
+  // 実績保存ロジック
   const handleSaveAchievement = async () => {
     if (!selectedSingle || !profile) return;
     const dateStr = format(selectedSingle, 'yyyy-MM-dd');
-    const selectedShift = shifts.find(s => s.shift_date === dateStr);
 
     if (!selectedShift || selectedShift.start_time === 'OFF') {
       alert('HPにシフトがない日は実績を入力できません');
@@ -43,15 +65,6 @@ export function useAchievement(supabase: any, profile: any, shifts: any[], selec
       alert('実績を保存しました💰'); 
     }
   };
-
-  // その日が編集可能かどうかの判定
-  const today = startOfToday();
-  const selectedShift = selectedSingle ? shifts.find(s => s.shift_date === format(selectedSingle, 'yyyy-MM-dd')) : null;
-  const isEditable = selectedSingle && 
-                     !isAfter(selectedSingle, today) && 
-                     selectedShift && 
-                     selectedShift.start_time && 
-                     selectedShift.start_time !== 'OFF';
 
   return { editReward, setEditReward, handleSaveAchievement, isEditable, selectedShift };
 }
