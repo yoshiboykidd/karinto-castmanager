@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay, isValid } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface DashboardCalendarProps {
@@ -15,15 +15,30 @@ interface DashboardCalendarProps {
 
 export default function DashboardCalendar({ shifts, selectedDates, onSelect, month, onMonthChange, isRequestMode }: DashboardCalendarProps) {
   const [holidays, setHolidays] = useState<string[]>([]);
-  const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) });
+  const [mounted, setMounted] = useState(false); // ハイドレーションエラー防止用
 
-  // 日本の祝日を外部API（GitHub Pagesでホストされている信頼性の高いもの）から取得
+  // 1. マウント状態の管理
   useEffect(() => {
-    fetch(`https://holidays-jp.github.io/api/v1/${month.getFullYear()}/date.json`)
+    setMounted(true);
+  }, []);
+
+  // 2. 祝日データの取得
+  useEffect(() => {
+    if (!month) return;
+    const year = month.getFullYear();
+    fetch(`https://holidays-jp.github.io/api/v1/${year}/date.json`)
       .then(res => res.json())
       .then(data => setHolidays(Object.keys(data)))
       .catch(() => console.error("Holiday fetch error"));
-  }, [month.getFullYear()]); // 年が変わった時だけ再取得
+  }, [month?.getFullYear()]);
+
+  // マウント前（サーバーサイドレンダリング時）は何も表示しない、またはスケルトンを表示してエラーを回避
+  if (!mounted) return <div className="w-full h-64 bg-transparent" />;
+
+  const days = eachDayOfInterval({ 
+    start: startOfMonth(month || new Date()), 
+    end: endOfMonth(month || new Date()) 
+  });
 
   return (
     <div className="w-full">
@@ -38,7 +53,7 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
         </button>
       </div>
 
-      {/* 2. 曜日（色分け：日=赤 / 土=青） */}
+      {/* 2. 曜日（日=赤 / 土=青） */}
       <div className="grid grid-cols-7 gap-1 px-1">
         {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((d, idx) => (
           <div key={d} className={`text-[9px] font-black pb-2 text-center tracking-widest 
@@ -49,6 +64,8 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
 
         {/* 3. 日付セル */}
         {days.map(day => {
+          if (!isValid(day)) return null;
+
           const dateStr = format(day, 'yyyy-MM-dd');
           const s = Array.isArray(shifts) ? shifts.find((x: any) => x.shift_date === dateStr) : null;
           
@@ -57,19 +74,22 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const isModified = isRequested && s?.is_official_pre_exist;
           const hasOfficialBase = isOfficial || isModified;
 
-          const isSelected = Array.isArray(selectedDates) 
-            ? selectedDates.some(d => isSameDay(d, day)) 
-            : selectedDates && isSameDay(selectedDates, day);
+          // 選択判定の堅牢化（null/undefinedチェック）
+          const isSelected = selectedDates ? (
+            Array.isArray(selectedDates) 
+              ? selectedDates.some(d => isValid(d) && isSameDay(d, day)) 
+              : (isValid(selectedDates) && isSameDay(selectedDates, day))
+          ) : false;
 
           const dNum = day.getDate();
-          const dayOfWeek = getDay(day); // 0:日, 6:土
+          const dayOfWeek = getDay(day);
           const isHoliday = holidays.includes(dateStr);
 
           // テキスト色決定
           let textColor = 'text-slate-600';
           if (hasOfficialBase) textColor = 'text-white';
-          else if (isHoliday || dayOfWeek === 0) textColor = 'text-red-500'; // 日・祝
-          else if (dayOfWeek === 6) textColor = 'text-blue-500'; // 土
+          else if (isHoliday || dayOfWeek === 0) textColor = 'text-red-500';
+          else if (dayOfWeek === 6) textColor = 'text-blue-500';
           else if (isSelected) textColor = 'text-pink-500';
 
           const isKarin = dNum === 10;
