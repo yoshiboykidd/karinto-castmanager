@@ -9,8 +9,11 @@ export async function GET(request: NextRequest) {
   const JST_OFFSET = 9 * 60 * 60 * 1000;
 
   try {
-    // 1. 全キャストのマスターデータを取得
-    const { data: allCasts } = await supabase.from('cast_members').select('login_id, hp_display_name');
+    // 1. キャスト名簿からID、HP表示名、そして店舗ID(home_shop_id)を取得
+    const { data: allCasts } = await supabase
+      .from('cast_members')
+      .select('login_id, hp_display_name, home_shop_id');
+      
     const normalize = (val: any): string => {
       let s = (val === null || val === undefined) ? "" : String(val);
       s = s.replace(/<[^>]*>?/gm, '').replace(/[（\(\[].*?[）\)\]]/g, '').replace(/\s+/g, '');
@@ -18,15 +21,14 @@ export async function GET(request: NextRequest) {
     };
     const cleanCastList = (allCasts || []).map(c => ({ ...c, matchName: normalize(c.hp_display_name) }));
 
-    // 2. 同期対象の日付：今日から未来7日間（合計8日間）に固定
-    // 過去（i - 1）を排除することで、昨日の実績データへの干渉を防止
+    // 2. 今日から未来7日間（計8日間）を同期対象にする（過去の上書きを防止）
     const dates = Array.from({ length: 8 }, (_, i) => {
       const d = new Date(Date.now() + JST_OFFSET + (i * 24 * 60 * 60 * 1000));
       return d.toISOString().split('T')[0];
     });
 
     for (const dateStr of dates) {
-      // Step A: 今回の生存確認用フラグをリセット（今日以降のデータのみ）
+      // Step A: 未来データの生存フラグ(is_official)を一旦リセット
       await supabase.from('shifts').update({ is_official: false }).eq('shift_date', dateStr);
 
       const hpDateStr = dateStr.replace(/-/g, '/');
@@ -44,15 +46,14 @@ export async function GET(request: NextRequest) {
           const hpS = timeMatch[1];
           const hpE = timeMatch[2];
 
-          // 現在のDB状態を確認
-          const { data: current } = await supabase
-            .from('shifts')
+          // 現在のDBの状態（申請中か、現在の時間は何か）を確認
+          const { data: current } = await supabase.from('shifts')
             .select('status, start_time, end_time')
             .eq('login_id', targetCast.login_id)
             .eq('shift_date', dateStr)
             .single();
 
-          // 自動確定：申請時間とHPの時間が完全に一致したか判定
+          // 自動確定判定：アプリの申請内容とHPの時間が一致したか
           const isMatching = current?.status === 'requested' && 
                              current.start_time === hpS && 
                              current.end_time === hpE;
@@ -63,16 +64,17 @@ export async function GET(request: NextRequest) {
             hp_display_name: targetCast.hp_display_name,
             hp_start_time: hpS,
             hp_end_time: hpE,
-            is_official: true
+            is_official: true,
+            // 【多店舗対応】shiftsテーブルの store_code カラムに店舗IDを記録（スタンプ）
+            store_code: targetCast.home_shop_id 
           };
 
-          // 確定済み(official) or 申請内容が一致した(自動承認)なら同期してofficial化
+          // 申請中でない or 申請内容が一致したなら、同期して status を official にする
           if (current?.status !== 'requested' || isMatching) {
             updateData.start_time = hpS;
             updateData.end_time = hpE;
             updateData.status = 'official';
           }
-
           await supabase.from('shifts').upsert(updateData, { onConflict: 'login_id,shift_date' });
         }
       }
@@ -87,34 +89,29 @@ export async function GET(request: NextRequest) {
         for (const shift of absentShifts) {
           const hpS = 'OFF';
           const hpE = 'OFF';
-
-          // 自動確定：OFF申請をしていてHPにも名前がない場合
+          // キャストが「OFF」で申請しており、実際にHPに名前がない（＝休み承認）場合
           const isMatchingOff = shift.status === 'requested' && shift.start_time === 'OFF';
 
-          const updateData: any = {
-            hp_start_time: hpS,
-            hp_end_time: hpE,
-            is_official: false
+          const updateData: any = { 
+            hp_start_time: hpS, 
+            hp_end_time: hpE, 
+            is_official: false 
           };
 
-          // すでに確定していた or OFF申請が承認されたなら、officialのままOFFを維持
+          // 元々確定だった or 休み申請が一致したなら、status を official に戻す（緑枠を消す）
           if (shift.status === 'official' || isMatchingOff) {
             updateData.start_time = hpS;
             updateData.end_time = hpE;
             updateData.status = 'official';
           }
-
-          await supabase.from('shifts')
-            .update(updateData)
-            .eq('login_id', shift.login_id)
-            .eq('shift_date', dateStr);
+          await supabase.from('shifts').update(updateData).eq('login_id', shift.login_id).eq('shift_date', dateStr);
         }
       }
     }
 
     const nowUTC = new Date().toISOString(); 
     await supabase.from('sync_logs').upsert({ id: 1, last_sync_at: nowUTC });
-    return NextResponse.json({ version: "v3.4.1", success: true, scope: "Today + 7 Days" });
+    return NextResponse.json({ version: "v3.4.2", success: true, scope: "Today + 7 Days with Store Stamp" });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
