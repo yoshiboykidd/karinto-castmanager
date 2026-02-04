@@ -67,26 +67,29 @@ export default function DashboardContent() {
         version="v3.4.5" 
       />
       
-      <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200 shadow-inner">
-        <button 
-          onClick={() => nav.toggleMode(false)} 
-          className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!nav.isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}
-        >
-          実績入力
-        </button>
-        <button 
-          onClick={() => nav.toggleMode(true)} 
-          className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${nav.isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}
-        >
-          シフト申請
-        </button>
-      </div>
-
-      <main className="px-4 mt-3 space-y-2">
+      <main className="px-4 mt-3 space-y-3">
+        {/* 1. 月間サマリー（一番上に配置） */}
         {!nav.isRequestMode && isValid(safeViewDate) && (
           <MonthlySummary month={format(safeViewDate, 'M月')} totals={monthlyTotals} />
         )}
+
+        {/* 2. 実績/申請の切り替えタブ（サマリーの下、カレンダーの上に移動） */}
+        <div className="flex p-1.5 bg-gray-100/80 rounded-2xl border border-gray-200 shadow-inner">
+          <button 
+            onClick={() => nav.toggleMode(false)} 
+            className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!nav.isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}
+          >
+            実績入力
+          </button>
+          <button 
+            onClick={() => nav.toggleMode(true)} 
+            className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${nav.isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}
+          >
+            シフト申請
+          </button>
+        </div>
         
+        {/* 3. カレンダー */}
         <section className="bg-white p-2 rounded-[32px] border border-gray-100 shadow-sm text-center">
           <DashboardCalendar 
             shifts={data.shifts as any} 
@@ -98,6 +101,7 @@ export default function DashboardContent() {
           />
         </section>
 
+        {/* 4. 詳細入力 or 申請リスト */}
         {!nav.isRequestMode ? (
           // selected.single が Date オブジェクトであり、かつ有効な日付の時だけ表示
           (nav.selected.single instanceof Date && isValid(nav.selected.single)) && (
@@ -121,6 +125,7 @@ export default function DashboardContent() {
           />
         )}
         
+        {/* 5. お知らせ */}
         <NewsSection newsList={data.news} />
       </main>
 

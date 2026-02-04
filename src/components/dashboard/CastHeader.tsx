@@ -49,7 +49,6 @@ export default function CastHeader({ shopName, syncTime, displayName }: CastHead
             </p>
 
             <div className="pt-1">
-              {/* 名前 + さん + 絵文字 */}
               <h1 className="font-black text-gray-800 leading-tight flex items-baseline">
                 <span className="text-[26px]">{displayName || 'キャスト'}</span>
                 <span className="text-[13px] text-gray-400 ml-1 font-bold">さん</span>
@@ -61,30 +60,30 @@ export default function CastHeader({ shopName, syncTime, displayName }: CastHead
             </div>
           </div>
 
-          {/* --- 右サイド --- */}
+          {/* --- 右サイド（サイズ統一・中央寄せ） --- */}
           <div className="flex flex-col items-end space-y-2 pb-0.5">
             
             {/* HP同期時刻 */}
             {syncTime && (
-              <div className="bg-green-50/80 w-[120px] px-3 py-1.5 rounded-xl border border-green-100 flex items-center gap-2 shadow-sm">
+              <div className="bg-green-50/80 w-[128px] h-[44px] rounded-xl border border-green-100 flex items-center justify-center gap-2 shadow-sm">
                 <span className="relative flex h-2.5 w-2.5 shrink-0">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
                 </span>
-                <div className="flex flex-col leading-none">
+                <div className="flex flex-col leading-none items-center">
                   <span className="text-[8px] font-black text-green-600/50 uppercase tracking-tighter mb-0.5">HP SYNC</span>
                   <span className="text-[13px] font-black text-green-600 tracking-tight">{syncTime}</span>
                 </div>
               </div>
             )}
 
-            {/* 緊急脱出ボタン（HP同期と同じサイズ感・かわいいデザイン） */}
+            {/* 緊急脱出ボタン */}
             <button
               onClick={() => setIsPanicMode(true)}
-              className="bg-rose-50/80 w-[120px] px-3 py-1.5 rounded-xl border border-rose-100 flex items-center gap-2 shadow-sm hover:bg-rose-100 transition-all active:scale-95 group"
+              className="bg-rose-50/80 w-[128px] h-[44px] rounded-xl border border-rose-100 flex items-center justify-center gap-2 shadow-sm hover:bg-rose-100 transition-all active:scale-95 group"
             >
               <LogOut className="w-4 h-4 text-rose-400 shrink-0 group-hover:rotate-12 transition-transform" />
-              <div className="flex flex-col leading-none items-start">
+              <div className="flex flex-col leading-none items-center">
                 <span className="text-[8px] font-black text-rose-400/50 uppercase tracking-tighter mb-0.5">SECRET</span>
                 <span className="text-[13px] font-black text-rose-500 tracking-widest">ESCAPE</span>
               </div>
