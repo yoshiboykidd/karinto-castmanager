@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay, isValid } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface DashboardCalendarProps {
@@ -15,30 +15,21 @@ interface DashboardCalendarProps {
 
 export default function DashboardCalendar({ shifts, selectedDates, onSelect, month, onMonthChange, isRequestMode }: DashboardCalendarProps) {
   const [holidays, setHolidays] = useState<string[]>([]);
-  const [mounted, setMounted] = useState(false); // ハイドレーションエラー防止用
+  const [isClient, setIsClient] = useState(false);
 
-  // 1. マウント状態の管理
+  // マウント確認（クラッシュ防止）
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // 2. 祝日データの取得
-  useEffect(() => {
-    if (!month) return;
-    const year = month.getFullYear();
+    setIsClient(true);
+    const year = month?.getFullYear() || 2026;
     fetch(`https://holidays-jp.github.io/api/v1/${year}/date.json`)
-      .then(res => res.json())
+      .then(res => res.ok ? res.json() : {})
       .then(data => setHolidays(Object.keys(data)))
-      .catch(() => console.error("Holiday fetch error"));
+      .catch(() => {});
   }, [month?.getFullYear()]);
 
-  // マウント前（サーバーサイドレンダリング時）は何も表示しない、またはスケルトンを表示してエラーを回避
-  if (!mounted) return <div className="w-full h-64 bg-transparent" />;
+  if (!isClient) return null;
 
-  const days = eachDayOfInterval({ 
-    start: startOfMonth(month || new Date()), 
-    end: endOfMonth(month || new Date()) 
-  });
+  const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) });
 
   return (
     <div className="w-full">
@@ -53,10 +44,10 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
         </button>
       </div>
 
-      {/* 2. 曜日（日=赤 / 土=青） */}
+      {/* 2. 曜日（日本語表記・色分け） */}
       <div className="grid grid-cols-7 gap-1 px-1">
-        {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((d, idx) => (
-          <div key={d} className={`text-[9px] font-black pb-2 text-center tracking-widest 
+        {['日', '月', '火', '水', '木', '金', '土'].map((d, idx) => (
+          <div key={d} className={`text-[10px] font-black pb-2 text-center tracking-widest
             ${idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-slate-300'}`}>
             {d}
           </div>
@@ -64,8 +55,6 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
 
         {/* 3. 日付セル */}
         {days.map(day => {
-          if (!isValid(day)) return null;
-
           const dateStr = format(day, 'yyyy-MM-dd');
           const s = Array.isArray(shifts) ? shifts.find((x: any) => x.shift_date === dateStr) : null;
           
@@ -74,18 +63,15 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const isModified = isRequested && s?.is_official_pre_exist;
           const hasOfficialBase = isOfficial || isModified;
 
-          // 選択判定の堅牢化（null/undefinedチェック）
-          const isSelected = selectedDates ? (
-            Array.isArray(selectedDates) 
-              ? selectedDates.some(d => isValid(d) && isSameDay(d, day)) 
-              : (isValid(selectedDates) && isSameDay(selectedDates, day))
-          ) : false;
+          const isSelected = Array.isArray(selectedDates) 
+            ? selectedDates.some(d => isSameDay(d, day)) 
+            : selectedDates && isSameDay(selectedDates, day);
 
           const dNum = day.getDate();
           const dayOfWeek = getDay(day);
           const isHoliday = holidays.includes(dateStr);
 
-          // テキスト色決定
+          // テキスト色の判定のみ追加
           let textColor = 'text-slate-600';
           if (hasOfficialBase) textColor = 'text-white';
           else if (isHoliday || dayOfWeek === 0) textColor = 'text-red-500';
@@ -110,12 +96,15 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
               {hasOfficialBase && (
                 <div className="absolute inset-1.5 rounded-full bg-gradient-to-br from-pink-400 to-rose-400 shadow-sm z-10" />
               )}
+              
               {isModified && (
                 <div className="absolute inset-0.5 rounded-full border-[5px] border-green-500 z-[15] animate-pulse" />
               )}
+              
               {isRequested && !isModified && (
                 <div className="absolute inset-1 rounded-full border-2 border-purple-400 border-dashed animate-pulse z-10" />
               )}
+
               {isKarin && <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-orange-400 shadow-sm z-30" />}
               {isSoine && <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-yellow-400 shadow-sm z-30" />}
             </div>
