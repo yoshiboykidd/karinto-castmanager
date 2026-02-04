@@ -84,7 +84,9 @@ export default function RequestList({
         {sortedDates.map((d) => {
           const key = format(d, 'yyyy-MM-dd');
           const official = (shifts || []).find((s: Shift) => s.shift_date === key && s.status === 'official');
-          const isOff = requestDetails[key]?.s === 'OFF';
+          
+          // ★修正箇所：未操作のとき、元がOFFなら画面も「OFF」と判定する
+          const isOff = (requestDetails[key]?.s || official?.start_time) === 'OFF';
 
           // 初期値の設定
           const defaultS = official?.start_time && official.start_time !== 'OFF' ? official.start_time : '11:00';
