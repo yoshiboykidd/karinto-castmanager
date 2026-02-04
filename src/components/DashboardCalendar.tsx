@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay, isValid } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay, isValid, isAfter, startOfDay } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface DashboardCalendarProps {
@@ -28,6 +28,7 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
   if (!month || !isValid(month)) return null;
 
   const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) });
+  const today = startOfDay(new Date());
 
   return (
     <div className="w-full">
@@ -63,14 +64,16 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const isModified = isRequested && s?.is_official_pre_exist;
           const hasOfficialBase = (isOfficial || isModified) && s?.start_time !== 'OFF';
 
-          // 選択判定 (鉄壁ガード版)
-          const isSelected = selectedDates ? (
+          // ★修正箇所：選択判定に「明日以降」の条件を追加（申請モード中のみ適用）
+          const isFuture = isAfter(startOfDay(day), today);
+          const canSelect = !isRequestMode || isFuture;
+
+          const isSelected = canSelect && selectedDates ? (
             Array.isArray(selectedDates) 
               ? selectedDates.some(d => (d instanceof Date) && isSameDay(d, day)) 
               : (selectedDates instanceof Date && isSameDay(selectedDates, day))
           ) : false;
 
-          // ★ 復活：特定日判定ロジック
           const isKarin = dNum === 10;
           const isSoine = dNum === 11 || dNum === 22;
 
@@ -86,11 +89,15 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           return (
             <div 
               key={dateStr} 
-              onClick={() => onSelect(day)} 
+              onClick={() => {
+                // ★修正箇所：明日以降の日付、または通常モードの時だけクリック可能にする
+                if (canSelect) onSelect(day);
+              }} 
               className={`relative h-12 w-full flex flex-col items-center justify-center rounded-2xl transition-all active:scale-95 cursor-pointer
               ${isSelected ? 'bg-white shadow-lg ring-2 ring-pink-400 z-10' : ''}
               ${!isSelected && isKarin ? 'bg-orange-50/60' : ''}
-              ${!isSelected && isSoine ? 'bg-yellow-50/60' : ''}`}
+              ${!isSelected && isSoine ? 'bg-yellow-50/60' : ''}
+              ${isRequestMode && !isFuture ? 'opacity-40 grayscale-[0.5] cursor-not-allowed' : ''}`}
             >
               <span className={`z-20 text-[13px] font-black ${textColor}`}>{dNum}</span>
 
@@ -103,7 +110,7 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
               {isModified && <div className="absolute inset-0.5 rounded-full border-[5px] border-green-500 z-[15] animate-pulse" />}
               {isRequested && !isModified && <div className="absolute inset-1 rounded-full border-2 border-purple-400 border-dashed animate-pulse z-10" />}
 
-              {/* ★ 復活：右上のアクセントドット */}
+              {/* 右上のアクセントドット */}
               {isKarin && !hasOfficialBase && (
                 <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-orange-400 shadow-sm z-30" />
               )}

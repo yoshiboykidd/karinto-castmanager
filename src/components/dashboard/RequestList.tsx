@@ -1,6 +1,6 @@
 'use client';
 
-import { format } from 'date-fns';
+import { format, isAfter, startOfDay } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
 // ★ 型定義: s => の波線を消すための定義
@@ -33,8 +33,13 @@ export default function RequestList({
   shifts,
   onSubmit
 }: RequestListProps) {
-  // ★ 1. 日付順にソート（タップ順ではなくカレンダー順に並ぶ）
-  const sortedDates = [...multiDates].sort((a, b) => a.getTime() - b.getTime());
+  // 本日の日付の開始時刻（00:00:00）を取得
+  const today = startOfDay(new Date());
+
+  // ★ 1. 日付順にソート ＆ 「明日以降」のみにフィルタリング
+  const sortedDates = [...multiDates]
+    .filter((d) => isAfter(startOfDay(d), today))
+    .sort((a, b) => a.getTime() - b.getTime());
 
   // ★ 2. 重複チェック（確定シフトと全く同じ時間のままの日を特定）
   const redundantDates = sortedDates.filter((d) => {
@@ -55,7 +60,7 @@ export default function RequestList({
   if (sortedDates.length === 0) {
     return (
       <section className="bg-white rounded-[32px] border border-purple-100 p-8 shadow-xl text-center">
-        <p className="text-gray-300 text-xs font-bold italic">カレンダーから日付を選んでください📅</p>
+        <p className="text-gray-300 text-xs font-bold italic">明日以降の日付を選んでください📅</p>
       </section>
     );
   }
