@@ -10,8 +10,6 @@ export async function GET(request: NextRequest) {
 
   try {
     const { data: allCasts } = await supabase.from('cast_members').select('login_id, hp_display_name');
-    
-    // 名前の名寄せ用正規化関数
     const normalize = (val: any): string => {
       let s = (val === null || val === undefined) ? "" : String(val);
       s = s.replace(/<[^>]*>?/gm, '').replace(/[（\(\[].*?[）\)\]]/g, '').replace(/\s+/g, '');
@@ -32,6 +30,7 @@ export async function GET(request: NextRequest) {
       const html = await (await fetch(`https://ikekari.com/attend.php?date_get=${hpDateStr}&t=${Date.now()}`, { cache: 'no-store' })).text();
       const listItems = html.match(/<li[^>]*>[\s\S]*?<\/li>/g) || [];
 
+      // --- A. HPに掲載されているキャストの処理 ---
       for (const item of listItems) {
         const nameMatch = item.match(/<h3>(.*?)<\/h3>/);
         const timeMatch = item.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
@@ -42,7 +41,7 @@ export async function GET(request: NextRequest) {
           const hpS = timeMatch[1];
           const hpE = timeMatch[2];
 
-          // 2. 現在のDBの状態をチェック
+          // 現在のDBの状態を取得
           const { data: current } = await supabase
             .from('shifts')
             .select('status, start_time, end_time')
@@ -50,42 +49,68 @@ export async function GET(request: NextRequest) {
             .eq('shift_date', dateStr)
             .single();
 
-          // ★自動確定ロジック：申請時間とHPの時間が一致したか？
+          // 自動確定判定：申請時間とHPの時間が一致したか
           const isMatching = current?.status === 'requested' && current.start_time === hpS && current.end_time === hpE;
 
           const updateData: any = {
             login_id: targetCast.login_id,
             shift_date: dateStr,
             hp_display_name: targetCast.hp_display_name,
-            hp_start_time: hpS, // HPの真実を常に記録
-            hp_end_time: hpE,   // HPの真実を常に記録
+            hp_start_time: hpS,
+            hp_end_time: hpE,
             is_official: true
           };
 
-          // 「申請中（requested）でない」 または 「時間が一致した（自動確定）」 場合のみ表示時間を同期
+          // 申請中でない or 時間が一致した(自動承認)なら情報を同期して確定(official)にする
           if (current?.status !== 'requested' || isMatching) {
             updateData.start_time = hpS;
             updateData.end_time = hpE;
             updateData.status = 'official';
           }
-          // 申請中で時間が不一致の場合は、start_time/end_time/status には触れない（キャストの希望を保護）
 
           await supabase.from('shifts').upsert(updateData, { onConflict: 'login_id,shift_date' });
         }
       }
 
-      // 3. HPから名前が消えた場合の処理（お休み承認）
-      // 元々 official だったものが HP になければ requested / OFF に落とす
-      await supabase.from('shifts')
-        .update({ status: 'requested', start_time: 'OFF', end_time: 'OFF' })
+      // --- B. HPに掲載されていないキャスト（休み）の処理 ---
+      // 今回のスクレイピングで is_official が false のままのシフトをチェック
+      const { data: absentShifts } = await supabase.from('shifts')
+        .select('login_id, status, start_time, end_time')
         .eq('shift_date', dateStr)
-        .eq('status', 'official')
         .eq('is_official', false);
+
+      if (absentShifts) {
+        for (const shift of absentShifts) {
+          const hpS = 'OFF';
+          const hpE = 'OFF';
+
+          // 自動確定判定：OFF申請をしていて、実際にHPに名前がない(＝休みが承認された)
+          const isMatchingOff = shift.status === 'requested' && shift.start_time === 'OFF';
+
+          const updateData: any = {
+            hp_start_time: hpS,
+            hp_end_time: hpE,
+            is_official: false
+          };
+
+          // 元々確定(official)だったのに消えた or OFF申請がHPと一致したなら確定(official)にする
+          if (shift.status === 'official' || isMatchingOff) {
+            updateData.start_time = hpS;
+            updateData.end_time = hpE;
+            updateData.status = 'official';
+          }
+
+          await supabase.from('shifts')
+            .update(updateData)
+            .eq('login_id', shift.login_id)
+            .eq('shift_date', dateStr);
+        }
+      }
     }
 
     const nowUTC = new Date().toISOString(); 
     await supabase.from('sync_logs').upsert({ id: 1, last_sync_at: nowUTC });
-    return NextResponse.json({ success: true, message: "Sync Completed with Auto-Confirm Logic" });
+    return NextResponse.json({ version: "v3.4.0", success: true });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
