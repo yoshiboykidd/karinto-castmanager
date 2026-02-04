@@ -68,12 +68,12 @@ export default function DashboardContent() {
       />
       
       <main className="px-4 mt-3 space-y-3">
-        {/* 1. 月間サマリー（一番上に配置） */}
-        {!nav.isRequestMode && isValid(safeViewDate) && (
+        {/* 1. 月間サマリー（条件分岐 !nav.isRequestMode を削除し、常時表示に変更） */}
+        {isValid(safeViewDate) && (
           <MonthlySummary month={format(safeViewDate, 'M月')} totals={monthlyTotals} />
         )}
 
-        {/* 2. 実績/申請の切り替えタブ（サマリーの下、カレンダーの上に移動） */}
+        {/* 2. 実績/申請の切り替えタブ */}
         <div className="flex p-1.5 bg-gray-100/80 rounded-2xl border border-gray-200 shadow-inner">
           <button 
             onClick={() => nav.toggleMode(false)} 
@@ -103,7 +103,6 @@ export default function DashboardContent() {
 
         {/* 4. 詳細入力 or 申請リスト */}
         {!nav.isRequestMode ? (
-          // selected.single が Date オブジェクトであり、かつ有効な日付の時だけ表示
           (nav.selected.single instanceof Date && isValid(nav.selected.single)) && (
             <DailyDetail 
               date={nav.selected.single} 
