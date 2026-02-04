@@ -33,34 +33,43 @@ export default function RequestList({
   shifts,
   onSubmit
 }: RequestListProps) {
-  // 本日の日付の開始時刻
   const today = startOfDay(new Date());
 
-  // 1. 日付順にソート ＆ 「明日以降」のみにフィルタリング
+  // 1. 日付順にソート
   const sortedDates = [...multiDates]
     .filter((d) => isAfter(startOfDay(d), today))
     .sort((a, b) => a.getTime() - b.getTime());
 
-  // ★ 2. 重複チェック（統合ロジック適用）
+  // 2. 重複チェック（変更なし）
   const redundantDates = sortedDates.filter((d) => {
     const key = format(d, 'yyyy-MM-dd');
-    // 実際の確定データ（あれば）
     const official = (shifts || []).find((s: Shift) => s.shift_date === key && s.status === 'official');
     
-    // ★統合ポイント：「データがない」も「OFF」とみなす（Virtual Official）
     const baseS = official?.start_time || 'OFF';
     const baseE = official?.end_time || 'OFF';
-
-    // 画面の入力値（未操作ならベースの時間を使用）
     const currentS = requestDetails[key]?.s || baseS;
     const currentE = requestDetails[key]?.e || baseE;
 
-    // 「今の状態（未入力含む）」と「入力値」が同じなら重複（申請不可）
     return baseS === currentS && baseE === currentE;
   });
 
-  // 全ての日付が適切に変更されていれば送信可能
-  const canSubmit = sortedDates.length > 0 && redundantDates.length === 0;
+  // ★ 3. 時間逆転チェック（追加ロジック）
+  // 「OFF」ではなく、かつ「開始 >= 終了」になってしまっている日を特定
+  const invalidDates = sortedDates.filter((d) => {
+    const key = format(d, 'yyyy-MM-dd');
+    const official = (shifts || []).find((s: Shift) => s.shift_date === key && s.status === 'official');
+    const baseS = official?.start_time || 'OFF';
+    const baseE = official?.end_time || 'OFF';
+    
+    const s = requestDetails[key]?.s || baseS;
+    const e = requestDetails[key]?.e || baseE;
+
+    if (s === 'OFF' || e === 'OFF') return false;
+    return s >= e; // 文字列比較でOK（例: "21:00" >= "17:00" は true）
+  });
+
+  // 送信可能条件：データあり ＆ 重複なし ＆ 時間逆転なし
+  const canSubmit = sortedDates.length > 0 && redundantDates.length === 0 && invalidDates.length === 0;
 
   if (sortedDates.length === 0) {
     return (
@@ -78,9 +87,10 @@ export default function RequestList({
           <span className="w-1.5 h-4 bg-purple-500 rounded-full"></span>
           申請リスト ({sortedDates.length}件)
         </h3>
-        {redundantDates.length > 0 && (
+        {/* エラー表示エリア（優先度：逆転エラー ＞ 重複警告） */}
+        {(invalidDates.length > 0 || redundantDates.length > 0) && (
           <span className="text-[10px] font-black text-red-500 bg-red-50 px-2 py-1 rounded-lg animate-pulse">
-            ⚠️ 時間を変更してください
+            {invalidDates.length > 0 ? '⚠️ 時間の前後がおかしいです' : '⚠️ 時間を変更してください'}
           </span>
         )}
       </div>
@@ -90,40 +100,43 @@ export default function RequestList({
           const key = format(d, 'yyyy-MM-dd');
           const official = (shifts || []).find((s: Shift) => s.shift_date === key && s.status === 'official');
           
-          // ★統合ポイント：ベース時間（未入力ならOFF）
+          const showOfficial = official && official.start_time !== 'OFF';
           const baseS = official?.start_time || 'OFF';
           const baseE = official?.end_time || 'OFF';
-
-          // 画面上のOFF判定（未操作ならベースに従う）
           const isOff = (requestDetails[key]?.s || baseS) === 'OFF';
 
-          // 初期値の設定（未入力日はUXとして11-23を提案するが、データ上のベースはOFF）
           const defaultS = baseS !== 'OFF' ? baseS : '11:00';
           const defaultE = baseE !== 'OFF' ? baseE : '23:00';
 
-          // 重複判定
-          const isRedundant = 
-            (requestDetails[key]?.s || baseS) === baseS && 
-            (requestDetails[key]?.e || baseE) === baseE;
+          const isRedundant = (requestDetails[key]?.s || baseS) === baseS && (requestDetails[key]?.e || baseE) === baseE;
+          
+          // この行が時間逆転エラーか判定（赤枠などを付けるため）
+          const currentS = requestDetails[key]?.s || baseS;
+          const currentE = requestDetails[key]?.e || baseE;
+          const isInvalid = !isOff && currentS >= currentE;
 
           return (
-            <div key={key} className={`py-3.5 border-b border-gray-100 last:border-0 flex flex-col space-y-2 transition-all ${isRedundant ? 'bg-red-50/50 -mx-2 px-2 rounded-xl' : ''}`}>
+            <div key={key} className={`py-3.5 border-b border-gray-100 last:border-0 flex flex-col space-y-2 transition-all 
+              ${isRedundant ? 'bg-red-50/50 -mx-2 px-2 rounded-xl' : ''}
+              ${isInvalid ? 'bg-yellow-50 -mx-2 px-2 rounded-xl ring-1 ring-yellow-200' : ''}
+            `}>
               <div className="flex items-center justify-between px-1">
                 <span className="text-[16px] font-black text-gray-800">
                   {format(d, 'M/d')} <span className="text-xs opacity-60">({format(d, 'E', { locale: ja })})</span>
                 </span>
-                {official && (
+                
+                {showOfficial && (
                   <div className="flex items-center gap-1.5">
                     <span className="text-[12px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 leading-none">確定</span>
                     <span className="text-[17px] font-black text-gray-400 leading-none">
-                      {official.start_time === 'OFF' ? 'お休み' : `${official.start_time}〜${official.end_time}`}
+                      {`${official?.start_time}〜${official?.end_time}`}
                     </span>
                   </div>
                 )}
               </div>
 
               <div className="flex items-center gap-2">
-                {official ? (
+                {showOfficial ? (
                   <span className="bg-orange-50 text-orange-500 text-[12px] font-black px-2.5 py-2 rounded-xl border border-orange-100 leading-none shrink-0">変更</span>
                 ) : (
                   <span className="bg-green-50 text-green-500 text-[12px] font-black px-2.5 py-2 rounded-xl border border-green-100 leading-none shrink-0">新規</span>
@@ -138,7 +151,7 @@ export default function RequestList({
                     <select
                       value={requestDetails[key]?.s || defaultS}
                       onChange={(e) => setRequestDetails({ ...requestDetails, [key]: { ...requestDetails[key], s: e.target.value } })}
-                      className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none"
+                      className={`w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none ${isInvalid ? 'text-red-500 bg-red-50' : ''}`}
                       style={{ textAlignLast: 'center' }}
                     >
                       {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
@@ -147,7 +160,7 @@ export default function RequestList({
                     <select
                       value={requestDetails[key]?.e || defaultE}
                       onChange={(e) => setRequestDetails({ ...requestDetails, [key]: { ...requestDetails[key], e: e.target.value } })}
-                      className="w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none"
+                      className={`w-24 bg-gray-100 py-2.5 rounded-lg text-center font-black text-base border-none focus:ring-1 focus:ring-purple-200 appearance-none ${isInvalid ? 'text-red-500 bg-red-50' : ''}`}
                       style={{ textAlignLast: 'center' }}
                     >
                       {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
@@ -156,7 +169,6 @@ export default function RequestList({
                 )}
                 <button
                   onClick={() => {
-                    // ★ここも統合：OFFにする時は常に「OFF」、解除する時は「元の時間」か「11-23」
                     const nextVal = isOff ? { s: defaultS, e: defaultE } : { s: 'OFF', e: 'OFF' };
                     setRequestDetails({ ...requestDetails, [key]: nextVal });
                   }}
@@ -170,7 +182,6 @@ export default function RequestList({
         })}
       </div>
 
-      {/* 送信ボタン */}
       <button
         onClick={onSubmit}
         disabled={!canSubmit}
@@ -180,7 +191,12 @@ export default function RequestList({
             : 'bg-gray-100 text-gray-400 shadow-none cursor-not-allowed'
         }`}
       >
-        {canSubmit ? '申請を確定する 🚀' : '時間を変更してください ⚠️'}
+        {canSubmit 
+          ? '申請を確定する 🚀' 
+          : invalidDates.length > 0 
+            ? '終了時間は開始より後にしてください ⏳' 
+            : '時間を変更してください ⚠️'
+        }
       </button>
     </section>
   );
