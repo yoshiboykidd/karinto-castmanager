@@ -3,7 +3,7 @@
 import { format, isAfter, startOfDay } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
-// ★ 型定義: s => の波線を消すための定義
+// ★ 型定義
 type Shift = {
   shift_date: string;
   status: string;
@@ -33,25 +33,30 @@ export default function RequestList({
   shifts,
   onSubmit
 }: RequestListProps) {
-  // 本日の日付の開始時刻（00:00:00）を取得
+  // 本日の日付の開始時刻
   const today = startOfDay(new Date());
 
-  // ★ 1. 日付順にソート ＆ 「明日以降」のみにフィルタリング
+  // 1. 日付順にソート ＆ 「明日以降」のみにフィルタリング
   const sortedDates = [...multiDates]
     .filter((d) => isAfter(startOfDay(d), today))
     .sort((a, b) => a.getTime() - b.getTime());
 
-  // ★ 2. 重複チェック（確定シフトと全く同じ時間のままの日を特定）
+  // ★ 2. 重複チェック（統合ロジック適用）
   const redundantDates = sortedDates.filter((d) => {
     const key = format(d, 'yyyy-MM-dd');
+    // 実際の確定データ（あれば）
     const official = (shifts || []).find((s: Shift) => s.shift_date === key && s.status === 'official');
-    if (!official) return false;
+    
+    // ★統合ポイント：「データがない」も「OFF」とみなす（Virtual Official）
+    const baseS = official?.start_time || 'OFF';
+    const baseE = official?.end_time || 'OFF';
 
-    // 画面の入力値（未操作なら公式の時間を使用）
-    const currentS = requestDetails[key]?.s || official.start_time;
-    const currentE = requestDetails[key]?.e || official.end_time;
+    // 画面の入力値（未操作ならベースの時間を使用）
+    const currentS = requestDetails[key]?.s || baseS;
+    const currentE = requestDetails[key]?.e || baseE;
 
-    return official.start_time === currentS && official.end_time === currentE;
+    // 「今の状態（未入力含む）」と「入力値」が同じなら重複（申請不可）
+    return baseS === currentS && baseE === currentE;
   });
 
   // 全ての日付が適切に変更されていれば送信可能
@@ -85,17 +90,21 @@ export default function RequestList({
           const key = format(d, 'yyyy-MM-dd');
           const official = (shifts || []).find((s: Shift) => s.shift_date === key && s.status === 'official');
           
-          // ★修正箇所：未操作のとき、元がOFFなら画面も「OFF」と判定する
-          const isOff = (requestDetails[key]?.s || official?.start_time) === 'OFF';
+          // ★統合ポイント：ベース時間（未入力ならOFF）
+          const baseS = official?.start_time || 'OFF';
+          const baseE = official?.end_time || 'OFF';
 
-          // 初期値の設定
-          const defaultS = official?.start_time && official.start_time !== 'OFF' ? official.start_time : '11:00';
-          const defaultE = official?.end_time && official.end_time !== 'OFF' ? official.end_time : '23:00';
+          // 画面上のOFF判定（未操作ならベースに従う）
+          const isOff = (requestDetails[key]?.s || baseS) === 'OFF';
 
-          // この行が確定と同じ時間のままか判定
-          const isRedundant = official && 
-            (requestDetails[key]?.s || official.start_time) === official.start_time && 
-            (requestDetails[key]?.e || official.end_time) === official.end_time;
+          // 初期値の設定（未入力日はUXとして11-23を提案するが、データ上のベースはOFF）
+          const defaultS = baseS !== 'OFF' ? baseS : '11:00';
+          const defaultE = baseE !== 'OFF' ? baseE : '23:00';
+
+          // 重複判定
+          const isRedundant = 
+            (requestDetails[key]?.s || baseS) === baseS && 
+            (requestDetails[key]?.e || baseE) === baseE;
 
           return (
             <div key={key} className={`py-3.5 border-b border-gray-100 last:border-0 flex flex-col space-y-2 transition-all ${isRedundant ? 'bg-red-50/50 -mx-2 px-2 rounded-xl' : ''}`}>
@@ -147,6 +156,7 @@ export default function RequestList({
                 )}
                 <button
                   onClick={() => {
+                    // ★ここも統合：OFFにする時は常に「OFF」、解除する時は「元の時間」か「11-23」
                     const nextVal = isOff ? { s: defaultS, e: defaultE } : { s: 'OFF', e: 'OFF' };
                     setRequestDetails({ ...requestDetails, [key]: nextVal });
                   }}
@@ -160,7 +170,7 @@ export default function RequestList({
         })}
       </div>
 
-      {/* 送信ボタン（バリデーション結果によって状態変化） */}
+      {/* 送信ボタン */}
       <button
         onClick={onSubmit}
         disabled={!canSubmit}
