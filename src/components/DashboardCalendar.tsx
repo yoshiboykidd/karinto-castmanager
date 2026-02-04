@@ -31,27 +31,24 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
 
   return (
     <div className="w-full">
-      {/* 月切り替えヘッダー */}
       <div className="flex items-center justify-between mb-4 px-4 font-black text-slate-700">
         <button onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>
-          <ChevronLeft className="text-pink-300" />
+          <ChevronLeft className="text-pink-400" />
         </button>
         <span className="text-[20px] tracking-tighter">{format(month, 'yyyy / M月')}</span>
         <button onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>
-          <ChevronRight className="text-pink-300" />
+          <ChevronRight className="text-pink-400" />
         </button>
       </div>
 
       <div className="grid grid-cols-7 gap-1 px-1">
-        {/* 曜日ラベル（サイズUP & 平日黒） */}
         {['日', '月', '火', '水', '木', '金', '土'].map((d, idx) => (
-          <div key={d} className={`text-[12px] font-black pb-2 text-center tracking-widest
+          <div key={d} className={`text-[13px] font-black pb-2 text-center tracking-widest
             ${idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-gray-900'}`}>
             {d}
           </div>
         ))}
 
-        {/* 日付セル */}
         {days.map(day => {
           const dateStr = format(day, 'yyyy-MM-dd');
           const dNum = day.getDate();
@@ -73,21 +70,16 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
               : (selectedDates instanceof Date && isSameDay(selectedDates, day))
           ) : false;
 
-          const isCurrentDay = isToday(day);
-          
-          // ★特定日判定（10日、11日、22日）
-          const isKarin = dNum === 10; // かりんと日
-          const isSoine = dNum === 11 || dNum === 22; // 添い寝の日
+          const isKarin = dNum === 10;
+          const isSoine = dNum === 11 || dNum === 22;
 
-          // テキスト色判定（平日を黒に）
           const dayOfWeek = getDay(day);
           const isHoliday = holidays.includes(dateStr);
-          let textColor = 'text-gray-900'; // デフォルト黒
-          
+          let textColor = 'text-gray-900';
           if (hasOfficialBase) textColor = 'text-white';
           else if (isHoliday || dayOfWeek === 0) textColor = 'text-red-500';
           else if (dayOfWeek === 6) textColor = 'text-blue-500';
-          else if (isSelected) textColor = isRequestMode ? 'text-purple-600' : 'text-pink-500';
+          else if (isSelected) textColor = 'text-pink-500';
 
           return (
             <div 
@@ -96,33 +88,27 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
                 if (canSelect) onSelect(day);
               }} 
               className={`relative h-12 w-full flex flex-col items-center justify-center rounded-2xl transition-all active:scale-95 cursor-pointer
-              ${isSelected 
-                  ? (isRequestMode ? 'bg-white shadow-lg ring-2 ring-purple-500 z-10' : 'bg-white shadow-lg ring-2 ring-pink-400 z-10') 
-                  : ''}
-              ${!isSelected && isKarin ? 'bg-orange-100/80 border border-orange-200' : ''}
-              ${!isSelected && isSoine ? 'bg-yellow-100/80 border border-yellow-200' : ''}
+              ${isSelected ? 'bg-white shadow-lg ring-2 ring-pink-400 z-10' : ''}
+              ${!isSelected && isKarin ? 'bg-orange-200 border border-orange-300' : ''} 
+              ${!isSelected && isSoine ? 'bg-yellow-200 border border-yellow-300' : ''}
               ${isRequestMode && !isFuture ? 'opacity-40 grayscale-[0.5] cursor-not-allowed' : ''}`}
             >
-              {/* 日付数字（サイズUP: 13px -> 15px） */}
-              <span className={`z-20 text-[15px] font-black ${textColor} ${isCurrentDay && !hasOfficialBase && !isSelected ? 'underline decoration-2 underline-offset-4 decoration-pink-300' : ''}`}>
-                {dNum}
-              </span>
+              <span className={`z-20 text-[16px] font-black ${textColor}`}>{dNum}</span>
 
-              {/* 確定ピンク丸（そのまま） */}
+              {/* 確定ピンク丸 (z-10) */}
               {hasOfficialBase && (
                 <div className="absolute inset-1.5 rounded-full bg-gradient-to-br from-pink-400 to-rose-400 shadow-sm z-10" />
               )}
               
-              {/* 各種申請中マーク（そのまま） */}
               {isModified && <div className="absolute inset-0.5 rounded-full border-[5px] border-green-500 z-[15] animate-pulse" />}
               {isRequested && !isModified && <div className="absolute inset-1 rounded-full border-2 border-purple-400 border-dashed animate-pulse z-10" />}
 
-              {/* 右上のアクセントドット（そのまま維持） */}
-              {isKarin && !hasOfficialBase && (
-                <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-orange-500 shadow-sm z-30 ring-1 ring-white" />
+              {/* ★修正：ピンク丸の有無に関わらずドットを表示 (z-30なので一番上に来る) */}
+              {isKarin && (
+                <div className="absolute top-1 right-1 h-2 w-2 rounded-full bg-orange-500 shadow-sm z-30 ring-2 ring-white" />
               )}
-              {isSoine && !hasOfficialBase && (
-                <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-yellow-500 shadow-sm z-30 ring-1 ring-white" />
+              {isSoine && (
+                <div className="absolute top-1 right-1 h-2 w-2 rounded-full bg-yellow-500 shadow-sm z-30 ring-2 ring-white" />
               )}
             </div>
           );
