@@ -1,125 +1,157 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay, isValid, isAfter, startOfDay } from 'date-fns';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { format, isSameMonth, isSameDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isToday } from 'date-fns';
+import { ja } from 'date-fns/locale';
 
-interface DashboardCalendarProps {
-  shifts: any[];
-  selectedDates: any;
+type Shift = {
+  shift_date: string;
+  status: string;
+  start_time: string;
+  end_time: string;
+  is_specific_day?: boolean;
+};
+
+type DashboardCalendarProps = {
+  shifts: Shift[];
+  selectedDates: Date | Date[] | undefined;
   onSelect: (date: Date) => void;
   month: Date;
   onMonthChange: (date: Date) => void;
   isRequestMode: boolean;
-}
+};
 
-export default function DashboardCalendar({ shifts, selectedDates, onSelect, month, onMonthChange, isRequestMode }: DashboardCalendarProps) {
-  const [holidays, setHolidays] = useState<string[]>([]);
+export default function DashboardCalendar({
+  shifts,
+  selectedDates,
+  onSelect,
+  month,
+  onMonthChange,
+  isRequestMode
+}: DashboardCalendarProps) {
+  
+  const monthStart = startOfMonth(month);
+  const monthEnd = endOfMonth(monthStart);
+  const startDate = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
+  
+  const calendarDays = eachDayOfInterval({ start: startDate, end: endDate });
+  const weekDays = ['月', '火', '水', '木', '金', '土', '日'];
 
-  useEffect(() => {
-    if (!month || !isValid(month)) return;
-    fetch(`https://holidays-jp.github.io/api/v1/${month.getFullYear()}/date.json`)
-      .then(res => res.ok ? res.json() : {})
-      .then(data => setHolidays(Object.keys(data)))
-      .catch(() => {});
-  }, [month?.getFullYear()]);
+  const prevMonth = () => onMonthChange(new Date(month.getFullYear(), month.getMonth() - 1, 1));
+  const nextMonth = () => onMonthChange(new Date(month.getFullYear(), month.getMonth() + 1, 1));
 
-  // セーフティガード
-  if (!month || !isValid(month)) return null;
-
-  const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) });
-  const today = startOfDay(new Date());
+  const isSelected = (date: Date) => {
+    if (Array.isArray(selectedDates)) {
+      return selectedDates.some(d => isSameDay(d, date));
+    }
+    return selectedDates ? isSameDay(selectedDates, date) : false;
+  };
 
   return (
-    <div className="w-full">
-      {/* 月切り替えヘッダー */}
-      <div className="flex items-center justify-between mb-4 px-4 font-black text-slate-700">
-        <button onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>
-          <ChevronLeft className="text-pink-300" />
+    <div className="select-none">
+      {/* 月ナビゲーション */}
+      <div className="flex items-center justify-between mb-4 px-2">
+        <button onClick={prevMonth} className="p-2 text-gray-400 hover:text-pink-500 font-black text-xl transition-colors">
+          &lt;
         </button>
-        <span className="text-lg tracking-tighter">{format(month, 'yyyy / M月')}</span>
-        <button onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>
-          <ChevronRight className="text-pink-300" />
+        <h2 className="text-[22px] font-black text-gray-800 tracking-tight">
+          {format(month, 'yyyy')} / <span className="text-pink-500 text-[26px]">{format(month, 'M')}</span>
+          <span className="text-[14px] ml-1 text-gray-400 font-bold">月</span>
+        </h2>
+        <button onClick={nextMonth} className="p-2 text-gray-400 hover:text-pink-500 font-black text-xl transition-colors">
+          &gt;
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-1 px-1">
-        {/* 曜日ラベル */}
-        {['日', '月', '火', '水', '木', '金', '土'].map((d, idx) => (
-          <div key={d} className={`text-[10px] font-black pb-2 text-center tracking-widest
-            ${idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-slate-300'}`}>
-            {d}
-          </div>
-        ))}
+      {/* 曜日ヘッダー（平日＝黒） */}
+      <div className="grid grid-cols-7 mb-2 border-b border-gray-100 pb-2">
+        {weekDays.map((d, i) => {
+          let colorClass = "text-gray-900"; 
+          if (i === 5) colorClass = "text-blue-500";
+          if (i === 6) colorClass = "text-red-500";
+          return (
+            <div key={d} className={`text-center font-black text-[15px] ${colorClass}`}>
+              {d}
+            </div>
+          );
+        })}
+      </div>
 
-        {/* 日付セル */}
-        {days.map(day => {
-          const dateStr = format(day, 'yyyy-MM-dd');
-          const dNum = day.getDate();
+      {/* 日付グリッド */}
+      <div className="grid grid-cols-7 gap-y-3 gap-x-1">
+        {calendarDays.map((day, idx) => {
+          const key = format(day, 'yyyy-MM-dd');
+          const isCurrentMonth = isSameMonth(day, month);
           
-          // シフト判定
-          const s = Array.isArray(shifts) ? shifts.find((x: any) => x.shift_date === dateStr) : null;
-          const isOfficial = s?.status === 'official';
-          const isRequested = s?.status === 'requested';
-          const isModified = isRequested && s?.is_official_pre_exist;
+          const shift = shifts.find(s => s.shift_date === key);
+          const isOfficial = shift?.status === 'official';
+          const isRequested = shift?.status === 'requested';
+          const hasTime = isOfficial && shift?.start_time !== 'OFF';
+          
+          // 特定日判定
+          const isSpecific = shift?.is_specific_day || false;
 
-          // ★修正箇所：ピンク丸（確定ベース）の判定ロジック
-          // 変更申請中なら「HPの時間」を、そうでなければ「今の時間」を参照する
-          const refStart = isModified ? s?.hp_start_time : s?.start_time;
-          const hasOfficialBase = (isOfficial || isModified) && refStart && refStart !== 'OFF';
+          const selected = isSelected(day);
+          const today = isToday(day);
 
-          // 選択判定
-          const isFuture = isAfter(startOfDay(day), today);
-          const canSelect = !isRequestMode || isFuture;
-
-          const isSelected = canSelect && selectedDates ? (
-            Array.isArray(selectedDates) 
-              ? selectedDates.some(d => (d instanceof Date) && isSameDay(d, day)) 
-              : (selectedDates instanceof Date && isSameDay(selectedDates, day))
-          ) : false;
-
-          const isKarin = dNum === 10;
-          const isSoine = dNum === 11 || dNum === 22;
-
-          // テキスト色判定
-          const dayOfWeek = getDay(day);
-          const isHoliday = holidays.includes(dateStr);
-          let textColor = 'text-slate-600';
-          if (hasOfficialBase) textColor = 'text-white';
-          else if (isHoliday || dayOfWeek === 0) textColor = 'text-red-500';
-          else if (dayOfWeek === 6) textColor = 'text-blue-500';
-          else if (isSelected) textColor = 'text-pink-500';
+          // 背景色・文字色の決定ロジック
+          // 優先度： 選択中 > 本日 > 特定日 > 通常
+          let containerClass = "text-gray-900"; // デフォルト黒
+          
+          if (selected) {
+            containerClass = isRequestMode 
+              ? 'bg-purple-600 text-white shadow-md shadow-purple-200 scale-110' 
+              : 'bg-gray-900 text-white shadow-xl scale-110';
+          } else if (today) {
+            containerClass = 'bg-pink-50 text-pink-600 font-bold border border-pink-100';
+          } else if (isSpecific) {
+            // ★ここを変更：背景を濃い黄色(amber-200)にし、枠線(amber-300)も追加
+            containerClass = 'bg-amber-200 text-gray-900 font-bold border border-amber-300';
+          }
 
           return (
             <div 
-              key={dateStr} 
-              onClick={() => {
-                if (canSelect) onSelect(day);
-              }} 
-              className={`relative h-12 w-full flex flex-col items-center justify-center rounded-2xl transition-all active:scale-95 cursor-pointer
-              ${isSelected ? 'bg-white shadow-lg ring-2 ring-pink-400 z-10' : ''}
-              ${!isSelected && isKarin ? 'bg-orange-50/60' : ''}
-              ${!isSelected && isSoine ? 'bg-yellow-50/60' : ''}
-              ${isRequestMode && !isFuture ? 'opacity-40 grayscale-[0.5] cursor-not-allowed' : ''}`}
+              key={key} 
+              onClick={() => onSelect(day)}
+              className="relative flex flex-col items-center justify-start h-[56px] cursor-pointer group"
             >
-              <span className={`z-20 text-[13px] font-black ${textColor}`}>{dNum}</span>
+              {/* ① 特定日マーカー（最上部にゴールドの点） */}
+              {isSpecific && (
+                <div className="absolute -top-1 w-2 h-2 bg-amber-500 rounded-full shadow-sm z-20 animate-bounce-slow border border-white" />
+              )}
 
-              {/* 確定ピンク丸 */}
-              {hasOfficialBase && (
-                <div className="absolute inset-1.5 rounded-full bg-gradient-to-br from-pink-400 to-rose-400 shadow-sm z-10" />
-              )}
-              
-              {/* 各種申請中マーク */}
-              {isModified && <div className="absolute inset-0.5 rounded-full border-[5px] border-green-500 z-[15] animate-pulse" />}
-              {isRequested && !isModified && <div className="absolute inset-1 rounded-full border-2 border-purple-400 border-dashed animate-pulse z-10" />}
+              {/* 日付数字コンテナ */}
+              <div className={`
+                w-10 h-10 flex items-center justify-center rounded-full transition-all relative z-10
+                ${containerClass}
+                ${!isCurrentMonth && !selected && 'opacity-30'}
+                ${isRequestMode && !selected && !isCurrentMonth ? 'opacity-20' : ''}
+              `}>
+                {/* 確定シフトがある場合の「ピンクの円」背景 */}
+                {/* 特定日の黄色と混ざらないよう、特定日かつ非選択の場合はピンクを少し濃くする等の調整も可能だが、現状は透過で重ねる */}
+                {hasTime && !selected && (
+                  <span className={`absolute inset-0 rounded-full opacity-60 scale-90 border border-pink-200 ${isSpecific ? 'bg-pink-200 mix-blend-multiply' : 'bg-pink-100'}`}></span>
+                )}
 
-              {/* 右上のアクセントドット */}
-              {isKarin && !hasOfficialBase && (
-                <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-orange-400 shadow-sm z-30" />
+                {/* 日付数字 */}
+                <span className={`text-[19px] font-black leading-none ${!isCurrentMonth && !selected ? 'font-medium' : ''}`}>
+                  {format(day, 'd')}
+                </span>
+              </div>
+
+              {/* ② 申請中バッジ（緑の点） */}
+              {isRequested && !isOfficial && (
+                <span className="absolute bottom-1 w-1.5 h-1.5 bg-green-500 rounded-full shadow-sm"></span>
               )}
-              {isSoine && !hasOfficialBase && (
-                <div className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-yellow-400 shadow-sm z-30" />
+
+              {/* ③ 変更申請中バッジ */}
+              {isRequested && isOfficial && (
+                <span className="absolute -right-0 top-0 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500 border border-white"></span>
+                </span>
               )}
+
             </div>
           );
         })}

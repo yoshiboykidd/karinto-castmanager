@@ -3,13 +3,12 @@
 import { format, isAfter, startOfDay } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
-// ★ 型定義
+// 型定義
 type Shift = {
   shift_date: string;
   status: string;
   start_time: string;
   end_time: string;
-  // 追加: 申請中の裏にある確定情報を読むため
   hp_start_time?: string;
   hp_end_time?: string;
   is_official_pre_exist?: boolean;
@@ -42,26 +41,28 @@ export default function RequestList({
     .filter((d) => isAfter(startOfDay(d), today))
     .sort((a, b) => a.getTime() - b.getTime());
 
-  // ★ 共通ロジック：その日の「確定情報（Official Truth）」を導き出す関数
+  // ★ 修正：真の確定情報を取得するロジック
   const getOfficialBase = (dateStr: string) => {
-    // statusに関わらず、その日のデータを探す
     const s = (shifts || []).find((x) => x.shift_date === dateStr);
     if (!s) return { s: 'OFF', e: 'OFF', exists: false };
 
-    // officialならそのまま、requestedならhp_xxx（裏の確定情報）を参照
     if (s.status === 'official') {
+      // 確定データそのものがOFFなら「存在しない（新規扱い）」
       return { s: s.start_time, e: s.end_time, exists: s.start_time !== 'OFF' };
     } else if (s.status === 'requested') {
-      // 以前から確定があった場合のみ hp_ 時間を採用
-      if (s.is_official_pre_exist || (s.hp_start_time && s.hp_start_time !== 'OFF')) {
+      // 申請中の場合、裏にある確定情報をチェック
+      if (s.is_official_pre_exist || s.hp_start_time) {
+        const underlyingS = s.hp_start_time || 'OFF';
+        const underlyingE = s.hp_end_time || 'OFF';
+        // ★ここが修正点：裏の確定がOFFなら、表示フラグ(exists)はfalseにする
         return { 
-          s: s.hp_start_time || 'OFF', 
-          e: s.hp_end_time || 'OFF', 
-          exists: true 
+          s: underlyingS, 
+          e: underlyingE, 
+          exists: underlyingS !== 'OFF' 
         };
       }
     }
-    // それ以外（純粋な新規申請など）はOFF扱い
+    // それ以外はOFF扱い
     return { s: 'OFF', e: 'OFF', exists: false };
   };
 
@@ -116,12 +117,13 @@ export default function RequestList({
         {sortedDates.map((d) => {
           const key = format(d, 'yyyy-MM-dd');
           
-          // ★修正：共通関数から「真の確定情報」を取得
+          // ★修正された関数で判定
           const base = getOfficialBase(key);
           
+          // existsがfalseなら、確定バッジは表示しない
           const showOfficial = base.exists;
+          
           const isOff = (requestDetails[key]?.s || base.s) === 'OFF';
-
           const defaultS = base.s !== 'OFF' ? base.s : '11:00';
           const defaultE = base.e !== 'OFF' ? base.e : '23:00';
 
@@ -141,11 +143,11 @@ export default function RequestList({
                   {format(d, 'M/d')} <span className="text-xs opacity-60">({format(d, 'E', { locale: ja })})</span>
                 </span>
                 
+                {/* 確定バッジの表示エリア（showOfficial=falseなら何も出ない） */}
                 {showOfficial && (
                   <div className="flex items-center gap-1.5">
                     <span className="text-[12px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 leading-none">確定</span>
                     <span className="text-[17px] font-black text-gray-400 leading-none">
-                      {/* ここには常に「裏の真実（HPの時間）」が表示される */}
                       {`${base.s}〜${base.e}`}
                     </span>
                   </div>
@@ -153,6 +155,7 @@ export default function RequestList({
               </div>
 
               <div className="flex items-center gap-2">
+                {/* OFF(新規扱い)なら「新規(緑)」、時間が入っていれば「変更(オレンジ)」 */}
                 {showOfficial ? (
                   <span className="bg-orange-50 text-orange-500 text-[12px] font-black px-2.5 py-2 rounded-xl border border-orange-100 leading-none shrink-0">変更</span>
                 ) : (

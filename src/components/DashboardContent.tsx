@@ -47,7 +47,6 @@ export default function DashboardContent() {
     return getMonthlyTotals(nav.viewDate);
   }, [data.shifts, nav.viewDate, getMonthlyTotals]);
 
-  // マウント前やデータロード中は「KARINTO...」待機画面
   if (!mounted || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse text-5xl italic tracking-tighter">
@@ -57,6 +56,7 @@ export default function DashboardContent() {
   }
 
   const safeViewDate = nav.viewDate || new Date();
+  const isRequest = nav.isRequestMode; // 短縮用
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
@@ -68,41 +68,53 @@ export default function DashboardContent() {
       />
       
       <main className="px-4 mt-3 space-y-3">
-        {/* 1. 月間サマリー（条件分岐 !nav.isRequestMode を削除し、常時表示に変更） */}
+        {/* 1. 月間サマリー */}
         {isValid(safeViewDate) && (
           <MonthlySummary month={format(safeViewDate, 'M月')} totals={monthlyTotals} />
         )}
 
-        {/* 2. 実績/申請の切り替えタブ */}
-        <div className="flex p-1.5 bg-gray-100/80 rounded-2xl border border-gray-200 shadow-inner">
+        {/* 2. 実績/申請の切り替えタブ（色味でモードを強調） */}
+        <div className={`flex p-1.5 rounded-2xl border shadow-inner transition-colors duration-300 
+          ${isRequest ? 'bg-purple-50 border-purple-100' : 'bg-pink-50 border-pink-100'}`}
+        >
           <button 
             onClick={() => nav.toggleMode(false)} 
-            className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${!nav.isRequestMode ? 'bg-white text-pink-500 shadow-sm' : 'text-gray-400'}`}
+            className={`flex-1 py-3 text-xs font-black rounded-xl transition-all duration-300 flex items-center justify-center gap-2
+              ${!isRequest 
+                ? 'bg-white text-pink-500 shadow-sm translate-y-0 scale-100' 
+                : 'text-gray-400 hover:text-pink-300 scale-95'}`
+            }
           >
-            実績入力
+            <span>📝</span> 実績入力
           </button>
+          
           <button 
             onClick={() => nav.toggleMode(true)} 
-            className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all ${nav.isRequestMode ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-400'}`}
+            className={`flex-1 py-3 text-xs font-black rounded-xl transition-all duration-300 flex items-center justify-center gap-2
+              ${isRequest 
+                ? 'bg-purple-600 text-white shadow-lg shadow-purple-200 translate-y-0 scale-100' 
+                : 'text-gray-400 hover:text-purple-400 scale-95'}`
+            }
           >
-            シフト申請
+            <span>📅</span> シフト申請
           </button>
         </div>
         
         {/* 3. カレンダー */}
-        <section className="bg-white p-2 rounded-[32px] border border-gray-100 shadow-sm text-center">
+        <section className={`bg-white p-2 rounded-[32px] border shadow-sm text-center transition-colors duration-500
+          ${isRequest ? 'border-purple-100 shadow-purple-50' : 'border-gray-100 shadow-gray-100'}`}>
           <DashboardCalendar 
             shifts={data.shifts as any} 
-            selectedDates={nav.isRequestMode ? nav.selected.multi : nav.selected.single} 
+            selectedDates={isRequest ? nav.selected.multi : nav.selected.single} 
             onSelect={nav.handleDateSelect} 
             month={safeViewDate} 
             onMonthChange={nav.setViewDate} 
-            isRequestMode={nav.isRequestMode} 
+            isRequestMode={isRequest} 
           />
         </section>
 
         {/* 4. 詳細入力 or 申請リスト */}
-        {!nav.isRequestMode ? (
+        {!isRequest ? (
           (nav.selected.single instanceof Date && isValid(nav.selected.single)) && (
             <DailyDetail 
               date={nav.selected.single} 
