@@ -1,16 +1,16 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react'; // useStateを追加
 import { useRouter, usePathname } from 'next/navigation'; 
 import { format } from 'date-fns';
 
-// ★ 四種の神器（カスタムフック）
+// ★ カスタムフック
 import { useShiftData } from '@/hooks/useShiftData';
 import { useAchievement } from '@/hooks/useAchievement';
 import { useRequestManager } from '@/hooks/useRequestManager';
 import { useNavigation } from '@/hooks/useNavigation';
 
-// ★ フォルダ構成に基づいたインポート
+// ★ コンポーネント
 import CastHeader from '@/components/dashboard/CastHeader';
 import MonthlySummary from '@/components/dashboard/MonthlySummary';
 import DashboardCalendar from '@/components/DashboardCalendar';
@@ -22,52 +22,61 @@ import FixedFooter from '@/components/dashboard/FixedFooter';
 export default function Page() {
   const router = useRouter();
   const pathname = usePathname();
+  
+  // 0. ハイドレーションエラーを物理的に防ぐためのステート
+  const [mounted, setMounted] = useState(false);
 
-  // 1. データ基盤（読み込み担当）
-  // data.syncAt には v3.3.3 の API が更新した最新の UTC 時刻が入ります
+  // 1. データ基盤
   const { data, loading, fetchInitialData, getMonthlyTotals, supabase } = useShiftData();
 
-  // 2. ナビゲーション（選択・切替担当）
+  // 2. ナビゲーション
   const { isRequestMode, toggleMode, viewDate, setViewDate, selected, handleDateSelect, setSelected } = useNavigation();
 
-  // 3. 実績入力ロジック（過去の保存担当）
+  // 3. 実績入力ロジック
   const { editReward, setEditReward, handleSaveAchievement, isEditable, selectedShift } = useAchievement(
     supabase, data.profile, data.shifts, selected.single, () => fetchInitialData(router)
   );
 
-  // 4. シフト申請ロジック（未来の送信担当）
+  // 4. シフト申請ロジック
   const { requestDetails, setRequestDetails, handleBulkSubmit } = useRequestManager(
     supabase, data.profile, data.shifts, selected.multi, 
     () => fetchInitialData(router), 
     () => setSelected({ single: undefined, multi: [] })
   );
 
+  // 初回マウント時に実行
   useEffect(() => { 
+    setMounted(true); // マウント完了を通知
     fetchInitialData(router); 
   }, []);
 
-  // 今月の集計データ
-  const monthlyTotals = useMemo(() => getMonthlyTotals(viewDate), [data.shifts, viewDate]);
+  // 今月の集計データ（viewDate が確実にある時だけ計算）
+  const monthlyTotals = useMemo(() => {
+    if (!viewDate) return { total_points: 0, total_reward: 0, count: 0 };
+    return getMonthlyTotals(viewDate);
+  }, [data.shifts, viewDate]);
 
-  // ローディング画面
-  if (loading) return (
+  // ローディング中、またはマウント前は「KARINTO...」画面で待機
+  // これによりサーバーとクライアントの不一致によるクラッシュを防ぐ
+  if (!mounted || loading) return (
     <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse text-5xl italic tracking-tighter">
       KARINTO...
     </div>
   );
 
+  // viewDate が万が一 undefined の場合の安全策
+  const safeViewDate = viewDate || new Date();
+
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
       
-      {/* セクション1: ヘッダー (v3.3.3) */}
       <CastHeader 
         shopName={data.shop?.shop_name || "かりんと 池袋東口店"} 
         syncTime={data.syncAt} 
         displayName={data.profile?.display_name} 
-        version="v3.3.3" 
+        version="v3.4.2" 
       />
       
-      {/* セクション2: モード切替タブ */}
       <div className="flex p-1.5 bg-gray-100/80 mx-6 mt-2 rounded-2xl border border-gray-200 shadow-inner">
         <button 
           onClick={() => toggleMode(false)} 
@@ -84,22 +93,22 @@ export default function Page() {
       </div>
 
       <main className="px-4 mt-3 space-y-2">
-        {/* セクション3: 実績サマリー */}
-        {!isRequestMode && <MonthlySummary month={format(viewDate, 'M月')} totals={monthlyTotals} />}
+        {/* 実績サマリー */}
+        {!isRequestMode && <MonthlySummary month={format(safeViewDate, 'M月')} totals={monthlyTotals} />}
         
-        {/* セクション4: インタラクティブ・カレンダー */}
+        {/* インタラクティブ・カレンダー */}
         <section className="bg-white p-2 rounded-[32px] border border-gray-100 shadow-sm text-center">
           <DashboardCalendar 
             shifts={data.shifts as any} 
             selectedDates={isRequestMode ? selected.multi : selected.single} 
             onSelect={handleDateSelect} 
-            month={viewDate} 
+            month={safeViewDate} 
             onMonthChange={setViewDate} 
             isRequestMode={isRequestMode} 
           />
         </section>
 
-        {/* --- セクション5: 実績入力詳細 or セクション6: 申請リスト --- */}
+        {/* 詳細エリア */}
         {!isRequestMode ? (
           selected.single && (
             <DailyDetail 
@@ -122,11 +131,9 @@ export default function Page() {
           />
         )}
         
-        {/* セクション7: 店舗内お知らせ */}
         <NewsSection newsList={data.news} />
       </main>
 
-      {/* セクション8: 固定フッター */}
       <FixedFooter 
         pathname={pathname} 
         onHome={() => router.push('/')} 
