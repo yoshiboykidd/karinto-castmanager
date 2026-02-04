@@ -29,7 +29,6 @@ export default function DailyDetail({
   const isRequested = shift?.status === 'requested';
   
   // ★重要：開始・終了どちらか一箇所でもHPの真実とズレていれば「変更中」とみなす
-  // 修正箇所：shiftが存在しない場合のガードを追加
   const isTimeDiff = 
     shift && (shift.start_time !== shift.hp_start_time || 
     shift.end_time !== shift.hp_end_time);
@@ -46,8 +45,6 @@ export default function DailyDetail({
   else if (isRequested) themeClass = "bg-purple-50/40 border-purple-200";
 
   // 3. 表示時間の切り分け（開始・終了ペアで扱う）
-  // 確定枠には「HP上の現在の真実」を、申請枠には「アプリで送った希望」を表示
-  // 修正箇所：shift?. による安全な参照
   const displayOfficialS = isModified ? (shift?.hp_start_time || shift?.start_time) : shift?.start_time;
   const displayOfficialE = isModified ? (shift?.hp_end_time || shift?.end_time) : shift?.end_time;
   
@@ -78,15 +75,17 @@ export default function DailyDetail({
               変更申請中
             </span>
             <span className="text-[19px] font-black text-green-600 tracking-tighter whitespace-nowrap">
-              {displayRequestS}〜{displayRequestE}
+              {/* 修正箇所：OFFの場合は時間を表示せずメッセージを出す */}
+              {displayRequestS === 'OFF' ? 'お休み希望' : `${displayRequestS}〜${displayRequestE}`}
             </span>
           </div>
         )}
       </div>
 
-      {/* 2行目：メイン時間（確定シフト：HPの最新 / 新規申請中：本人の希望） */}
+      {/* 2行目：メイン時間 */}
       <div className="flex items-center justify-between px-1 h-10 gap-1">
-        {shift && shift.start_time !== 'OFF' ? (
+        {/* 修正箇所：shift.start_time ではなく displayOfficialS（HPの値）で判定 */}
+        {shift && displayOfficialS !== 'OFF' ? (
           <>
             <div className="shrink-0">
               {isOfficial || isModified ? (
@@ -116,7 +115,7 @@ export default function DailyDetail({
       </div>
 
       {/* 実績入力フォーム */}
-      {(isOfficial || isModified) && shift?.start_time !== 'OFF' ? (
+      {(isOfficial || isModified) && displayOfficialS !== 'OFF' ? (
         <div className="space-y-1.5 pt-2 border-t border-gray-100/50">
           <div className="grid grid-cols-3 gap-2">
             {(['f', 'first', 'main'] as const).map((key) => (

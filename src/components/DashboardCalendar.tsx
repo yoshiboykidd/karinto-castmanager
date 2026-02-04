@@ -62,9 +62,13 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const isOfficial = s?.status === 'official';
           const isRequested = s?.status === 'requested';
           const isModified = isRequested && s?.is_official_pre_exist;
-          const hasOfficialBase = (isOfficial || isModified) && s?.start_time !== 'OFF';
 
-          // ★修正箇所：選択判定に「明日以降」の条件を追加（申請モード中のみ適用）
+          // ★修正箇所：ピンク丸（確定ベース）の判定ロジック
+          // 変更申請中なら「HPの時間」を、そうでなければ「今の時間」を参照する
+          const refStart = isModified ? s?.hp_start_time : s?.start_time;
+          const hasOfficialBase = (isOfficial || isModified) && refStart && refStart !== 'OFF';
+
+          // 選択判定
           const isFuture = isAfter(startOfDay(day), today);
           const canSelect = !isRequestMode || isFuture;
 
@@ -90,7 +94,6 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
             <div 
               key={dateStr} 
               onClick={() => {
-                // ★修正箇所：明日以降の日付、または通常モードの時だけクリック可能にする
                 if (canSelect) onSelect(day);
               }} 
               className={`relative h-12 w-full flex flex-col items-center justify-center rounded-2xl transition-all active:scale-95 cursor-pointer
