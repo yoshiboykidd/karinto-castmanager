@@ -15,19 +15,28 @@ interface DashboardCalendarProps {
 
 export default function DashboardCalendar({ shifts, selectedDates, onSelect, month, onMonthChange, isRequestMode }: DashboardCalendarProps) {
   const [holidays, setHolidays] = useState<string[]>([]);
-  const [isClient, setIsClient] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  // マウント確認（クラッシュ防止）
+  // マウント後の処理を一元化（ハイドレーションエラーを物理的に防ぐ）
   useEffect(() => {
-    setIsClient(true);
-    const year = month?.getFullYear() || 2026;
-    fetch(`https://holidays-jp.github.io/api/v1/${year}/date.json`)
-      .then(res => res.ok ? res.json() : {})
-      .then(data => setHolidays(Object.keys(data)))
-      .catch(() => {});
+    setMounted(true);
+    const fetchHolidays = async () => {
+      try {
+        const year = month?.getFullYear() || 2026;
+        const res = await fetch(`https://holidays-jp.github.io/api/v1/${year}/date.json`);
+        if (res.ok) {
+          const data = await res.json();
+          setHolidays(Object.keys(data));
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchHolidays();
   }, [month?.getFullYear()]);
 
-  if (!isClient) return null;
+  // マウント前は「枠」だけ返して中身の計算をさせない（これがエラー回避のキモ）
+  if (!mounted || !month) return <div className="w-full h-[350px]" />;
 
   const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) });
 
@@ -44,7 +53,7 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
         </button>
       </div>
 
-      {/* 2. 曜日（日本語表記・色分け） */}
+      {/* 2. 曜日（日本語表記を維持） */}
       <div className="grid grid-cols-7 gap-1 px-1">
         {['日', '月', '火', '水', '木', '金', '土'].map((d, idx) => (
           <div key={d} className={`text-[10px] font-black pb-2 text-center tracking-widest
@@ -63,19 +72,21 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const isModified = isRequested && s?.is_official_pre_exist;
           const hasOfficialBase = isOfficial || isModified;
 
-          const isSelected = Array.isArray(selectedDates) 
-            ? selectedDates.some(d => isSameDay(d, day)) 
-            : selectedDates && isSameDay(selectedDates, day);
+          const isSelected = selectedDates ? (
+            Array.isArray(selectedDates) 
+              ? selectedDates.some(d => isSameDay(d, day)) 
+              : isSameDay(selectedDates, day)
+          ) : false;
 
           const dNum = day.getDate();
           const dayOfWeek = getDay(day);
           const isHoliday = holidays.includes(dateStr);
 
-          // テキスト色の判定のみ追加
+          // テキスト色の決定
           let textColor = 'text-slate-600';
           if (hasOfficialBase) textColor = 'text-white';
-          else if (isHoliday || dayOfWeek === 0) textColor = 'text-red-500';
-          else if (dayOfWeek === 6) textColor = 'text-blue-500';
+          else if (isHoliday || dayOfWeek === 0) textColor = 'text-red-500'; // 日・祝
+          else if (dayOfWeek === 6) textColor = 'text-blue-500'; // 土
           else if (isSelected) textColor = 'text-pink-500';
 
           const isKarin = dNum === 10;
