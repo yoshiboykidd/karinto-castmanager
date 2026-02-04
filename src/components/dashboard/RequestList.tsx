@@ -9,6 +9,10 @@ type Shift = {
   status: string;
   start_time: string;
   end_time: string;
+  // 追加: 申請中の裏にある確定情報を読むため
+  hp_start_time?: string;
+  hp_end_time?: string;
+  is_official_pre_exist?: boolean;
 };
 
 type RequestListProps = {
@@ -19,7 +23,6 @@ type RequestListProps = {
   onSubmit: () => void;
 };
 
-// 11:00〜23:00の選択肢
 const TIME_OPTIONS: string[] = [];
 for (let h = 11; h <= 23; h++) {
   TIME_OPTIONS.push(`${h}:00`);
@@ -35,40 +38,56 @@ export default function RequestList({
 }: RequestListProps) {
   const today = startOfDay(new Date());
 
-  // 1. 日付順にソート
   const sortedDates = [...multiDates]
     .filter((d) => isAfter(startOfDay(d), today))
     .sort((a, b) => a.getTime() - b.getTime());
 
-  // 2. 重複チェック（変更なし）
+  // ★ 共通ロジック：その日の「確定情報（Official Truth）」を導き出す関数
+  const getOfficialBase = (dateStr: string) => {
+    // statusに関わらず、その日のデータを探す
+    const s = (shifts || []).find((x) => x.shift_date === dateStr);
+    if (!s) return { s: 'OFF', e: 'OFF', exists: false };
+
+    // officialならそのまま、requestedならhp_xxx（裏の確定情報）を参照
+    if (s.status === 'official') {
+      return { s: s.start_time, e: s.end_time, exists: s.start_time !== 'OFF' };
+    } else if (s.status === 'requested') {
+      // 以前から確定があった場合のみ hp_ 時間を採用
+      if (s.is_official_pre_exist || (s.hp_start_time && s.hp_start_time !== 'OFF')) {
+        return { 
+          s: s.hp_start_time || 'OFF', 
+          e: s.hp_end_time || 'OFF', 
+          exists: true 
+        };
+      }
+    }
+    // それ以外（純粋な新規申請など）はOFF扱い
+    return { s: 'OFF', e: 'OFF', exists: false };
+  };
+
+  // 重複チェック
   const redundantDates = sortedDates.filter((d) => {
     const key = format(d, 'yyyy-MM-dd');
-    const official = (shifts || []).find((s: Shift) => s.shift_date === key && s.status === 'official');
+    const base = getOfficialBase(key);
     
-    const baseS = official?.start_time || 'OFF';
-    const baseE = official?.end_time || 'OFF';
-    const currentS = requestDetails[key]?.s || baseS;
-    const currentE = requestDetails[key]?.e || baseE;
+    const currentS = requestDetails[key]?.s || base.s;
+    const currentE = requestDetails[key]?.e || base.e;
 
-    return baseS === currentS && baseE === currentE;
+    return base.s === currentS && base.e === currentE;
   });
 
-  // ★ 3. 時間逆転チェック（追加ロジック）
-  // 「OFF」ではなく、かつ「開始 >= 終了」になってしまっている日を特定
+  // 時間逆転チェック
   const invalidDates = sortedDates.filter((d) => {
     const key = format(d, 'yyyy-MM-dd');
-    const official = (shifts || []).find((s: Shift) => s.shift_date === key && s.status === 'official');
-    const baseS = official?.start_time || 'OFF';
-    const baseE = official?.end_time || 'OFF';
+    const base = getOfficialBase(key);
     
-    const s = requestDetails[key]?.s || baseS;
-    const e = requestDetails[key]?.e || baseE;
+    const s = requestDetails[key]?.s || base.s;
+    const e = requestDetails[key]?.e || base.e;
 
     if (s === 'OFF' || e === 'OFF') return false;
-    return s >= e; // 文字列比較でOK（例: "21:00" >= "17:00" は true）
+    return s >= e;
   });
 
-  // 送信可能条件：データあり ＆ 重複なし ＆ 時間逆転なし
   const canSubmit = sortedDates.length > 0 && redundantDates.length === 0 && invalidDates.length === 0;
 
   if (sortedDates.length === 0) {
@@ -81,13 +100,11 @@ export default function RequestList({
 
   return (
     <section className="bg-white rounded-[32px] border border-purple-100 p-5 shadow-xl space-y-3">
-      {/* 申請リストヘッダー */}
       <div className="flex items-center justify-between">
         <h3 className="font-black text-purple-600 text-[14px] uppercase tracking-widest flex items-center gap-2">
           <span className="w-1.5 h-4 bg-purple-500 rounded-full"></span>
           申請リスト ({sortedDates.length}件)
         </h3>
-        {/* エラー表示エリア（優先度：逆転エラー ＞ 重複警告） */}
         {(invalidDates.length > 0 || redundantDates.length > 0) && (
           <span className="text-[10px] font-black text-red-500 bg-red-50 px-2 py-1 rounded-lg animate-pulse">
             {invalidDates.length > 0 ? '⚠️ 時間の前後がおかしいです' : '⚠️ 時間を変更してください'}
@@ -98,21 +115,20 @@ export default function RequestList({
       <div className="flex flex-col">
         {sortedDates.map((d) => {
           const key = format(d, 'yyyy-MM-dd');
-          const official = (shifts || []).find((s: Shift) => s.shift_date === key && s.status === 'official');
           
-          const showOfficial = official && official.start_time !== 'OFF';
-          const baseS = official?.start_time || 'OFF';
-          const baseE = official?.end_time || 'OFF';
-          const isOff = (requestDetails[key]?.s || baseS) === 'OFF';
-
-          const defaultS = baseS !== 'OFF' ? baseS : '11:00';
-          const defaultE = baseE !== 'OFF' ? baseE : '23:00';
-
-          const isRedundant = (requestDetails[key]?.s || baseS) === baseS && (requestDetails[key]?.e || baseE) === baseE;
+          // ★修正：共通関数から「真の確定情報」を取得
+          const base = getOfficialBase(key);
           
-          // この行が時間逆転エラーか判定（赤枠などを付けるため）
-          const currentS = requestDetails[key]?.s || baseS;
-          const currentE = requestDetails[key]?.e || baseE;
+          const showOfficial = base.exists;
+          const isOff = (requestDetails[key]?.s || base.s) === 'OFF';
+
+          const defaultS = base.s !== 'OFF' ? base.s : '11:00';
+          const defaultE = base.e !== 'OFF' ? base.e : '23:00';
+
+          const isRedundant = (requestDetails[key]?.s || base.s) === base.s && (requestDetails[key]?.e || base.e) === base.e;
+          
+          const currentS = requestDetails[key]?.s || base.s;
+          const currentE = requestDetails[key]?.e || base.e;
           const isInvalid = !isOff && currentS >= currentE;
 
           return (
@@ -129,7 +145,8 @@ export default function RequestList({
                   <div className="flex items-center gap-1.5">
                     <span className="text-[12px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 leading-none">確定</span>
                     <span className="text-[17px] font-black text-gray-400 leading-none">
-                      {`${official?.start_time}〜${official?.end_time}`}
+                      {/* ここには常に「裏の真実（HPの時間）」が表示される */}
+                      {`${base.s}〜${base.e}`}
                     </span>
                   </div>
                 )}
