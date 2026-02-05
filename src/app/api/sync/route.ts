@@ -1,117 +1,137 @@
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { NextRequest, NextResponse } from 'next/server';
+import * as cheerio from 'cheerio';
+import { addDays, format } from 'date-fns';
 
-export const maxDuration = 60;
+// タイムアウト対策 (最大60秒)
+export const maxDuration = 60; 
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+// ▼▼▼ 設定エリア: ここを実際の店舗URLに書き換えてください ▼▼▼
+const TARGET_SHOPS = [
+  { id: '001', name: '池袋西', baseUrl: 'https://ikenishi.karinto-group.com/attend.php' }, 
+  { id: '002', name: '池袋東', baseUrl: 'https://ikekari.com/attend.php' }, 
+  // ... 他の店舗もここに追加
+];
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+export async function GET() {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  let logs: string[] = [];
   const JST_OFFSET = 9 * 60 * 60 * 1000;
 
   try {
-    // 1. キャスト名簿からID、HP表示名、そして店舗ID(home_shop_id)を取得
-    const { data: allCasts } = await supabase
-      .from('cast_members')
-      .select('login_id, hp_display_name, home_shop_id');
-      
-    const normalize = (val: any): string => {
-      let s = (val === null || val === undefined) ? "" : String(val);
-      s = s.replace(/<[^>]*>?/gm, '').replace(/[（\(\[].*?[）\)\]]/g, '').replace(/\s+/g, '');
-      return s.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (m: string) => String.fromCharCode(m.charCodeAt(0) - 0xFEE0));
-    };
-    const cleanCastList = (allCasts || []).map(c => ({ ...c, matchName: normalize(c.hp_display_name) }));
+    for (const shop of TARGET_SHOPS) {
+      logs.push(`🏁 Check Shop: ${shop.name}`);
 
-    // 2. 今日から未来7日間（計8日間）を同期対象にする（過去の上書きを防止）
-    const dates = Array.from({ length: 8 }, (_, i) => {
-      const d = new Date(Date.now() + JST_OFFSET + (i * 24 * 60 * 60 * 1000));
-      return d.toISOString().split('T')[0];
-    });
+      // 1. 名簿取得
+      const { data: castList } = await supabase
+        .from('cast_members')
+        .select('login_id, hp_display_name')
+        .eq('home_shop_id', shop.id);
 
-    for (const dateStr of dates) {
-      // Step A: 未来データの生存フラグ(is_official)を一旦リセット
-      await supabase.from('shifts').update({ is_official: false }).eq('shift_date', dateStr);
-
-      const hpDateStr = dateStr.replace(/-/g, '/');
-      const html = await (await fetch(`https://ikekari.com/attend.php?date_get=${hpDateStr}&t=${Date.now()}`, { cache: 'no-store' })).text();
-      const listItems = html.match(/<li[^>]*>[\s\S]*?<\/li>/g) || [];
-
-      // --- B. HPに掲載されているキャストの処理 ---
-      for (const item of listItems) {
-        const nameMatch = item.match(/<h3>(.*?)<\/h3>/);
-        const timeMatch = item.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
-        if (!nameMatch || !timeMatch) continue;
-
-        const targetCast = cleanCastList.find(c => c.matchName === normalize(nameMatch[1]));
-        if (targetCast) {
-          const hpS = timeMatch[1];
-          const hpE = timeMatch[2];
-
-          // 現在のDBの状態（申請中か、現在の時間は何か）を確認
-          const { data: current } = await supabase.from('shifts')
-            .select('status, start_time, end_time')
-            .eq('login_id', targetCast.login_id)
-            .eq('shift_date', dateStr)
-            .single();
-
-          // 自動確定判定：アプリの申請内容とHPの時間が一致したか
-          const isMatching = current?.status === 'requested' && 
-                             current.start_time === hpS && 
-                             current.end_time === hpE;
-
-          const updateData: any = {
-            login_id: targetCast.login_id,
-            shift_date: dateStr,
-            hp_display_name: targetCast.hp_display_name,
-            hp_start_time: hpS,
-            hp_end_time: hpE,
-            is_official: true,
-            // 【多店舗対応】shiftsテーブルの store_code カラムに店舗IDを記録（スタンプ）
-            store_code: targetCast.home_shop_id 
-          };
-
-          // 申請中でない or 申請内容が一致したなら、同期して status を official にする
-          if (current?.status !== 'requested' || isMatching) {
-            updateData.start_time = hpS;
-            updateData.end_time = hpE;
-            updateData.status = 'official';
-          }
-          await supabase.from('shifts').upsert(updateData, { onConflict: 'login_id,shift_date' });
-        }
+      if (!castList || castList.length === 0) {
+        logs.push(`  ⚠️ 名簿なし: ${shop.name}`);
+        continue;
       }
 
-      // --- C. HPに掲載されていないキャスト（休み）の処理 ---
-      const { data: absentShifts } = await supabase.from('shifts')
-        .select('login_id, status, start_time, end_time')
-        .eq('shift_date', dateStr)
-        .eq('is_official', false);
+      // 名前正規化 (Python版ロジック移植)
+      const normalize = (val: string) => {
+        if (!val) return "";
+        let s = val.replace(/\s+/g, '').replace(/[（\(\[].*?[）\)\]]/g, ''); 
+        s = s.replace(/（\d+）/g, ''); 
+        return s.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+      };
 
-      if (absentShifts) {
-        for (const shift of absentShifts) {
-          const hpS = 'OFF';
-          const hpE = 'OFF';
-          // キャストが「OFF」で申請しており、実際にHPに名前がない（＝休み承認）場合
-          const isMatchingOff = shift.status === 'requested' && shift.start_time === 'OFF';
+      const nameMap = new Map();
+      castList.forEach(c => nameMap.set(normalize(c.hp_display_name), c.login_id));
 
-          const updateData: any = { 
-            hp_start_time: hpS, 
-            hp_end_time: hpE, 
-            is_official: false 
-          };
+      // 2. 向こう7日間ループ
+      for (let i = 0; i < 7; i++) {
+        const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
+        const dateStrDB = format(targetDate, 'yyyy-MM-dd');
+        const dateStrURL = format(targetDate, 'yyyy/MM/dd');
 
-          // 元々確定だった or 休み申請が一致したなら、status を official に戻す（緑枠を消す）
-          if (shift.status === 'official' || isMatchingOff) {
-            updateData.start_time = hpS;
-            updateData.end_time = hpE;
-            updateData.status = 'official';
+        const url = `${shop.baseUrl}?date_get=${dateStrURL}&t=${Date.now()}`;
+        
+        try {
+          const res = await fetch(url, { cache: 'no-store' });
+          if (!res.ok) continue;
+          
+          const html = await res.text();
+          const $ = cheerio.load(html);
+
+          // 既存シフト確認
+          const { data: existingShifts } = await supabase
+            .from('shifts')
+            .select('cast_id, status')
+            .eq('shop_id', shop.id)
+            .eq('date', dateStrDB);
+
+          const existingStatusMap = new Map();
+          existingShifts?.forEach(s => existingStatusMap.set(s.cast_id, s.status));
+
+          const batchData: any[] = [];
+
+          $('li').each((_, element) => {
+            const li = $(element);
+            const rawName = li.find('h3').text();
+            const cleanName = normalize(rawName);
+            const text = li.text();
+            const timeMatch = text.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/); // 柔軟な正規表現
+
+            if (cleanName && timeMatch) {
+              const castId = nameMap.get(cleanName);
+              if (castId) {
+                const currentStatus = existingStatusMap.get(castId);
+                
+                // 🔥 賢いロジック: 申請中は上書きしない
+                if (currentStatus === 'requested') {
+                  batchData.push({
+                    cast_id: castId,
+                    shop_id: shop.id,
+                    date: dateStrDB,
+                    is_official_pre_exist: true 
+                  });
+                  logs.push(`    🛡 Keep Request: ${cleanName}`);
+                } else {
+                  batchData.push({
+                    cast_id: castId,
+                    shop_id: shop.id,
+                    date: dateStrDB,
+                    start_time: timeMatch[1].padStart(5, '0'),
+                    end_time: timeMatch[2].padStart(5, '0'),
+                    status: 'official',
+                    is_official: true,
+                    is_official_pre_exist: true
+                  });
+                }
+              }
+            }
+          });
+
+          if (batchData.length > 0) {
+            const { error } = await supabase
+              .from('shifts')
+              .upsert(batchData, { onConflict: 'cast_id, date' });
+            
+            if (!error) {
+              logs.push(`  ✅ ${shop.name} (${dateStrDB}): ${batchData.length}件 同期`);
+            }
           }
-          await supabase.from('shifts').update(updateData).eq('login_id', shift.login_id).eq('shift_date', dateStr);
+
+        } catch (e: any) {
+          logs.push(`  ❌ Error: ${e.message}`);
         }
       }
     }
 
-    const nowUTC = new Date().toISOString(); 
-    await supabase.from('sync_logs').upsert({ id: 1, last_sync_at: nowUTC });
-    return NextResponse.json({ version: "v3.4.2", success: true, scope: "Today + 7 Days with Store Stamp" });
+    return NextResponse.json({ success: true, logs });
+
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
