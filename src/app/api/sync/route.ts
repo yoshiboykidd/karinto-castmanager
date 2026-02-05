@@ -15,9 +15,8 @@ const TARGET_SHOPS = [
   { id: '006', name: '池西', baseUrl: 'https://ikekari.com/attend.php' }, 
   { id: '007', name: '五反田', baseUrl: 'https://www.karin-go.com/attend.php' }, 
   { id: '008', name: '大宮', baseUrl: 'https://www.karin10omiya.com/attend.php' }, 
-  { id: '009', name: '吉祥寺', baseUrl: 'https://www.kari-kichi.com/attend.php' }, // IDを009に整理
-  //{ id: '010', name: '大久保', baseUrl: 'https://www.ookubo-karinto.com/attend.php' }, 
-  { id: '011', name: '池東', baseUrl: 'https://www.karin10bukuro-3shine.com/attend.php' }, // IDを011に整理
+  { id: '009', name: '吉祥寺', baseUrl: 'https://www.kari-kichi.com/attend.php' },
+  { id: '011', name: '池東', baseUrl: 'https://www.karin10bukuro-3shine.com/attend.php' }, 
   { id: '012', name: '小岩', baseUrl: 'https://www.karin10koiwa.com/attend.php' }, 
 ];
 
@@ -27,49 +26,41 @@ export async function GET() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  let logs: string[] = [];
   const JST_OFFSET = 9 * 60 * 60 * 1000;
 
-  try {
-    for (const shop of TARGET_SHOPS) {
-      logs.push(`🏁 Start: ${shop.name}`);
+  // 各店舗の処理を関数として独立
+  const processShop = async (shop: typeof TARGET_SHOPS[0]) => {
+    let localLogs: string[] = [`🏁 Start: ${shop.name}`];
 
+    try {
+      // 1. 名簿取得
       const { data: castList, error: castError } = await supabase
         .from('cast_members')
         .select('login_id, hp_display_name')
         .eq('home_shop_id', shop.id);
 
-      if (castError) {
-        logs.push(`  ❌ DB Fetch Error (${shop.name}): ${castError.message}`);
-        continue;
-      }
-
-      if (!castList || castList.length === 0) {
-        logs.push(`  ⚠️ No casts: ${shop.name} (Check ID: ${shop.id})`);
-        continue;
+      if (castError || !castList || castList.length === 0) {
+        return [`⚠️ Skip ${shop.name}: 名簿なし`];
       }
 
       const normalize = (val: string) => {
         if (!val) return "";
-        let s = val.replace(/\s+/g, '').replace(/[（\(\[].*?[）\)\]]/g, ''); 
-        s = s.replace(/（\d+）/g, ''); 
+        let s = val.replace(/\s+/g, '').replace(/[（\(\[].*?[）\)\]]/g, '').replace(/（\d+）/g, ''); 
         return s.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
       };
 
-      const nameMap = new Map();
-      castList.forEach(c => nameMap.set(normalize(c.hp_display_name), c.login_id));
+      const nameMap = new Map(castList.map(c => [normalize(c.hp_display_name), c.login_id]));
 
-      for (let i = 0; i < 7; i++) {
+      // 7日分のPromiseを作成
+      const dayPromises = Array.from({ length: 7 }).map(async (_, i) => {
         const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
         const dateStrDB = format(targetDate, 'yyyy-MM-dd');
         const dateStrURL = format(targetDate, 'yyyy/MM/dd');
-
         const url = `${shop.baseUrl}?date_get=${dateStrURL}&t=${Date.now()}`;
-        
+
         try {
           const res = await fetch(url, { cache: 'no-store' });
-          if (!res.ok) continue;
-          
+          if (!res.ok) return null;
           const html = await res.text();
           const $ = cheerio.load(html);
 
@@ -78,30 +69,20 @@ export async function GET() {
             .select('login_id, status')
             .eq('shift_date', dateStrDB);
 
-          const existingStatusMap = new Map();
-          existingShifts?.forEach(s => existingStatusMap.set(s.login_id, s.status));
-
+          const existingStatusMap = new Map(existingShifts?.map(s => [s.login_id, s.status]));
           const batchData: any[] = [];
 
           $('li').each((_, element) => {
             const li = $(element);
-            const rawName = li.find('h3').text();
-            const cleanName = normalize(rawName);
-            const text = li.text();
-            const timeMatch = text.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
+            const cleanName = normalize(li.find('h3').text());
+            const timeMatch = li.text().match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
 
             if (cleanName && timeMatch) {
               const loginId = nameMap.get(cleanName);
               if (loginId) {
                 const currentStatus = existingStatusMap.get(loginId);
+                const baseData = { login_id: loginId, shift_date: dateStrDB, hp_display_name: cleanName, is_official_pre_exist: true };
                 
-                const baseData: any = {
-                  login_id: loginId,
-                  shift_date: dateStrDB,
-                  hp_display_name: cleanName,
-                  is_official_pre_exist: true 
-                };
-
                 if (currentStatus === 'requested') {
                   batchData.push(baseData);
                 } else {
@@ -118,30 +99,31 @@ export async function GET() {
           });
 
           if (batchData.length > 0) {
-            const { error } = await supabase
-              .from('shifts')
-              .upsert(batchData, { onConflict: 'login_id, shift_date' });
-            
-            if (!error) {
-              logs.push(`  ✅ ${shop.name} (${dateStrDB}): ${batchData.length}件`);
-            } else {
-              logs.push(`  ❌ DB Upsert Error: ${error.message}`);
-            }
+            const { error } = await supabase.from('shifts').upsert(batchData, { onConflict: 'login_id, shift_date' });
+            return error ? `❌ ${dateStrDB} DB Error` : `✅ ${dateStrDB} (${batchData.length}件)`;
           }
-
-        } catch (e: any) {
-          logs.push(`  ❌ Scrape Error (${shop.name}): ${e.message}`);
+          return null;
+        } catch {
+          return `❌ ${dateStrDB} Parse Error`;
         }
-      }
-    }
+      });
 
-    return NextResponse.json({ success: true, logs });
+      const dayResults = await Promise.all(dayPromises);
+      localLogs.push(...dayResults.filter((r): r is string => r !== null));
+      return localLogs;
+
+    } catch (e: any) {
+      return [`❌ Fatal Error ${shop.name}: ${e.message}`];
+    }
+  };
+
+  try {
+    // 全店舗を一斉に実行開始！
+    const allResults = await Promise.all(TARGET_SHOPS.map(shop => processShop(shop)));
+    const flatLogs = allResults.flat();
+    return NextResponse.json({ success: true, logs: flatLogs });
 
   } catch (error: any) {
-    return NextResponse.json({ 
-      success: false, 
-      error_type: "Fatal Error",
-      message: error.message 
-    }, { status: 500 });
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 }
