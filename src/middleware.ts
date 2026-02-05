@@ -59,11 +59,13 @@ export const config = {
   matcher: [
     /*
      * すべてのリクエストパスにマッチさせますが、以下は除外します:
+     * - api (APIルート)  <-- ★これを追加したことになります
      * - _next/static (静的ファイル)
      * - _next/image (画像最適化ファイル)
      * - favicon.ico (ファビコン)
      * - 画像ファイル
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // ▼▼▼ 修正箇所: 先頭に「api|」を追加 ▼▼▼
+    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
