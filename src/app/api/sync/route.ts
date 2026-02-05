@@ -135,8 +135,18 @@ export async function GET() {
 
   try {
     // 全店舗を一斉に実行開始！
-    const allResults = await Promise.all(TARGET_SHOPS.map(shop => processShop(shop)));
+   const allResults = await Promise.all(TARGET_SHOPS.map(shop => processShop(shop)));
     const flatLogs = allResults.flat();
+
+    // ★追加: sync_logs テーブルの id=1 の時間を「今」に更新する
+    // これでフロントエンドのヘッダー時間が更新されます
+    await supabase
+      .from('sync_logs')
+      .upsert({ 
+        id: 1, 
+        last_sync_at: new Date().toISOString() 
+      });
+
     return NextResponse.json({ success: true, logs: flatLogs });
 
   } catch (error: any) {
