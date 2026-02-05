@@ -135,11 +135,12 @@ export async function GET() {
     return NextResponse.json({ success: true, logs });
 
   } catch (error: any) {
-    // ここで具体的なエラー内容を返すように強化
+    // 500エラーの正体を画面に表示させる
     return NextResponse.json({ 
       success: false, 
-      message: error.message,
-      stack: error.stack 
+      error_type: "Fatal Error",
+      message: error.message, // ← ここに具体的なエラー理由が出ます
+      detail: error.code || "No error code" 
     }, { status: 500 });
   }
 }
