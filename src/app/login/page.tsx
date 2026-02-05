@@ -19,31 +19,49 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    // 1. IDの形式を整える (@が含まれなければ自動補完)
+    // 1. メールアドレス形式に変換
     const email = castId.includes('@') ? castId : `${castId}@karinto-internal.com`;
 
-    // 2. Supabaseでログイン実行
-    const { data, error } = await supabase.auth.signInWithPassword({
+    // 2. Supabaseで認証 (Auth)
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email: email,
       password: password,
     });
 
-    if (error) {
+    if (authError) {
       alert('IDまたはパスワードが違います');
       setLoading(false);
-    } else {
-      // 3. ✨ ログイン成功後の「自動振り分け」
-      if (email === "admin@karinto-internal.com") {
-        // 管理者の場合は管理画面へ直行！
-        router.push('/admin');
-      } else {
-        // キャストの場合はホーム画面へ直行！
-        router.push('/');
-      }
-      
-      // 画面の状態を最新にする
-      router.refresh();
+      return;
     }
+
+    // 3. 役職チェック (Database)
+    // ログインしたIDを使って、cast_membersテーブルから役割(role)を取得
+    const { data: member, error: dbError } = await supabase
+      .from('cast_members')
+      // ここで login_id を使って検索
+      .select('role')
+      .eq('login_id', castId) 
+      .single();
+
+    if (dbError) {
+      // 万が一DB取得に失敗しても、ログイン自体は成功しているので
+      // 一旦ホームに飛ばすか、エラーを出すか。今回はログに出してホームへ。
+      console.error('Role check failed:', dbError);
+      router.push('/');
+    } else {
+      // 4. 振り分けロジック
+      const role = member?.role;
+
+      if (role === 'developer' || role === 'admin') {
+        console.log(`Login as ${role}: Redirecting to Admin Panel`);
+        router.push('/admin'); // 開発者・店長は管理画面へ
+      } else {
+        console.log('Login as Cast: Redirecting to Dashboard');
+        router.push('/'); // キャストはホームへ
+      }
+    }
+    
+    router.refresh();
   };
 
   return (
