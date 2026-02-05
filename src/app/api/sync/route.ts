@@ -81,15 +81,31 @@ export async function GET() {
               const loginId = nameMap.get(cleanName);
               if (loginId) {
                 const currentStatus = existingStatusMap.get(loginId);
-                const baseData = { login_id: loginId, shift_date: dateStrDB, hp_display_name: cleanName, is_official_pre_exist: true };
+                
+                // ★修正点: HP上の時間を変数に確保
+                const hpStart = timeMatch[1].padStart(5, '0');
+                const hpEnd = timeMatch[2].padStart(5, '0');
+
+                // ★修正点: baseDataに hp_start_time / hp_end_time を追加
+                // これにより、status='requested' の時でも、裏側で「HP上の時間」が更新・保存される
+                const baseData = { 
+                  login_id: loginId, 
+                  shift_date: dateStrDB, 
+                  hp_display_name: cleanName, 
+                  is_official_pre_exist: true,
+                  hp_start_time: hpStart, // ここが重要
+                  hp_end_time: hpEnd      // ここが重要
+                };
                 
                 if (currentStatus === 'requested') {
+                  // 申請中の場合：start_time（希望時間）は上書きせず、hp_time だけ更新する
                   batchData.push(baseData);
                 } else {
+                  // 通常（確定/新規）の場合：start_time も HPの時間に合わせる
                   batchData.push({
                     ...baseData,
-                    start_time: timeMatch[1].padStart(5, '0'),
-                    end_time: timeMatch[2].padStart(5, '0'),
+                    start_time: hpStart,
+                    end_time: hpEnd,
                     status: 'official',
                     is_official: true
                   });
