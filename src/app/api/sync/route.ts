@@ -3,11 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { addDays, format } from 'date-fns';
 
-// タイムアウト対策 (最大60秒)
 export const maxDuration = 60; 
 export const dynamic = 'force-dynamic';
 
-// ▼▼▼ 設定エリア: ここを実際の店舗URLに書き換えてください ▼▼▼
 const TARGET_SHOPS = [
   { id: '001', name: '神田', baseUrl: 'https://www.kakarinto.com/attend.php' }, 
   { id: '002', name: '赤坂', baseUrl: 'https://www.akakari10.com/attend.php' }, 
@@ -17,13 +15,11 @@ const TARGET_SHOPS = [
   { id: '006', name: '池西', baseUrl: 'https://ikekari.com/attend.php' }, 
   { id: '007', name: '五反田', baseUrl: 'https://www.karin-go.com/attend.php' }, 
   { id: '008', name: '大宮', baseUrl: 'https://www.karin10omiya.com/attend.php' }, 
-  { id: '007', name: '吉祥寺', baseUrl: 'https://www.kari-kichi.com/attend.php' }, 
-  //{ id: '009', name: '大久保', baseUrl: 'https://www.ookubo-karinto.com/attend.php' }, 
-  { id: '010', name: '池東', baseUrl: 'https://www.karin10bukuro-3shine.com/attend.php' }, 
+  { id: '009', name: '吉祥寺', baseUrl: 'https://www.kari-kichi.com/attend.php' }, 
+  //{ id: '010', name: '大久保', baseUrl: 'https://www.ookubo-karinto.com/attend.php' }, 
+  { id: '011', name: '池東', baseUrl: 'https://www.karin10bukuro-3shine.com/attend.php' }, 
   { id: '012', name: '小岩', baseUrl: 'https://www.karin10koiwa.com/attend.php' }, 
-  // ... 他の店舗もここに追加
 ];
-// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
 export async function GET() {
   const supabase = createClient(
@@ -38,7 +34,6 @@ export async function GET() {
     for (const shop of TARGET_SHOPS) {
       logs.push(`🏁 Check Shop: ${shop.name}`);
 
-      // 1. 名簿取得
       const { data: castList } = await supabase
         .from('cast_members')
         .select('login_id, hp_display_name')
@@ -49,7 +44,6 @@ export async function GET() {
         continue;
       }
 
-      // 名前正規化 (Python版ロジック移植)
       const normalize = (val: string) => {
         if (!val) return "";
         let s = val.replace(/\s+/g, '').replace(/[（\(\[].*?[）\)\]]/g, ''); 
@@ -60,7 +54,6 @@ export async function GET() {
       const nameMap = new Map();
       castList.forEach(c => nameMap.set(normalize(c.hp_display_name), c.login_id));
 
-      // 2. 向こう7日間ループ
       for (let i = 0; i < 7; i++) {
         const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
         const dateStrDB = format(targetDate, 'yyyy-MM-dd');
@@ -75,15 +68,14 @@ export async function GET() {
           const html = await res.text();
           const $ = cheerio.load(html);
 
-          // 既存シフト確認
+          // --- DB定義に合わせて修正 ---
           const { data: existingShifts } = await supabase
             .from('shifts')
-            .select('cast_id, status')
-            .eq('shop_id', shop.id)
-            .eq('date', dateStrDB);
+            .select('login_id, status')
+            .eq('shift_date', dateStrDB);
 
           const existingStatusMap = new Map();
-          existingShifts?.forEach(s => existingStatusMap.set(s.cast_id, s.status));
+          existingShifts?.forEach(s => existingStatusMap.set(s.login_id, s.status));
 
           const batchData: any[] = [];
 
@@ -92,27 +84,23 @@ export async function GET() {
             const rawName = li.find('h3').text();
             const cleanName = normalize(rawName);
             const text = li.text();
-            const timeMatch = text.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/); // 柔軟な正規表現
+            const timeMatch = text.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
 
             if (cleanName && timeMatch) {
-              const castId = nameMap.get(cleanName);
-              if (castId) {
-                const currentStatus = existingStatusMap.get(castId);
+              const loginId = nameMap.get(cleanName);
+              if (loginId) {
+                const currentStatus = existingStatusMap.get(loginId);
                 
-                // 🔥 賢いロジック: 申請中は上書きしない
                 if (currentStatus === 'requested') {
                   batchData.push({
-                    cast_id: castId,
-                    shop_id: shop.id,
-                    date: dateStrDB,
+                    login_id: loginId,
+                    shift_date: dateStrDB,
                     is_official_pre_exist: true 
                   });
-                  logs.push(`    🛡 Keep Request: ${cleanName}`);
                 } else {
                   batchData.push({
-                    cast_id: castId,
-                    shop_id: shop.id,
-                    date: dateStrDB,
+                    login_id: loginId,
+                    shift_date: dateStrDB,
                     start_time: timeMatch[1].padStart(5, '0'),
                     end_time: timeMatch[2].padStart(5, '0'),
                     status: 'official',
@@ -125,12 +113,15 @@ export async function GET() {
           });
 
           if (batchData.length > 0) {
+            // --- 重複キー制約に合わせて修正 ---
             const { error } = await supabase
               .from('shifts')
-              .upsert(batchData, { onConflict: 'cast_id, date' });
+              .upsert(batchData, { onConflict: 'login_id, shift_date' });
             
             if (!error) {
               logs.push(`  ✅ ${shop.name} (${dateStrDB}): ${batchData.length}件 同期`);
+            } else {
+              logs.push(`  ❌ DB Error: ${error.message}`);
             }
           }
 
