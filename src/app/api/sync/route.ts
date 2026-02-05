@@ -28,7 +28,6 @@ export async function GET() {
 
   const JST_OFFSET = 9 * 60 * 60 * 1000;
 
-  // 各店舗の処理を関数として独立
   const processShop = async (shop: typeof TARGET_SHOPS[0]) => {
     let localLogs: string[] = [`🏁 Start: ${shop.name}`];
 
@@ -49,7 +48,8 @@ export async function GET() {
         return s.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
       };
 
-      const nameMap = new Map(castList.map(c => [normalize(c.hp_display_name), c.login_id]));
+      // ★修正: IDを必ずString型に変換してMapに登録
+      const nameMap = new Map(castList.map(c => [normalize(c.hp_display_name), String(c.login_id)]));
 
       // 7日分のPromiseを作成
       const dayPromises = Array.from({ length: 7 }).map(async (_, i) => {
@@ -69,7 +69,9 @@ export async function GET() {
             .select('login_id, status')
             .eq('shift_date', dateStrDB);
 
-          const existingStatusMap = new Map(existingShifts?.map(s => [s.login_id, s.status]));
+          // ★修正: こちらもIDを必ずString型にしてMapを作成
+          const existingStatusMap = new Map(existingShifts?.map(s => [String(s.login_id), s.status]));
+          
           const batchData: any[] = [];
 
           $('li').each((_, element) => {
@@ -78,30 +80,28 @@ export async function GET() {
             const timeMatch = li.text().match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
 
             if (cleanName && timeMatch) {
-              const loginId = nameMap.get(cleanName);
+              const loginId = nameMap.get(cleanName); // Stringで返ってくる
               if (loginId) {
-                const currentStatus = existingStatusMap.get(loginId);
+                const currentStatus = existingStatusMap.get(loginId); // String同士で検索するので確実
                 
-                // ★修正点: HP上の時間を変数に確保
                 const hpStart = timeMatch[1].padStart(5, '0');
                 const hpEnd = timeMatch[2].padStart(5, '0');
 
-                // ★修正点: baseDataに hp_start_time / hp_end_time を追加
-                // これにより、status='requested' の時でも、裏側で「HP上の時間」が更新・保存される
                 const baseData = { 
                   login_id: loginId, 
                   shift_date: dateStrDB, 
                   hp_display_name: cleanName, 
                   is_official_pre_exist: true,
-                  hp_start_time: hpStart, // ここが重要
-                  hp_end_time: hpEnd      // ここが重要
+                  hp_start_time: hpStart, 
+                  hp_end_time: hpEnd      
                 };
                 
                 if (currentStatus === 'requested') {
-                  // 申請中の場合：start_time（希望時間）は上書きせず、hp_time だけ更新する
+                  // 申請中なら、start_time（希望時間）は上書きせず、裏側のデータだけ更新
+                  // statusも送らないので、DBの requested が維持される（部分更新）
                   batchData.push(baseData);
                 } else {
-                  // 通常（確定/新規）の場合：start_time も HPの時間に合わせる
+                  // それ以外なら、公式情報で全上書き
                   batchData.push({
                     ...baseData,
                     start_time: hpStart,
@@ -134,12 +134,10 @@ export async function GET() {
   };
 
   try {
-    // 全店舗を一斉に実行開始！
-   const allResults = await Promise.all(TARGET_SHOPS.map(shop => processShop(shop)));
+    const allResults = await Promise.all(TARGET_SHOPS.map(shop => processShop(shop)));
     const flatLogs = allResults.flat();
 
-    // ★追加: sync_logs テーブルの id=1 の時間を「今」に更新する
-    // これでフロントエンドのヘッダー時間が更新されます
+    // ログ更新
     await supabase
       .from('sync_logs')
       .upsert({ 
