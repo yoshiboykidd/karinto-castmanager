@@ -9,8 +9,18 @@ export const dynamic = 'force-dynamic';
 
 // ▼▼▼ 設定エリア: ここを実際の店舗URLに書き換えてください ▼▼▼
 const TARGET_SHOPS = [
-  { id: '001', name: '池袋西', baseUrl: 'https://ikenishi.karinto-group.com/attend.php' }, 
-  { id: '002', name: '池袋東', baseUrl: 'https://ikekari.com/attend.php' }, 
+  { id: '001', name: '神田', baseUrl: 'https://www.kakarinto.com/attend.php' }, 
+  { id: '002', name: '赤坂', baseUrl: 'https://www.akakari10.com/attend.php' }, 
+  { id: '003', name: '秋葉原', baseUrl: 'https://www.akikarinto.com/attend.php' }, 
+  { id: '004', name: '上野', baseUrl: 'https://www.karin360plus-ueno.com/attend.php' }, 
+  { id: '005', name: '渋谷', baseUrl: 'https://www.shibuyakarinto.com/attend.php' }, 
+  { id: '006', name: '池西', baseUrl: 'https://ikekari.com/attend.php' }, 
+  { id: '007', name: '五反田', baseUrl: 'https://www.karin-go.com/attend.php' }, 
+  { id: '008', name: '大宮', baseUrl: 'https://www.karin10omiya.com/attend.php' }, 
+  { id: '007', name: '吉祥寺', baseUrl: 'https://www.kari-kichi.com/attend.php' }, 
+  //{ id: '009', name: '大久保', baseUrl: 'https://www.ookubo-karinto.com/attend.php' }, 
+  { id: '010', name: '池東', baseUrl: 'https://www.karin10bukuro-3shine.com/attend.php' }, 
+  { id: '012', name: '小岩', baseUrl: 'https://www.karin10koiwa.com/attend.php' }, 
   // ... 他の店舗もここに追加
 ];
 // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
