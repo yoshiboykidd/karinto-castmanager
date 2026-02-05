@@ -16,7 +16,7 @@ const TARGET_SHOPS = [
   { id: '007', name: '五反田', baseUrl: 'https://www.karin-go.com/attend.php' }, 
   { id: '008', name: '大宮', baseUrl: 'https://www.karin10omiya.com/attend.php' }, 
   { id: '009', name: '吉祥寺', baseUrl: 'https://www.kari-kichi.com/attend.php' }, 
-  //{ id: '010', name: '大久保', baseUrl: 'https://www.ookubo-karinto.com/attend.php' }, 
+//  { id: '010', name: '大久保', baseUrl: 'https://www.ookubo-karinto.com/attend.php' }, 
   { id: '011', name: '池東', baseUrl: 'https://www.karin10bukuro-3shine.com/attend.php' }, 
   { id: '012', name: '小岩', baseUrl: 'https://www.karin10koiwa.com/attend.php' }, 
 ];
@@ -32,7 +32,7 @@ export async function GET() {
 
   try {
     for (const shop of TARGET_SHOPS) {
-      logs.push(`🏁 Check Shop: ${shop.name}`);
+      logs.push(`🏁 Start: ${shop.name}`);
 
       const { data: castList } = await supabase
         .from('cast_members')
@@ -40,7 +40,7 @@ export async function GET() {
         .eq('home_shop_id', shop.id);
 
       if (!castList || castList.length === 0) {
-        logs.push(`  ⚠️ 名簿なし: ${shop.name}`);
+        logs.push(`  ⚠️ No casts: ${shop.name}`);
         continue;
       }
 
@@ -68,7 +68,7 @@ export async function GET() {
           const html = await res.text();
           const $ = cheerio.load(html);
 
-          // --- DB定義に合わせて修正 ---
+          // 以前のDB定義に合わせて取得
           const { data: existingShifts } = await supabase
             .from('shifts')
             .select('login_id, status')
@@ -91,21 +91,23 @@ export async function GET() {
               if (loginId) {
                 const currentStatus = existingStatusMap.get(loginId);
                 
+                // --- 保存データの組み立て ---
+                const baseData: any = {
+                  login_id: loginId,
+                  shift_date: dateStrDB,
+                  hp_display_name: cleanName, // DBにあるなら入れる
+                  is_official_pre_exist: true 
+                };
+
                 if (currentStatus === 'requested') {
-                  batchData.push({
-                    login_id: loginId,
-                    shift_date: dateStrDB,
-                    is_official_pre_exist: true 
-                  });
+                  batchData.push(baseData);
                 } else {
                   batchData.push({
-                    login_id: loginId,
-                    shift_date: dateStrDB,
+                    ...baseData,
                     start_time: timeMatch[1].padStart(5, '0'),
                     end_time: timeMatch[2].padStart(5, '0'),
                     status: 'official',
-                    is_official: true,
-                    is_official_pre_exist: true
+                    is_official: true
                   });
                 }
               }
@@ -113,13 +115,12 @@ export async function GET() {
           });
 
           if (batchData.length > 0) {
-            // --- 重複キー制約に合わせて修正 ---
             const { error } = await supabase
               .from('shifts')
               .upsert(batchData, { onConflict: 'login_id, shift_date' });
             
             if (!error) {
-              logs.push(`  ✅ ${shop.name} (${dateStrDB}): ${batchData.length}件 同期`);
+              logs.push(`  ✅ ${shop.name} (${dateStrDB}): ${batchData.length}件`);
             } else {
               logs.push(`  ❌ DB Error: ${error.message}`);
             }
@@ -134,6 +135,11 @@ export async function GET() {
     return NextResponse.json({ success: true, logs });
 
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    // ここで具体的なエラー内容を返すように強化
+    return NextResponse.json({ 
+      success: false, 
+      message: error.message,
+      stack: error.stack 
+    }, { status: 500 });
   }
 }
