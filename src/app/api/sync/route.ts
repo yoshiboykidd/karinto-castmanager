@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
   } else if (group === '3') {
     targetShops = ALL_SHOPS.slice(8, 12); // 吉祥寺〜小岩
   } else {
-    // 指定がなければ全店舗（タイムアウトのリスクあり）
+    // 指定がなければ全店舗
     targetShops = ALL_SHOPS;
   }
 
@@ -199,8 +199,17 @@ export async function GET(request: NextRequest) {
     for (const shop of targetShops) {
       const shopLogs = await processShop(shop);
       allResults.push(shopLogs);
-      // 少し休憩
-      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // ★修正1: 成功したら、その店舗の最終更新時間をDBに書き込む
+      // これにより、ダッシュボードのヘッダー時間が更新されます
+      await supabase
+        .from('shops')
+        .update({ last_synced_at: new Date().toISOString() })
+        .eq('id', shop.id);
+
+      // ★修正2: 休憩時間を 200ms -> 2000ms (2秒) に延長
+      // HTTPエラー（アクセス拒否）を防ぐために重要です
+      await new Promise(resolve => setTimeout(resolve, 2000));
     }
 
     const flatLogs = allResults.flat();
@@ -211,12 +220,6 @@ export async function GET(request: NextRequest) {
     const diffSec = (diffMs / 1000).toFixed(1);
     
     flatLogs.push(`🏁 Group ${group || 'ALL'} 完了！所要時間: ${diffSec}秒`);
-
-    // ログ保存 (Group1の時だけ、あるいは常に上書き、など運用に合わせて調整)
-    // ここでは単純に「実行された」ことだけ記録します
-    await supabase
-      .from('sync_logs')
-      .upsert({ id: 1, last_sync_at: new Date().toISOString() });
 
     return NextResponse.json({ success: true, group: group, logs: flatLogs });
 
