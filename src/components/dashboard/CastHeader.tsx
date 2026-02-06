@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation'; // 追加: ページ移動用
+import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { format, isValid, parseISO } from 'date-fns';
 
@@ -19,19 +19,24 @@ export default function CastHeader({
   displayName, 
   bgColor 
 }: CastHeaderProps) {
-  const router = useRouter(); // ルーター使用
+  const router = useRouter();
   const [seasonalEmoji, setSeasonalEmoji] = useState('☃️');
   const [isPanicMode, setIsPanicMode] = useState(false);
 
-  // 時間表示の安全策（ISO文字列を HH:mm に変換）
+  // ★修正: 時間表示のロジック（変換できなければそのまま表示）
   const formattedTime = (() => {
     if (!syncTime) return '--:--';
     try {
-      // parseISOを使うとSafariなどでも安全に変換できます
+      // まず日付として解析を試みる
       const date = typeof syncTime === 'string' ? parseISO(syncTime) : new Date(syncTime);
-      return isValid(date) ? format(date, 'HH:mm') : '--:--';
+      if (isValid(date)) {
+        return format(date, 'HH:mm');
+      }
+      // 日付じゃなければ（"15:30" とかの文字列なら）そのまま返す
+      return syncTime;
     } catch (e) {
-      return '--:--';
+      // エラーになっても元の文字列を返す（--:--にはしない）
+      return syncTime;
     }
   })();
 
@@ -68,7 +73,6 @@ export default function CastHeader({
         <div className="flex justify-between items-end">
           
           {/* --- 左サイド（名前エリア）: ここだけクリックでマイページへ --- */}
-          {/* ★修正: 親のLinkではなく、ここでonClickで飛ばす */}
           <div 
             onClick={() => router.push('/mypage')}
             className="flex flex-col space-y-1 cursor-pointer active:opacity-70 transition-opacity"
@@ -100,7 +104,7 @@ export default function CastHeader({
             </div>
           </div>
 
-          {/* --- 右サイド（ボタンエリア）: クリックイベントを独立させる --- */}
+          {/* --- 右サイド（ボタンエリア） --- */}
           <div className="flex flex-col items-end space-y-2 pb-0.5">
             
             {/* HP同期時刻 */}
@@ -128,13 +132,13 @@ export default function CastHeader({
               </div>
             </div>
 
-            {/* 緊急脱出ボタン（ここが押せるようになる！） */}
+            {/* 緊急脱出ボタン */}
             <button
               onClick={(e) => {
-                e.stopPropagation(); // 親のクリックイベントを止める念の為の処置
+                e.stopPropagation(); // 親のイベントを止める
                 setIsPanicMode(true);
               }}
-              className={`w-[128px] h-[44px] rounded-xl border flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 group z-10
+              className={`w-[128px] h-[44px] rounded-xl border flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 group z-10 cursor-pointer
                 ${isThemed
                   ? 'bg-white/20 border-white/20 text-white hover:bg-white/30'
                   : 'bg-rose-50/80 border-rose-100 hover:bg-rose-100'

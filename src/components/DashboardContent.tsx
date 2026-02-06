@@ -88,11 +88,11 @@ export default function DashboardContent() {
         <CastHeader 
           shopName={data?.shop?.shop_name || "かりんと"} 
           
-          // ★修正：ここを正しいデータパスに変更しました！
-          syncTime={data?.shop?.last_synced_at} 
+          // ★修正：ここを正しいデータパスに戻しました！これで時間は表示されます
+          syncTime={data?.syncAt} 
           
           displayName={safeProfile.display_name} 
-          version="v3.6.2"
+          version="v3.6.3"
           bgColor={currentTheme.header}
         />
       </div>
