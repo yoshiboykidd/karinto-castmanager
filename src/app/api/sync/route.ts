@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { addDays, format } from 'date-fns';
 
+// 処理時間を最大限確保 (Vercel Hobbyだと最大60秒)
 export const maxDuration = 60; 
 export const dynamic = 'force-dynamic';
 
@@ -22,16 +23,26 @@ const ALL_SHOPS = [
 ];
 
 export async function GET(request: NextRequest) {
+  // ★計測開始
   const startTime = Date.now();
+
+  // URLパラメータ (?group=1 など) を取得
   const searchParams = request.nextUrl.searchParams;
   const group = searchParams.get('group');
 
+  // ★グループ分けロジック
   let targetShops = [];
-  if (group === '1') targetShops = ALL_SHOPS.slice(0, 3);
-  else if (group === '2') targetShops = ALL_SHOPS.slice(3, 6);
-  else if (group === '3') targetShops = ALL_SHOPS.slice(6, 9);
-  else if (group === '4') targetShops = ALL_SHOPS.slice(9, 12);
-  else targetShops = ALL_SHOPS;
+  if (group === '1') {
+    targetShops = ALL_SHOPS.slice(0, 3);
+  } else if (group === '2') {
+    targetShops = ALL_SHOPS.slice(3, 6);
+  } else if (group === '3') {
+    targetShops = ALL_SHOPS.slice(6, 9);
+  } else if (group === '4') {
+    targetShops = ALL_SHOPS.slice(9, 12);
+  } else {
+    targetShops = ALL_SHOPS;
+  }
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -40,6 +51,7 @@ export async function GET(request: NextRequest) {
 
   const JST_OFFSET = 9 * 60 * 60 * 1000;
 
+  // 1店舗ごとの処理ロジック
   const processShop = async (shop: typeof ALL_SHOPS[0]) => {
     let localLogs: string[] = [];
 
@@ -53,6 +65,7 @@ export async function GET(request: NextRequest) {
         return [`⚠️ Skip ${shop.name}: 名簿取得失敗`];
       }
 
+      // 名前正規化
       const normalize = (val: string) => {
         if (!val) return "";
         let s = val.replace(/\s+/g, '').replace(/[（\(\[].*?[）\)\]]/g, '').replace(/（\d+）/g, ''); 
@@ -61,6 +74,7 @@ export async function GET(request: NextRequest) {
 
       const nameMap = new Map(castList.map(c => [normalize(c.hp_display_name), String(c.login_id)]));
 
+      // 7日分ループ
       const dayPromises = Array.from({ length: 7 }).map(async (_, i) => {
         const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
         const dateStrDB = format(targetDate, 'yyyy-MM-dd');
@@ -92,12 +106,14 @@ export async function GET(request: NextRequest) {
           const unmatchedNames: string[] = []; 
           const processedLoginIds = new Set<string>();
 
+          // 共通処理関数
           const tryAddShift = (rawName: string, timeText: string) => {
             const cleanName = normalize(rawName);
             const timeMatch = timeText.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
 
             if (cleanName && timeMatch) {
               const loginId = nameMap.get(cleanName);
+              
               if (loginId) {
                 if (processedLoginIds.has(loginId)) return;
                 processedLoginIds.add(loginId);
@@ -132,7 +148,12 @@ export async function GET(request: NextRequest) {
             }
           };
 
-          $('li').each((_, element) => { tryAddShift($(element).find('h3').text(), $(element).text()); });
+          // 【パターンA】 リスト形式
+          $('li').each((_, element) => {
+            tryAddShift($(element).find('h3').text(), $(element).text());
+          });
+
+          // 【パターンB】 カード形式
           $('.dataBox').each((_, element) => {
             const box = $(element);
             let timeText = "";
@@ -148,14 +169,19 @@ export async function GET(request: NextRequest) {
 
           if (batchData.length > 0) {
             const { error } = await supabase.from('shifts').upsert(batchData, { onConflict: 'login_id, shift_date' });
-            if (error) return `❌ DB Error`;
+            if (error) return `❌ ${shop.name} ${format(targetDate, 'MM/dd')} DB Error: ${error.message}`;
             return `✅ ${shop.name} ${format(targetDate, 'MM/dd')} (${batchData.length}件)`;
           } else {
-            return `💤 ${shop.name} ${format(targetDate, 'MM/dd')} (0件)`;
+            if (unmatchedNames.length > 0) {
+                const names = unmatchedNames.slice(0, 3).join(', ');
+                return `⚠️ ${shop.name} ${format(targetDate, 'MM/dd')} (0件) - 名簿なし: ${names}...`;
+            }
+            return `💤 ${shop.name} ${format(targetDate, 'MM/dd')} (0件) - シフトなし`;
           }
 
         } catch (err: any) {
-          return `❌ Error: ${err.message}`;
+          if (err.name === 'AbortError') return `⏱️ ${shop.name} ${format(targetDate, 'MM/dd')} Timeout`;
+          return `❌ ${shop.name} ${format(targetDate, 'MM/dd')} Error: ${err.message}`;
         }
       });
 
@@ -171,28 +197,30 @@ export async function GET(request: NextRequest) {
   try {
     const allResults: string[][] = [];
     
-    // 店舗ごとの処理
+    // ターゲット店舗のみ実行
     for (const shop of targetShops) {
       const shopLogs = await processShop(shop);
       allResults.push(shopLogs);
       
       const nowISO = new Date().toISOString();
 
-      // ★修正: sync_logs テーブルの id=1 だけを更新する
-      // 店舗ごとに分けるのはやめて、とにかく「最後に何か更新した時間」として1箇所を上書き
+      // ★修正箇所：shopsテーブルではなく、sync_logsのid=1を更新する
       await supabase
         .from('sync_logs')
         .upsert({ 
-          id: 1,  // ここを固定
+          id: 1,  // フロントエンドが読みに行っているID
           last_sync_at: nowISO 
         }, { onConflict: 'id' });
 
+      // 休憩時間を1秒に短縮
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     const flatLogs = allResults.flat();
+
     const endTime = Date.now();
-    const diffSec = ((endTime - startTime) / 1000).toFixed(1);
+    const diffMs = endTime - startTime;
+    const diffSec = (diffMs / 1000).toFixed(1);
     
     flatLogs.push(`🏁 Group ${group || 'ALL'} 完了！所要時間: ${diffSec}秒`);
 
