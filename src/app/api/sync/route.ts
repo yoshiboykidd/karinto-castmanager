@@ -1,13 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { addDays, format } from 'date-fns';
 
-// 処理時間を最大限確保
+// 処理時間を最大限確保 (Vercel Hobbyだと最大60秒)
 export const maxDuration = 60; 
 export const dynamic = 'force-dynamic';
 
-const TARGET_SHOPS = [
+const ALL_SHOPS = [
   { id: '001', name: '神田', baseUrl: 'https://www.kakarinto.com/attend.php' }, 
   { id: '002', name: '赤坂', baseUrl: 'https://www.akakari10.com/attend.php' }, 
   { id: '003', name: '秋葉原', baseUrl: 'https://www.akikarinto.com/attend.php' }, 
@@ -22,9 +22,26 @@ const TARGET_SHOPS = [
   { id: '012', name: '小岩', baseUrl: 'https://www.karin10koiwa.com/attend.php' }, 
 ];
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   // ★計測開始
   const startTime = Date.now();
+
+  // URLパラメータ (?group=1 など) を取得
+  const searchParams = request.nextUrl.searchParams;
+  const group = searchParams.get('group');
+
+  // グループ分けロジック (4店舗ずつ)
+  let targetShops = [];
+  if (group === '1') {
+    targetShops = ALL_SHOPS.slice(0, 4); // 神田〜上野
+  } else if (group === '2') {
+    targetShops = ALL_SHOPS.slice(4, 8); // 渋谷〜大宮
+  } else if (group === '3') {
+    targetShops = ALL_SHOPS.slice(8, 12); // 吉祥寺〜小岩
+  } else {
+    // 指定がなければ全店舗（タイムアウトのリスクあり）
+    targetShops = ALL_SHOPS;
+  }
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,7 +51,7 @@ export async function GET() {
   const JST_OFFSET = 9 * 60 * 60 * 1000;
 
   // 1店舗ごとの処理ロジック
-  const processShop = async (shop: typeof TARGET_SHOPS[0]) => {
+  const processShop = async (shop: typeof ALL_SHOPS[0]) => {
     let localLogs: string[] = [];
 
     try {
@@ -47,7 +64,7 @@ export async function GET() {
         return [`⚠️ Skip ${shop.name}: 名簿取得失敗`];
       }
 
-      // 名前正規化ロジック
+      // 名前正規化
       const normalize = (val: string) => {
         if (!val) return "";
         let s = val.replace(/\s+/g, '').replace(/[（\(\[].*?[）\)\]]/g, '').replace(/（\d+）/g, ''); 
@@ -65,7 +82,7 @@ export async function GET() {
 
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒に延長
+          const timeoutId = setTimeout(() => controller.abort(), 8000); // 8秒制限
 
           const res = await fetch(url, { 
             cache: 'no-store',
@@ -87,12 +104,9 @@ export async function GET() {
           const batchData: any[] = [];
           const unmatchedNames: string[] = []; 
 
-          // -----------------------------------------------------------
           // 共通処理関数
-          // -----------------------------------------------------------
           const tryAddShift = (rawName: string, timeText: string) => {
             const cleanName = normalize(rawName);
-            // 時間フォーマット (11:00-19:00 や 17:30-21:00) を探す
             const timeMatch = timeText.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
 
             if (cleanName && timeMatch) {
@@ -128,10 +142,6 @@ export async function GET() {
             }
           };
 
-          // ===========================================================
-          // ★ 解析ロジック (色指定を削除し、時間パターンで探す) ★
-          // ===========================================================
-
           // 【パターンA】 リスト形式
           $('li').each((_, element) => {
             const li = $(element);
@@ -140,25 +150,20 @@ export async function GET() {
             tryAddShift(rawName, timeText);
           });
 
-          // 【パターンB】 カード形式 (神田・渋谷・秋葉原など)
+          // 【パターンB】 カード形式
           $('.dataBox').each((_, element) => {
             const box = $(element);
-            const rawName = box.find('h3').text(); // "ゆりか（21）"
-            
-            // 色クラス(moziRed等)を指定せず、ボックス内のすべてのテキストから時間を探す
+            const rawName = box.find('h3').text();
             let timeText = "";
             box.find('p').each((_, p) => {
                 const t = $(p).text();
-                // 数字:数字 - 数字:数字 のパターンが含まれていたらそれを採用
                 if (/\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}/.test(t)) {
                     timeText = t;
-                    return false; // ループを抜ける
+                    return false;
                 }
             });
-
             tryAddShift(rawName, timeText);
           });
-          // ===========================================================
 
           if (batchData.length > 0) {
             const { error } = await supabase.from('shifts').upsert(batchData, { onConflict: 'login_id, shift_date' });
@@ -167,7 +172,7 @@ export async function GET() {
           } else {
             if (unmatchedNames.length > 0) {
                 const names = unmatchedNames.slice(0, 3).join(', ');
-                return `⚠️ ${shop.name} ${format(targetDate, 'MM/dd')} (0件) - 名簿なし: ${names}${unmatchedNames.length > 3 ? '...' : ''}`;
+                return `⚠️ ${shop.name} ${format(targetDate, 'MM/dd')} (0件) - 名簿なし: ${names}...`;
             }
             return `💤 ${shop.name} ${format(targetDate, 'MM/dd')} (0件) - シフトなし`;
           }
@@ -190,31 +195,30 @@ export async function GET() {
   try {
     const allResults: string[][] = [];
     
-    // 1店舗ずつ順番に実行
-    for (const shop of TARGET_SHOPS) {
+    // ターゲット店舗のみ実行
+    for (const shop of targetShops) {
       const shopLogs = await processShop(shop);
       allResults.push(shopLogs);
-      
-      // 次の店舗に行く前に 0.5秒 休む
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // 少し休憩
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
 
     const flatLogs = allResults.flat();
 
-    // ★計測終了＆時間計算
+    // ★計測終了
     const endTime = Date.now();
     const diffMs = endTime - startTime;
-    const diffMin = Math.floor(diffMs / 60000);
-    const diffSec = ((diffMs % 60000) / 1000).toFixed(0);
+    const diffSec = (diffMs / 1000).toFixed(1);
     
-    // ログの最後に追加
-    flatLogs.push(`🏁 全店完了！所要時間: ${diffMin}分${diffSec}秒`);
+    flatLogs.push(`🏁 Group ${group || 'ALL'} 完了！所要時間: ${diffSec}秒`);
 
+    // ログ保存 (Group1の時だけ、あるいは常に上書き、など運用に合わせて調整)
+    // ここでは単純に「実行された」ことだけ記録します
     await supabase
       .from('sync_logs')
       .upsert({ id: 1, last_sync_at: new Date().toISOString() });
 
-    return NextResponse.json({ success: true, logs: flatLogs });
+    return NextResponse.json({ success: true, group: group, logs: flatLogs });
 
   } catch (error: any) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
