@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { useShiftData } from '@/hooks/useShiftData'; // ★実績のあるフックを使う
+import { useShiftData } from '@/hooks/useShiftData';
 import CastHeader from '@/components/dashboard/CastHeader';
 import FixedFooter from '@/components/dashboard/FixedFooter';
 
@@ -19,8 +19,8 @@ export default function MyPage() {
   const router = useRouter();
   const pathname = usePathname();
   
-  // ★ダッシュボードと同じ仕組みでデータを取得（これなら確実！）
-  const { data, loading, supabase } = useShiftData();
+  // ★fetchInitialData を取り出すのを忘れていました！
+  const { data, loading, fetchInitialData, supabase } = useShiftData();
   const profile = data?.profile;
 
   // フォーム状態
@@ -28,6 +28,11 @@ export default function MyPage() {
   const [targetAmount, setTargetAmount] = useState(''); 
   const [theme, setTheme] = useState('pink');
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // ★重要：画面が開いたらデータを取得開始する！
+  useEffect(() => {
+    fetchInitialData(router);
+  }, []);
 
   // データが読み込まれたら、フォームに初期値をセット
   useEffect(() => {
@@ -62,8 +67,8 @@ export default function MyPage() {
     if (!error) {
       alert('設定を保存しました！🎨');
       setTargetAmount(String(cleanAmount));
-      // 即座に反映させるためにリロードする手もありますが、今回は状態更新のみ
-      // もし全体の色が変わらない場合は window.location.reload() してもOK
+      // ダッシュボードに戻った時に反映されるようリロード推奨
+      // window.location.reload(); 
     } else {
       alert('保存に失敗しました...');
     }
@@ -98,7 +103,7 @@ export default function MyPage() {
       <CastHeader 
         shopName={profile?.shops?.shop_name || "マイページ"} 
         displayName={profile?.display_name} 
-        version="v3.6.6" 
+        version="v3.6.7" 
         bgColor={currentTheme.bg} 
       />
 
@@ -107,7 +112,7 @@ export default function MyPage() {
         {/* プロフィール情報 */}
         <div className="text-center space-y-1">
           <h2 className="text-xl font-black text-gray-800">
-            {profile?.display_name || "読み込み中..."}
+            {profile?.display_name || "ゲスト"}
           </h2>
           <p className="text-gray-400 text-xs font-bold tracking-widest">
             ID: {profile?.login_id}
