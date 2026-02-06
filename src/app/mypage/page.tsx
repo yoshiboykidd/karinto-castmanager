@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
 import { useRouter, usePathname } from 'next/navigation';
+// ★これを使います！ダッシュボードと同じデータ取得フック
+import { useShiftData } from '@/hooks/useShiftData'; 
+
 import CastHeader from '@/components/dashboard/CastHeader';
 import FixedFooter from '@/components/dashboard/FixedFooter';
 
@@ -18,66 +20,32 @@ const THEMES = [
 export default function MyPage() {
   const router = useRouter();
   const pathname = usePathname();
+
+  // ★ここがポイント！ダッシュボードと同じ仕組みでデータを取る
+  const { data, loading, supabase, fetchInitialData } = useShiftData();
   
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
-  const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<any>(null);
-
   // フォーム状態
   const [newPassword, setNewPassword] = useState('');
   const [targetAmount, setTargetAmount] = useState(''); 
   const [theme, setTheme] = useState('pink');
-  
   const [isSaving, setIsSaving] = useState(false);
 
-  // データ取得
+  // 初回ロード
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user || !user.email) { 
-          router.push('/login'); 
-          return; 
-        }
+    fetchInitialData(router);
+  }, []);
 
-        const rawLoginId = user.email.split('@')[0];         
-        const strippedLoginId = String(Number(rawLoginId));  
-
-        // ★修正: 再度、結合クエリを使用（これが一番確実に取れるため）
-        // ただし、shopsがnullでもエラーにならないよう左外部結合的な挙動を期待
-        const { data: members, error } = await supabase
-          .from('cast_members')
-          .select('*, shops(shop_name, last_synced_at)') 
-          .in('login_id', [rawLoginId, strippedLoginId]);
-
-        if (error) throw error;
-
-        const member = members && members.length > 0 ? members[0] : null;
-
-        if (member) {
-          setProfile(member);
-          setTargetAmount(String(member.monthly_target_amount || '')); 
-          setTheme(member.theme_color || 'pink');
-        } else {
-          console.error('Profile NOT found in DB');
-        }
-
-      } catch (e) {
-        console.error('Fetch Error:', e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [router, supabase]);
+  // データが取れたら、フォームに初期値をセットする
+  useEffect(() => {
+    if (data?.profile) {
+      setTargetAmount(String(data.profile.monthly_target_amount || ''));
+      setTheme(data.profile.theme_color || 'pink');
+    }
+  }, [data?.profile]);
 
   // 設定保存
   const handleSaveSettings = async () => {
-    if (!profile || !profile.login_id) return;
+    if (!data?.profile?.login_id) return;
     setIsSaving(true);
 
     try {
@@ -96,17 +64,17 @@ export default function MyPage() {
           monthly_target_amount: cleanAmount,
           theme_color: theme 
         })
-        .eq('login_id', profile.login_id);
+        .eq('login_id', data.profile.login_id);
 
       if (error) throw error;
 
       alert('設定を保存しました！🎨');
-      setTargetAmount(String(cleanAmount));
-      window.location.reload(); // 反映のためリロード
+      // 画面をリロードして、ダッシュボード側の色も更新させる
+      window.location.reload(); 
 
     } catch (e: any) {
       console.error('Update Error:', e);
-      alert(`保存に失敗しました...`);
+      alert('保存に失敗しました...');
     } finally {
       setIsSaving(false);
     }
@@ -114,13 +82,13 @@ export default function MyPage() {
 
   // パスワード変更
   const handlePasswordChange = async () => {
-    if (!profile?.login_id) return;
+    if (!data?.profile?.login_id) return;
     if (!newPassword || newPassword.length < 4) return alert('パスワードは4文字以上にしてください');
     
     const { error } = await supabase
       .from('cast_members')
       .update({ password: newPassword })
-      .eq('login_id', profile.login_id);
+      .eq('login_id', data.profile.login_id);
 
     if (!error) { 
       alert('パスワードを変更しました✨'); 
@@ -131,13 +99,12 @@ export default function MyPage() {
   };
 
   const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
-  const isDangerPassword = profile?.password === '0000';
+  const isDangerPassword = data?.profile?.password === '0000';
   
-  // Header情報
-  const headerShopName = profile?.shops?.shop_name || "マイページ";
-  // ★重要: 配列ではなくオブジェクトとして入ってくるのでそのまま参照
-  const headerSyncTime = profile?.shops?.last_synced_at; 
-  const headerDisplayName = profile?.display_name;
+  // ダッシュボードと同じデータを使うので、確実に表示される
+  const headerShopName = data?.shop?.shop_name || "マイページ";
+  const headerSyncTime = data?.syncAt; // ★これでHP Syncも確実に動く
+  const headerDisplayName = data?.profile?.display_name;
   const headerBgColor = currentTheme.bg;
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse">LOADING...</div>;
@@ -145,24 +112,25 @@ export default function MyPage() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800">
       
+      {/* 共通のHeaderを使用 */}
       <CastHeader 
         shopName={headerShopName}
         displayName={headerDisplayName}
         syncTime={headerSyncTime}
-        version="v3.8.0"
+        version="v3.8.1"
         bgColor={headerBgColor}
       />
 
-      {/* ★修正: 余白を詰める (mt-6 -> mt-3, space-y-8 -> space-y-4) */}
       <main className="px-4 mt-3 space-y-4">
         
-        {!profile && (
+        {/* データ取得エラー時はここが出る（useShiftDataを使えば基本出ないはず） */}
+        {!data?.profile && (
             <div className="bg-red-50 p-3 rounded-xl mb-2 text-left border border-red-200">
               <p className="text-red-500 font-bold text-xs">⚠️ データの取得に失敗しました</p>
             </div>
         )}
 
-        <div className="space-y-3"> {/* 間隔を詰める */}
+        <div className="space-y-3">
           
           {/* 1. 目標金額設定 */}
           <section className="bg-white border border-gray-100 rounded-[24px] p-5 shadow-lg space-y-2">
@@ -249,7 +217,6 @@ export default function MyPage() {
           </div>
         </section>
 
-        {/* ログアウトボタンは削除しました */}
       </main>
 
       <FixedFooter 
