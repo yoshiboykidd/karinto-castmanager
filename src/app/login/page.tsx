@@ -35,29 +35,28 @@ export default function LoginPage() {
     }
 
     // 3. 役職チェック (Database)
-    // ログインしたIDを使って、cast_membersテーブルから役割(role)を取得
     const { data: member, error: dbError } = await supabase
       .from('cast_members')
-      // ここで login_id を使って検索
       .select('role')
       .eq('login_id', castId) 
       .single();
 
     if (dbError) {
-      // 万が一DB取得に失敗しても、ログイン自体は成功しているので
-      // 一旦ホームに飛ばすか、エラーを出すか。今回はログに出してホームへ。
       console.error('Role check failed:', dbError);
       router.push('/');
     } else {
-      // 4. 振り分けロジック
+      // 4. 振り分けロジック & パスワード警告判定
       const role = member?.role;
+      const isAdmin = role === 'developer' || role === 'admin';
+      
+      // 行き先決定
+      const destination = isAdmin ? '/admin' : '/';
 
-      if (role === 'developer' || role === 'admin') {
-        console.log(`Login as ${role}: Redirecting to Admin Panel`);
-        router.push('/admin'); // 開発者・店長は管理画面へ
+      // ★追加: パスワードが「0000」なら、URLに目印(?alert_password=true)をつける
+      if (password === '0000') {
+        router.push(`${destination}?alert_password=true`);
       } else {
-        console.log('Login as Cast: Redirecting to Dashboard');
-        router.push('/'); // キャストはホームへ
+        router.push(destination);
       }
     }
     
