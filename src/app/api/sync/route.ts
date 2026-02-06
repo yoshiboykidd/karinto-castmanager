@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { addDays, format } from 'date-fns';
 
+// タイムアウト時間を少し延長 (Vercelのホビー枠だと限界がありますが念のため)
 export const maxDuration = 60; 
 export const dynamic = 'force-dynamic';
 
@@ -42,9 +43,12 @@ export async function GET() {
         return [`⚠️ Skip ${shop.name}: 名簿取得失敗`];
       }
 
+      // 名前正規化ロジック
       const normalize = (val: string) => {
         if (!val) return "";
+        // 空白除去、カッコ除去（神田店の（24）などもここで消えます）
         let s = val.replace(/\s+/g, '').replace(/[（\(\[].*?[）\)\]]/g, '').replace(/（\d+）/g, ''); 
+        // 全角英数を半角に
         return s.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
       };
 
@@ -58,7 +62,7 @@ export async function GET() {
 
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8000); // ちょっと長めに8秒
+          const timeoutId = setTimeout(() => controller.abort(), 8000); 
 
           const res = await fetch(url, { 
             cache: 'no-store',
@@ -78,18 +82,18 @@ export async function GET() {
           const existingStatusMap = new Map(existingShifts?.map(s => [String(s.login_id), s.status]));
           
           const batchData: any[] = [];
-          const unmatchedNames: string[] = []; // マッチしなかった名前リスト
+          const unmatchedNames: string[] = []; 
 
-          $('li').each((_, element) => {
-            const li = $(element);
-            const rawName = li.find('h3').text(); // 元の名前
-            const cleanName = normalize(rawName); // 正規化した名前
-            const timeMatch = li.text().match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
+          // -----------------------------------------------------------
+          // 共通処理関数: 名前と時間を受け取ってリストに追加する
+          // -----------------------------------------------------------
+          const tryAddShift = (rawName: string, timeText: string) => {
+            const cleanName = normalize(rawName);
+            const timeMatch = timeText.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
 
             if (cleanName && timeMatch) {
               const loginId = nameMap.get(cleanName);
               if (loginId) {
-                // マッチした！
                 const currentStatus = existingStatusMap.get(loginId);
                 const hpStart = timeMatch[1].padStart(5, '0');
                 const hpEnd = timeMatch[2].padStart(5, '0');
@@ -115,20 +119,44 @@ export async function GET() {
                   });
                 }
               } else {
-                // 名前はあるけどDBにない！
                 unmatchedNames.push(rawName);
               }
             }
+          };
+
+          // ===========================================================
+          // ★ 解析ロジック分岐 ★
+          // ===========================================================
+
+          // 【パターンA】 上野・池袋・五反田など (リスト形式)
+          $('li').each((_, element) => {
+            const li = $(element);
+            const rawName = li.find('h3').text();
+            // パターンAは li 全体のテキストから時間を探す
+            const timeText = li.text(); 
+            tryAddShift(rawName, timeText);
           });
+
+          // 【パターンB】 神田・赤坂・秋葉原・渋谷など (カード形式)
+          // パターンAで1件も取れなかった場合のみ実行、または混在の可能性を考えて両方実行でもOK
+          // ここでは「もしパターンAが空なら」ではなく「常に追加で探す」ようにします（安全策）
+          if (batchData.length === 0) {
+            $('.dataBox').each((_, element) => {
+              const box = $(element);
+              const rawName = box.find('h3').text(); // 例: "ことね （24）"
+              const timeText = box.find('p.moziRed').text(); // 例: "11:00-19:00"
+              tryAddShift(rawName, timeText);
+            });
+          }
+
+          // ===========================================================
 
           if (batchData.length > 0) {
             const { error } = await supabase.from('shifts').upsert(batchData, { onConflict: 'login_id, shift_date' });
             if (error) return `❌ ${shop.name} ${dateStrDB} DB Error`;
             return `✅ ${shop.name} ${format(targetDate, 'MM/dd')} (${batchData.length}件)`;
           } else {
-            // ★ここが変更点: 0件でも理由を表示する
             if (unmatchedNames.length > 0) {
-                // 最初の3人だけログに出す（長くなりすぎるので）
                 const names = unmatchedNames.slice(0, 3).join(', ');
                 return `⚠️ ${shop.name} ${format(targetDate, 'MM/dd')} (0件) - 名簿なし: ${names}${unmatchedNames.length > 3 ? '...' : ''}`;
             }
