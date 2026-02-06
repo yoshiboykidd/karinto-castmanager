@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createBrowserClient } from '@supabase/ssr'; // 直接Supabaseを使う
+import { createBrowserClient } from '@supabase/ssr';
 import { useRouter, usePathname } from 'next/navigation';
 import CastHeader from '@/components/dashboard/CastHeader';
 import FixedFooter from '@/components/dashboard/FixedFooter';
@@ -17,9 +17,10 @@ const THEMES = [
 
 export default function MyPage() {
   const router = useRouter();
-  const pathname = usePathname();
   
-  // Supabaseクライアント作成
+  // ★ここに「pathname」の定義を追加しました！これで波線が消えます。
+  const pathname = usePathname(); 
+
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -33,40 +34,35 @@ export default function MyPage() {
   const [targetAmount, setTargetAmount] = useState(''); 
   const [theme, setTheme] = useState('pink');
   
-  // 保存中の状態
   const [isSaving, setIsSaving] = useState(false);
 
-  // ★データ取得ロジック（ここを最強にする）
+  // データ取得
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1. ログインユーザー確認
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || !user.email) { 
           router.push('/login'); 
           return; 
         }
 
-        const rawLoginId = user.email.split('@')[0];         // そのまま (例: 00600037)
-        const strippedLoginId = String(Number(rawLoginId));  // ゼロなし (例: 600037)
+        const rawLoginId = user.email.split('@')[0];         
+        const strippedLoginId = String(Number(rawLoginId));  
 
         console.log(`Searching profile for: "${rawLoginId}" OR "${strippedLoginId}"`);
 
-        // 2. プロフィール検索（両方のパターンで探す！）
         const { data: members, error } = await supabase
           .from('cast_members')
           .select('*, shops(shop_name)')
-          .in('login_id', [rawLoginId, strippedLoginId]); // どっちかあればOK
+          .in('login_id', [rawLoginId, strippedLoginId]);
 
         if (error) throw error;
 
-        // 見つかったデータを取り出す
         const member = members && members.length > 0 ? members[0] : null;
 
         if (member) {
           console.log('Profile Loaded:', member);
           setProfile(member);
-          // 初期値をフォームにセット
           setTargetAmount(String(member.monthly_target_amount || '')); 
           setTheme(member.theme_color || 'pink');
         } else {
@@ -84,7 +80,7 @@ export default function MyPage() {
 
   // 設定保存
   const handleSaveSettings = async () => {
-    if (!profile || !profile.id) {
+    if (!profile || !profile.login_id) {
       alert('エラー：プロフィール情報が読み込めていません。\n画面をリロードしてみてください。');
       return;
     }
@@ -92,7 +88,6 @@ export default function MyPage() {
     setIsSaving(true);
 
     try {
-      // 全角数字→半角変換
       const cleanAmountStr = String(targetAmount).replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
       const cleanAmount = cleanAmountStr ? Number(cleanAmountStr) : 0;
 
@@ -102,21 +97,19 @@ export default function MyPage() {
         return;
       }
 
-      // アップデート実行
       const { error } = await supabase
         .from('cast_members')
         .update({ 
           monthly_target_amount: cleanAmount,
           theme_color: theme 
         })
-        .eq('id', profile.id);
+        .eq('login_id', profile.login_id);
 
       if (error) throw error;
 
       alert('設定を保存しました！🎨\n（ダッシュボードの色が変わります）');
       setTargetAmount(String(cleanAmount));
       
-      // 反映のためリロード
       window.location.reload();
 
     } catch (e: any) {
@@ -129,13 +122,13 @@ export default function MyPage() {
 
   // パスワード変更
   const handlePasswordChange = async () => {
-    if (!profile?.id) return alert('プロフィール読込中...');
+    if (!profile?.login_id) return alert('プロフィール読込中...');
     if (!newPassword || newPassword.length < 4) return alert('パスワードは4文字以上にしてください');
     
     const { error } = await supabase
       .from('cast_members')
       .update({ password: newPassword })
-      .eq('id', profile.id);
+      .eq('login_id', profile.login_id);
 
     if (!error) { 
       alert('パスワードを変更しました✨'); 
@@ -157,15 +150,14 @@ export default function MyPage() {
       <CastHeader 
         shopName={profile?.shops?.shop_name || "マイページ"} 
         displayName={profile?.display_name} 
-        version="v3.7.0" 
+        version="v3.7.3" 
         bgColor={currentTheme.bg} 
       />
 
+      {/* ★ここの波線も、上の pathname が定義されたことで消えるはずです！ */}
       <main className="px-5 mt-6 space-y-8">
         
-        {/* プロフィール情報 */}
         <div className="text-center space-y-1">
-          {/* データが見つからない場合の警告 */}
           {!profile && (
              <div className="bg-red-50 p-4 rounded-xl mb-4 text-left border border-red-200">
                <p className="text-red-500 font-bold text-sm">⚠️ データの取得に失敗しました</p>
@@ -184,9 +176,7 @@ export default function MyPage() {
           </p>
         </div>
 
-        {/* 設定フォーム */}
         <div className="space-y-6">
-          {/* テーマカラー */}
           <section className="bg-white border border-gray-100 rounded-[32px] p-6 shadow-xl space-y-4">
             <div className="flex items-center gap-2 font-black text-gray-700">
               <span className="text-xl">🎨</span>
@@ -203,7 +193,6 @@ export default function MyPage() {
             </div>
           </section>
 
-          {/* 目標金額 */}
           <section className="bg-white border border-gray-100 rounded-[32px] p-6 shadow-xl space-y-4">
             <div className="flex items-center gap-2 font-black text-gray-700">
               <span className="text-xl">💰</span>
@@ -243,7 +232,6 @@ export default function MyPage() {
 
         <hr className="border-gray-100" />
 
-        {/* パスワード変更 */}
         <section className={`border-2 rounded-[32px] p-6 shadow-lg transition-colors duration-500
           ${isDangerPassword ? 'bg-red-50 border-red-100 animate-pulse-slow' : 'bg-gray-50 border-gray-100'}
         `}>
@@ -280,6 +268,7 @@ export default function MyPage() {
         <button onClick={async () => { await supabase.auth.signOut(); router.push('/login'); }} className="w-full py-4 text-gray-400 text-xs font-bold tracking-widest">LOGOUT</button>
       </main>
 
+      {/* pathname={pathname} もこれでエラーが消えます */}
       <FixedFooter 
         pathname={pathname || ''} 
         onHome={() => router.push('/')} 

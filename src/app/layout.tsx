@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Karinto Cast Manager", // ブラウザのタブに表示される名前
+  title: "KarintoCastManager", // ブラウザのタブに表示される名前
   description: "かりんとキャスト専用ポータル", // サイトの説明（裏側の設定）
 };
 
