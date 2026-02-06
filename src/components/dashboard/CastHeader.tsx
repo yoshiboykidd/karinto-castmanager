@@ -1,68 +1,35 @@
 'use client';
 
-import { format, isValid } from 'date-fns';
-
-type Props = {
+type CastHeaderProps = {
   shopName: string;
-  syncTime?: string | null;
-  displayName?: string;
+  syncTime: string;
+  displayName: string;
   version: string;
-  bgColor?: string; // ★変更: 具体的な色クラスを受け取る (例: 'bg-pink-500')
 };
 
-export default function CastHeader({ 
-  shopName, 
-  syncTime, 
-  displayName, 
-  version, 
-  bgColor // 色が渡されなければデフォルト（白）になる
-}: Props) {
-  
-  // 時間表示の安全策
-  const formattedTime = (() => {
-    try {
-      if (!syncTime) return '--:--';
-      const date = new Date(syncTime);
-      return isValid(date) ? format(date, 'HH:mm') : '--:--';
-    } catch (e) {
-      return '--:--';
-    }
-  })();
-
-  // 色が指定されているか？
-  const hasTheme = !!bgColor;
-
+export default function CastHeader({ shopName, syncTime, displayName, version }: CastHeaderProps) {
   return (
-    <header className={`px-6 py-5 rounded-b-[40px] flex items-center justify-between relative overflow-hidden transition-colors duration-500 shadow-sm
-      ${hasTheme 
-        ? `${bgColor} text-white`  // テーマ色がある場合（文字は白）
-        : 'bg-white text-gray-800' // デフォルト（白背景、文字はグレー）
-      }
-    `}>
-      {/* 左側：店名と更新時間 */}
-      <div>
-        <h1 className="text-lg font-black tracking-tighter leading-none mb-1">
-          {shopName || 'KARINTO'}
-        </h1>
-        <div className="flex items-center gap-2 opacity-80">
-          <span className="text-[10px] font-bold tracking-widest uppercase">
-            LAST SYNC
-          </span>
-          <span className="text-[10px] font-mono font-bold bg-black/10 px-1.5 py-0.5 rounded">
-            {formattedTime}
-          </span>
+    <header className="bg-white px-6 pt-10 pb-4 rounded-b-[40px] shadow-sm border-b border-pink-50 relative">
+      <div className="flex justify-between items-start">
+        <div>
+          <p className="text-[10px] font-black text-pink-300 uppercase tracking-widest mb-1 leading-none underline decoration-pink-100 decoration-2 underline-offset-4">
+            {version}
+          </p>
+          <p className="text-[13px] font-bold text-gray-400 mb-1">{shopName}店</p>
         </div>
+        {syncTime && (
+          <div className="bg-gray-50 px-2 py-1 rounded-lg border border-gray-100 flex items-center gap-1">
+            <span className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></span>
+            <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">
+              HP同期: {syncTime}
+            </span>
+          </div>
+        )}
       </div>
-
-      {/* 右側：名前とバージョン */}
-      <div className="text-right">
-        <p className="text-sm font-black tracking-tight leading-none mb-1">
-          {displayName || 'GUEST'}
-        </p>
-        <span className="text-[10px] font-bold opacity-60 tracking-widest">
-          {version}
-        </span>
-      </div>
+      <h1 className="text-3xl font-black flex items-baseline gap-0.5 leading-tight">
+        {displayName || 'キャスト'}
+        <span className="text-[14px] text-pink-400 font-bold ml-0.5">さん</span>
+      </h1>
     </header>
   );
 }
