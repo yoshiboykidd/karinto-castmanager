@@ -1,32 +1,49 @@
 'use client';
 
-type FixedFooterProps = {
+import { Home, CircleDollarSign, UserRound, LogOut } from 'lucide-react';
+
+type Props = {
   pathname: string;
   onHome: () => void;
   onSalary: () => void;
+  onProfile?: () => void; // ★追加
   onLogout: () => void;
 };
 
-export default function FixedFooter({ pathname, onHome, onSalary, onLogout }: FixedFooterProps) {
-  const isHome = pathname === '/' || !pathname;
+export default function FixedFooter({ pathname, onHome, onSalary, onProfile, onLogout }: Props) {
+  const isHome = pathname === '/';
   const isSalary = pathname === '/salary';
+  const isProfile = pathname === '/mypage';
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-xl border-t border-gray-100 pb-8 pt-4">
-      <nav className="flex justify-around items-center max-w-md mx-auto px-6">
-        <button onClick={onHome} className="flex flex-col items-center gap-1.5">
-          <span className={`text-2xl ${isHome ? 'opacity-100' : 'opacity-30'}`}>🏠</span>
-          <span className={`text-[9px] font-black uppercase ${isHome ? 'text-pink-500' : 'text-gray-300'}`}>ホーム</span>
+    <footer className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-md border-t border-pink-100 pb-safe pt-2 px-6 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] z-50">
+      <div className="flex justify-between items-center max-w-md mx-auto h-[60px] pb-2">
+        
+        {/* ホーム */}
+        <button onClick={onHome} className="flex flex-col items-center gap-1 w-12 group">
+          <Home className={`w-6 h-6 transition-colors ${isHome ? 'text-pink-500 fill-pink-50' : 'text-gray-300 group-hover:text-pink-300'}`} />
+          <span className={`text-[9px] font-bold ${isHome ? 'text-pink-500' : 'text-gray-300'}`}>HOME</span>
         </button>
-        <button onClick={onSalary} className="flex flex-col items-center gap-1.5">
-          <span className={`text-2xl ${isSalary ? 'opacity-100' : 'opacity-30'}`}>💰</span>
-          <span className={`text-[9px] font-black uppercase ${isSalary ? 'text-pink-500' : 'text-gray-300'}`}>給与明細</span>
+
+        {/* 給与 (Salary) */}
+        <button onClick={onSalary} className="flex flex-col items-center gap-1 w-12 group">
+          <CircleDollarSign className={`w-6 h-6 transition-colors ${isSalary ? 'text-pink-500 fill-pink-50' : 'text-gray-300 group-hover:text-pink-300'}`} />
+          <span className={`text-[9px] font-bold ${isSalary ? 'text-pink-500' : 'text-gray-300'}`}>SALARY</span>
         </button>
-        <button onClick={onLogout} className="flex flex-col items-center gap-1.5 text-gray-300">
-          <span className="text-2xl opacity-30">🚪</span>
-          <span className="text-[9px] font-black uppercase">ログアウト</span>
+
+        {/* ★マイページ (Profile) */}
+        <button onClick={onProfile} className="flex flex-col items-center gap-1 w-12 group">
+          <UserRound className={`w-6 h-6 transition-colors ${isProfile ? 'text-pink-500 fill-pink-50' : 'text-gray-300 group-hover:text-pink-300'}`} />
+          <span className={`text-[9px] font-bold ${isProfile ? 'text-pink-500' : 'text-gray-300'}`}>MY</span>
         </button>
-      </nav>
+
+        {/* ログアウト */}
+        <button onClick={onLogout} className="flex flex-col items-center gap-1 w-12 group">
+          <LogOut className="w-6 h-6 text-gray-300 group-hover:text-red-400 transition-colors" />
+          <span className="text-[9px] font-bold text-gray-300 group-hover:text-red-400">EXIT</span>
+        </button>
+
+      </div>
     </footer>
   );
 }

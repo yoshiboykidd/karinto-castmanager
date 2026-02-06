@@ -17,7 +17,6 @@ import RequestList from '@/components/dashboard/RequestList';
 import NewsSection from '@/components/dashboard/NewsSection';
 import FixedFooter from '@/components/dashboard/FixedFooter';
 
-// テーマ設定
 const THEME_CONFIG: any = {
   pink:   { header: 'bg-pink-500',   calendar: 'bg-pink-50 border-pink-100',   text: 'text-pink-500' },
   blue:   { header: 'bg-blue-500',   calendar: 'bg-blue-50 border-blue-100',   text: 'text-blue-500' },
@@ -35,7 +34,6 @@ export default function DashboardContent() {
   const { data, loading, fetchInitialData, getMonthlyTotals, supabase } = useShiftData();
   const nav = useNavigation();
 
-  // 安全にデータ取得
   const safeProfile = data?.profile || {};
   const targetAmount = safeProfile.monthly_target_amount || 0;
   const themeKey = safeProfile.theme_color || 'pink';
@@ -75,6 +73,8 @@ export default function DashboardContent() {
     return getMonthlyTotals(nav.viewDate);
   }, [data?.shifts, nav.viewDate, getMonthlyTotals]);
 
+  const goToMyPage = () => router.push('/mypage');
+
   if (!mounted || loading) {
     return <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse text-5xl italic tracking-tighter">KARINTO...</div>;
   }
@@ -86,17 +86,22 @@ export default function DashboardContent() {
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
       
       {/* 1. ヘッダー */}
-      <CastHeader 
-        shopName={data?.shop?.shop_name || "かりんと"} 
-        syncTime={data?.syncAt} 
-        displayName={safeProfile.display_name} 
-        version="v3.5.5"
-        bgColor={currentTheme.header}
-      />
+      <div onClick={goToMyPage} className="cursor-pointer active:opacity-80 transition-opacity">
+        {/* ヘッダーの下に余白(pb-10)を追加して、重なるスペースを確保 */}
+        <div className="pb-4">
+          <CastHeader 
+            shopName={data?.shop?.shop_name || "かりんと"} 
+            syncTime={data?.syncAt} 
+            displayName={safeProfile.display_name} 
+            version="v3.5.5"
+            bgColor={currentTheme.header}
+          />
+        </div>
+      </div>
       
-      {/* ★ここを修正！ mt-4 にして間隔を空ける */}
-      <main className="px-4 mt-4 relative z-10 space-y-3">
-        {/* 2. 月間サマリー */}
+      {/* 2. メインコンテンツ (マイナスマージンで上に食い込ませる！) */}
+      <main className="px-4 -mt-8 relative z-10 space-y-3">
+        {/* 月間サマリー */}
         {isValid(safeViewDate) && (
           <MonthlySummary 
             month={format(safeViewDate, 'M月')} 
@@ -106,7 +111,7 @@ export default function DashboardContent() {
           />
         )}
 
-        {/* 3. 実績/申請の切り替えタブ */}
+        {/* 実績/申請の切り替えタブ */}
         <div className="flex p-1 bg-gray-100/80 rounded-2xl border border-gray-200 shadow-inner">
           <button 
             onClick={() => nav.toggleMode(false)} 
@@ -130,7 +135,7 @@ export default function DashboardContent() {
           </button>
         </div>
         
-        {/* 4. カレンダー */}
+        {/* カレンダー */}
         <section className={`p-3 rounded-[32px] border shadow-sm text-center transition-colors duration-500
           ${isRequest 
             ? 'bg-cyan-50 border-cyan-100'
@@ -146,7 +151,7 @@ export default function DashboardContent() {
           />
         </section>
 
-        {/* 5. 詳細入力 or 申請リスト */}
+        {/* 詳細入力 or 申請リスト */}
         {!isRequest ? (
           (nav.selected.single instanceof Date && isValid(nav.selected.single)) && (
             <DailyDetail 
@@ -169,7 +174,7 @@ export default function DashboardContent() {
           />
         )}
         
-        {/* 6. お知らせ */}
+        {/* お知らせ */}
         <NewsSection newsList={data?.news || []} />
       </main>
 
@@ -177,6 +182,7 @@ export default function DashboardContent() {
         pathname={pathname} 
         onHome={() => router.push('/')} 
         onSalary={() => router.push('/salary')} 
+        onProfile={goToMyPage}
         onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} 
       />
     </div>
