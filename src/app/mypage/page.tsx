@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
 import { useRouter, usePathname } from 'next/navigation';
+import { useShiftData } from '@/hooks/useShiftData'; // ★実績のあるフックを使う
 import CastHeader from '@/components/dashboard/CastHeader';
 import FixedFooter from '@/components/dashboard/FixedFooter';
 
@@ -18,70 +18,31 @@ const THEMES = [
 export default function MyPage() {
   const router = useRouter();
   const pathname = usePathname();
-  const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<any>(null);
   
-  // デバッグ用
-  const [debugRawId, setDebugRawId] = useState('');
-  const [debugStrippedId, setDebugStrippedId] = useState('');
-  
+  // ★ダッシュボードと同じ仕組みでデータを取得（これなら確実！）
+  const { data, loading, supabase } = useShiftData();
+  const profile = data?.profile;
+
+  // フォーム状態
   const [newPassword, setNewPassword] = useState('');
   const [targetAmount, setTargetAmount] = useState(''); 
   const [theme, setTheme] = useState('pink');
-  
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const [isInitialized, setIsInitialized] = useState(false);
 
+  // データが読み込まれたら、フォームに初期値をセット
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user || !user.email) { router.push('/login'); return; }
+    if (profile && !isInitialized) {
+      setTargetAmount(String(profile.monthly_target_amount || '')); 
+      setTheme(profile.theme_color || 'pink');
+      setIsInitialized(true);
+    }
+  }, [profile, isInitialized]);
 
-        const rawLoginId = user.email.split('@')[0];         // そのまま "00600037"
-        const strippedLoginId = String(Number(rawLoginId));  // ゼロなし "600037"
-        
-        setDebugRawId(rawLoginId);
-        setDebugStrippedId(strippedLoginId);
-
-        console.log(`Searching for ID: "${rawLoginId}" OR "${strippedLoginId}"`);
-
-        // ★最強検索: 両方のパターンで探して、最初に見つかった方を採用
-        const { data: members, error } = await supabase
-          .from('cast_members')
-          .select('*, shops(shop_name)')
-          .in('login_id', [rawLoginId, strippedLoginId]); // どっちかあればOK
-
-        if (error) {
-          console.error('Data Fetch Error:', error);
-        }
-
-        // 配列の1つ目を取得
-        const member = members && members.length > 0 ? members[0] : null;
-
-        if (member) {
-          console.log('Member Found:', member);
-          setProfile(member);
-          setTargetAmount(member.monthly_target_amount || ''); 
-          setTheme(member.theme_color || 'pink');
-        } else {
-          console.warn('Member not found for either ID.');
-        }
-
-      } catch (e) {
-        console.error('Error:', e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [router, supabase]);
-
+  // 設定保存
   const handleSaveSettings = async () => {
     if (!profile?.id) return;
 
+    // 全角数字→半角変換
     const cleanAmountStr = String(targetAmount).replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
     const cleanAmount = cleanAmountStr ? Number(cleanAmountStr) : 0;
 
@@ -101,12 +62,14 @@ export default function MyPage() {
     if (!error) {
       alert('設定を保存しました！🎨');
       setTargetAmount(String(cleanAmount));
-      setProfile({ ...profile, monthly_target_amount: cleanAmount, theme_color: theme });
+      // 即座に反映させるためにリロードする手もありますが、今回は状態更新のみ
+      // もし全体の色が変わらない場合は window.location.reload() してもOK
     } else {
       alert('保存に失敗しました...');
     }
   };
 
+  // パスワード変更
   const handlePasswordChange = async () => {
     if (!newPassword || newPassword.length < 4) return alert('パスワードは4文字以上にしてください');
     
@@ -118,7 +81,6 @@ export default function MyPage() {
     if (!error) { 
       alert('パスワードを変更しました✨'); 
       setNewPassword('');
-      setProfile({ ...profile, password: newPassword });
     } else {
       alert('変更に失敗しました...');
     }
@@ -136,7 +98,7 @@ export default function MyPage() {
       <CastHeader 
         shopName={profile?.shops?.shop_name || "マイページ"} 
         displayName={profile?.display_name} 
-        version="v3.6.5" 
+        version="v3.6.6" 
         bgColor={currentTheme.bg} 
       />
 
@@ -144,26 +106,11 @@ export default function MyPage() {
         
         {/* プロフィール情報 */}
         <div className="text-center space-y-1">
-          {/* まだ見つからない場合のデバッグ表示 */}
-          {!profile && (
-             <div className="bg-gray-100 p-4 rounded-xl mb-4 text-left border-l-4 border-red-400">
-               <p className="text-red-500 font-bold text-sm mb-1">⚠️ まだデータが見つかりません</p>
-               <p className="text-xs text-gray-600 leading-relaxed">
-                 以下のどちらのIDも登録がありませんでした。<br/>
-                 1. <span className="font-mono font-bold">{debugRawId}</span> (そのまま)<br/>
-                 2. <span className="font-mono font-bold">{debugStrippedId}</span> (ゼロなし)<br/>
-                 <br/>
-                 <span className="text-red-400 font-bold">対処法：</span><br/>
-                 Supabaseの `cast_members` テーブルに、このIDの行を追加してください。
-               </p>
-             </div>
-          )}
-
           <h2 className="text-xl font-black text-gray-800">
-            {profile?.display_name || "ゲスト"}
+            {profile?.display_name || "読み込み中..."}
           </h2>
           <p className="text-gray-400 text-xs font-bold tracking-widest">
-            ID: {profile?.login_id || debugRawId}
+            ID: {profile?.login_id}
           </p>
         </div>
 
