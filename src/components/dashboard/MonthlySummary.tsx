@@ -39,19 +39,23 @@ export default function MonthlySummary({
   return (
     <section className={`bg-gradient-to-br ${c.bgFrom} ${c.bgTo} rounded-[32px] p-5 border ${c.border} relative overflow-hidden shadow-sm flex flex-col space-y-2`}>
       
-      {/* 上段: 実績タイトル & バッジ */}
-      <div className="flex items-center justify-between h-8">
+      {/* 上段: 実績タイトル & バッジ（サイズを大きく復元） */}
+      <div className="flex items-center justify-between mb-1">
         <h2 className={`text-[20px] font-black ${c.textSub} tracking-tighter leading-none shrink-0`}>
           {month}の実績
         </h2>
         <div className="flex gap-1.5">
-          <div className={`bg-white/90 px-2 py-1 rounded-lg border ${c.subBorder} shadow-sm flex items-baseline justify-center min-w-[50px]`}>
-            <span className="text-[9px] font-bold text-gray-400 mr-1">出勤</span>
-            <span className={`text-[18px] font-black ${c.textSub} leading-none`}>{totals.count}</span>
+          {/* 出勤バッジ */}
+          <div className={`bg-white/90 px-3 py-1.5 rounded-xl border ${c.subBorder} shadow-sm flex items-baseline justify-center min-w-[70px]`}>
+            <span className="text-[11px] font-bold text-gray-400 mr-1">出勤</span>
+            <span className={`text-[24px] font-black ${c.textSub} leading-none tracking-tighter`}>{totals.count}</span>
+            <span className="text-[11px] font-bold text-gray-400 ml-0.5">日</span>
           </div>
-          <div className={`bg-white/90 px-2 py-1 rounded-lg border ${c.subBorder} shadow-sm flex items-baseline justify-center min-w-[50px]`}>
-            <span className="text-[9px] font-bold text-gray-400 mr-1">稼働</span>
-            <span className={`text-[18px] font-black ${c.textSub} leading-none`}>{Math.round(totals.hours * 10) / 10}</span>
+          {/* 稼働バッジ */}
+          <div className={`bg-white/90 px-3 py-1.5 rounded-xl border ${c.subBorder} shadow-sm flex items-baseline justify-center min-w-[70px]`}>
+            <span className="text-[11px] font-bold text-gray-400 mr-1">稼働</span>
+            <span className={`text-[24px] font-black ${c.textSub} leading-none tracking-tighter`}>{Math.round(totals.hours * 10) / 10}</span>
+            <span className="text-[11px] font-bold text-gray-400 ml-0.5">h</span>
           </div>
         </div>
       </div>
@@ -64,7 +68,7 @@ export default function MonthlySummary({
         </p>
       </div>
 
-      {/* 目標＆進捗エリア（サイズ調整済み） */}
+      {/* 目標＆進捗エリア（ハーフサイズ維持） */}
       {targetAmount > 0 && (
         <div className="bg-white/40 rounded-xl p-2.5 border border-white/50 shadow-sm mx-1">
           
@@ -83,13 +87,12 @@ export default function MonthlySummary({
              </div>
           </div>
           
-          {/* バー（h-3.5：程よい太さ） */}
+          {/* バー（h-3.5） */}
           <div className="w-full h-3.5 bg-gray-100 rounded-full overflow-hidden border border-white/60 shadow-inner relative">
             <div 
               className={`h-full ${c.bar} transition-all duration-1000 ease-out shadow-sm relative`} 
               style={{ width: `${progressPercent}%` }}
             >
-               {/* うっすらストライプ */}
                <div className="absolute inset-0 w-full h-full opacity-30 bg-[repeating-linear-gradient(45deg,transparent,transparent_6px,#fff_6px,#fff_12px)]"></div>
             </div>
           </div>
