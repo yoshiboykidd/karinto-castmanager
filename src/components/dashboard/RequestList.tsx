@@ -3,12 +3,12 @@
 import { format, isAfter, startOfDay } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
-// ★修正1: 型定義を any に逃がしてビルドエラーを回避
+// 型定義
 type RequestListProps = {
   multiDates: Date[];
   requestDetails: { [key: string]: { s: string; e: string } };
   setRequestDetails: (details: any) => void;
-  shifts: any[]; // ← ここを any[] にすることで、null混じりのデータでも怒られなくなります
+  shifts: any; // ★修正: any[] から any に変更（これでnullが来てもエラーになりません）
   onSubmit: () => void;
 };
 
@@ -34,8 +34,9 @@ export default function RequestList({
 
   // 確定情報を取得するロジック
   const getOfficialBase = (dateStr: string) => {
-    // ★修正2: shiftsが undefined/null の場合でも安全に動くようにガード
-    const s = (shifts || []).find((x: any) => x.shift_date === dateStr);
+    // 安全に配列化
+    const safeShifts = Array.isArray(shifts) ? shifts : [];
+    const s = safeShifts.find((x: any) => x.shift_date === dateStr);
     
     if (!s) return { s: 'OFF', e: 'OFF', exists: false };
 
