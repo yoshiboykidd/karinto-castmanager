@@ -6,14 +6,14 @@ import { useRouter, usePathname } from 'next/navigation';
 import CastHeader from '@/components/dashboard/CastHeader';
 import FixedFooter from '@/components/dashboard/FixedFooter';
 
-// カラー定義
+// ★カラー定義（ここをパステルに変更！）
 const THEMES = [
-  { id: 'pink',   name: 'サクラ',   bg: 'bg-pink-500',   ring: 'ring-pink-300' },
-  { id: 'blue',   name: 'マリン',   bg: 'bg-blue-500',   ring: 'ring-blue-300' },
-  { id: 'black',  name: 'クール',   bg: 'bg-gray-800',   ring: 'ring-gray-500' },
-  { id: 'white',  name: 'ピュア',   bg: 'bg-gray-500',   ring: 'ring-gray-300' }, // header用に少し濃く調整
-  { id: 'red',    name: 'ルージュ', bg: 'bg-red-500',    ring: 'ring-red-300' },
-  { id: 'yellow', name: 'レモン',   bg: 'bg-yellow-400', ring: 'ring-yellow-300' },
+  { id: 'pink',   name: 'サクラ',   bg: 'bg-pink-300',   ring: 'ring-pink-200' },   // 500→300
+  { id: 'blue',   name: 'マリン',   bg: 'bg-cyan-300',   ring: 'ring-cyan-200' },   // blue→cyan-300
+  { id: 'yellow', name: 'レモン',   bg: 'bg-yellow-300', ring: 'ring-yellow-200' }, // 400→300
+  { id: 'white',  name: 'ピュア',   bg: 'bg-gray-400',   ring: 'ring-gray-300' },   // header用に少し濃いグレー
+  { id: 'black',  name: 'クール',   bg: 'bg-gray-800',   ring: 'ring-gray-500' },   // そのまま
+  { id: 'red',    name: 'ルージュ', bg: 'bg-red-500',    ring: 'ring-red-300' },    // そのまま
 ];
 
 export default function MyPage() {
@@ -24,8 +24,8 @@ export default function MyPage() {
   
   // フォーム状態
   const [newPassword, setNewPassword] = useState('');
-  const [targetAmount, setTargetAmount] = useState(''); // 目標金額
-  const [theme, setTheme] = useState('pink');           // テーマカラー
+  const [targetAmount, setTargetAmount] = useState(''); 
+  const [theme, setTheme] = useState('pink');
   const [isPwChanged, setIsPwChanged] = useState(false);
 
   const supabase = createBrowserClient(
@@ -36,45 +36,31 @@ export default function MyPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1. ユーザー取得
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user || !user.email) { 
-            router.push('/login'); 
-            return; 
-        }
+        if (!user || !user.email) { router.push('/login'); return; }
 
-        // 2. プロフィール取得
         const loginId = user.email.split('@')[0];
-        console.log('Fetching profile for:', loginId);
-
         const { data: member, error } = await supabase
           .from('cast_members')
           .select('*, shops(shop_name)')
           .eq('login_id', loginId)
           .single();
 
-        if (error) {
-           console.error('Supabase Error:', error);
-           // エラーでも処理を止めずに、空の状態で画面を出す
-        }
-
         if (member) {
           setProfile(member);
           setTargetAmount(member.monthly_target_amount || ''); 
           setTheme(member.theme_color || 'pink');
         }
-
       } catch (e) {
-        console.error('Unknown Error:', e);
+        console.error('Error:', e);
       } finally {
-        // ★重要: 成功しても失敗しても、必ずLoadingを終わらせる
         setLoading(false);
       }
     };
     fetchData();
   }, [router, supabase]);
 
-  // 設定保存（目標＆カラー）
+  // 設定保存
   const handleSaveSettings = async () => {
     if (!profile?.id) return;
 
@@ -100,33 +86,24 @@ export default function MyPage() {
     if (!error) { alert('変更しました✨'); setIsPwChanged(true); }
   };
 
-  // 選択中のテーマ情報
   const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse">
-        LOADING...
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse">LOADING...</div>;
 
   const showPwChangeForm = profile?.password === '0000' && !isPwChanged;
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800">
       
-      {/* ★ヘッダーにもテーマ色を適用 */}
       <CastHeader 
         shopName={profile?.shops?.shop_name || "マイページ"} 
         displayName={profile?.display_name} 
-        version="v3.6.0" 
+        version="v3.6.1" 
         bgColor={currentTheme.bg} 
       />
 
       <main className="px-5 mt-6 space-y-8">
         
-        {/* PW変更警告 */}
         {showPwChangeForm && (
           <section className="bg-red-50 border-2 border-red-100 rounded-[32px] p-6 shadow-lg animate-bounce-slow">
             <h3 className="text-red-500 font-black mb-2">⚠️ パスワード変更のお願い</h3>

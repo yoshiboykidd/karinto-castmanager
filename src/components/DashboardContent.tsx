@@ -1,14 +1,13 @@
 'use client';
 
+// ... (import文はそのまま) ...
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation'; 
 import { format, isValid } from 'date-fns';
-
 import { useShiftData } from '@/hooks/useShiftData';
 import { useAchievement } from '@/hooks/useAchievement';
 import { useRequestManager } from '@/hooks/useRequestManager';
 import { useNavigation } from '@/hooks/useNavigation';
-
 import CastHeader from '@/components/dashboard/CastHeader';
 import MonthlySummary from '@/components/dashboard/MonthlySummary';
 import DashboardCalendar from '@/components/DashboardCalendar';
@@ -17,13 +16,17 @@ import RequestList from '@/components/dashboard/RequestList';
 import NewsSection from '@/components/dashboard/NewsSection';
 import FixedFooter from '@/components/dashboard/FixedFooter';
 
+// ★テーマ設定（ここをパステルに変更！）
 const THEME_CONFIG: any = {
-  pink:   { header: 'bg-pink-500',   calendar: 'bg-pink-50 border-pink-100',   text: 'text-pink-500' },
-  blue:   { header: 'bg-blue-500',   calendar: 'bg-blue-50 border-blue-100',   text: 'text-blue-500' },
+  // ピンク、青、黄色は薄く(300/400)
+  pink:   { header: 'bg-pink-300',   calendar: 'bg-pink-50 border-pink-100',   text: 'text-pink-400' },
+  blue:   { header: 'bg-cyan-300',   calendar: 'bg-cyan-50 border-cyan-100',   text: 'text-cyan-400' },
+  yellow: { header: 'bg-yellow-300', calendar: 'bg-yellow-50 border-yellow-100', text: 'text-yellow-500' },
+  white:  { header: 'bg-gray-400',   calendar: 'bg-gray-50 border-gray-200',   text: 'text-gray-400' },
+  
+  // 黒と赤はクッキリ(800/500)
   black:  { header: 'bg-gray-800',   calendar: 'bg-gray-100 border-gray-300',  text: 'text-gray-800' },
-  white:  { header: 'bg-gray-500',   calendar: 'bg-gray-50 border-gray-200',   text: 'text-gray-500' },
   red:    { header: 'bg-red-500',    calendar: 'bg-red-50 border-red-100',     text: 'text-red-500' },
-  yellow: { header: 'bg-yellow-400', calendar: 'bg-yellow-50 border-yellow-100', text: 'text-yellow-600' },
 };
 
 export default function DashboardContent() {
@@ -87,21 +90,19 @@ export default function DashboardContent() {
       
       {/* 1. ヘッダー */}
       <div onClick={goToMyPage} className="cursor-pointer active:opacity-80 transition-opacity">
-        {/* ヘッダーの下に余白(pb-10)を追加して、重なるスペースを確保 */}
         <div className="pb-4">
           <CastHeader 
             shopName={data?.shop?.shop_name || "かりんと"} 
             syncTime={data?.syncAt} 
             displayName={safeProfile.display_name} 
-            version="v3.5.5"
+            version="v3.6.1"
             bgColor={currentTheme.header}
           />
         </div>
       </div>
       
-      {/* 2. メインコンテンツ (マイナスマージンで上に食い込ませる！) */}
+      {/* 2. メインコンテンツ */}
       <main className="px-4 -mt-8 relative z-10 space-y-3">
-        {/* 月間サマリー */}
         {isValid(safeViewDate) && (
           <MonthlySummary 
             month={format(safeViewDate, 'M月')} 
@@ -111,7 +112,7 @@ export default function DashboardContent() {
           />
         )}
 
-        {/* 実績/申請の切り替えタブ */}
+        {/* タブ */}
         <div className="flex p-1 bg-gray-100/80 rounded-2xl border border-gray-200 shadow-inner">
           <button 
             onClick={() => nav.toggleMode(false)} 
@@ -151,7 +152,6 @@ export default function DashboardContent() {
           />
         </section>
 
-        {/* 詳細入力 or 申請リスト */}
         {!isRequest ? (
           (nav.selected.single instanceof Date && isValid(nav.selected.single)) && (
             <DailyDetail 
@@ -174,7 +174,6 @@ export default function DashboardContent() {
           />
         )}
         
-        {/* お知らせ */}
         <NewsSection newsList={data?.news || []} />
       </main>
 
