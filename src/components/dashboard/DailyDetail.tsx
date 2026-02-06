@@ -75,7 +75,6 @@ export default function DailyDetail({
               変更申請中
             </span>
             <span className="text-[19px] font-black text-green-600 tracking-tighter whitespace-nowrap">
-              {/* 修正箇所：OFFの場合は時間を表示せずメッセージを出す */}
               {displayRequestS === 'OFF' ? 'お休み希望' : `${displayRequestS}〜${displayRequestE}`}
             </span>
           </div>
@@ -84,7 +83,6 @@ export default function DailyDetail({
 
       {/* 2行目：メイン時間 */}
       <div className="flex items-center justify-between px-1 h-10 gap-1">
-        {/* 修正箇所：shift.start_time ではなく displayOfficialS（HPの値）で判定 */}
         {shift && displayOfficialS !== 'OFF' ? (
           <>
             <div className="shrink-0">
@@ -150,7 +148,7 @@ export default function DailyDetail({
                   const v = e.target.value.replace(/,/g, '');
                   if (/^\d*$/.test(v)) setEditReward({ ...editReward, amount: v });
                 }}
-                className="w-32 text-right bg-transparent font-black text-2xl border-none focus:ring-0 tracking-tighter"
+                className="w-32 text-right bg-transparent font-black text-2xl border-none focus:outline-none focus:ring-0 tracking-tighter"
               />
             </div>
           </div>
