@@ -26,6 +26,7 @@ export default function MyPage() {
 
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
+  const [shopInfo, setShopInfo] = useState<any>(null); // 店舗情報は別管理
 
   // フォーム状態
   const [newPassword, setNewPassword] = useState('');
@@ -47,10 +48,10 @@ export default function MyPage() {
         const rawLoginId = user.email.split('@')[0];         
         const strippedLoginId = String(Number(rawLoginId));  
 
-        // ★修正: 店舗情報(shops)から sync時間 も一緒に取得する
+        // ★修正1: まず「キャスト情報だけ」確実に取る（結合しない）
         const { data: members, error } = await supabase
           .from('cast_members')
-          .select('*, shops(shop_name, last_synced_at)') 
+          .select('*') 
           .in('login_id', [rawLoginId, strippedLoginId]);
 
         if (error) throw error;
@@ -61,6 +62,19 @@ export default function MyPage() {
           setProfile(member);
           setTargetAmount(String(member.monthly_target_amount || '')); 
           setTheme(member.theme_color || 'pink');
+
+          // ★修正2: キャストが取れたら、その後に「店舗情報」を取りに行く（失敗してもOKにする）
+          if (member.shop_id) {
+            const { data: shop } = await supabase
+              .from('shops')
+              .select('shop_name, last_synced_at')
+              .eq('id', member.shop_id)
+              .single();
+            
+            if (shop) {
+              setShopInfo(shop);
+            }
+          }
         } else {
           console.error('Profile NOT found in DB');
         }
@@ -74,7 +88,7 @@ export default function MyPage() {
     fetchData();
   }, [router, supabase]);
 
-  // 設定保存（目標・テーマ）
+  // 設定保存
   const handleSaveSettings = async () => {
     if (!profile || !profile.login_id) {
       alert('エラー：プロフィール情報が読み込めていません。\n画面をリロードしてみてください。');
@@ -115,7 +129,7 @@ export default function MyPage() {
     }
   };
 
-  // パスワード変更（※これだけ独立して保存されます）
+  // パスワード変更
   const handlePasswordChange = async () => {
     if (!profile?.login_id) return alert('プロフィール読込中...');
     if (!newPassword || newPassword.length < 4) return alert('パスワードは4文字以上にしてください');
@@ -136,30 +150,27 @@ export default function MyPage() {
   const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
   const isDangerPassword = profile?.password === '0000';
   
-  // Header情報
-  const headerShopName = profile?.shops?.shop_name || "マイページ";
+  // Header情報（別々に取得した情報をここで合わせる）
+  const headerShopName = shopInfo?.shop_name || "マイページ";
+  const headerSyncTime = shopInfo?.last_synced_at;
   const headerDisplayName = profile?.display_name;
   const headerBgColor = currentTheme.bg;
-  // ★修正: 取得したsync時間を渡す
-  const headerSyncTime = profile?.shops?.last_synced_at; 
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse">LOADING...</div>;
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800">
       
-      {/* Headerに syncTime を渡す */}
       <CastHeader 
         shopName={headerShopName}
         displayName={headerDisplayName}
         syncTime={headerSyncTime}
-        version="v3.7.7"
+        version="v3.7.8"
         bgColor={headerBgColor}
       />
 
       <main className="px-5 mt-6 space-y-8">
         
-        {/* エラー表示エリア（通常は非表示） */}
         {!profile && (
             <div className="bg-red-50 p-4 rounded-xl mb-4 text-left border border-red-200">
               <p className="text-red-500 font-bold text-sm">⚠️ データの取得に失敗しました</p>
@@ -167,10 +178,9 @@ export default function MyPage() {
             </div>
         )}
 
-        {/* --- 設定エリア --- */}
         <div className="space-y-6">
           
-          {/* 1. 目標金額設定 (一番上に移動) */}
+          {/* 1. 目標金額設定 */}
           <section className="bg-white border border-gray-100 rounded-[32px] p-6 shadow-xl space-y-4">
             <div className="flex items-center gap-2 font-black text-gray-700">
               <span className="text-xl">💰</span>
@@ -228,7 +238,7 @@ export default function MyPage() {
 
         <hr className="border-gray-100" />
 
-        {/* 3. パスワード変更 (独立エリア) */}
+        {/* 3. パスワード変更 */}
         <section className={`border-2 rounded-[32px] p-6 shadow-lg transition-colors duration-500
           ${isDangerPassword ? 'bg-red-50 border-red-100 animate-pulse-slow' : 'bg-gray-50 border-gray-100'}
         `}>
