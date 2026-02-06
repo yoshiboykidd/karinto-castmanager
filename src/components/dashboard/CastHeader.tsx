@@ -1,31 +1,34 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation'; // 追加: ページ移動用
 import { LogOut } from 'lucide-react';
-import { format, isValid } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 
 type CastHeaderProps = {
   shopName: string;
   syncTime?: string | null;
   displayName?: string;
   version?: string;
-  bgColor?: string; // テーマカラー受け取り用
+  bgColor?: string; 
 };
 
 export default function CastHeader({ 
   shopName, 
   syncTime, 
   displayName, 
-  bgColor // 色が渡されなければデフォルト（白）
+  bgColor 
 }: CastHeaderProps) {
+  const router = useRouter(); // ルーター使用
   const [seasonalEmoji, setSeasonalEmoji] = useState('☃️');
   const [isPanicMode, setIsPanicMode] = useState(false);
 
   // 時間表示の安全策（ISO文字列を HH:mm に変換）
   const formattedTime = (() => {
+    if (!syncTime) return '--:--';
     try {
-      if (!syncTime) return '--:--';
-      const date = new Date(syncTime);
+      // parseISOを使うとSafariなどでも安全に変換できます
+      const date = typeof syncTime === 'string' ? parseISO(syncTime) : new Date(syncTime);
       return isValid(date) ? format(date, 'HH:mm') : '--:--';
     } catch (e) {
       return '--:--';
@@ -40,12 +43,11 @@ export default function CastHeader({
     else setSeasonalEmoji('☃️');
   }, []);
 
-  // テーマが適用されているか判定（背景色が白以外ならテーマあり）
   const isThemed = !!bgColor && !bgColor.includes('white');
 
   return (
     <>
-      {/* 緊急脱出用オーバーレイ (Panic Mode) */}
+      {/* 緊急脱出用オーバーレイ */}
       {isPanicMode && (
         <div 
           className="fixed inset-0 bg-white z-[9999] flex flex-col items-center justify-center cursor-pointer"
@@ -59,14 +61,18 @@ export default function CastHeader({
 
       <header className={`px-5 pt-8 pb-5 rounded-b-[40px] shadow-sm relative transition-colors duration-500
         ${isThemed 
-          ? `${bgColor} text-white border-b border-white/10` // テーマ色ON
-          : 'bg-white text-gray-800 border-b border-pink-50' // デフォルト（白）
+          ? `${bgColor} text-white border-b border-white/10` 
+          : 'bg-white text-gray-800 border-b border-pink-50' 
         }
       `}>
         <div className="flex justify-between items-end">
           
-          {/* --- 左サイド --- */}
-          <div className="flex flex-col space-y-1">
+          {/* --- 左サイド（名前エリア）: ここだけクリックでマイページへ --- */}
+          {/* ★修正: 親のLinkではなく、ここでonClickで飛ばす */}
+          <div 
+            onClick={() => router.push('/mypage')}
+            className="flex flex-col space-y-1 cursor-pointer active:opacity-70 transition-opacity"
+          >
             <p className={`text-[10px] font-black uppercase tracking-[0.2em] leading-none
               ${isThemed ? 'text-white/70' : 'text-pink-300/80'}
             `}>
@@ -89,12 +95,12 @@ export default function CastHeader({
               <p className={`text-[11px] font-bold flex items-center gap-1 pl-0.5 mt-0.5
                 ${isThemed ? 'text-white/90' : 'text-gray-400'}
               `}>
-                お疲れ様です <span className="text-[14px]">🍵</span>
+                お疲れ様です <span className="text-[14px]">♨️</span>
               </p>
             </div>
           </div>
 
-          {/* --- 右サイド（サイズ統一・中央寄せ） --- */}
+          {/* --- 右サイド（ボタンエリア）: クリックイベントを独立させる --- */}
           <div className="flex flex-col items-end space-y-2 pb-0.5">
             
             {/* HP同期時刻 */}
@@ -122,10 +128,13 @@ export default function CastHeader({
               </div>
             </div>
 
-            {/* 緊急脱出ボタン */}
+            {/* 緊急脱出ボタン（ここが押せるようになる！） */}
             <button
-              onClick={() => setIsPanicMode(true)}
-              className={`w-[128px] h-[44px] rounded-xl border flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 group
+              onClick={(e) => {
+                e.stopPropagation(); // 親のクリックイベントを止める念の為の処置
+                setIsPanicMode(true);
+              }}
+              className={`w-[128px] h-[44px] rounded-xl border flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 group z-10
                 ${isThemed
                   ? 'bg-white/20 border-white/20 text-white hover:bg-white/30'
                   : 'bg-rose-50/80 border-rose-100 hover:bg-rose-100'

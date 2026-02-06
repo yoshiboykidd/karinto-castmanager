@@ -1,6 +1,5 @@
 'use client';
 
-// ... (import文はそのまま) ...
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation'; 
 import { format, isValid } from 'date-fns';
@@ -16,15 +15,12 @@ import RequestList from '@/components/dashboard/RequestList';
 import NewsSection from '@/components/dashboard/NewsSection';
 import FixedFooter from '@/components/dashboard/FixedFooter';
 
-// ★テーマ設定（ここをパステルに変更！）
+// テーマ設定
 const THEME_CONFIG: any = {
-  // ピンク、青、黄色は薄く(300/400)
   pink:   { header: 'bg-pink-300',   calendar: 'bg-pink-50 border-pink-100',   text: 'text-pink-400' },
   blue:   { header: 'bg-cyan-300',   calendar: 'bg-cyan-50 border-cyan-100',   text: 'text-cyan-400' },
   yellow: { header: 'bg-yellow-300', calendar: 'bg-yellow-50 border-yellow-100', text: 'text-yellow-500' },
   white:  { header: 'bg-gray-400',   calendar: 'bg-gray-50 border-gray-200',   text: 'text-gray-400' },
-  
-  // 黒と赤はクッキリ(800/500)
   black:  { header: 'bg-gray-800',   calendar: 'bg-gray-100 border-gray-300',  text: 'text-gray-800' },
   red:    { header: 'bg-red-500',    calendar: 'bg-red-50 border-red-100',     text: 'text-red-500' },
 };
@@ -88,20 +84,19 @@ export default function DashboardContent() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
       
-      {/* 1. ヘッダー */}
-      <div onClick={goToMyPage} className="cursor-pointer active:opacity-80 transition-opacity">
-        <div className="pb-4">
-          <CastHeader 
-            shopName={data?.shop?.shop_name || "かりんと"} 
-            syncTime={data?.syncAt} 
-            displayName={safeProfile.display_name} 
-            version="v3.6.1"
-            bgColor={currentTheme.header}
-          />
-        </div>
+      <div className="pb-4">
+        <CastHeader 
+          shopName={data?.shop?.shop_name || "かりんと"} 
+          
+          // ★修正：ここを正しいデータパスに変更しました！
+          syncTime={data?.shop?.last_synced_at} 
+          
+          displayName={safeProfile.display_name} 
+          version="v3.6.2"
+          bgColor={currentTheme.header}
+        />
       </div>
       
-      {/* 2. メインコンテンツ */}
       <main className="px-4 -mt-8 relative z-10 space-y-3">
         {isValid(safeViewDate) && (
           <MonthlySummary 
