@@ -17,7 +17,7 @@ import RequestList from '@/components/dashboard/RequestList';
 import NewsSection from '@/components/dashboard/NewsSection';
 import FixedFooter from '@/components/dashboard/FixedFooter';
 
-// ★追加: テーマごとの色設定（ヘッダー背景、カレンダー背景、文字色）
+// テーマごとの色設定
 const THEME_CONFIG: any = {
   pink:   { header: 'bg-pink-500',   calendar: 'bg-pink-50 border-pink-100',   text: 'text-pink-500' },
   blue:   { header: 'bg-blue-500',   calendar: 'bg-blue-50 border-blue-100',   text: 'text-blue-500' },
@@ -35,15 +35,15 @@ export default function DashboardContent() {
   const { data, loading, fetchInitialData, getMonthlyTotals, supabase } = useShiftData();
   const nav = useNavigation();
 
-  // ★追加: プロフィールから目標額とテーマを取得（なければデフォルト）
-  const targetAmount = data.profile?.monthly_target_amount || 0;
-  const themeKey = data.profile?.theme_color || 'pink';
+  // ★修正: data自体が undefined の場合に備えて 'data?.' を使う！(ここがエラー原因でした)
+  const targetAmount = data?.profile?.monthly_target_amount || 0;
+  const themeKey = data?.profile?.theme_color || 'pink';
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
 
-  // 安全策: data.shifts が undefined の場合
+  // 安全策
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  // useAchievement を any型で強制受け取り
+  // useAchievement
   const achievementData: any = useAchievement(
     supabase, 
     data?.profile, 
@@ -60,7 +60,7 @@ export default function DashboardContent() {
     selectedShift = null 
   } = achievementData || {};
 
-  // useRequestManager も any型で強制受け取り
+  // useRequestManager
   const requestManagerData: any = useRequestManager(
     supabase, 
     data?.profile, 
@@ -83,8 +83,10 @@ export default function DashboardContent() {
 
   const monthlyTotals = useMemo(() => {
     if (!nav.viewDate) return { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 };
+    // ここも安全策
+    if (!data?.shifts) return { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 };
     return getMonthlyTotals(nav.viewDate);
-  }, [data.shifts, nav.viewDate, getMonthlyTotals]);
+  }, [data?.shifts, nav.viewDate, getMonthlyTotals]);
 
   if (!mounted || loading) {
     return (
@@ -100,25 +102,25 @@ export default function DashboardContent() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
       
-      {/* 1. ヘッダー (テーマ色を反映) */}
+      {/* 1. ヘッダー */}
       <div className={`${currentTheme.header} text-white transition-colors duration-500 pb-2 shadow-sm`}>
         <CastHeader 
-          shopName={data.shop?.shop_name || "かりんと 池袋東口店"} 
-          syncTime={data.syncAt} 
-          displayName={data.profile?.display_name} 
-          version="v3.5.1"
-          transparent={true} // ヘッダー自体を透明にして親のdivの色を透かす
+          shopName={data?.shop?.shop_name || "かりんと 池袋東口店"} 
+          syncTime={data?.syncAt} 
+          displayName={data?.profile?.display_name} 
+          version="v3.5.2"
+          transparent={true} 
         />
       </div>
       
       <main className="px-4 -mt-4 relative z-10 space-y-3">
-        {/* 2. 月間サマリー (目標金額とテーマ色を渡す) */}
+        {/* 2. 月間サマリー */}
         {isValid(safeViewDate) && (
           <MonthlySummary 
             month={format(safeViewDate, 'M月')} 
             totals={monthlyTotals} 
-            targetAmount={targetAmount} // ★追加
-            theme={themeKey}            // ★追加
+            targetAmount={targetAmount}
+            theme={themeKey}
           />
         )}
 
@@ -128,7 +130,7 @@ export default function DashboardContent() {
             onClick={() => nav.toggleMode(false)} 
             className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all duration-300 flex items-center justify-center gap-1
               ${!isRequest 
-                ? `bg-white ${currentTheme.text} shadow-sm` // ★ここもテーマ色に
+                ? `bg-white ${currentTheme.text} shadow-sm` 
                 : 'text-gray-400 hover:text-gray-500'}`
             }
           >
@@ -146,11 +148,11 @@ export default function DashboardContent() {
           </button>
         </div>
         
-        {/* 4. カレンダー (背景色をテーマに合わせる) */}
+        {/* 4. カレンダー */}
         <section className={`p-3 rounded-[32px] border shadow-sm text-center transition-colors duration-500
           ${isRequest 
-            ? 'bg-cyan-50 border-cyan-100'   // 申請モード：水色固定
-            : currentTheme.calendar          // 実績モード：テーマ色
+            ? 'bg-cyan-50 border-cyan-100'
+            : currentTheme.calendar
           }`}>
           <DashboardCalendar 
             shifts={safeShifts as any} 
@@ -186,7 +188,7 @@ export default function DashboardContent() {
         )}
         
         {/* 6. お知らせ */}
-        <NewsSection newsList={data.news} />
+        <NewsSection newsList={data?.news || []} />
       </main>
 
       <FixedFooter 
