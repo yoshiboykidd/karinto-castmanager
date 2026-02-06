@@ -22,10 +22,12 @@ type RequestListProps = {
   onSubmit: () => void;
 };
 
+// ★修正1: 時間リスト生成ロジック (23:30を含める)
 const TIME_OPTIONS: string[] = [];
 for (let h = 11; h <= 23; h++) {
   TIME_OPTIONS.push(`${h}:00`);
-  if (h !== 23) TIME_OPTIONS.push(`${h}:30`);
+  // 23時でも30分を追加する (以前のコードでは if (h !== 23) で除外されていた)
+  TIME_OPTIONS.push(`${h}:30`);
 }
 
 export default function RequestList({
@@ -54,7 +56,6 @@ export default function RequestList({
       if (s.is_official_pre_exist || s.hp_start_time) {
         const underlyingS = s.hp_start_time || 'OFF';
         const underlyingE = s.hp_end_time || 'OFF';
-        // ★ここが修正点：裏の確定がOFFなら、表示フラグ(exists)はfalseにする
         return { 
           s: underlyingS, 
           e: underlyingE, 
@@ -124,8 +125,9 @@ export default function RequestList({
           const showOfficial = base.exists;
           
           const isOff = (requestDetails[key]?.s || base.s) === 'OFF';
+          // ★修正2: デフォルト値をここで明示的に設定
           const defaultS = base.s !== 'OFF' ? base.s : '11:00';
-          const defaultE = base.e !== 'OFF' ? base.e : '23:30';
+          const defaultE = base.e !== 'OFF' ? base.e : '23:30'; // ここも23:30でOK
 
           const isRedundant = (requestDetails[key]?.s || base.s) === base.s && (requestDetails[key]?.e || base.e) === base.e;
           
