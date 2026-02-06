@@ -25,18 +25,42 @@ export default function DashboardContent() {
   const { data, loading, fetchInitialData, getMonthlyTotals, supabase } = useShiftData();
   const nav = useNavigation();
 
-  // useAchievementの戻り値を any で受け取る
-  const achievementData: any = useAchievement(
-    supabase, data.profile, data.shifts, nav.selected.single, () => fetchInitialData(router)
-  );
-  const { editReward, setEditReward, handleSaveAchievement, isEditable, selectedShift } = achievementData;
+  // ★修正: data.shifts が undefined の場合に備えて安全策を追加
+  const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  // シフト申請
-  const { requestDetails, setRequestDetails, handleBulkSubmit } = useRequestManager(
-    supabase, data.profile, data.shifts, nav.selected.multi, 
+  // ★修正: useAchievement を any型で強制受け取り
+  const achievementData: any = useAchievement(
+    supabase, 
+    data?.profile, 
+    safeShifts, 
+    nav.selected.single, 
+    () => fetchInitialData(router)
+  );
+  
+  // 中身がない場合に備えてデフォルト値を設定
+  const { 
+    editReward = { f: '', first: '', main: '', amount: '' }, 
+    setEditReward = () => {}, 
+    handleSaveAchievement = () => {}, 
+    isEditable = false, 
+    selectedShift = null 
+  } = achievementData || {};
+
+  // ★修正: useRequestManager も any型で強制受け取り
+  const requestManagerData: any = useRequestManager(
+    supabase, 
+    data?.profile, 
+    safeShifts, 
+    nav.selected.multi, 
     () => fetchInitialData(router), 
     () => nav.setSelected({ single: undefined, multi: [] })
   );
+
+  const {
+    requestDetails = {},
+    setRequestDetails = () => {},
+    handleBulkSubmit = () => {}
+  } = requestManagerData || {};
 
   useEffect(() => { 
     setMounted(true);
@@ -65,7 +89,7 @@ export default function DashboardContent() {
         shopName={data.shop?.shop_name || "かりんと 池袋東口店"} 
         syncTime={data.syncAt} 
         displayName={data.profile?.display_name} 
-        version="v3.4.7" 
+        version="v3.4.8" 
       />
       
       <main className="px-4 mt-3 space-y-3">
@@ -105,7 +129,7 @@ export default function DashboardContent() {
             : 'bg-pink-50 border-pink-100'   // 実績モード：うすピンク
           }`}>
           <DashboardCalendar 
-            shifts={data.shifts as any} 
+            shifts={safeShifts as any} 
             selectedDates={isRequest ? nav.selected.multi : nav.selected.single} 
             onSelect={nav.handleDateSelect} 
             month={safeViewDate} 
@@ -132,8 +156,7 @@ export default function DashboardContent() {
             multiDates={nav.selected.multi} 
             requestDetails={requestDetails} 
             setRequestDetails={setRequestDetails} 
-            // ★修正: ここで強制的に型を合わせる
-            shifts={data.shifts as any} 
+            shifts={safeShifts as any} 
             onSubmit={handleBulkSubmit} 
           />
         )}
