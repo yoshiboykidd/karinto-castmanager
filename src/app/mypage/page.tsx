@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation'; // usePathnameを追加
-import { useShiftData } from '@/hooks/useShiftData';
+import { createBrowserClient } from '@supabase/ssr'; // 直接Supabaseを使う
+import { useRouter, usePathname } from 'next/navigation';
 import CastHeader from '@/components/dashboard/CastHeader';
 import FixedFooter from '@/components/dashboard/FixedFooter';
 
@@ -17,34 +17,70 @@ const THEMES = [
 
 export default function MyPage() {
   const router = useRouter();
-  const pathname = usePathname(); // ここで取得
+  const pathname = usePathname();
   
-  // データ取得
-  const { data, loading, fetchInitialData, supabase } = useShiftData();
-  const profile = data?.profile;
+  // Supabaseクライアント作成
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<any>(null);
 
   // フォーム状態
   const [newPassword, setNewPassword] = useState('');
   const [targetAmount, setTargetAmount] = useState(''); 
   const [theme, setTheme] = useState('pink');
   
-  // 保存中の状態管理
+  // 保存中の状態
   const [isSaving, setIsSaving] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
 
-  // 初回データ取得
+  // ★データ取得ロジック（ここを最強にする）
   useEffect(() => {
-    fetchInitialData(router);
-  }, []);
+    const fetchData = async () => {
+      try {
+        // 1. ログインユーザー確認
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !user.email) { 
+          router.push('/login'); 
+          return; 
+        }
 
-  // データが来たらフォームに入れる
-  useEffect(() => {
-    if (profile && !isInitialized) {
-      setTargetAmount(String(profile.monthly_target_amount || '')); 
-      setTheme(profile.theme_color || 'pink');
-      setIsInitialized(true);
-    }
-  }, [profile, isInitialized]);
+        const rawLoginId = user.email.split('@')[0];         // そのまま (例: 00600037)
+        const strippedLoginId = String(Number(rawLoginId));  // ゼロなし (例: 600037)
+
+        console.log(`Searching profile for: "${rawLoginId}" OR "${strippedLoginId}"`);
+
+        // 2. プロフィール検索（両方のパターンで探す！）
+        const { data: members, error } = await supabase
+          .from('cast_members')
+          .select('*, shops(shop_name)')
+          .in('login_id', [rawLoginId, strippedLoginId]); // どっちかあればOK
+
+        if (error) throw error;
+
+        // 見つかったデータを取り出す
+        const member = members && members.length > 0 ? members[0] : null;
+
+        if (member) {
+          console.log('Profile Loaded:', member);
+          setProfile(member);
+          // 初期値をフォームにセット
+          setTargetAmount(String(member.monthly_target_amount || '')); 
+          setTheme(member.theme_color || 'pink');
+        } else {
+          console.error('Profile NOT found in DB');
+        }
+
+      } catch (e) {
+        console.error('Fetch Error:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [router, supabase]);
 
   // 設定保存
   const handleSaveSettings = async () => {
@@ -115,14 +151,13 @@ export default function MyPage() {
 
   const isDangerPassword = profile?.password === '0000';
 
-  // ★ここ！ return ( が重要です
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800">
       
       <CastHeader 
         shopName={profile?.shops?.shop_name || "マイページ"} 
         displayName={profile?.display_name} 
-        version="v3.6.9" 
+        version="v3.7.0" 
         bgColor={currentTheme.bg} 
       />
 
@@ -130,6 +165,17 @@ export default function MyPage() {
         
         {/* プロフィール情報 */}
         <div className="text-center space-y-1">
+          {/* データが見つからない場合の警告 */}
+          {!profile && (
+             <div className="bg-red-50 p-4 rounded-xl mb-4 text-left border border-red-200">
+               <p className="text-red-500 font-bold text-sm">⚠️ データの取得に失敗しました</p>
+               <p className="text-xs text-red-400 mt-1">
+                 データベースにこのIDのユーザー登録がありません。<br/>
+                 管理者に連絡してください。
+               </p>
+             </div>
+          )}
+
           <h2 className="text-xl font-black text-gray-800">
             {profile?.display_name || "ゲスト"}
           </h2>
@@ -234,7 +280,6 @@ export default function MyPage() {
         <button onClick={async () => { await supabase.auth.signOut(); router.push('/login'); }} className="w-full py-4 text-gray-400 text-xs font-bold tracking-widest">LOGOUT</button>
       </main>
 
-      {/* ★修正: pathname={pathname || ''} にしてnullエラーを回避 */}
       <FixedFooter 
         pathname={pathname || ''} 
         onHome={() => router.push('/')} 
