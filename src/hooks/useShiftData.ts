@@ -30,7 +30,7 @@ export function useShiftData() {
       const { data: profile } = await supabase.from('cast_members').select('*').eq('login_id', loginId).single();
       
       if (profile) {
-        const myShopId = profile.home_shop_id || 'main';
+        const myShopId = profile.home_shop_id || 'main'; // ここで店舗IDを特定
         
         // Promise.all 内の各クエリ
         const [shopRes, shiftsRes, newsRes, syncRes] = await Promise.all([
@@ -38,7 +38,7 @@ export function useShiftData() {
           supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
           supabase.from('news').select('*').or(`shop_id.eq.${myShopId},shop_id.eq.all`).order('created_at', { ascending: false }).limit(3),
           
-          // ★修正ポイント: id=1 固定ではなく、自分の店舗(myShopId)のログを取得する
+          // ★修正箇所はここだけ！ id:1 固定をやめて、myShopId で検索するように変更
           supabase.from('sync_logs').select('last_sync_at').eq('shop_id', myShopId).single()
         ]);
         
@@ -47,7 +47,7 @@ export function useShiftData() {
           profile, 
           shop: shopRes.data || null, 
           news: newsRes.data || [],
-          // syncRes.data が null の場合のガードを徹底
+          // syncRes.data が null の場合のガード
           syncAt: (syncRes.data && syncRes.data.last_sync_at) 
             ? format(parseISO(syncRes.data.last_sync_at), 'HH:mm') 
             : '--:--'
@@ -61,7 +61,7 @@ export function useShiftData() {
   };
 
   /**
-   * 月間集計ロジック（ここは元のまま）
+   * 月間集計ロジック（完全に元のコードに戻しました）
    */
   const getMonthlyTotals = useCallback((viewDate: Date) => {
     if (!mounted || !viewDate) return { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 };
