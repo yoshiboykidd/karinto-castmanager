@@ -47,12 +47,10 @@ export default function MyPage() {
         const rawLoginId = user.email.split('@')[0];         
         const strippedLoginId = String(Number(rawLoginId));  
 
-        console.log(`Searching profile for: "${rawLoginId}" OR "${strippedLoginId}"`);
-
-        // 店舗情報は結合せず、キャスト情報だけシンプルに取得
+        // ★修正: 店舗情報(shops)から sync時間 も一緒に取得する
         const { data: members, error } = await supabase
           .from('cast_members')
-          .select('*') 
+          .select('*, shops(shop_name, last_synced_at)') 
           .in('login_id', [rawLoginId, strippedLoginId]);
 
         if (error) throw error;
@@ -60,15 +58,7 @@ export default function MyPage() {
         const member = members && members.length > 0 ? members[0] : null;
 
         if (member) {
-          console.log('Profile Loaded:', member);
-          
-          // 店舗名を擬似的にセット
-          const fullProfile = { 
-            ...member, 
-            shops: { shop_name: "マイページ" } 
-          };
-          
-          setProfile(fullProfile);
+          setProfile(member);
           setTargetAmount(String(member.monthly_target_amount || '')); 
           setTheme(member.theme_color || 'pink');
         } else {
@@ -84,7 +74,7 @@ export default function MyPage() {
     fetchData();
   }, [router, supabase]);
 
-  // 設定保存
+  // 設定保存（目標・テーマ）
   const handleSaveSettings = async () => {
     if (!profile || !profile.login_id) {
       alert('エラー：プロフィール情報が読み込めていません。\n画面をリロードしてみてください。');
@@ -125,7 +115,7 @@ export default function MyPage() {
     }
   };
 
-  // パスワード変更
+  // パスワード変更（※これだけ独立して保存されます）
   const handlePasswordChange = async () => {
     if (!profile?.login_id) return alert('プロフィール読込中...');
     if (!newPassword || newPassword.length < 4) return alert('パスワードは4文字以上にしてください');
@@ -136,73 +126,51 @@ export default function MyPage() {
       .eq('login_id', profile.login_id);
 
     if (!error) { 
-      alert('パスワードを変更しました✨'); 
+      alert('パスワードを変更しました✨\n次回から新しいパスワードでログインしてください。'); 
       setNewPassword('');
     } else {
       alert('変更に失敗しました...');
     }
   };
 
-  // 描画用の変数を整理（これで波線を回避）
   const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
   const isDangerPassword = profile?.password === '0000';
   
-  // CastHeaderに渡す値を事前に確定させる
+  // Header情報
   const headerShopName = profile?.shops?.shop_name || "マイページ";
   const headerDisplayName = profile?.display_name;
   const headerBgColor = currentTheme.bg;
+  // ★修正: 取得したsync時間を渡す
+  const headerSyncTime = profile?.shops?.last_synced_at; 
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse">LOADING...</div>;
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800">
       
+      {/* Headerに syncTime を渡す */}
       <CastHeader 
         shopName={headerShopName}
         displayName={headerDisplayName}
-        version="v3.7.6"
+        syncTime={headerSyncTime}
+        version="v3.7.7"
         bgColor={headerBgColor}
       />
 
       <main className="px-5 mt-6 space-y-8">
         
-        <div className="text-center space-y-1">
-          {!profile && (
-             <div className="bg-red-50 p-4 rounded-xl mb-4 text-left border border-red-200">
-               <p className="text-red-500 font-bold text-sm">⚠️ データの取得に失敗しました</p>
-               <p className="text-xs text-red-400 mt-1">
-                 データベースのロック(RLS)が解除されていない可能性があります。<br/>
-                 SQL Editorで以下を実行してください：<br/>
-                 <span className="font-mono bg-red-100 p-1">ALTER TABLE cast_members DISABLE ROW LEVEL SECURITY;</span>
-               </p>
-             </div>
-          )}
+        {/* エラー表示エリア（通常は非表示） */}
+        {!profile && (
+            <div className="bg-red-50 p-4 rounded-xl mb-4 text-left border border-red-200">
+              <p className="text-red-500 font-bold text-sm">⚠️ データの取得に失敗しました</p>
+              <p className="text-xs text-red-400 mt-1">リロードしてください。</p>
+            </div>
+        )}
 
-          <h2 className="text-xl font-black text-gray-800">
-            {profile?.display_name || "ゲスト"}
-          </h2>
-          <p className="text-gray-400 text-xs font-bold tracking-widest">
-            ID: {profile?.login_id}
-          </p>
-        </div>
-
+        {/* --- 設定エリア --- */}
         <div className="space-y-6">
-          <section className="bg-white border border-gray-100 rounded-[32px] p-6 shadow-xl space-y-4">
-            <div className="flex items-center gap-2 font-black text-gray-700">
-              <span className="text-xl">🎨</span>
-              <h3>テーマカラー</h3>
-            </div>
-            <div className="grid grid-cols-6 gap-2">
-              {THEMES.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setTheme(t.id)}
-                  className={`w-10 h-10 rounded-full mx-auto shadow-sm transition-all ${t.bg} ${theme === t.id ? `scale-125 ring-2 ${t.ring} ring-offset-2` : 'opacity-70 hover:opacity-100'}`}
-                />
-              ))}
-            </div>
-          </section>
-
+          
+          {/* 1. 目標金額設定 (一番上に移動) */}
           <section className="bg-white border border-gray-100 rounded-[32px] p-6 shadow-xl space-y-4">
             <div className="flex items-center gap-2 font-black text-gray-700">
               <span className="text-xl">💰</span>
@@ -222,6 +190,24 @@ export default function MyPage() {
             </div>
           </section>
 
+          {/* 2. テーマカラー設定 */}
+          <section className="bg-white border border-gray-100 rounded-[32px] p-6 shadow-xl space-y-4">
+            <div className="flex items-center gap-2 font-black text-gray-700">
+              <span className="text-xl">🎨</span>
+              <h3>テーマカラー</h3>
+            </div>
+            <div className="grid grid-cols-6 gap-2">
+              {THEMES.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTheme(t.id)}
+                  className={`w-10 h-10 rounded-full mx-auto shadow-sm transition-all ${t.bg} ${theme === t.id ? `scale-125 ring-2 ${t.ring} ring-offset-2` : 'opacity-70 hover:opacity-100'}`}
+                />
+              ))}
+            </div>
+          </section>
+
+          {/* 設定保存ボタン */}
           <button 
             onClick={handleSaveSettings}
             disabled={isSaving}
@@ -242,6 +228,7 @@ export default function MyPage() {
 
         <hr className="border-gray-100" />
 
+        {/* 3. パスワード変更 (独立エリア) */}
         <section className={`border-2 rounded-[32px] p-6 shadow-lg transition-colors duration-500
           ${isDangerPassword ? 'bg-red-50 border-red-100 animate-pulse-slow' : 'bg-gray-50 border-gray-100'}
         `}>
