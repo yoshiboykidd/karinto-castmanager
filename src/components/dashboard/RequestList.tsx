@@ -125,7 +125,7 @@ export default function RequestList({
           
           const isOff = (requestDetails[key]?.s || base.s) === 'OFF';
           const defaultS = base.s !== 'OFF' ? base.s : '11:00';
-          const defaultE = base.e !== 'OFF' ? base.e : '23:00';
+          const defaultE = base.e !== 'OFF' ? base.e : '23:30';
 
           const isRedundant = (requestDetails[key]?.s || base.s) === base.s && (requestDetails[key]?.e || base.e) === base.e;
           

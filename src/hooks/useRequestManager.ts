@@ -34,7 +34,7 @@ export function useRequestManager(
           hp_display_name: profile.display_name || 'キャスト',
           shift_date: key,
           start_time: requestDetails[key]?.s || '11:00',
-          end_time: requestDetails[key]?.e || '23:00',
+          end_time: requestDetails[key]?.e || '23:30',
           status: 'requested',
           is_official: false,
           // すでに確定(official)していたデータがあればフラグを立てる
