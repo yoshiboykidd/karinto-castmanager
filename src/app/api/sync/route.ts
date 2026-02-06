@@ -3,7 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { addDays, format } from 'date-fns';
 
-// 処理時間を最大限確保 (Vercel Hobbyだと最大60秒)
 export const maxDuration = 60; 
 export const dynamic = 'force-dynamic';
 
@@ -23,23 +22,18 @@ const ALL_SHOPS = [
 ];
 
 export async function GET(request: NextRequest) {
-  // ★計測開始
   const startTime = Date.now();
-
-  // URLパラメータ (?group=1 など) を取得
   const searchParams = request.nextUrl.searchParams;
   const group = searchParams.get('group');
 
-  // グループ分けロジック (4店舗ずつ)
   let targetShops = [];
   if (group === '1') {
-    targetShops = ALL_SHOPS.slice(0, 4); // 神田〜上野
+    targetShops = ALL_SHOPS.slice(0, 4);
   } else if (group === '2') {
-    targetShops = ALL_SHOPS.slice(4, 8); // 渋谷〜大宮
+    targetShops = ALL_SHOPS.slice(4, 8);
   } else if (group === '3') {
-    targetShops = ALL_SHOPS.slice(8, 12); // 吉祥寺〜小岩
+    targetShops = ALL_SHOPS.slice(8, 12);
   } else {
-    // 指定がなければ全店舗
     targetShops = ALL_SHOPS;
   }
 
@@ -50,7 +44,6 @@ export async function GET(request: NextRequest) {
 
   const JST_OFFSET = 9 * 60 * 60 * 1000;
 
-  // 1店舗ごとの処理ロジック
   const processShop = async (shop: typeof ALL_SHOPS[0]) => {
     let localLogs: string[] = [];
 
@@ -64,7 +57,6 @@ export async function GET(request: NextRequest) {
         return [`⚠️ Skip ${shop.name}: 名簿取得失敗`];
       }
 
-      // 名前正規化
       const normalize = (val: string) => {
         if (!val) return "";
         let s = val.replace(/\s+/g, '').replace(/[（\(\[].*?[）\)\]]/g, '').replace(/（\d+）/g, ''); 
@@ -73,7 +65,6 @@ export async function GET(request: NextRequest) {
 
       const nameMap = new Map(castList.map(c => [normalize(c.hp_display_name), String(c.login_id)]));
 
-      // 7日分ループ
       const dayPromises = Array.from({ length: 7 }).map(async (_, i) => {
         const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
         const dateStrDB = format(targetDate, 'yyyy-MM-dd');
@@ -82,7 +73,7 @@ export async function GET(request: NextRequest) {
 
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8000); // 8秒制限
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
 
           const res = await fetch(url, { 
             cache: 'no-store',
@@ -103,15 +94,21 @@ export async function GET(request: NextRequest) {
           
           const batchData: any[] = [];
           const unmatchedNames: string[] = []; 
+          // 重複防止用セット
+          const processedLoginIds = new Set<string>();
 
-          // 共通処理関数
           const tryAddShift = (rawName: string, timeText: string) => {
             const cleanName = normalize(rawName);
             const timeMatch = timeText.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
 
             if (cleanName && timeMatch) {
               const loginId = nameMap.get(cleanName);
+              
               if (loginId) {
+                // ★重複チェック（同じ日に2回同じ人がいたら無視）
+                if (processedLoginIds.has(loginId)) return;
+                processedLoginIds.add(loginId);
+
                 const currentStatus = existingStatusMap.get(loginId);
                 const hpStart = timeMatch[1].padStart(5, '0');
                 const hpEnd = timeMatch[2].padStart(5, '0');
@@ -142,44 +139,33 @@ export async function GET(request: NextRequest) {
             }
           };
 
-          // 【パターンA】 リスト形式
           $('li').each((_, element) => {
-            const li = $(element);
-            const rawName = li.find('h3').text();
-            const timeText = li.text(); 
-            tryAddShift(rawName, timeText);
+            tryAddShift($(element).find('h3').text(), $(element).text());
           });
 
-          // 【パターンB】 カード形式
           $('.dataBox').each((_, element) => {
             const box = $(element);
-            const rawName = box.find('h3').text();
             let timeText = "";
             box.find('p').each((_, p) => {
-                const t = $(p).text();
-                if (/\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}/.test(t)) {
-                    timeText = t;
-                    return false;
-                }
+                if (/\d{1,2}:\d{2}/.test($(p).text())) { timeText = $(p).text(); return false; }
             });
-            tryAddShift(rawName, timeText);
+            tryAddShift(box.find('h3').text(), timeText);
           });
 
           if (batchData.length > 0) {
             const { error } = await supabase.from('shifts').upsert(batchData, { onConflict: 'login_id, shift_date' });
-            if (error) return `❌ ${shop.name} ${dateStrDB} DB Error`;
+            
+            // ★ここを変更！具体的なエラーメッセージを表示する
+            if (error) return `❌ ${shop.name} ${format(targetDate, 'MM/dd')} DB Error: ${error.message}`;
+            
             return `✅ ${shop.name} ${format(targetDate, 'MM/dd')} (${batchData.length}件)`;
           } else {
-            if (unmatchedNames.length > 0) {
-                const names = unmatchedNames.slice(0, 3).join(', ');
-                return `⚠️ ${shop.name} ${format(targetDate, 'MM/dd')} (0件) - 名簿なし: ${names}...`;
-            }
             return `💤 ${shop.name} ${format(targetDate, 'MM/dd')} (0件) - シフトなし`;
           }
 
         } catch (err: any) {
           if (err.name === 'AbortError') return `⏱️ ${shop.name} ${format(targetDate, 'MM/dd')} Timeout`;
-          return `❌ ${shop.name} ${dateStrDB} Error`;
+          return `❌ ${shop.name} ${format(targetDate, 'MM/dd')} Error: ${err.message}`;
         }
       });
 
@@ -195,29 +181,23 @@ export async function GET(request: NextRequest) {
   try {
     const allResults: string[][] = [];
     
-    // ターゲット店舗のみ実行
     for (const shop of targetShops) {
       const shopLogs = await processShop(shop);
       allResults.push(shopLogs);
       
-      // ★修正1: 成功したら、その店舗の最終更新時間をDBに書き込む
-      // これにより、ダッシュボードのヘッダー時間が更新されます
+      // ★エラーがない場合のみ、最終同期時間を更新する方が安全だが、
+      // 一旦は「実行したら更新」のままにしておきます
       await supabase
         .from('shops')
         .update({ last_synced_at: new Date().toISOString() })
         .eq('id', shop.id);
 
-      // ★修正2: 休憩時間を 200ms -> 2000ms (2秒) に延長
-      // HTTPエラー（アクセス拒否）を防ぐために重要です
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
 
     const flatLogs = allResults.flat();
-
-    // ★計測終了
     const endTime = Date.now();
-    const diffMs = endTime - startTime;
-    const diffSec = (diffMs / 1000).toFixed(1);
+    const diffSec = ((endTime - startTime) / 1000).toFixed(1);
     
     flatLogs.push(`🏁 Group ${group || 'ALL'} 完了！所要時間: ${diffSec}秒`);
 
