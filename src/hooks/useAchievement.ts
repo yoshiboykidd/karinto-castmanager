@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { format, isAfter, startOfToday } from 'date-fns';
 
-// ★修正点: shifts の型を any[] から any に変更 (nullが来ても怒られないようにする)
+// ★修正点: shifts の型を any に変更
 export function useAchievement(
   supabase: any, 
   profile: any, 
-  shifts: any, // ← ここを any に変更
+  shifts: any, 
   selectedSingle: Date | undefined, 
   refreshData: () => void
 ) {
@@ -78,3 +78,5 @@ export function useAchievement(
   // ★ここに selectedShift が含まれているので、呼び出し元で取得できます
   return { editReward, setEditReward, handleSaveAchievement, isEditable, selectedShift };
 }
+
+// Fix Vercel Build v2
