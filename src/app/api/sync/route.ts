@@ -30,19 +30,17 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const group = searchParams.get('group');
 
-  // ★グループ分けロジック (3店舗ずつ × 4グループに変更)
-  // これで1回の処理が軽くなり、タイムアウトしなくなります
+  // ★グループ分けロジック
   let targetShops = [];
   if (group === '1') {
-    targetShops = ALL_SHOPS.slice(0, 3); // 1.神田, 2.赤坂, 3.秋葉原
+    targetShops = ALL_SHOPS.slice(0, 3);
   } else if (group === '2') {
-    targetShops = ALL_SHOPS.slice(3, 6); // 4.上野, 5.渋谷, 6.池西
+    targetShops = ALL_SHOPS.slice(3, 6);
   } else if (group === '3') {
-    targetShops = ALL_SHOPS.slice(6, 9); // 7.五反田, 8.大宮, 9.吉祥寺
+    targetShops = ALL_SHOPS.slice(6, 9);
   } else if (group === '4') {
-    targetShops = ALL_SHOPS.slice(9, 12); // 10.大久保, 11.池東, 12.小岩
+    targetShops = ALL_SHOPS.slice(9, 12);
   } else {
-    // 指定がなければ全店舗（手動実行用だがタイムアウト注意）
     targetShops = ALL_SHOPS;
   }
 
@@ -85,7 +83,6 @@ export async function GET(request: NextRequest) {
 
         try {
           const controller = new AbortController();
-          // ★修正: タイムアウトを4秒に短縮（回転率重視）
           const timeoutId = setTimeout(() => controller.abort(), 4000); 
 
           const res = await fetch(url, { 
@@ -107,8 +104,6 @@ export async function GET(request: NextRequest) {
           
           const batchData: any[] = [];
           const unmatchedNames: string[] = []; 
-          
-          // ★重要: 重複防止セット（上野のエラー対策）
           const processedLoginIds = new Set<string>();
 
           // 共通処理関数
@@ -120,7 +115,6 @@ export async function GET(request: NextRequest) {
               const loginId = nameMap.get(cleanName);
               
               if (loginId) {
-                // ★既にこの日のリストに入っているIDなら無視する
                 if (processedLoginIds.has(loginId)) return;
                 processedLoginIds.add(loginId);
 
@@ -154,12 +148,10 @@ export async function GET(request: NextRequest) {
             }
           };
 
-          // 【パターンA】 リスト形式
           $('li').each((_, element) => {
             tryAddShift($(element).find('h3').text(), $(element).text());
           });
 
-          // 【パターンB】 カード形式
           $('.dataBox').each((_, element) => {
             const box = $(element);
             let timeText = "";
@@ -208,22 +200,23 @@ export async function GET(request: NextRequest) {
       const shopLogs = await processShop(shop);
       allResults.push(shopLogs);
       
-      // 成功したら最終更新時間をDBに書き込む
-      await supabase
-        .from('shops')
-        .update({ last_synced_at: new Date().toISOString() })
-        .eq('id', shop.id);
+      const nowISO = new Date().toISOString();
 
-      // ★修正: 休憩時間を1秒に短縮（3店舗ならこれで十分）
+      // ★修正: shopsではなく sync_logs テーブルを更新 (Upsert)
+      await supabase
+        .from('sync_logs')
+        .upsert({ 
+          shop_id: shop.id, 
+          last_sync_at: nowISO 
+        }, { onConflict: 'shop_id' });
+
+      // 負荷軽減の休憩
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     const flatLogs = allResults.flat();
-
-    // ★計測終了
     const endTime = Date.now();
-    const diffMs = endTime - startTime;
-    const diffSec = (diffMs / 1000).toFixed(1);
+    const diffSec = ((endTime - startTime) / 1000).toFixed(1);
     
     flatLogs.push(`🏁 Group ${group || 'ALL'} 完了！所要時間: ${diffSec}秒`);
 
