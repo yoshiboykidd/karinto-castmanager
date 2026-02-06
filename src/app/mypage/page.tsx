@@ -21,7 +21,7 @@ export default function MyPage() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   
-  // デバッグ用：どんなIDで検索しているか表示するため
+  // デバッグ用
   const [debugLoginId, setDebugLoginId] = useState(''); 
   
   const [newPassword, setNewPassword] = useState('');
@@ -39,29 +39,29 @@ export default function MyPage() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || !user.email) { router.push('/login'); return; }
 
-        // メールアドレスの @ の前を取得 (例: 00600037)
-        const loginId = user.email.split('@')[0];
-        setDebugLoginId(loginId); // デバッグ用に保存
+        // メールアドレスからIDを取得 (例: "00600037")
+        const rawLoginId = user.email.split('@')[0];
+        
+        // ★修正ポイント: 先頭のゼロを取り除く (例: "00600037" -> "600037")
+        // Number()で一度数字にしてからString()に戻すことで、余計な0を消します
+        const cleanLoginId = String(Number(rawLoginId));
+        
+        setDebugLoginId(cleanLoginId); // 画面表示用もゼロなし版にする
 
-        console.log('Searching for ID:', loginId);
+        console.log(`Searching for ID: ${cleanLoginId} (Original: ${rawLoginId})`);
 
-        // 文字列として検索してみる
         const { data: member, error } = await supabase
           .from('cast_members')
           .select('*, shops(shop_name)')
-          .eq('login_id', loginId) // ここで一致するか確認
+          .eq('login_id', cleanLoginId) // ゼロなしIDで検索！
           .single();
-
-        if (error) {
-          console.error('Data Fetch Error:', error);
-        }
 
         if (member) {
           setProfile(member);
           setTargetAmount(member.monthly_target_amount || ''); 
           setTheme(member.theme_color || 'pink');
         } else {
-          console.warn('Member not found for ID:', loginId);
+          console.warn('Member not found for ID:', cleanLoginId);
         }
 
       } catch (e) {
@@ -76,7 +76,6 @@ export default function MyPage() {
   const handleSaveSettings = async () => {
     if (!profile?.id) return;
 
-    // 全角数字を半角に変換
     const cleanAmountStr = String(targetAmount).replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
     const cleanAmount = cleanAmountStr ? Number(cleanAmountStr) : 0;
 
@@ -131,21 +130,21 @@ export default function MyPage() {
       <CastHeader 
         shopName={profile?.shops?.shop_name || "マイページ"} 
         displayName={profile?.display_name} 
-        version="v3.6.3" 
+        version="v3.6.4" 
         bgColor={currentTheme.bg} 
       />
 
       <main className="px-5 mt-6 space-y-8">
         
-        {/* プロフィール情報（アイコンは削除しました） */}
+        {/* プロフィール情報 */}
         <div className="text-center space-y-1">
-          {/* もしデータが取れていない場合、検索中のIDを表示して確認できるようにする */}
+          {/* まだ見つからない場合のデバッグ表示 */}
           {!profile && (
              <div className="bg-gray-100 p-4 rounded-xl mb-4 text-left">
                <p className="text-red-500 font-bold text-sm">⚠️ データが見つかりません</p>
                <p className="text-xs text-gray-500">
-                 検索中のID: <span className="font-mono font-bold text-black">{debugLoginId}</span><br/>
-                 DBの `login_id` と一致していますか？
+                 検索ID: <span className="font-mono font-bold text-black">{debugLoginId}</span><br/>
+                 （先頭の0を取り除いて検索しています）
                </p>
              </div>
           )}
@@ -158,7 +157,7 @@ export default function MyPage() {
           </p>
         </div>
 
-        {/* 設定フォーム（以下同じ） */}
+        {/* 設定フォーム */}
         <div className="space-y-6">
           {/* テーマカラー */}
           <section className="bg-white border border-gray-100 rounded-[32px] p-6 shadow-xl space-y-4">
