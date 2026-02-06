@@ -6,193 +6,165 @@ import { useRouter, usePathname } from 'next/navigation';
 import CastHeader from '@/components/dashboard/CastHeader';
 import FixedFooter from '@/components/dashboard/FixedFooter';
 
+// カラー定義
+const THEMES = [
+  { id: 'pink',   name: 'サクラ',   bg: 'bg-pink-500',   ring: 'ring-pink-300' },
+  { id: 'blue',   name: 'マリン',   bg: 'bg-blue-500',   ring: 'ring-blue-300' },
+  { id: 'black',  name: 'クール',   bg: 'bg-gray-800',   ring: 'ring-gray-500' },
+  { id: 'white',  name: 'ピュア',   bg: 'bg-white border border-gray-200', ring: 'ring-gray-300' },
+  { id: 'red',    name: 'ルージュ', bg: 'bg-red-500',    ring: 'ring-red-300' },
+  { id: 'yellow', name: 'レモン',   bg: 'bg-yellow-400', ring: 'ring-yellow-300' },
+];
+
 export default function MyPage() {
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   
-  // フォーム入力用
+  // フォーム状態
   const [newPassword, setNewPassword] = useState('');
-  const [goal, setGoal] = useState('');
-  const [isPwChanged, setIsPwChanged] = useState(false); // 変更完了フラグ
+  const [targetAmount, setTargetAmount] = useState(''); // 目標金額
+  const [theme, setTheme] = useState('pink');           // テーマカラー
+  const [isPwChanged, setIsPwChanged] = useState(false);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // データ取得
   useEffect(() => {
     const fetchData = async () => {
-      // 1. ログインユーザー取得
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/login');
-        return;
-      }
+      if (!user) { router.push('/login'); return; }
 
-      // 2. プロフィール（パスワードと目標）取得
-      // ※ login_id がメールアドレスの @ の前部分と一致する前提
       const loginId = user.email?.split('@')[0];
-      
       const { data: member, error } = await supabase
         .from('cast_members')
         .select('*, shops(shop_name)')
         .eq('login_id', loginId)
         .single();
 
-      if (error || !member) {
-        alert('データ取得エラー');
-        return;
-      }
+      if (error || !member) { alert('データ取得エラー'); return; }
 
       setProfile(member);
-      setGoal(member.monthly_goal || ''); // 既存の目標があればセット
+      setTargetAmount(member.monthly_target_amount || ''); 
+      setTheme(member.theme_color || 'pink');
       setLoading(false);
     };
-
     fetchData();
   }, [router, supabase]);
 
-  // パスワード変更処理
-  const handlePasswordChange = async () => {
-    if (!newPassword || newPassword.length < 4) {
-      alert('パスワードは4文字以上にしてください');
-      return;
-    }
-
+  // 設定保存（目標＆カラー）
+  const handleSaveSettings = async () => {
     const { error } = await supabase
       .from('cast_members')
-      .update({ password: newPassword })
+      .update({ 
+        monthly_target_amount: Number(targetAmount) || 0,
+        theme_color: theme 
+      })
       .eq('id', profile.id);
 
     if (!error) {
-      alert('パスワードを変更しました！✨\n次回から新しいパスワードでログインしてください。');
-      setIsPwChanged(true); // フォームを消す
-      setProfile({ ...profile, password: newPassword }); // 見た目も更新
-    } else {
-      alert('変更に失敗しました...');
-    }
-  };
-
-  // 目標保存処理
-  const handleSaveGoal = async () => {
-    const { error } = await supabase
-      .from('cast_members')
-      .update({ monthly_goal: goal })
-      .eq('id', profile.id);
-
-    if (!error) {
-      alert('今月の目標を保存しました！🔥');
+      alert('設定を保存しました！🎨\nダッシュボードに戻ると反映されます。');
+      setProfile({ ...profile, monthly_target_amount: targetAmount, theme_color: theme });
     } else {
       alert('保存に失敗しました...');
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse">
-        LOADING...
-      </div>
-    );
-  }
+  const handlePasswordChange = async () => {
+    if (!newPassword || newPassword.length < 4) return alert('4文字以上にしてください');
+    const { error } = await supabase.from('cast_members').update({ password: newPassword }).eq('id', profile.id);
+    if (!error) { alert('変更しました✨'); setIsPwChanged(true); }
+  };
 
-  // PWが '0000' かどうか判定（変更済みフラグが立っていたら表示しない）
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse">LOADING...</div>;
+
   const showPwChangeForm = profile?.password === '0000' && !isPwChanged;
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800">
-      <CastHeader 
-        shopName={profile?.shops?.shop_name || "マイページ"} 
-        displayName={profile?.display_name} 
-        syncTime={null}
-        version="v3.4.8" 
-      />
+      <CastHeader shopName="マイページ" displayName={profile?.display_name} version="v3.5.0" />
 
       <main className="px-5 mt-6 space-y-8">
-        
-        {/* プロフィール基本情報 */}
+        {/* プロフィール */}
         <div className="text-center space-y-1">
-          <div className="w-24 h-24 bg-pink-100 rounded-full mx-auto flex items-center justify-center text-4xl mb-3 shadow-inner">
+          <div className={`w-24 h-24 rounded-full mx-auto flex items-center justify-center text-4xl mb-3 shadow-inner bg-${theme === 'white' ? 'gray-100' : theme + '-100'}`}>
             👩🏻‍🦰
           </div>
           <h2 className="text-xl font-black text-gray-800">{profile?.display_name}</h2>
           <p className="text-gray-400 text-xs font-bold tracking-widest">ID: {profile?.login_id}</p>
         </div>
 
-        {/* ⚠️ パスワード変更フォーム（0000の時だけ出現） */}
+        {/* PW変更警告 */}
         {showPwChangeForm && (
           <section className="bg-red-50 border-2 border-red-100 rounded-[32px] p-6 shadow-lg animate-bounce-slow">
-            <div className="flex items-center gap-2 mb-3 text-red-500 font-black">
-              <span className="text-xl">⚠️</span>
-              <h3>パスワード変更のお願い</h3>
-            </div>
-            <p className="text-xs text-gray-500 mb-4 font-bold leading-relaxed">
-              現在のパスワードは初期設定の「0000」です。<br/>
-              セキュリティのため、独自のパスワードに変更してください。
-            </p>
-            
+            <h3 className="text-red-500 font-black mb-2">⚠️ パスワード変更のお願い</h3>
             <div className="space-y-3">
-              <input 
-                type="text" 
-                placeholder="新しいパスワード" 
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full px-5 py-3 rounded-xl bg-white border border-red-100 font-bold text-gray-700 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-red-200"
-              />
-              <button 
-                onClick={handlePasswordChange}
-                className="w-full bg-red-400 text-white font-black py-3 rounded-xl shadow-md active:scale-95 transition-all"
-              >
-                変更して保存する
-              </button>
+              <input type="text" placeholder="新しいパスワード" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-5 py-3 rounded-xl bg-white border border-red-100 font-bold" />
+              <button onClick={handlePasswordChange} className="w-full bg-red-400 text-white font-black py-3 rounded-xl">変更する</button>
             </div>
           </section>
         )}
 
-        {/* 🔥 1ヶ月の目標設定 */}
-        <section className="bg-white border border-purple-100 rounded-[32px] p-6 shadow-xl">
-          <div className="flex items-center gap-2 mb-4 text-purple-500 font-black">
-            <span className="text-xl">🎯</span>
-            <h3>今月の目標設定</h3>
+        {/* 💰 目標金額設定 */}
+        <section className="bg-white border border-gray-100 rounded-[32px] p-6 shadow-xl space-y-4">
+          <div className="flex items-center gap-2 font-black text-gray-700">
+            <span className="text-xl">💰</span>
+            <h3>今月の目標金額</h3>
           </div>
-          
-          <div className="space-y-4">
-            <textarea 
-              value={goal}
-              onChange={(e) => setGoal(e.target.value)}
-              placeholder="例：指名本数100本！&#13;&#10;例：遅刻をしない！&#13;&#10;ここに書いた目標は意識するために保存しよう✨"
-              className="w-full h-32 px-5 py-4 rounded-2xl bg-purple-50/50 border border-purple-100 font-medium text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-200 resize-none leading-relaxed"
+          <div className="relative">
+            <input 
+              type="number" 
+              value={targetAmount}
+              onChange={(e) => setTargetAmount(e.target.value)}
+              placeholder="例: 500000"
+              className="w-full px-5 py-4 pl-10 rounded-2xl bg-gray-50 border border-gray-100 font-black text-xl text-gray-700 focus:ring-2 focus:ring-pink-200 focus:outline-none"
             />
-            <button 
-              onClick={handleSaveGoal}
-              className="w-full bg-gradient-to-r from-purple-400 to-pink-400 text-white font-black py-4 rounded-2xl shadow-lg shadow-purple-200 active:scale-95 transition-all"
-            >
-              目標を更新する ✨
-            </button>
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">¥</span>
           </div>
         </section>
 
-        {/* ログアウトボタン（おまけ） */}
+        {/* 🎨 テーマカラー設定 */}
+        <section className="bg-white border border-gray-100 rounded-[32px] p-6 shadow-xl space-y-4">
+          <div className="flex items-center gap-2 font-black text-gray-700">
+            <span className="text-xl">🎨</span>
+            <h3>アプリのテーマカラー</h3>
+          </div>
+          <div className="grid grid-cols-6 gap-2">
+            {THEMES.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTheme(t.id)}
+                className={`w-10 h-10 rounded-full mx-auto shadow-sm transition-all ${t.bg} ${theme === t.id ? `scale-125 ring-2 ${t.ring} ring-offset-2` : 'opacity-70 hover:opacity-100'}`}
+                title={t.name}
+              />
+            ))}
+          </div>
+          <p className="text-center text-xs font-bold text-gray-400 mt-2">
+            現在のテーマ: {THEMES.find(t => t.id === theme)?.name}
+          </p>
+        </section>
+
         <button 
-          onClick={async () => {
-            await supabase.auth.signOut();
-            router.push('/login');
-          }}
-          className="w-full py-4 text-gray-400 text-xs font-bold tracking-widest hover:text-gray-600 transition-colors"
+          onClick={handleSaveSettings}
+          className={`w-full py-4 rounded-2xl shadow-lg font-black text-white text-lg active:scale-95 transition-all
+            ${theme === 'pink' ? 'bg-pink-500 shadow-pink-200' : 
+              theme === 'blue' ? 'bg-blue-500 shadow-blue-200' :
+              theme === 'black' ? 'bg-gray-800 shadow-gray-400' :
+              theme === 'red' ? 'bg-red-500 shadow-red-200' :
+              theme === 'yellow' ? 'bg-yellow-400 shadow-yellow-200' :
+              'bg-gray-400' // whiteの場合
+            }`}
         >
-          LOGOUT
+          設定を保存する ✨
         </button>
 
+        <button onClick={async () => { await supabase.auth.signOut(); router.push('/login'); }} className="w-full py-4 text-gray-400 text-xs font-bold tracking-widest">LOGOUT</button>
       </main>
 
-      <FixedFooter 
-        pathname={pathname} 
-        onHome={() => router.push('/')} 
-        onSalary={() => router.push('/salary')} // 給与明細ページがあれば
-        onLogout={() => {}} // ログアウトは上のボタンでも可
-      />
+      <FixedFooter pathname={pathname} onHome={() => router.push('/')} onSalary={() => router.push('/salary')} onLogout={() => {}} />
     </div>
   );
 }
