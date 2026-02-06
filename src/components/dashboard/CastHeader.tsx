@@ -7,7 +7,7 @@ type Props = {
   syncTime?: string | null;
   displayName?: string;
   version: string;
-  transparent?: boolean;
+  bgColor?: string; // ★変更: 具体的な色クラスを受け取る (例: 'bg-pink-500')
 };
 
 export default function CastHeader({ 
@@ -15,10 +15,10 @@ export default function CastHeader({
   syncTime, 
   displayName, 
   version, 
-  transparent = false 
+  bgColor // 色が渡されなければデフォルト（白）になる
 }: Props) {
   
-  // 安全に時間を表示するロジック
+  // 時間表示の安全策
   const formattedTime = (() => {
     try {
       if (!syncTime) return '--:--';
@@ -29,11 +29,14 @@ export default function CastHeader({
     }
   })();
 
+  // 色が指定されているか？
+  const hasTheme = !!bgColor;
+
   return (
-    <header className={`px-6 py-5 rounded-b-[40px] flex items-center justify-between relative overflow-hidden transition-colors duration-500
-      ${transparent 
-        ? 'bg-transparent text-white border-none shadow-none' 
-        : 'bg-white text-gray-800 shadow-sm'
+    <header className={`px-6 py-5 rounded-b-[40px] flex items-center justify-between relative overflow-hidden transition-colors duration-500 shadow-sm
+      ${hasTheme 
+        ? `${bgColor} text-white`  // テーマ色がある場合（文字は白）
+        : 'bg-white text-gray-800' // デフォルト（白背景、文字はグレー）
       }
     `}>
       {/* 左側：店名と更新時間 */}

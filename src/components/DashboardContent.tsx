@@ -17,7 +17,7 @@ import RequestList from '@/components/dashboard/RequestList';
 import NewsSection from '@/components/dashboard/NewsSection';
 import FixedFooter from '@/components/dashboard/FixedFooter';
 
-// テーマごとの色設定
+// テーマ設定
 const THEME_CONFIG: any = {
   pink:   { header: 'bg-pink-500',   calendar: 'bg-pink-50 border-pink-100',   text: 'text-pink-500' },
   blue:   { header: 'bg-blue-500',   calendar: 'bg-blue-50 border-blue-100',   text: 'text-blue-500' },
@@ -35,21 +35,16 @@ export default function DashboardContent() {
   const { data, loading, fetchInitialData, getMonthlyTotals, supabase } = useShiftData();
   const nav = useNavigation();
 
-  // ★修正: data自体が undefined の場合に備えて 'data?.' を使う！(ここがエラー原因でした)
-  const targetAmount = data?.profile?.monthly_target_amount || 0;
-  const themeKey = data?.profile?.theme_color || 'pink';
+  // 安全にデータ取得
+  const safeProfile = data?.profile || {};
+  const targetAmount = safeProfile.monthly_target_amount || 0;
+  const themeKey = safeProfile.theme_color || 'pink';
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
 
-  // 安全策
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  // useAchievement
   const achievementData: any = useAchievement(
-    supabase, 
-    data?.profile, 
-    safeShifts, 
-    nav.selected.single, 
-    () => fetchInitialData(router)
+    supabase, safeProfile, safeShifts, nav.selected.single, () => fetchInitialData(router)
   );
   
   const { 
@@ -60,20 +55,14 @@ export default function DashboardContent() {
     selectedShift = null 
   } = achievementData || {};
 
-  // useRequestManager
   const requestManagerData: any = useRequestManager(
-    supabase, 
-    data?.profile, 
-    safeShifts, 
-    nav.selected.multi, 
+    supabase, safeProfile, safeShifts, nav.selected.multi, 
     () => fetchInitialData(router), 
     () => nav.setSelected({ single: undefined, multi: [] })
   );
 
   const {
-    requestDetails = {},
-    setRequestDetails = () => {},
-    handleBulkSubmit = () => {}
+    requestDetails = {}, setRequestDetails = () => {}, handleBulkSubmit = () => {}
   } = requestManagerData || {};
 
   useEffect(() => { 
@@ -82,18 +71,12 @@ export default function DashboardContent() {
   }, []);
 
   const monthlyTotals = useMemo(() => {
-    if (!nav.viewDate) return { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 };
-    // ここも安全策
-    if (!data?.shifts) return { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 };
+    if (!nav.viewDate || !data?.shifts) return { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 };
     return getMonthlyTotals(nav.viewDate);
   }, [data?.shifts, nav.viewDate, getMonthlyTotals]);
 
   if (!mounted || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse text-5xl italic tracking-tighter">
-        KARINTO...
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse text-5xl italic tracking-tighter">KARINTO...</div>;
   }
 
   const safeViewDate = nav.viewDate || new Date();
@@ -102,16 +85,14 @@ export default function DashboardContent() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
       
-      {/* 1. ヘッダー */}
-      <div className={`${currentTheme.header} text-white transition-colors duration-500 pb-2 shadow-sm`}>
-        <CastHeader 
-          shopName={data?.shop?.shop_name || "かりんと 池袋東口店"} 
-          syncTime={data?.syncAt} 
-          displayName={data?.profile?.display_name} 
-          version="v3.5.2"
-          transparent={true} 
-        />
-      </div>
+      {/* 1. ヘッダー (ここで直接色を指定する) */}
+      <CastHeader 
+        shopName={data?.shop?.shop_name || "かりんと"} 
+        syncTime={data?.syncAt} 
+        displayName={safeProfile.display_name} 
+        version="v3.5.4"
+        bgColor={currentTheme.header} // ★余計なdivを消して、ここで色を渡す！
+      />
       
       <main className="px-4 -mt-4 relative z-10 space-y-3">
         {/* 2. 月間サマリー */}
