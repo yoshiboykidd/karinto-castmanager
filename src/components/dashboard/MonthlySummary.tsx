@@ -14,7 +14,6 @@ type MonthlySummaryProps = {
   theme?: string;
 };
 
-// テーマ設定
 const THEME_STYLES: any = {
   pink:   { bgFrom: 'from-[#FFE9ED]', bgTo: 'to-[#FFF5F7]', border: 'border-pink-200',  textMain: 'text-pink-600', textSub: 'text-pink-500',  textLabel: 'text-pink-400',  subBorder: 'border-pink-50',  bar: 'bg-pink-400' },
   blue:   { bgFrom: 'from-blue-50',   bgTo: 'to-blue-100',   border: 'border-blue-200',  textMain: 'text-blue-600', textSub: 'text-blue-500',  textLabel: 'text-blue-400',  subBorder: 'border-blue-100', bar: 'bg-blue-400' },
@@ -37,12 +36,10 @@ export default function MonthlySummary({
     ? Math.min(100, Math.floor((totals.amount / targetAmount) * 100)) 
     : 0;
 
-  const isAchieved = progressPercent >= 100;
-
   return (
-    <section className={`bg-gradient-to-br ${c.bgFrom} ${c.bgTo} rounded-[32px] p-5 border ${c.border} relative overflow-hidden shadow-sm flex flex-col space-y-3`}>
+    <section className={`bg-gradient-to-br ${c.bgFrom} ${c.bgTo} rounded-[32px] p-5 border ${c.border} relative overflow-hidden shadow-sm flex flex-col space-y-2`}>
       
-      {/* 上段: 実績タイトル */}
+      {/* 上段: 実績タイトル & バッジ */}
       <div className="flex items-center justify-between h-8">
         <h2 className={`text-[20px] font-black ${c.textSub} tracking-tighter leading-none shrink-0`}>
           {month}の実績
@@ -67,37 +64,33 @@ export default function MonthlySummary({
         </p>
       </div>
 
-      {/* ★修正: 目標＆進捗エリア（全体的に巨大化） */}
+      {/* 目標＆進捗エリア（サイズ調整済み） */}
       {targetAmount > 0 && (
-        <div className="bg-white/50 rounded-2xl p-3 border border-white/60 shadow-inner">
+        <div className="bg-white/40 rounded-xl p-2.5 border border-white/50 shadow-sm mx-1">
           
-          {/* 目標額とパーセントの表示 */}
-          <div className="flex justify-between items-end mb-2 px-1">
-             <div className="flex flex-col leading-none">
-                <span className="text-[10px] font-bold text-gray-400 tracking-widest mb-1">TARGET GOAL</span>
-                <span className={`text-[24px] font-black ${c.textSub} tracking-tight`}>
-                  <span className="text-[14px] mr-0.5 opacity-60">¥</span>
-                  {targetAmount.toLocaleString()}
+          <div className="flex justify-between items-end mb-1.5 px-1">
+             <div className="flex items-center gap-2">
+                <span className="text-[9px] font-bold text-gray-400 tracking-widest bg-white/60 px-1.5 py-0.5 rounded">GOAL</span>
+                <span className={`text-[16px] font-black ${c.textSub} tracking-tight leading-none`}>
+                  ¥{targetAmount.toLocaleString()}
                 </span>
              </div>
              <div className="flex items-baseline">
-                <span className={`text-[36px] font-black ${isAchieved ? 'text-yellow-500' : c.textMain} leading-none tracking-tighter`}>
+                <span className={`text-[20px] font-black ${c.textMain} leading-none tracking-tighter`}>
                    {progressPercent}
                 </span>
-                <span className={`text-[14px] font-bold ${c.textLabel} ml-0.5`}>%</span>
+                <span className={`text-[10px] font-bold ${c.textLabel} ml-0.5`}>%</span>
              </div>
           </div>
           
-          {/* バー（h-8の極太サイズに変更） */}
-          <div className="w-full h-8 bg-gray-200/50 rounded-full overflow-hidden border border-white shadow-inner relative">
+          {/* バー（h-3.5：程よい太さ） */}
+          <div className="w-full h-3.5 bg-gray-100 rounded-full overflow-hidden border border-white/60 shadow-inner relative">
             <div 
-              className={`h-full ${c.bar} transition-all duration-1000 ease-out shadow-sm relative flex items-center justify-end pr-3`} 
+              className={`h-full ${c.bar} transition-all duration-1000 ease-out shadow-sm relative`} 
               style={{ width: `${progressPercent}%` }}
             >
-               {/* ストライプ加工 */}
-               <div className="absolute inset-0 w-full h-full opacity-20 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,#fff_10px,#fff_20px)]"></div>
-               {/* 光沢 */}
-               <div className="absolute inset-0 bg-gradient-to-b from-white/30 to-transparent"></div>
+               {/* うっすらストライプ */}
+               <div className="absolute inset-0 w-full h-full opacity-30 bg-[repeating-linear-gradient(45deg,transparent,transparent_6px,#fff_6px,#fff_12px)]"></div>
             </div>
           </div>
         </div>
