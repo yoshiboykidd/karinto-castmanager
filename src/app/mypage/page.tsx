@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation'; // usePathnameを追加
 import { useShiftData } from '@/hooks/useShiftData';
 import CastHeader from '@/components/dashboard/CastHeader';
 import FixedFooter from '@/components/dashboard/FixedFooter';
@@ -17,9 +17,9 @@ const THEMES = [
 
 export default function MyPage() {
   const router = useRouter();
-  const pathname = usePathname();
+  const pathname = usePathname(); // ここで取得
   
-  // ★fetchInitialData を取り出すのを忘れていました！
+  // データ取得
   const { data, loading, fetchInitialData, supabase } = useShiftData();
   const profile = data?.profile;
 
@@ -27,14 +27,17 @@ export default function MyPage() {
   const [newPassword, setNewPassword] = useState('');
   const [targetAmount, setTargetAmount] = useState(''); 
   const [theme, setTheme] = useState('pink');
+  
+  // 保存中の状態管理
+  const [isSaving, setIsSaving] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // ★重要：画面が開いたらデータを取得開始する！
+  // 初回データ取得
   useEffect(() => {
     fetchInitialData(router);
   }, []);
 
-  // データが読み込まれたら、フォームに初期値をセット
+  // データが来たらフォームに入れる
   useEffect(() => {
     if (profile && !isInitialized) {
       setTargetAmount(String(profile.monthly_target_amount || '')); 
@@ -45,37 +48,52 @@ export default function MyPage() {
 
   // 設定保存
   const handleSaveSettings = async () => {
-    if (!profile?.id) return;
-
-    // 全角数字→半角変換
-    const cleanAmountStr = String(targetAmount).replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
-    const cleanAmount = cleanAmountStr ? Number(cleanAmountStr) : 0;
-
-    if (isNaN(cleanAmount)) {
-      alert('目標金額は「数字」で入力してください🙇‍♂️');
+    if (!profile || !profile.id) {
+      alert('エラー：プロフィール情報が読み込めていません。\n画面をリロードしてみてください。');
       return;
     }
 
-    const { error } = await supabase
-      .from('cast_members')
-      .update({ 
-        monthly_target_amount: cleanAmount,
-        theme_color: theme 
-      })
-      .eq('id', profile.id);
+    setIsSaving(true);
 
-    if (!error) {
-      alert('設定を保存しました！🎨');
+    try {
+      // 全角数字→半角変換
+      const cleanAmountStr = String(targetAmount).replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+      const cleanAmount = cleanAmountStr ? Number(cleanAmountStr) : 0;
+
+      if (targetAmount && isNaN(cleanAmount)) {
+        alert('目標金額は「数字」で入力してください🙇‍♂️');
+        setIsSaving(false);
+        return;
+      }
+
+      // アップデート実行
+      const { error } = await supabase
+        .from('cast_members')
+        .update({ 
+          monthly_target_amount: cleanAmount,
+          theme_color: theme 
+        })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+
+      alert('設定を保存しました！🎨\n（ダッシュボードの色が変わります）');
       setTargetAmount(String(cleanAmount));
-      // ダッシュボードに戻った時に反映されるようリロード推奨
-      // window.location.reload(); 
-    } else {
-      alert('保存に失敗しました...');
+      
+      // 反映のためリロード
+      window.location.reload();
+
+    } catch (e: any) {
+      console.error('Update Error:', e);
+      alert(`保存に失敗しました...\nエラー内容: ${e.message || '不明なエラー'}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   // パスワード変更
   const handlePasswordChange = async () => {
+    if (!profile?.id) return alert('プロフィール読込中...');
     if (!newPassword || newPassword.length < 4) return alert('パスワードは4文字以上にしてください');
     
     const { error } = await supabase
@@ -97,13 +115,14 @@ export default function MyPage() {
 
   const isDangerPassword = profile?.password === '0000';
 
+  // ★ここ！ return ( が重要です
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800">
       
       <CastHeader 
         shopName={profile?.shops?.shop_name || "マイページ"} 
         displayName={profile?.display_name} 
-        version="v3.6.7" 
+        version="v3.6.9" 
         bgColor={currentTheme.bg} 
       />
 
@@ -160,9 +179,19 @@ export default function MyPage() {
 
           <button 
             onClick={handleSaveSettings}
-            className={`w-full py-4 rounded-2xl shadow-lg font-black text-white text-lg active:scale-95 transition-all ${currentTheme.bg}`}
+            disabled={isSaving}
+            className={`w-full py-4 rounded-2xl shadow-lg font-black text-white text-lg active:scale-95 transition-all flex items-center justify-center gap-2
+              ${isSaving ? 'bg-gray-400 cursor-not-allowed' : currentTheme.bg}
+            `}
           >
-            設定を保存する ✨
+            {isSaving ? (
+              <>
+                <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
+                保存中...
+              </>
+            ) : (
+              '設定を保存する ✨'
+            )}
           </button>
         </div>
 
@@ -205,8 +234,9 @@ export default function MyPage() {
         <button onClick={async () => { await supabase.auth.signOut(); router.push('/login'); }} className="w-full py-4 text-gray-400 text-xs font-bold tracking-widest">LOGOUT</button>
       </main>
 
+      {/* ★修正: pathname={pathname || ''} にしてnullエラーを回避 */}
       <FixedFooter 
-        pathname={pathname} 
+        pathname={pathname || ''} 
         onHome={() => router.push('/')} 
         onSalary={() => router.push('/salary')} 
         onProfile={() => {}} 
