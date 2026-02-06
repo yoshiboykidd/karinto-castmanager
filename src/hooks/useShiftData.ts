@@ -1,13 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-// ★修正: 新しいライブラリではなく、既存の supabase-js を使う形に戻しました
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 import { format, parseISO, startOfToday, isAfter } from 'date-fns';
 
 export function useShiftData() {
-  // ★修正: createBrowserClient ではなく createClient を使用
-  const [supabase] = useState(() => createClient(
+  const [supabase] = useState(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ));
@@ -25,48 +23,31 @@ export function useShiftData() {
   const fetchInitialData = async (router: any) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        if (router) router.push('/login');
-        return;
-      }
+      if (!session) return router.push('/login');
       
-      const loginId = session.user.email?.split('@')[0];
+      const loginId = session.user.email?.replace('@karinto-internal.com', '');
       
-      const { data: profile } = await supabase
-        .from('cast_members')
-        .select('*')
-        .eq('login_id', loginId)
-        .single();
+      const { data: profile } = await supabase.from('cast_members').select('*').eq('login_id', loginId).single();
       
       if (profile) {
-        // 店舗IDの特定
-        const myShopId = profile.shop_id || profile.home_shop_id;
-
-        // 並列取得
+        const myShopId = profile.home_shop_id || 'main';
+        // Promise.all 内の各クエリに安全策を追加
         const [shopRes, shiftsRes, newsRes, syncRes] = await Promise.all([
-          supabase.from('shops').select('*').eq('id', myShopId).single(),
+          supabase.from('shop_master').select('*').eq('shop_id', myShopId).single(),
           supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
           supabase.from('news').select('*').or(`shop_id.eq.${myShopId},shop_id.eq.all`).order('created_at', { ascending: false }).limit(3),
-          // sync_logs から該当店舗のログを取得
-          supabase.from('sync_logs').select('last_sync_at').eq('shop_id', myShopId).single()
+          supabase.from('sync_logs').select('last_sync_at').eq('id', 1).single()
         ]);
         
-        // ログの時間フォーマット
-        let formattedSyncTime = '--:--';
-        if (syncRes.data?.last_sync_at) {
-          try {
-            formattedSyncTime = format(parseISO(syncRes.data.last_sync_at), 'HH:mm');
-          } catch (e) {
-            console.error('Time parse error', e);
-          }
-        }
-
         setData({
           shifts: shiftsRes.data || [], 
           profile, 
           shop: shopRes.data || null, 
           news: newsRes.data || [],
-          syncAt: formattedSyncTime
+          // syncRes.data が null の場合のガードを徹底
+          syncAt: (syncRes.data && syncRes.data.last_sync_at) 
+            ? format(parseISO(syncRes.data.last_sync_at), 'HH:mm') 
+            : '--:--'
         });
       }
     } catch (err) {
@@ -80,6 +61,7 @@ export function useShiftData() {
    * 月間集計ロジック
    */
   const getMonthlyTotals = useCallback((viewDate: Date) => {
+    // マウント前、または viewDate が不正な場合は 0 を返す
     if (!mounted || !viewDate) return { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 };
     
     const today = startOfToday();
@@ -88,15 +70,19 @@ export function useShiftData() {
       .filter((s: any) => {
         if (!s.shift_date) return false;
         const d = parseISO(s.shift_date);
-        
-        const isSameMonth = d.getMonth() === viewDate.getMonth() && d.getFullYear() === viewDate.getFullYear();
         const isPastOrToday = !isAfter(d, today);
         const isOfficialInfo = s.status === 'official' || s.is_official_pre_exist === true;
         
-        return isSameMonth && isPastOrToday && isOfficialInfo;
+        return (
+          d.getMonth() === viewDate.getMonth() && 
+          d.getFullYear() === viewDate.getFullYear() && 
+          isPastOrToday && 
+          isOfficialInfo
+        );
       })
       .reduce((acc, s: any) => {
         let dur = 0;
+        // 時間文字列のバリデーションを強化
         if (s.start_time && s.end_time && s.start_time.includes(':') && s.start_time !== 'OFF') {
           try {
             const [sH, sM] = s.start_time.split(':').map(Number);
@@ -109,16 +95,11 @@ export function useShiftData() {
           }
         }
 
-        const reward = Number(s.reward_amount) || Number(s.achievement?.reward) || 0;
-        const fCount = Number(s.f_count) || Number(s.achievement?.f) || 0;
-        const firstCount = Number(s.first_request_count) || Number(s.achievement?.first) || 0;
-        const mainCount = Number(s.main_request_count) || Number(s.achievement?.main) || 0;
-
         return { 
-          amount: acc.amount + reward, 
-          f: acc.f + fCount, 
-          first: acc.first + firstCount, 
-          main: acc.main + mainCount, 
+          amount: acc.amount + (Number(s.reward_amount) || 0), 
+          f: acc.f + (Number(s.f_count) || 0), 
+          first: acc.first + (Number(s.first_request_count) || 0), 
+          main: acc.main + (Number(s.main_request_count) || 0), 
           count: acc.count + 1, 
           hours: acc.hours + dur 
         };
