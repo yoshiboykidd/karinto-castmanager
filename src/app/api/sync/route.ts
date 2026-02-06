@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { addDays, format } from 'date-fns';
 
-// タイムアウト時間を少し延長 (Vercelのホビー枠だと限界がありますが念のため)
+// 処理時間を最大限確保
 export const maxDuration = 60; 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +23,9 @@ const TARGET_SHOPS = [
 ];
 
 export async function GET() {
+  // ★計測開始
+  const startTime = Date.now();
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -30,6 +33,7 @@ export async function GET() {
 
   const JST_OFFSET = 9 * 60 * 60 * 1000;
 
+  // 1店舗ごとの処理ロジック
   const processShop = async (shop: typeof TARGET_SHOPS[0]) => {
     let localLogs: string[] = [];
 
@@ -46,14 +50,13 @@ export async function GET() {
       // 名前正規化ロジック
       const normalize = (val: string) => {
         if (!val) return "";
-        // 空白除去、カッコ除去（神田店の（24）などもここで消えます）
         let s = val.replace(/\s+/g, '').replace(/[（\(\[].*?[）\)\]]/g, '').replace(/（\d+）/g, ''); 
-        // 全角英数を半角に
         return s.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
       };
 
       const nameMap = new Map(castList.map(c => [normalize(c.hp_display_name), String(c.login_id)]));
 
+      // 7日分ループ
       const dayPromises = Array.from({ length: 7 }).map(async (_, i) => {
         const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
         const dateStrDB = format(targetDate, 'yyyy-MM-dd');
@@ -62,7 +65,7 @@ export async function GET() {
 
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8000); 
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒に延長
 
           const res = await fetch(url, { 
             cache: 'no-store',
@@ -85,10 +88,11 @@ export async function GET() {
           const unmatchedNames: string[] = []; 
 
           // -----------------------------------------------------------
-          // 共通処理関数: 名前と時間を受け取ってリストに追加する
+          // 共通処理関数
           // -----------------------------------------------------------
           const tryAddShift = (rawName: string, timeText: string) => {
             const cleanName = normalize(rawName);
+            // 時間フォーマット (11:00-19:00 や 17:30-21:00) を探す
             const timeMatch = timeText.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
 
             if (cleanName && timeMatch) {
@@ -125,30 +129,35 @@ export async function GET() {
           };
 
           // ===========================================================
-          // ★ 解析ロジック分岐 ★
+          // ★ 解析ロジック (色指定を削除し、時間パターンで探す) ★
           // ===========================================================
 
-          // 【パターンA】 上野・池袋・五反田など (リスト形式)
+          // 【パターンA】 リスト形式
           $('li').each((_, element) => {
             const li = $(element);
             const rawName = li.find('h3').text();
-            // パターンAは li 全体のテキストから時間を探す
             const timeText = li.text(); 
             tryAddShift(rawName, timeText);
           });
 
-          // 【パターンB】 神田・赤坂・秋葉原・渋谷など (カード形式)
-          // パターンAで1件も取れなかった場合のみ実行、または混在の可能性を考えて両方実行でもOK
-          // ここでは「もしパターンAが空なら」ではなく「常に追加で探す」ようにします（安全策）
-          if (batchData.length === 0) {
-            $('.dataBox').each((_, element) => {
-              const box = $(element);
-              const rawName = box.find('h3').text(); // 例: "ことね （24）"
-              const timeText = box.find('p.moziRed').text(); // 例: "11:00-19:00"
-              tryAddShift(rawName, timeText);
+          // 【パターンB】 カード形式 (神田・渋谷・秋葉原など)
+          $('.dataBox').each((_, element) => {
+            const box = $(element);
+            const rawName = box.find('h3').text(); // "ゆりか（21）"
+            
+            // 色クラス(moziRed等)を指定せず、ボックス内のすべてのテキストから時間を探す
+            let timeText = "";
+            box.find('p').each((_, p) => {
+                const t = $(p).text();
+                // 数字:数字 - 数字:数字 のパターンが含まれていたらそれを採用
+                if (/\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}/.test(t)) {
+                    timeText = t;
+                    return false; // ループを抜ける
+                }
             });
-          }
 
+            tryAddShift(rawName, timeText);
+          });
           // ===========================================================
 
           if (batchData.length > 0) {
@@ -179,8 +188,27 @@ export async function GET() {
   };
 
   try {
-    const allResults = await Promise.all(TARGET_SHOPS.map(shop => processShop(shop)));
+    const allResults: string[][] = [];
+    
+    // 1店舗ずつ順番に実行
+    for (const shop of TARGET_SHOPS) {
+      const shopLogs = await processShop(shop);
+      allResults.push(shopLogs);
+      
+      // 次の店舗に行く前に 0.5秒 休む
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
     const flatLogs = allResults.flat();
+
+    // ★計測終了＆時間計算
+    const endTime = Date.now();
+    const diffMs = endTime - startTime;
+    const diffMin = Math.floor(diffMs / 60000);
+    const diffSec = ((diffMs % 60000) / 1000).toFixed(0);
+    
+    // ログの最後に追加
+    flatLogs.push(`🏁 全店完了！所要時間: ${diffMin}分${diffSec}秒`);
 
     await supabase
       .from('sync_logs')
