@@ -30,16 +30,17 @@ export function useShiftData() {
       const { data: profile } = await supabase.from('cast_members').select('*').eq('login_id', loginId).single();
       
       if (profile) {
-        const myShopId = profile.home_shop_id || 'main'; // ここで店舗IDを特定
+        const myShopId = profile.home_shop_id || 'main';
         
-        // Promise.all 内の各クエリ
+        // ★修正: ここを「動いていた時の状態」である id=1 固定に戻します
+        // これならデータが存在するのでエラーにならず、他のデータ（シフトや数字）も道連れに消えません
         const [shopRes, shiftsRes, newsRes, syncRes] = await Promise.all([
           supabase.from('shop_master').select('*').eq('shop_id', myShopId).single(),
           supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
           supabase.from('news').select('*').or(`shop_id.eq.${myShopId},shop_id.eq.all`).order('created_at', { ascending: false }).limit(3),
           
-          // ★修正箇所はここだけ！ id:1 固定をやめて、myShopId で検索するように変更
-          supabase.from('sync_logs').select('last_sync_at').eq('shop_id', myShopId).single()
+          // id=1 のデータ（全体の最終更新時間）を取得
+          supabase.from('sync_logs').select('last_sync_at').eq('id', 1).single()
         ]);
         
         setData({
@@ -47,7 +48,7 @@ export function useShiftData() {
           profile, 
           shop: shopRes.data || null, 
           news: newsRes.data || [],
-          // syncRes.data が null の場合のガード
+          // 時間のフォーマット処理
           syncAt: (syncRes.data && syncRes.data.last_sync_at) 
             ? format(parseISO(syncRes.data.last_sync_at), 'HH:mm') 
             : '--:--'
@@ -60,9 +61,6 @@ export function useShiftData() {
     }
   };
 
-  /**
-   * 月間集計ロジック（完全に元のコードに戻しました）
-   */
   const getMonthlyTotals = useCallback((viewDate: Date) => {
     if (!mounted || !viewDate) return { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 };
     
