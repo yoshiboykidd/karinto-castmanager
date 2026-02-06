@@ -6,7 +6,6 @@ import { useRouter, usePathname } from 'next/navigation';
 import CastHeader from '@/components/dashboard/CastHeader';
 import FixedFooter from '@/components/dashboard/FixedFooter';
 
-// テーマ定義
 const THEMES = [
   { id: 'pink',   name: 'サクラ',   bg: 'bg-pink-300',   ring: 'ring-pink-200' },
   { id: 'blue',   name: 'マリン',   bg: 'bg-cyan-300',   ring: 'ring-cyan-200' },
@@ -22,7 +21,9 @@ export default function MyPage() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   
-  // フォーム状態
+  // デバッグ用：どんなIDで検索しているか表示するため
+  const [debugLoginId, setDebugLoginId] = useState(''); 
+  
   const [newPassword, setNewPassword] = useState('');
   const [targetAmount, setTargetAmount] = useState(''); 
   const [theme, setTheme] = useState('pink');
@@ -38,19 +39,31 @@ export default function MyPage() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || !user.email) { router.push('/login'); return; }
 
+        // メールアドレスの @ の前を取得 (例: 00600037)
         const loginId = user.email.split('@')[0];
-        
+        setDebugLoginId(loginId); // デバッグ用に保存
+
+        console.log('Searching for ID:', loginId);
+
+        // 文字列として検索してみる
         const { data: member, error } = await supabase
           .from('cast_members')
           .select('*, shops(shop_name)')
-          .eq('login_id', loginId)
+          .eq('login_id', loginId) // ここで一致するか確認
           .single();
+
+        if (error) {
+          console.error('Data Fetch Error:', error);
+        }
 
         if (member) {
           setProfile(member);
           setTargetAmount(member.monthly_target_amount || ''); 
           setTheme(member.theme_color || 'pink');
+        } else {
+          console.warn('Member not found for ID:', loginId);
         }
+
       } catch (e) {
         console.error('Error:', e);
       } finally {
@@ -60,11 +73,10 @@ export default function MyPage() {
     fetchData();
   }, [router, supabase]);
 
-  // 設定保存（目標＆カラー）
   const handleSaveSettings = async () => {
     if (!profile?.id) return;
 
-    // ★修正: 全角数字を半角に変換して保存する（エラー防止）
+    // 全角数字を半角に変換
     const cleanAmountStr = String(targetAmount).replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
     const cleanAmount = cleanAmountStr ? Number(cleanAmountStr) : 0;
 
@@ -82,17 +94,14 @@ export default function MyPage() {
       .eq('id', profile.id);
 
     if (!error) {
-      alert('設定を保存しました！🎨\nダッシュボードに戻ると反映されます。');
-      // 画面の数字も綺麗に直す
+      alert('設定を保存しました！🎨');
       setTargetAmount(String(cleanAmount));
       setProfile({ ...profile, monthly_target_amount: cleanAmount, theme_color: theme });
     } else {
-      console.error(error);
-      alert('保存に失敗しました...\n通信環境を確認してください。');
+      alert('保存に失敗しました...');
     }
   };
 
-  // パスワード変更
   const handlePasswordChange = async () => {
     if (!newPassword || newPassword.length < 4) return alert('パスワードは4文字以上にしてください');
     
@@ -102,9 +111,9 @@ export default function MyPage() {
       .eq('id', profile.id);
 
     if (!error) { 
-      alert('パスワードを変更しました✨\n次回から新しいパスワードでログインしてください。'); 
-      setNewPassword(''); // 入力をクリア
-      setProfile({ ...profile, password: newPassword }); // 警告を消すために状態更新
+      alert('パスワードを変更しました✨'); 
+      setNewPassword('');
+      setProfile({ ...profile, password: newPassword });
     } else {
       alert('変更に失敗しました...');
     }
@@ -114,7 +123,6 @@ export default function MyPage() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse">LOADING...</div>;
 
-  // ★変更: 0000なら「危険モード（赤）」、それ以外なら「通常モード（白）」
   const isDangerPassword = profile?.password === '0000';
 
   return (
@@ -123,22 +131,34 @@ export default function MyPage() {
       <CastHeader 
         shopName={profile?.shops?.shop_name || "マイページ"} 
         displayName={profile?.display_name} 
-        version="v3.6.2" 
+        version="v3.6.3" 
         bgColor={currentTheme.bg} 
       />
 
       <main className="px-5 mt-6 space-y-8">
         
-        {/* プロフィール情報 */}
+        {/* プロフィール情報（アイコンは削除しました） */}
         <div className="text-center space-y-1">
-          <div className={`w-24 h-24 rounded-full mx-auto flex items-center justify-center text-4xl mb-3 shadow-inner ${currentTheme.bg} bg-opacity-20`}>
-            👩🏻‍🦰
-          </div>
-          <h2 className="text-xl font-black text-gray-800">{profile?.display_name}</h2>
-          <p className="text-gray-400 text-xs font-bold tracking-widest">ID: {profile?.login_id}</p>
+          {/* もしデータが取れていない場合、検索中のIDを表示して確認できるようにする */}
+          {!profile && (
+             <div className="bg-gray-100 p-4 rounded-xl mb-4 text-left">
+               <p className="text-red-500 font-bold text-sm">⚠️ データが見つかりません</p>
+               <p className="text-xs text-gray-500">
+                 検索中のID: <span className="font-mono font-bold text-black">{debugLoginId}</span><br/>
+                 DBの `login_id` と一致していますか？
+               </p>
+             </div>
+          )}
+
+          <h2 className="text-xl font-black text-gray-800">
+            {profile?.display_name || "ゲスト"}
+          </h2>
+          <p className="text-gray-400 text-xs font-bold tracking-widest">
+            ID: {profile?.login_id || debugLoginId}
+          </p>
         </div>
 
-        {/* 🎨 設定セクション（色と目標） */}
+        {/* 設定フォーム（以下同じ） */}
         <div className="space-y-6">
           {/* テーマカラー */}
           <section className="bg-white border border-gray-100 rounded-[32px] p-6 shadow-xl space-y-4">
@@ -187,7 +207,7 @@ export default function MyPage() {
 
         <hr className="border-gray-100" />
 
-        {/* 🔑 パスワード変更（常時表示に変更） */}
+        {/* パスワード変更 */}
         <section className={`border-2 rounded-[32px] p-6 shadow-lg transition-colors duration-500
           ${isDangerPassword ? 'bg-red-50 border-red-100 animate-pulse-slow' : 'bg-gray-50 border-gray-100'}
         `}>
