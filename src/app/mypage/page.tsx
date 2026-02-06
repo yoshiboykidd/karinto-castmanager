@@ -11,7 +11,7 @@ const THEMES = [
   { id: 'pink',   name: 'サクラ',   bg: 'bg-pink-500',   ring: 'ring-pink-300' },
   { id: 'blue',   name: 'マリン',   bg: 'bg-blue-500',   ring: 'ring-blue-300' },
   { id: 'black',  name: 'クール',   bg: 'bg-gray-800',   ring: 'ring-gray-500' },
-  { id: 'white',  name: 'ピュア',   bg: 'bg-white border border-gray-200', ring: 'ring-gray-300' },
+  { id: 'white',  name: 'ピュア',   bg: 'bg-gray-500',   ring: 'ring-gray-300' }, // header用に少し濃く調整
   { id: 'red',    name: 'ルージュ', bg: 'bg-red-500',    ring: 'ring-red-300' },
   { id: 'yellow', name: 'レモン',   bg: 'bg-yellow-400', ring: 'ring-yellow-300' },
 ];
@@ -35,28 +35,49 @@ export default function MyPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/login'); return; }
+      try {
+        // 1. ユーザー取得
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !user.email) { 
+            router.push('/login'); 
+            return; 
+        }
 
-      const loginId = user.email?.split('@')[0];
-      const { data: member, error } = await supabase
-        .from('cast_members')
-        .select('*, shops(shop_name)')
-        .eq('login_id', loginId)
-        .single();
+        // 2. プロフィール取得
+        const loginId = user.email.split('@')[0];
+        console.log('Fetching profile for:', loginId);
 
-      if (error || !member) { alert('データ取得エラー'); return; }
+        const { data: member, error } = await supabase
+          .from('cast_members')
+          .select('*, shops(shop_name)')
+          .eq('login_id', loginId)
+          .single();
 
-      setProfile(member);
-      setTargetAmount(member.monthly_target_amount || ''); 
-      setTheme(member.theme_color || 'pink');
-      setLoading(false);
+        if (error) {
+           console.error('Supabase Error:', error);
+           // エラーでも処理を止めずに、空の状態で画面を出す
+        }
+
+        if (member) {
+          setProfile(member);
+          setTargetAmount(member.monthly_target_amount || ''); 
+          setTheme(member.theme_color || 'pink');
+        }
+
+      } catch (e) {
+        console.error('Unknown Error:', e);
+      } finally {
+        // ★重要: 成功しても失敗しても、必ずLoadingを終わらせる
+        setLoading(false);
+      }
     };
     fetchData();
   }, [router, supabase]);
 
   // 設定保存（目標＆カラー）
   const handleSaveSettings = async () => {
+    if (!profile?.id) return;
+
     const { error } = await supabase
       .from('cast_members')
       .update({ 
@@ -79,24 +100,32 @@ export default function MyPage() {
     if (!error) { alert('変更しました✨'); setIsPwChanged(true); }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse">LOADING...</div>;
+  // 選択中のテーマ情報
+  const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse">
+        LOADING...
+      </div>
+    );
+  }
 
   const showPwChangeForm = profile?.password === '0000' && !isPwChanged;
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800">
-      <CastHeader shopName="マイページ" displayName={profile?.display_name} version="v3.5.0" />
+      
+      {/* ★ヘッダーにもテーマ色を適用 */}
+      <CastHeader 
+        shopName={profile?.shops?.shop_name || "マイページ"} 
+        displayName={profile?.display_name} 
+        version="v3.6.0" 
+        bgColor={currentTheme.bg} 
+      />
 
       <main className="px-5 mt-6 space-y-8">
-        {/* プロフィール */}
-        <div className="text-center space-y-1">
-          <div className={`w-24 h-24 rounded-full mx-auto flex items-center justify-center text-4xl mb-3 shadow-inner bg-${theme === 'white' ? 'gray-100' : theme + '-100'}`}>
-            👩🏻‍🦰
-          </div>
-          <h2 className="text-xl font-black text-gray-800">{profile?.display_name}</h2>
-          <p className="text-gray-400 text-xs font-bold tracking-widest">ID: {profile?.login_id}</p>
-        </div>
-
+        
         {/* PW変更警告 */}
         {showPwChangeForm && (
           <section className="bg-red-50 border-2 border-red-100 rounded-[32px] p-6 shadow-lg animate-bounce-slow">
@@ -149,14 +178,7 @@ export default function MyPage() {
 
         <button 
           onClick={handleSaveSettings}
-          className={`w-full py-4 rounded-2xl shadow-lg font-black text-white text-lg active:scale-95 transition-all
-            ${theme === 'pink' ? 'bg-pink-500 shadow-pink-200' : 
-              theme === 'blue' ? 'bg-blue-500 shadow-blue-200' :
-              theme === 'black' ? 'bg-gray-800 shadow-gray-400' :
-              theme === 'red' ? 'bg-red-500 shadow-red-200' :
-              theme === 'yellow' ? 'bg-yellow-400 shadow-yellow-200' :
-              'bg-gray-400' // whiteの場合
-            }`}
+          className={`w-full py-4 rounded-2xl shadow-lg font-black text-white text-lg active:scale-95 transition-all ${currentTheme.bg}`}
         >
           設定を保存する ✨
         </button>
@@ -164,7 +186,13 @@ export default function MyPage() {
         <button onClick={async () => { await supabase.auth.signOut(); router.push('/login'); }} className="w-full py-4 text-gray-400 text-xs font-bold tracking-widest">LOGOUT</button>
       </main>
 
-      <FixedFooter pathname={pathname} onHome={() => router.push('/')} onSalary={() => router.push('/salary')} onLogout={() => {}} />
+      <FixedFooter 
+        pathname={pathname} 
+        onHome={() => router.push('/')} 
+        onSalary={() => router.push('/salary')} 
+        onProfile={() => {}} 
+        onLogout={async () => { await supabase.auth.signOut(); router.push('/login'); }} 
+      />
     </div>
   );
 }
