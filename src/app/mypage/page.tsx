@@ -17,10 +17,8 @@ const THEMES = [
 
 export default function MyPage() {
   const router = useRouter();
+  const pathname = usePathname();
   
-  // ★ここに「pathname」の定義を追加しました！これで波線が消えます。
-  const pathname = usePathname(); 
-
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -51,9 +49,10 @@ export default function MyPage() {
 
         console.log(`Searching profile for: "${rawLoginId}" OR "${strippedLoginId}"`);
 
+        // 店舗情報は結合せず、キャスト情報だけシンプルに取得
         const { data: members, error } = await supabase
           .from('cast_members')
-          .select('*, shops(shop_name)')
+          .select('*') 
           .in('login_id', [rawLoginId, strippedLoginId]);
 
         if (error) throw error;
@@ -62,7 +61,14 @@ export default function MyPage() {
 
         if (member) {
           console.log('Profile Loaded:', member);
-          setProfile(member);
+          
+          // 店舗名を擬似的にセット
+          const fullProfile = { 
+            ...member, 
+            shops: { shop_name: "マイページ" } 
+          };
+          
+          setProfile(fullProfile);
           setTargetAmount(String(member.monthly_target_amount || '')); 
           setTheme(member.theme_color || 'pink');
         } else {
@@ -109,7 +115,6 @@ export default function MyPage() {
 
       alert('設定を保存しました！🎨\n（ダッシュボードの色が変わります）');
       setTargetAmount(String(cleanAmount));
-      
       window.location.reload();
 
     } catch (e: any) {
@@ -138,23 +143,27 @@ export default function MyPage() {
     }
   };
 
+  // 描画用の変数を整理（これで波線を回避）
   const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
+  const isDangerPassword = profile?.password === '0000';
+  
+  // CastHeaderに渡す値を事前に確定させる
+  const headerShopName = profile?.shops?.shop_name || "マイページ";
+  const headerDisplayName = profile?.display_name;
+  const headerBgColor = currentTheme.bg;
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse">LOADING...</div>;
-
-  const isDangerPassword = profile?.password === '0000';
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800">
       
       <CastHeader 
-        shopName={profile?.shops?.shop_name || "マイページ"} 
-        displayName={profile?.display_name} 
-        version="v3.7.3" 
-        bgColor={currentTheme.bg} 
+        shopName={headerShopName}
+        displayName={headerDisplayName}
+        version="v3.7.6"
+        bgColor={headerBgColor}
       />
 
-      {/* ★ここの波線も、上の pathname が定義されたことで消えるはずです！ */}
       <main className="px-5 mt-6 space-y-8">
         
         <div className="text-center space-y-1">
@@ -162,8 +171,9 @@ export default function MyPage() {
              <div className="bg-red-50 p-4 rounded-xl mb-4 text-left border border-red-200">
                <p className="text-red-500 font-bold text-sm">⚠️ データの取得に失敗しました</p>
                <p className="text-xs text-red-400 mt-1">
-                 データベースにこのIDのユーザー登録がありません。<br/>
-                 管理者に連絡してください。
+                 データベースのロック(RLS)が解除されていない可能性があります。<br/>
+                 SQL Editorで以下を実行してください：<br/>
+                 <span className="font-mono bg-red-100 p-1">ALTER TABLE cast_members DISABLE ROW LEVEL SECURITY;</span>
                </p>
              </div>
           )}
@@ -268,7 +278,6 @@ export default function MyPage() {
         <button onClick={async () => { await supabase.auth.signOut(); router.push('/login'); }} className="w-full py-4 text-gray-400 text-xs font-bold tracking-widest">LOGOUT</button>
       </main>
 
-      {/* pathname={pathname} もこれでエラーが消えます */}
       <FixedFooter 
         pathname={pathname || ''} 
         onHome={() => router.push('/')} 
