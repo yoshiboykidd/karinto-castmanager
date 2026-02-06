@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { addDays, format } from 'date-fns';
 
+// タイムアウトを最大まで伸ばす
 export const maxDuration = 60; 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,7 @@ export async function GET() {
   const JST_OFFSET = 9 * 60 * 60 * 1000;
 
   const processShop = async (shop: typeof TARGET_SHOPS[0]) => {
-    let localLogs: string[] = [`🏁 Start: ${shop.name}`];
+    let localLogs: string[] = [];
 
     try {
       // 1. 名簿取得
@@ -40,7 +41,7 @@ export async function GET() {
         .eq('home_shop_id', shop.id);
 
       if (castError || !castList || castList.length === 0) {
-        return [`⚠️ Skip ${shop.name}: 名簿なし`];
+        return [`⚠️ Skip ${shop.name}: 名簿取得失敗`];
       }
 
       const normalize = (val: string) => {
@@ -49,7 +50,7 @@ export async function GET() {
         return s.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
       };
 
-      // ★修正: IDを必ずString型に変換してMapに登録
+      // IDをString化してMap作成
       const nameMap = new Map(castList.map(c => [normalize(c.hp_display_name), String(c.login_id)]));
 
       // 7日分のPromiseを作成
@@ -60,17 +61,25 @@ export async function GET() {
         const url = `${shop.baseUrl}?date_get=${dateStrURL}&t=${Date.now()}`;
 
         try {
-          const res = await fetch(url, { cache: 'no-store' });
+          // ★修正ポイント：タイムアウト設定 (5秒以上かかったら諦めて次へ行く)
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒制限
+
+          const res = await fetch(url, { 
+            cache: 'no-store',
+            signal: controller.signal
+          }).finally(() => clearTimeout(timeoutId));
+
           if (!res.ok) return null;
           const html = await res.text();
           const $ = cheerio.load(html);
 
+          // 既存データの取得
           const { data: existingShifts } = await supabase
             .from('shifts')
             .select('login_id, status')
             .eq('shift_date', dateStrDB);
 
-          // ★修正: こちらもIDを必ずString型にしてMapを作成
           const existingStatusMap = new Map(existingShifts?.map(s => [String(s.login_id), s.status]));
           
           const batchData: any[] = [];
@@ -81,16 +90,17 @@ export async function GET() {
             const timeMatch = li.text().match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
 
             if (cleanName && timeMatch) {
-              const loginId = nameMap.get(cleanName); // Stringで返ってくる
+              const loginId = nameMap.get(cleanName);
               if (loginId) {
-                const currentStatus = existingStatusMap.get(loginId); // String同士で検索するので確実
+                const currentStatus = existingStatusMap.get(loginId);
                 
                 const hpStart = timeMatch[1].padStart(5, '0');
                 const hpEnd = timeMatch[2].padStart(5, '0');
 
-                const baseData = { 
+                // ★修正ポイント：確実に shift_date を含むオブジェクトを作る
+                const commonData = { 
                   login_id: loginId, 
-                  shift_date: dateStrDB, 
+                  shift_date: dateStrDB, // ← これが絶対に必要
                   hp_display_name: cleanName, 
                   is_official_pre_exist: true,
                   hp_start_time: hpStart, 
@@ -98,13 +108,12 @@ export async function GET() {
                 };
                 
                 if (currentStatus === 'requested') {
-                  // 申請中なら、start_time（希望時間）は上書きせず、裏側のデータだけ更新
-                  // statusも送らないので、DBの requested が維持される（部分更新）
-                  batchData.push(baseData);
+                  // 申請中の場合は commonData (HP時間情報) だけ更新
+                  batchData.push(commonData);
                 } else {
-                  // それ以外なら、公式情報で全上書き
+                  // 通常時は commonData + 公式確定情報 で更新
                   batchData.push({
-                    ...baseData,
+                    ...commonData,
                     start_time: hpStart,
                     end_time: hpEnd,
                     status: 'official',
@@ -117,11 +126,18 @@ export async function GET() {
 
           if (batchData.length > 0) {
             const { error } = await supabase.from('shifts').upsert(batchData, { onConflict: 'login_id, shift_date' });
-            return error ? `❌ ${dateStrDB} DB Error` : `✅ ${dateStrDB} (${batchData.length}件)`;
+            if (error) {
+              console.error(`DB Error ${shop.name} ${dateStrDB}:`, error);
+              return `❌ ${shop.name} ${dateStrDB} DB Error`;
+            }
+            return `✅ ${shop.name} ${format(targetDate, 'MM/dd')} (${batchData.length}件)`;
           }
           return null;
-        } catch {
-          return `❌ ${dateStrDB} Parse Error`;
+        } catch (err: any) {
+          if (err.name === 'AbortError') {
+             return `⏱️ ${shop.name} ${format(targetDate, 'MM/dd')} Timeout`;
+          }
+          return `❌ ${shop.name} ${dateStrDB} Error`;
         }
       });
 
