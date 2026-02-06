@@ -22,7 +22,8 @@ export default function MyPage() {
   const [profile, setProfile] = useState<any>(null);
   
   // デバッグ用
-  const [debugLoginId, setDebugLoginId] = useState(''); 
+  const [debugRawId, setDebugRawId] = useState('');
+  const [debugStrippedId, setDebugStrippedId] = useState('');
   
   const [newPassword, setNewPassword] = useState('');
   const [targetAmount, setTargetAmount] = useState(''); 
@@ -39,29 +40,34 @@ export default function MyPage() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user || !user.email) { router.push('/login'); return; }
 
-        // メールアドレスからIDを取得 (例: "00600037")
-        const rawLoginId = user.email.split('@')[0];
+        const rawLoginId = user.email.split('@')[0];         // そのまま "00600037"
+        const strippedLoginId = String(Number(rawLoginId));  // ゼロなし "600037"
         
-        // ★修正ポイント: 先頭のゼロを取り除く (例: "00600037" -> "600037")
-        // Number()で一度数字にしてからString()に戻すことで、余計な0を消します
-        const cleanLoginId = String(Number(rawLoginId));
-        
-        setDebugLoginId(cleanLoginId); // 画面表示用もゼロなし版にする
+        setDebugRawId(rawLoginId);
+        setDebugStrippedId(strippedLoginId);
 
-        console.log(`Searching for ID: ${cleanLoginId} (Original: ${rawLoginId})`);
+        console.log(`Searching for ID: "${rawLoginId}" OR "${strippedLoginId}"`);
 
-        const { data: member, error } = await supabase
+        // ★最強検索: 両方のパターンで探して、最初に見つかった方を採用
+        const { data: members, error } = await supabase
           .from('cast_members')
           .select('*, shops(shop_name)')
-          .eq('login_id', cleanLoginId) // ゼロなしIDで検索！
-          .single();
+          .in('login_id', [rawLoginId, strippedLoginId]); // どっちかあればOK
+
+        if (error) {
+          console.error('Data Fetch Error:', error);
+        }
+
+        // 配列の1つ目を取得
+        const member = members && members.length > 0 ? members[0] : null;
 
         if (member) {
+          console.log('Member Found:', member);
           setProfile(member);
           setTargetAmount(member.monthly_target_amount || ''); 
           setTheme(member.theme_color || 'pink');
         } else {
-          console.warn('Member not found for ID:', cleanLoginId);
+          console.warn('Member not found for either ID.');
         }
 
       } catch (e) {
@@ -130,7 +136,7 @@ export default function MyPage() {
       <CastHeader 
         shopName={profile?.shops?.shop_name || "マイページ"} 
         displayName={profile?.display_name} 
-        version="v3.6.4" 
+        version="v3.6.5" 
         bgColor={currentTheme.bg} 
       />
 
@@ -140,11 +146,15 @@ export default function MyPage() {
         <div className="text-center space-y-1">
           {/* まだ見つからない場合のデバッグ表示 */}
           {!profile && (
-             <div className="bg-gray-100 p-4 rounded-xl mb-4 text-left">
-               <p className="text-red-500 font-bold text-sm">⚠️ データが見つかりません</p>
-               <p className="text-xs text-gray-500">
-                 検索ID: <span className="font-mono font-bold text-black">{debugLoginId}</span><br/>
-                 （先頭の0を取り除いて検索しています）
+             <div className="bg-gray-100 p-4 rounded-xl mb-4 text-left border-l-4 border-red-400">
+               <p className="text-red-500 font-bold text-sm mb-1">⚠️ まだデータが見つかりません</p>
+               <p className="text-xs text-gray-600 leading-relaxed">
+                 以下のどちらのIDも登録がありませんでした。<br/>
+                 1. <span className="font-mono font-bold">{debugRawId}</span> (そのまま)<br/>
+                 2. <span className="font-mono font-bold">{debugStrippedId}</span> (ゼロなし)<br/>
+                 <br/>
+                 <span className="text-red-400 font-bold">対処法：</span><br/>
+                 Supabaseの `cast_members` テーブルに、このIDの行を追加してください。
                </p>
              </div>
           )}
@@ -153,7 +163,7 @@ export default function MyPage() {
             {profile?.display_name || "ゲスト"}
           </h2>
           <p className="text-gray-400 text-xs font-bold tracking-widest">
-            ID: {profile?.login_id || debugLoginId}
+            ID: {profile?.login_id || debugRawId}
           </p>
         </div>
 
