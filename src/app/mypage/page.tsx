@@ -26,7 +26,6 @@ export default function MyPage() {
 
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
-  const [shopInfo, setShopInfo] = useState<any>(null); // 店舗情報は別管理
 
   // フォーム状態
   const [newPassword, setNewPassword] = useState('');
@@ -48,10 +47,11 @@ export default function MyPage() {
         const rawLoginId = user.email.split('@')[0];         
         const strippedLoginId = String(Number(rawLoginId));  
 
-        // ★修正1: まず「キャスト情報だけ」確実に取る（結合しない）
+        // ★修正: 再度、結合クエリを使用（これが一番確実に取れるため）
+        // ただし、shopsがnullでもエラーにならないよう左外部結合的な挙動を期待
         const { data: members, error } = await supabase
           .from('cast_members')
-          .select('*') 
+          .select('*, shops(shop_name, last_synced_at)') 
           .in('login_id', [rawLoginId, strippedLoginId]);
 
         if (error) throw error;
@@ -62,19 +62,6 @@ export default function MyPage() {
           setProfile(member);
           setTargetAmount(String(member.monthly_target_amount || '')); 
           setTheme(member.theme_color || 'pink');
-
-          // ★修正2: キャストが取れたら、その後に「店舗情報」を取りに行く（失敗してもOKにする）
-          if (member.shop_id) {
-            const { data: shop } = await supabase
-              .from('shops')
-              .select('shop_name, last_synced_at')
-              .eq('id', member.shop_id)
-              .single();
-            
-            if (shop) {
-              setShopInfo(shop);
-            }
-          }
         } else {
           console.error('Profile NOT found in DB');
         }
@@ -90,11 +77,7 @@ export default function MyPage() {
 
   // 設定保存
   const handleSaveSettings = async () => {
-    if (!profile || !profile.login_id) {
-      alert('エラー：プロフィール情報が読み込めていません。\n画面をリロードしてみてください。');
-      return;
-    }
-
+    if (!profile || !profile.login_id) return;
     setIsSaving(true);
 
     try {
@@ -117,13 +100,13 @@ export default function MyPage() {
 
       if (error) throw error;
 
-      alert('設定を保存しました！🎨\n（ダッシュボードの色が変わります）');
+      alert('設定を保存しました！🎨');
       setTargetAmount(String(cleanAmount));
-      window.location.reload();
+      window.location.reload(); // 反映のためリロード
 
     } catch (e: any) {
       console.error('Update Error:', e);
-      alert(`保存に失敗しました...\nエラー内容: ${e.message || '不明なエラー'}`);
+      alert(`保存に失敗しました...`);
     } finally {
       setIsSaving(false);
     }
@@ -131,7 +114,7 @@ export default function MyPage() {
 
   // パスワード変更
   const handlePasswordChange = async () => {
-    if (!profile?.login_id) return alert('プロフィール読込中...');
+    if (!profile?.login_id) return;
     if (!newPassword || newPassword.length < 4) return alert('パスワードは4文字以上にしてください');
     
     const { error } = await supabase
@@ -140,7 +123,7 @@ export default function MyPage() {
       .eq('login_id', profile.login_id);
 
     if (!error) { 
-      alert('パスワードを変更しました✨\n次回から新しいパスワードでログインしてください。'); 
+      alert('パスワードを変更しました✨'); 
       setNewPassword('');
     } else {
       alert('変更に失敗しました...');
@@ -150,9 +133,10 @@ export default function MyPage() {
   const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
   const isDangerPassword = profile?.password === '0000';
   
-  // Header情報（別々に取得した情報をここで合わせる）
-  const headerShopName = shopInfo?.shop_name || "マイページ";
-  const headerSyncTime = shopInfo?.last_synced_at;
+  // Header情報
+  const headerShopName = profile?.shops?.shop_name || "マイページ";
+  // ★重要: 配列ではなくオブジェクトとして入ってくるのでそのまま参照
+  const headerSyncTime = profile?.shops?.last_synced_at; 
   const headerDisplayName = profile?.display_name;
   const headerBgColor = currentTheme.bg;
 
@@ -165,26 +149,26 @@ export default function MyPage() {
         shopName={headerShopName}
         displayName={headerDisplayName}
         syncTime={headerSyncTime}
-        version="v3.7.8"
+        version="v3.8.0"
         bgColor={headerBgColor}
       />
 
-      <main className="px-5 mt-6 space-y-8">
+      {/* ★修正: 余白を詰める (mt-6 -> mt-3, space-y-8 -> space-y-4) */}
+      <main className="px-4 mt-3 space-y-4">
         
         {!profile && (
-            <div className="bg-red-50 p-4 rounded-xl mb-4 text-left border border-red-200">
-              <p className="text-red-500 font-bold text-sm">⚠️ データの取得に失敗しました</p>
-              <p className="text-xs text-red-400 mt-1">リロードしてください。</p>
+            <div className="bg-red-50 p-3 rounded-xl mb-2 text-left border border-red-200">
+              <p className="text-red-500 font-bold text-xs">⚠️ データの取得に失敗しました</p>
             </div>
         )}
 
-        <div className="space-y-6">
+        <div className="space-y-3"> {/* 間隔を詰める */}
           
           {/* 1. 目標金額設定 */}
-          <section className="bg-white border border-gray-100 rounded-[32px] p-6 shadow-xl space-y-4">
+          <section className="bg-white border border-gray-100 rounded-[24px] p-5 shadow-lg space-y-2">
             <div className="flex items-center gap-2 font-black text-gray-700">
-              <span className="text-xl">💰</span>
-              <h3>今月の目標金額</h3>
+              <span className="text-lg">💰</span>
+              <h3 className="text-sm">今月の目標金額</h3>
             </div>
             <div className="relative">
               <input 
@@ -194,24 +178,24 @@ export default function MyPage() {
                 value={targetAmount}
                 onChange={(e) => setTargetAmount(e.target.value)}
                 placeholder="0"
-                className="w-full px-5 py-4 pl-10 rounded-2xl bg-gray-50 border border-gray-100 font-black text-xl text-gray-700 focus:ring-2 focus:ring-pink-200 focus:outline-none"
+                className="w-full px-4 py-3 pl-9 rounded-xl bg-gray-50 border border-gray-100 font-black text-lg text-gray-700 focus:ring-2 focus:ring-pink-200 focus:outline-none"
               />
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">¥</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">¥</span>
             </div>
           </section>
 
           {/* 2. テーマカラー設定 */}
-          <section className="bg-white border border-gray-100 rounded-[32px] p-6 shadow-xl space-y-4">
+          <section className="bg-white border border-gray-100 rounded-[24px] p-5 shadow-lg space-y-2">
             <div className="flex items-center gap-2 font-black text-gray-700">
-              <span className="text-xl">🎨</span>
-              <h3>テーマカラー</h3>
+              <span className="text-lg">🎨</span>
+              <h3 className="text-sm">テーマカラー</h3>
             </div>
-            <div className="grid grid-cols-6 gap-2">
+            <div className="grid grid-cols-6 gap-2 pt-1">
               {THEMES.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setTheme(t.id)}
-                  className={`w-10 h-10 rounded-full mx-auto shadow-sm transition-all ${t.bg} ${theme === t.id ? `scale-125 ring-2 ${t.ring} ring-offset-2` : 'opacity-70 hover:opacity-100'}`}
+                  className={`w-9 h-9 rounded-full mx-auto shadow-sm transition-all ${t.bg} ${theme === t.id ? `scale-110 ring-2 ${t.ring} ring-offset-2` : 'opacity-70 hover:opacity-100'}`}
                 />
               ))}
             </div>
@@ -221,58 +205,51 @@ export default function MyPage() {
           <button 
             onClick={handleSaveSettings}
             disabled={isSaving}
-            className={`w-full py-4 rounded-2xl shadow-lg font-black text-white text-lg active:scale-95 transition-all flex items-center justify-center gap-2
+            className={`w-full py-3.5 rounded-xl shadow-md font-black text-white text-base active:scale-95 transition-all flex items-center justify-center gap-2
               ${isSaving ? 'bg-gray-400 cursor-not-allowed' : currentTheme.bg}
             `}
           >
-            {isSaving ? (
-              <>
-                <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
-                保存中...
-              </>
-            ) : (
-              '設定を保存する ✨'
-            )}
+            {isSaving ? '保存中...' : '設定を保存する ✨'}
           </button>
         </div>
 
-        <hr className="border-gray-100" />
+        <hr className="border-gray-100 my-2" />
 
         {/* 3. パスワード変更 */}
-        <section className={`border-2 rounded-[32px] p-6 shadow-lg transition-colors duration-500
-          ${isDangerPassword ? 'bg-red-50 border-red-100 animate-pulse-slow' : 'bg-gray-50 border-gray-100'}
+        <section className={`border-2 rounded-[24px] p-5 shadow-md transition-colors duration-500
+          ${isDangerPassword ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100'}
         `}>
-          <div className={`flex items-center gap-2 font-black mb-3 ${isDangerPassword ? 'text-red-500' : 'text-gray-500'}`}>
-            <span className="text-xl">{isDangerPassword ? '⚠️' : '🔒'}</span>
-            <h3>{isDangerPassword ? 'パスワード変更のお願い' : 'パスワード変更'}</h3>
+          <div className={`flex items-center gap-2 font-black mb-2 ${isDangerPassword ? 'text-red-500' : 'text-gray-500'}`}>
+            <span className="text-lg">{isDangerPassword ? '⚠️' : '🔒'}</span>
+            <h3 className="text-sm">{isDangerPassword ? 'パスワード変更のお願い' : 'パスワード変更'}</h3>
           </div>
           
           {isDangerPassword && (
-            <p className="text-xs text-red-400 mb-4 font-bold">
-              初期設定の「0000」のままです。<br/>セキュリティのため変更してください。
+            <p className="text-[10px] text-red-400 mb-3 font-bold">
+              初期設定「0000」から変更してください。
             </p>
           )}
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             <input 
               type="text" 
               placeholder="新しいパスワード" 
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-5 py-3 rounded-xl bg-white border border-gray-200 font-bold text-gray-700 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
+              className="w-full px-4 py-3 rounded-xl bg-white border border-gray-200 font-bold text-gray-700 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-200"
             />
             <button 
               onClick={handlePasswordChange}
-              className={`w-full font-black py-3 rounded-xl text-white shadow-md active:scale-95 transition-all
+              className={`w-full font-black py-3 rounded-xl text-white shadow-sm active:scale-95 transition-all
                 ${isDangerPassword ? 'bg-red-400' : 'bg-gray-400'}
               `}
             >
-              パスワードを変更
+              変更する
             </button>
           </div>
         </section>
 
-        <button onClick={async () => { await supabase.auth.signOut(); router.push('/login'); }} className="w-full py-4 text-gray-400 text-xs font-bold tracking-widest">LOGOUT</button>
+        {/* ログアウトボタンは削除しました */}
       </main>
 
       <FixedFooter 
