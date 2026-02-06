@@ -1,7 +1,14 @@
-import { useState, useEffect, useMemo } from 'react'; // useMemoを追加
+import { useState, useEffect, useMemo } from 'react';
 import { format, isAfter, startOfToday } from 'date-fns';
 
-export function useAchievement(supabase: any, profile: any, shifts: any[] = [], selectedSingle: Date | undefined, refreshData: () => void) {
+// ★修正点: shifts の型を any[] から any に変更 (nullが来ても怒られないようにする)
+export function useAchievement(
+  supabase: any, 
+  profile: any, 
+  shifts: any, // ← ここを any に変更
+  selectedSingle: Date | undefined, 
+  refreshData: () => void
+) {
   // 実績入力用の状態
   const [editReward, setEditReward] = useState({ f: '', first: '', main: '', amount: '' });
   
@@ -11,9 +18,11 @@ export function useAchievement(supabase: any, profile: any, shifts: any[] = [], 
 
   // 選択された日付が変わったら、入力フォームの中身を同期
   useEffect(() => {
+    // Array.isArrayでチェックしているので安全
     if (!selectedSingle || !Array.isArray(shifts)) return;
+    
     const dateStr = format(selectedSingle, 'yyyy-MM-dd');
-    const shift = shifts.find(s => s.shift_date === dateStr);
+    const shift = shifts.find((s: any) => s.shift_date === dateStr);
     
     setEditReward({ 
       f: String(shift?.f_count || ''), 
@@ -23,16 +32,16 @@ export function useAchievement(supabase: any, profile: any, shifts: any[] = [], 
     });
   }, [selectedSingle, shifts]);
 
-  // その日が編集可能かどうかの判定（useMemoで保護し、マウント前はfalseにする）
+  // その日が編集可能かどうかの判定
   const { isEditable, selectedShift } = useMemo(() => {
-    // マウント前（サーバーサイド）は常に「編集不可」にして、ブラウザと表示を合わせる
+    // マウント前やデータがない場合は「編集不可」
     if (!mounted || !selectedSingle || !Array.isArray(shifts)) {
       return { isEditable: false, selectedShift: null };
     }
 
-    const today = startOfToday(); // ブラウザ上での「今日」を取得
+    const today = startOfToday();
     const dateStr = format(selectedSingle, 'yyyy-MM-dd');
-    const shift = shifts.find(s => s.shift_date === dateStr);
+    const shift = shifts.find((s: any) => s.shift_date === dateStr);
 
     const editable = !isAfter(selectedSingle, today) && 
                      shift && 
@@ -66,5 +75,6 @@ export function useAchievement(supabase: any, profile: any, shifts: any[] = [], 
     }
   };
 
+  // ★ここに selectedShift が含まれているので、呼び出し元で取得できます
   return { editReward, setEditReward, handleSaveAchievement, isEditable, selectedShift };
 }
