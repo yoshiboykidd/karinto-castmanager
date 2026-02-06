@@ -85,16 +85,17 @@ export default function DashboardContent() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
       
-      {/* 1. ヘッダー (ここで直接色を指定する) */}
+      {/* 1. ヘッダー */}
       <CastHeader 
         shopName={data?.shop?.shop_name || "かりんと"} 
         syncTime={data?.syncAt} 
         displayName={safeProfile.display_name} 
-        version="v3.5.4"
-        bgColor={currentTheme.header} // ★余計なdivを消して、ここで色を渡す！
+        version="v3.5.5"
+        bgColor={currentTheme.header}
       />
       
-      <main className="px-4 -mt-4 relative z-10 space-y-3">
+      {/* ★ここを修正！ mt-4 にして間隔を空ける */}
+      <main className="px-4 mt-4 relative z-10 space-y-3">
         {/* 2. 月間サマリー */}
         {isValid(safeViewDate) && (
           <MonthlySummary 
