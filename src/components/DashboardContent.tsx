@@ -25,13 +25,10 @@ export default function DashboardContent() {
   const { data, loading, fetchInitialData, getMonthlyTotals, supabase } = useShiftData();
   const nav = useNavigation();
 
-  // ★修正: ここで強制的に 'any' 型として扱うことで、型エラーを完全に黙らせます
-  // (useAchievementが何を返そうが、ビルドは通るようになります)
+  // useAchievementの戻り値を any で受け取る
   const achievementData: any = useAchievement(
     supabase, data.profile, data.shifts, nav.selected.single, () => fetchInitialData(router)
   );
-  
-  // any型から取り出すので、TypeScriptは文句を言わなくなります
   const { editReward, setEditReward, handleSaveAchievement, isEditable, selectedShift } = achievementData;
 
   // シフト申請
@@ -68,7 +65,7 @@ export default function DashboardContent() {
         shopName={data.shop?.shop_name || "かりんと 池袋東口店"} 
         syncTime={data.syncAt} 
         displayName={data.profile?.display_name} 
-        version="v3.4.6" 
+        version="v3.4.7" 
       />
       
       <main className="px-4 mt-3 space-y-3">
@@ -135,7 +132,8 @@ export default function DashboardContent() {
             multiDates={nav.selected.multi} 
             requestDetails={requestDetails} 
             setRequestDetails={setRequestDetails} 
-            shifts={data.shifts} 
+            // ★修正: ここで強制的に型を合わせる
+            shifts={data.shifts as any} 
             onSubmit={handleBulkSubmit} 
           />
         )}

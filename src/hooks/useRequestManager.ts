@@ -3,10 +3,11 @@ import { format } from 'date-fns';
 
 const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1467395577829523487/oQUEYdVA4oSbkAb53WYNMCnVIiOa0Tsi25WRPVWDtxF2UsnJFGrsU_gb-qG37gdyTQaQ";
 
+// ★修正: shifts: any[] を shifts: any に変更 (null対策)
 export function useRequestManager(
   supabase: any, 
   profile: any, 
-  shifts: any[] = [], // デフォルト値を空配列にして find() でのクラッシュを防ぐ
+  shifts: any, // ← ここを any に変更！
   selectedMulti: Date[] = [], 
   refreshData: () => void, 
   resetSelection: () => void
@@ -15,6 +16,7 @@ export function useRequestManager(
 
   const handleBulkSubmit = useCallback(async () => {
     // profile または shifts が揃っていない場合は実行させない
+    // ★修正: shiftsの配列チェックを Array.isArray で安全に行う
     if (!profile || !profile.login_id || !Array.isArray(shifts) || selectedMulti.length === 0) {
       alert('申請するデータが正しく読み込まれていません。');
       return;
@@ -22,12 +24,12 @@ export function useRequestManager(
     
     try {
       const requests = selectedMulti.map(date => {
-        // date が有効な Date オブジェクトか念のためチェック
         if (!(date instanceof Date) || isNaN(date.getTime())) return null;
 
         const key = format(date, 'yyyy-MM-dd');
-        // shifts が null の場合でも find() がエラーにならないようガード
-        const existing = (shifts || []).find(s => s.shift_date === key);
+        // ★修正: shiftsが配列であることを確認してからfind
+        const safeShifts = Array.isArray(shifts) ? shifts : [];
+        const existing = safeShifts.find((s: any) => s.shift_date === key);
 
         return {
           login_id: profile.login_id,
@@ -37,17 +39,15 @@ export function useRequestManager(
           end_time: requestDetails[key]?.e || '23:30',
           status: 'requested',
           is_official: false,
-          // すでに確定(official)していたデータがあればフラグを立てる
           is_official_pre_exist: existing?.is_official_pre_exist || existing?.status === 'official' || false
         };
-      }).filter(r => r !== null); // 無効なデータを除去
+      }).filter(r => r !== null);
 
       if (requests.length === 0) return;
 
       const { error } = await supabase.from('shifts').upsert(requests, { onConflict: 'login_id,shift_date' });
       
       if (!error) {
-        // Discord通知
         fetch(DISCORD_WEBHOOK_URL, { 
           method: 'POST', 
           headers: { 'Content-Type': 'application/json' },
