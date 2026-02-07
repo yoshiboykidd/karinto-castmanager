@@ -3,7 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { addDays, format } from 'date-fns';
 
-// 処理時間を最大限確保 (Vercel Hobbyだと最大60秒)
 export const maxDuration = 60; 
 export const dynamic = 'force-dynamic';
 
@@ -23,26 +22,16 @@ const ALL_SHOPS = [
 ];
 
 export async function GET(request: NextRequest) {
-  // ★計測開始
   const startTime = Date.now();
-
-  // URLパラメータ (?group=1 など) を取得
   const searchParams = request.nextUrl.searchParams;
   const group = searchParams.get('group');
 
-  // ★グループ分けロジック
   let targetShops = [];
-  if (group === '1') {
-    targetShops = ALL_SHOPS.slice(0, 3);
-  } else if (group === '2') {
-    targetShops = ALL_SHOPS.slice(3, 6);
-  } else if (group === '3') {
-    targetShops = ALL_SHOPS.slice(6, 9);
-  } else if (group === '4') {
-    targetShops = ALL_SHOPS.slice(9, 12);
-  } else {
-    targetShops = ALL_SHOPS;
-  }
+  if (group === '1') targetShops = ALL_SHOPS.slice(0, 3);
+  else if (group === '2') targetShops = ALL_SHOPS.slice(3, 6);
+  else if (group === '3') targetShops = ALL_SHOPS.slice(6, 9);
+  else if (group === '4') targetShops = ALL_SHOPS.slice(9, 12);
+  else targetShops = ALL_SHOPS;
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -51,7 +40,6 @@ export async function GET(request: NextRequest) {
 
   const JST_OFFSET = 9 * 60 * 60 * 1000;
 
-  // 1店舗ごとの処理ロジック
   const processShop = async (shop: typeof ALL_SHOPS[0]) => {
     let localLogs: string[] = [];
 
@@ -65,7 +53,6 @@ export async function GET(request: NextRequest) {
         return [`⚠️ Skip ${shop.name}: 名簿取得失敗`];
       }
 
-      // 名前正規化
       const normalize = (val: string) => {
         if (!val) return "";
         let s = val.replace(/\s+/g, '').replace(/[（\(\[].*?[）\)\]]/g, '').replace(/（\d+）/g, ''); 
@@ -74,7 +61,6 @@ export async function GET(request: NextRequest) {
 
       const nameMap = new Map(castList.map(c => [normalize(c.hp_display_name), String(c.login_id)]));
 
-      // 7日分ループ
       const dayPromises = Array.from({ length: 7 }).map(async (_, i) => {
         const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
         const dateStrDB = format(targetDate, 'yyyy-MM-dd');
@@ -102,18 +88,19 @@ export async function GET(request: NextRequest) {
 
           const existingStatusMap = new Map(existingShifts?.map(s => [String(s.login_id), s.status]));
           
-          const batchData: any[] = [];
+          // ★修正ポイント: 配列を2つに分ける
+          const officialBatch: any[] = [];   // 全書き換え用（青）
+          const requestedBatch: any[] = [];  // 部分更新用（緑・紫）
+          
           const unmatchedNames: string[] = []; 
           const processedLoginIds = new Set<string>();
 
-          // 共通処理関数
           const tryAddShift = (rawName: string, timeText: string) => {
             const cleanName = normalize(rawName);
             const timeMatch = timeText.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
 
             if (cleanName && timeMatch) {
               const loginId = nameMap.get(cleanName);
-              
               if (loginId) {
                 if (processedLoginIds.has(loginId)) return;
                 processedLoginIds.add(loginId);
@@ -122,21 +109,27 @@ export async function GET(request: NextRequest) {
                 const hpStart = timeMatch[1].padStart(5, '0');
                 const hpEnd = timeMatch[2].padStart(5, '0');
 
-                const commonData = { 
-                  login_id: loginId, 
-                  shift_date: dateStrDB,
-                  hp_display_name: cleanName, 
-                  is_official_pre_exist: true,
-                  hp_start_time: hpStart, 
-                  hp_end_time: hpEnd      
-                };
-                
                 if (currentStatus === 'requested') {
-                  batchData.push(commonData);
+                  // ★修正: 申請中の場合は「裏の時間(HP)」だけを更新するデータを詰める
+                  // ここに start_time を入れないことで、既存の申請時間を守る
+                  requestedBatch.push({
+                    login_id: loginId,
+                    shift_date: dateStrDB,
+                    hp_display_name: cleanName,
+                    is_official_pre_exist: true, // HPにあるのでフラグON
+                    hp_start_time: hpStart,
+                    hp_end_time: hpEnd
+                  });
                 } else {
-                  batchData.push({
-                    ...commonData,
-                    start_time: hpStart,
+                  // ★修正: 確定の場合は、表も裏もすべて上書き
+                  officialBatch.push({
+                    login_id: loginId,
+                    shift_date: dateStrDB,
+                    hp_display_name: cleanName,
+                    is_official_pre_exist: true,
+                    hp_start_time: hpStart,
+                    hp_end_time: hpEnd,
+                    start_time: hpStart, // 表の時間もHPに合わせる
                     end_time: hpEnd,
                     status: 'official',
                     is_official: true
@@ -148,12 +141,7 @@ export async function GET(request: NextRequest) {
             }
           };
 
-          // 【パターンA】 リスト形式
-          $('li').each((_, element) => {
-            tryAddShift($(element).find('h3').text(), $(element).text());
-          });
-
-          // 【パターンB】 カード形式
+          $('li').each((_, element) => { tryAddShift($(element).find('h3').text(), $(element).text()); });
           $('.dataBox').each((_, element) => {
             const box = $(element);
             let timeText = "";
@@ -167,21 +155,25 @@ export async function GET(request: NextRequest) {
             tryAddShift(box.find('h3').text(), timeText);
           });
 
-          if (batchData.length > 0) {
-            const { error } = await supabase.from('shifts').upsert(batchData, { onConflict: 'login_id, shift_date' });
-            if (error) return `❌ ${shop.name} ${format(targetDate, 'MM/dd')} DB Error: ${error.message}`;
-            return `✅ ${shop.name} ${format(targetDate, 'MM/dd')} (${batchData.length}件)`;
-          } else {
-            if (unmatchedNames.length > 0) {
-                const names = unmatchedNames.slice(0, 3).join(', ');
-                return `⚠️ ${shop.name} ${format(targetDate, 'MM/dd')} (0件) - 名簿なし: ${names}...`;
+          // ★修正: 2回に分けて送信
+          const totalCount = officialBatch.length + requestedBatch.length;
+          
+          if (totalCount > 0) {
+            // 1. 確定シフトを一括更新
+            if (officialBatch.length > 0) {
+              await supabase.from('shifts').upsert(officialBatch, { onConflict: 'login_id, shift_date' });
             }
-            return `💤 ${shop.name} ${format(targetDate, 'MM/dd')} (0件) - シフトなし`;
+            // 2. 申請中シフトを部分更新（start_time等を消さないため）
+            if (requestedBatch.length > 0) {
+              await supabase.from('shifts').upsert(requestedBatch, { onConflict: 'login_id, shift_date' });
+            }
+            return `✅ ${shop.name} ${format(targetDate, 'MM/dd')} (${totalCount}件)`;
+          } else {
+            return `💤 ${shop.name} ${format(targetDate, 'MM/dd')} (0件)`;
           }
 
         } catch (err: any) {
-          if (err.name === 'AbortError') return `⏱️ ${shop.name} ${format(targetDate, 'MM/dd')} Timeout`;
-          return `❌ ${shop.name} ${format(targetDate, 'MM/dd')} Error: ${err.message}`;
+          return `❌ Error: ${err.message}`;
         }
       });
 
@@ -197,30 +189,20 @@ export async function GET(request: NextRequest) {
   try {
     const allResults: string[][] = [];
     
-    // ターゲット店舗のみ実行
     for (const shop of targetShops) {
       const shopLogs = await processShop(shop);
       allResults.push(shopLogs);
       
       const nowISO = new Date().toISOString();
-
-      // ★修正箇所：shopsテーブルではなく、sync_logsのid=1を更新する
       await supabase
         .from('sync_logs')
-        .upsert({ 
-          id: 1,  // フロントエンドが読みに行っているID
-          last_sync_at: nowISO 
-        }, { onConflict: 'id' });
+        .upsert({ id: 1, last_sync_at: nowISO }, { onConflict: 'id' });
 
-      // 休憩時間を1秒に短縮
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     const flatLogs = allResults.flat();
-
-    const endTime = Date.now();
-    const diffMs = endTime - startTime;
-    const diffSec = (diffMs / 1000).toFixed(1);
+    const diffSec = ((Date.now() - startTime) / 1000).toFixed(1);
     
     flatLogs.push(`🏁 Group ${group || 'ALL'} 完了！所要時間: ${diffSec}秒`);
 
