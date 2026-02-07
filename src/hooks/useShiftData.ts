@@ -27,21 +27,21 @@ export function useShiftData() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return router.push('/login');
       
-      // 2. IDの抽出と「数値化」 (★重要: DBが数値型の場合、文字だとヒットしません)
-      const rawId = session.user.email?.replace('@karinto-internal.com', '');
-      const loginId = Number(rawId); 
-
-      console.log(`🔍 検索開始: ID=${loginId} (元=${rawId})`);
+      // 2. IDの抽出 (★修正: Number()を使わず、文字列のまま扱う！)
+      // 例: "00600037@..." -> "00600037" (0を残す)
+      const loginId = session.user.email?.replace('@karinto-internal.com', '');
+      
+      console.log(`🔍 検索開始: ID="${loginId}" (文字列として検索)`);
 
       // 3. プロフィール取得
       const { data: profile, error: profileError } = await supabase
         .from('cast_members')
         .select('*')
-        .eq('login_id', loginId)
+        .eq('login_id', loginId) // 文字列IDで検索
         .single();
       
       if (profileError) {
-        console.error("❌ プロフィール取得失敗 (RLSかID違い):", profileError);
+        console.error("❌ プロフィール取得失敗:", profileError);
       }
 
       if (profile) {
@@ -52,7 +52,7 @@ export function useShiftData() {
         const [shopRes, shiftsRes, newsRes, syncRes] = await Promise.all([
           supabase.from('shop_master').select('*').eq('shop_id', myShopId).single(),
           
-          // ★シフト取得: 数値化したIDで検索
+          // ★シフト取得: ここも文字列IDで検索
           supabase.from('shifts')
             .select('*')
             .eq('login_id', loginId)
@@ -64,9 +64,7 @@ export function useShiftData() {
           supabase.from('sync_logs').select('last_sync_at').eq('id', 1).single()
         ]);
         
-        // ★デバッグログ: ここで何件取れたか確認してください
-        console.log(`📊 シフト取得数: ${shiftsRes.data?.length}件`);
-        if (shiftsRes.error) console.error("❌ シフト取得エラー:", shiftsRes.error);
+        console.log(`📊 シフト取得成功: ${shiftsRes.data?.length}件`);
 
         setData({
           shifts: shiftsRes.data || [], 
