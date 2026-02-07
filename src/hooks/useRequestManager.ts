@@ -1,13 +1,31 @@
 import { useState, useCallback } from 'react';
 import { format } from 'date-fns';
 
-const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1467395577829523487/oQUEYdVA4oSbkAb53WYNMCnVIiOa0Tsi25WRPVWDtxF2UsnJFGrsU_gb-qG37gdyTQaQ";
+// ★修正1: 店舗ごとのWebhook URLリストを作成
+// Discordの「サーバー設定」→「連携サービス」→「ウェブフック」で店舗ごとに作成し、URLをコピペしてください
+const SHOP_WEBHOOKS: { [key: string]: string } = {
+  '001': "https://discord.com/api/webhooks/...", // 神田
+  '002': "https://discord.com/api/webhooks/...", // 赤坂
+  '003': "https://discord.com/api/webhooks/...", // 秋葉原
+  '004': "https://discord.com/api/webhooks/...", // 上野
+  '005': "https://discord.com/api/webhooks/...", // 渋谷
+  '006': "https://discord.com/api/webhooks/...", // 池西
+  '007': "https://discord.com/api/webhooks/...", // 五反田
+  '008': "https://discord.com/api/webhooks/...", // 大宮
+  '009': "https://discord.com/api/webhooks/...", // 吉祥寺
+  '010': "https://discord.com/api/webhooks/...", // 大久保
+  '011': "https://discord.com/api/webhooks/...", // 池東
+  '012': "https://discord.com/api/webhooks/...", // 小岩
+  // URLがない店舗は通知が飛びません
+};
 
-// ★修正: shifts: any[] を shifts: any に変更 (null対策)
+// 予備（全店舗共通の通知先がある場合などはここに入れる）
+const DEFAULT_WEBHOOK_URL = ""; 
+
 export function useRequestManager(
   supabase: any, 
   profile: any, 
-  shifts: any, // ← ここを any に変更！
+  shifts: any, 
   selectedMulti: Date[] = [], 
   refreshData: () => void, 
   resetSelection: () => void
@@ -15,8 +33,6 @@ export function useRequestManager(
   const [requestDetails, setRequestDetails] = useState<{[key: string]: {s: string, e: string}}>({});
 
   const handleBulkSubmit = useCallback(async () => {
-    // profile または shifts が揃っていない場合は実行させない
-    // ★修正: shiftsの配列チェックを Array.isArray で安全に行う
     if (!profile || !profile.login_id || !Array.isArray(shifts) || selectedMulti.length === 0) {
       alert('申請するデータが正しく読み込まれていません。');
       return;
@@ -27,7 +43,6 @@ export function useRequestManager(
         if (!(date instanceof Date) || isNaN(date.getTime())) return null;
 
         const key = format(date, 'yyyy-MM-dd');
-        // ★修正: shiftsが配列であることを確認してからfind
         const safeShifts = Array.isArray(shifts) ? shifts : [];
         const existing = safeShifts.find((s: any) => s.shift_date === key);
 
@@ -48,11 +63,23 @@ export function useRequestManager(
       const { error } = await supabase.from('shifts').upsert(requests, { onConflict: 'login_id,shift_date' });
       
       if (!error) {
-        fetch(DISCORD_WEBHOOK_URL, { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: `🔔 シフト申請: **${profile.display_name}** (${requests.length}件)` }) 
-        }).catch(err => console.error("Webhook Error:", err));
+        // ★修正2: キャストの所属店舗IDを取得 (home_shop_id または shop_id)
+        const shopId = profile.home_shop_id || profile.shop_id;
+        
+        // ★修正3: その店舗に対応するURLを取得
+        const targetUrl = SHOP_WEBHOOKS[shopId] || DEFAULT_WEBHOOK_URL;
+
+        if (targetUrl) {
+          fetch(targetUrl, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              content: `🔔 シフト申請 (${shopId}): **${profile.display_name}** (${requests.length}件)` 
+            }) 
+          }).catch(err => console.error("Webhook Error:", err));
+        } else {
+          console.warn(`Shop ID ${shopId} のWebhook URLが設定されていません`);
+        }
         
         alert('申請を送信しました！🚀');
         resetSelection(); 
