@@ -90,26 +90,25 @@ export async function GET(request: NextRequest) {
           
           const officialBatch: any[] = [];
           const requestedBatch: any[] = [];
-          
-          // ★追加: HPで見つかった人のIDを記録するセット
           const foundLoginIds = new Set<string>();
+
+          // ★修正: 時間の正規表現を強化 (ハイフン、波線、チルダ、全角半角スペースに対応)
+          const timeRegex = /(\d{1,2}:\d{2})[\s\-～〜~]+(\d{1,2}:\d{2})/;
 
           const tryAddShift = (rawName: string, timeText: string) => {
             const cleanName = normalize(rawName);
-            const timeMatch = timeText.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
+            const timeMatch = timeText.match(timeRegex);
 
             if (cleanName && timeMatch) {
               const loginId = nameMap.get(cleanName);
               if (loginId) {
-                // ★追加: 「この人はHPにいたよ」とマーク
-                foundLoginIds.add(loginId);
+                foundLoginIds.add(loginId); // ★発見マーク
 
                 const currentStatus = existingStatusMap.get(loginId);
                 const hpStart = timeMatch[1].padStart(5, '0');
                 const hpEnd = timeMatch[2].padStart(5, '0');
 
                 if (currentStatus === 'requested') {
-                  // 申請中の場合は裏の時間だけ更新
                   requestedBatch.push({
                     login_id: loginId,
                     shift_date: dateStrDB,
@@ -119,7 +118,6 @@ export async function GET(request: NextRequest) {
                     hp_end_time: hpEnd
                   });
                 } else {
-                  // 確定の場合は全更新
                   officialBatch.push({
                     login_id: loginId,
                     shift_date: dateStrDB,
@@ -143,7 +141,8 @@ export async function GET(request: NextRequest) {
             let timeText = "";
             box.find('p').each((_, p) => {
                 const t = $(p).text();
-                if (/\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}/.test(t)) {
+                // ★修正: 判定用Regexも強化
+                if (timeRegex.test(t)) {
                     timeText = t;
                     return false;
                 }
@@ -151,20 +150,20 @@ export async function GET(request: NextRequest) {
             tryAddShift(box.find('h3').text(), timeText);
           });
 
-          // ★追加: HPから消えた人を削除するロジック
+          // 削除・リセット対象の計算
           const deleteIds: string[] = [];
           const resetRequestIds: any[] = [];
 
           if (existingShifts) {
             existingShifts.forEach((shift) => {
               const sId = String(shift.login_id);
-              // DBにはあるのに、今回のHPスキャンで見つからなかった場合
+              
+              // DBにいるのに、今回のスキャンで見つからなかった場合
               if (!foundLoginIds.has(sId)) {
                 if (shift.status === 'official') {
-                  // 確定シフトなら削除リストへ (お休みになった)
-                  deleteIds.push(sId);
+                  deleteIds.push(sId); // 確定なら削除
                 } else if (shift.status === 'requested') {
-                  // 申請中なら、HP時間を消して「新規申請」扱いに戻す (緑 -> 紫)
+                  // 申請中なら、HP時間情報を消して「新規申請(紫)」状態に戻す
                   resetRequestIds.push({
                     login_id: sId,
                     shift_date: dateStrDB,
@@ -177,28 +176,25 @@ export async function GET(request: NextRequest) {
             });
           }
 
-          // DB操作実行
           let logMsg = `✅ ${shop.name} ${format(targetDate, 'MM/dd')}`;
           let updateCount = 0;
 
-          // 1. 確定シフト更新
           if (officialBatch.length > 0) {
             await supabase.from('shifts').upsert(officialBatch, { onConflict: 'login_id, shift_date' });
             updateCount += officialBatch.length;
           }
-          // 2. 申請中シフト更新
           if (requestedBatch.length > 0) {
             await supabase.from('shifts').upsert(requestedBatch, { onConflict: 'login_id, shift_date' });
             updateCount += requestedBatch.length;
           }
-          // 3. 消えた人を削除
           if (deleteIds.length > 0) {
+            // ★安全策: statusがofficialのものだけを確実に消す条件を追加
             await supabase.from('shifts').delete()
               .in('login_id', deleteIds)
-              .eq('shift_date', dateStrDB);
+              .eq('shift_date', dateStrDB)
+              .eq('status', 'official'); 
             logMsg += ` (削除${deleteIds.length}件)`;
           }
-          // 4. 申請中の人のHP時間リセット
           if (resetRequestIds.length > 0) {
             await supabase.from('shifts').upsert(resetRequestIds, { onConflict: 'login_id, shift_date' });
           }
