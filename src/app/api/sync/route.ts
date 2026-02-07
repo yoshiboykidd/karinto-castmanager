@@ -53,14 +53,14 @@ export async function GET(request: NextRequest) {
         return [`⚠️ Skip ${shop.name}: 名簿なし`];
       }
 
-      // 名前正規化: スペース削除、カッコと中身を削除、全角英数変換
+      // 名前正規化
       const normalize = (val: string) => {
         if (!val) return "";
         let s = val
-          .replace(/\s+/g, '') // スペース
-          .replace(/[（\(\[].*?[）\)\]]/g, '') // カッコとその中身（年齢など）を全削除
-          .replace(/\d+/g, '') // 残った数字も削除
-          .replace(/[^\u3040-\u309F]/g, '') // ★最強: ひらがな以外をすべて削除（記号なども消す）
+          .replace(/\s+/g, '') 
+          .replace(/[（\(\[].*?[）\)\]]/g, '') 
+          .replace(/\d+/g, '') 
+          .replace(/[^\u3040-\u309F]/g, '') // ひらがなのみ抽出
           .trim();
         return s;
       };
@@ -108,16 +108,13 @@ export async function GET(request: NextRequest) {
             if (!rawName) return;
 
             const cleanName = normalize(rawName);
-
-            // ★絶対ルール: ひらがな1文字〜3文字以外は即却下
-            // これでイベント名やコース名は確実に弾かれる
+            // ひらがな1〜3文字のみ対象（ゴミ除外）
             if (!/^[ぁ-ん]{1,3}$/.test(cleanName)) return;
 
             const loginId = nameMap.get(cleanName);
 
             if (loginId) {
-              foundLoginIds.add(loginId); // 名前があれば「発見」とする
-
+              foundLoginIds.add(loginId); 
               const timeMatch = timeText.match(timeRegex);
               if (timeMatch) {
                 const currentStatus = existingStatusMap.get(loginId);
@@ -163,17 +160,16 @@ export async function GET(request: NextRequest) {
              tryAddShift(name, time);
           });
 
-          // 削除候補の計算
+          // 削除候補計算
           const deleteIds: string[] = [];
           const resetRequestIds: any[] = [];
 
           if (existingShifts) {
             existingShifts.forEach((shift) => {
               const sId = String(shift.login_id);
-              // DBにあるのに、今回のスキャンで見つからなかった場合
               if (!foundLoginIds.has(sId)) {
                 if (shift.status === 'official') {
-                  deleteIds.push(sId); // 削除候補
+                  deleteIds.push(sId);
                 } else if (shift.status === 'requested') {
                   resetRequestIds.push({
                     login_id: sId,
@@ -200,9 +196,15 @@ export async function GET(request: NextRequest) {
             updateCount += requestedBatch.length;
           }
 
-          // 2. 削除・リセット実行 (安全装置付き)
+          // 2. 削除・リセット実行（安全装置の条件緩和）
           const currentShiftCount = existingShifts?.length || 0;
-          const isSafeToDelete = currentShiftCount < 5 || (deleteIds.length / currentShiftCount) < 0.8;
+          
+          // ★修正: 「更新データが正しく見つかっている(officialBatch > 0)」なら、
+          // 削除量が多くても「DBの正常化処理」とみなして許可する。
+          const isSafeToDelete = 
+            (currentShiftCount < 5) || 
+            (deleteIds.length / currentShiftCount) < 0.8 ||
+            (officialBatch.length > 0); // ← これを追加！
 
           if (isSafeToDelete) {
             if (deleteIds.length > 0) {
@@ -210,14 +212,15 @@ export async function GET(request: NextRequest) {
                 .in('login_id', deleteIds)
                 .eq('shift_date', dateStrDB)
                 .eq('status', 'official'); 
-              logMsg += ` (お休み反映:${deleteIds.length})`;
+              logMsg += ` (削除:${deleteIds.length})`;
             }
             if (resetRequestIds.length > 0) {
               await supabase.from('shifts').upsert(resetRequestIds, { onConflict: 'login_id, shift_date' });
-              logMsg += ` (申請中リセット:${resetRequestIds.length})`;
+              logMsg += ` (リセット:${resetRequestIds.length})`;
             }
           } else {
-            logMsg += ` ⚠️削除停止(安全装置発動: ${deleteIds.length}/${currentShiftCount}が消失判定)`;
+            // 万が一、1人も更新できず、かつ全員消そうとした時だけ止める
+            logMsg += ` ⚠️削除停止(異常検知: ${deleteIds.length}/${currentShiftCount}消失)`;
           }
 
           if (updateCount === 0 && deleteIds.length === 0) {
