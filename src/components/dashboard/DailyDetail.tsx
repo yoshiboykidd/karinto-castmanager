@@ -1,6 +1,6 @@
 'use client';
 
-import { format } from 'date-fns';
+import { format, startOfDay, isAfter } from 'date-fns'; // ★追加
 import { ja } from 'date-fns/locale';
 
 type DailyDetailProps = {
@@ -10,7 +10,7 @@ type DailyDetailProps = {
   editReward: { f: string; first: string; main: string; amount: string };
   setEditReward: (val: any) => void;
   onSave: () => void;
-  onDelete?: () => void; // ★追加: 削除機能を受け取る
+  onDelete?: () => void;
   isEditable: boolean;
 };
 
@@ -21,21 +21,24 @@ export default function DailyDetail({
   editReward,
   setEditReward,
   onSave,
-  onDelete, // ★追加
+  onDelete,
   isEditable
 }: DailyDetailProps) {
   if (!date) return null;
 
-  // 1. ステータス判定（開始・終了の両方をHPと比較）
+  // ★追加: 未来の日付判定 (時間情報を無視して日付だけで比較)
+  const today = startOfDay(new Date());
+  const targetDate = startOfDay(date);
+  const isFuture = isAfter(targetDate, today);
+
+  // 1. ステータス判定
   const isOfficial = shift?.status === 'official';
   const isRequested = shift?.status === 'requested';
   
-  // ★重要：開始・終了どちらか一箇所でもHPの真実とズレていれば「変更中」とみなす
   const isTimeDiff = 
     shift && (shift.start_time !== shift.hp_start_time || 
     shift.end_time !== shift.hp_end_time);
   
-  // 確定済みだった履歴があり、かつ今時間がズレている場合は「変更申請中」
   const isModified = isRequested && shift?.is_official_pre_exist && isTimeDiff;
 
   const isKarin = dayNum === 10;
@@ -46,7 +49,7 @@ export default function DailyDetail({
   if (isModified) themeClass = "bg-green-50/40 border-green-200";
   else if (isRequested) themeClass = "bg-purple-50/40 border-purple-200";
 
-  // 3. 表示時間の切り分け（開始・終了ペアで扱う）
+  // 3. 表示時間の切り分け
   const displayOfficialS = isModified ? (shift?.hp_start_time || shift?.start_time) : shift?.start_time;
   const displayOfficialE = isModified ? (shift?.hp_end_time || shift?.end_time) : shift?.end_time;
   
@@ -114,70 +117,78 @@ export default function DailyDetail({
         )}
       </div>
 
-      {/* 実績入力フォーム */}
+      {/* 実績入力フォーム (シフトがあり、かつ未来ではない場合のみ表示) */}
       {(isOfficial || isModified) && displayOfficialS !== 'OFF' ? (
-        <div className="space-y-1.5 pt-2 border-t border-gray-100/50">
-          <div className="grid grid-cols-3 gap-2">
-            {(['f', 'first', 'main'] as const).map((key) => (
-              <div key={key} className="flex flex-col space-y-0.5">
-                <label className="text-[9px] font-black text-gray-400 text-center uppercase">
-                  {key === 'f' ? 'フリー' : key === 'first' ? '初指名' : '本指名'}
-                </label>
+        
+        // ★修正: 未来ならメッセージのみ、当日以前なら入力フォームを表示
+        isFuture ? (
+          <div className="pt-4 border-t border-gray-100/50 text-center">
+            <p className="text-xs font-bold text-gray-300 italic">
+              実績入力は当日以降に可能です ⏳
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-1.5 pt-2 border-t border-gray-100/50">
+            <div className="grid grid-cols-3 gap-2">
+              {(['f', 'first', 'main'] as const).map((key) => (
+                <div key={key} className="flex flex-col space-y-0.5">
+                  <label className="text-[9px] font-black text-gray-400 text-center uppercase">
+                    {key === 'f' ? 'フリー' : key === 'first' ? '初指名' : '本指名'}
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={editReward[key]}
+                    placeholder="0"
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => setEditReward({ ...editReward, [key]: e.target.value })}
+                    className="w-full text-center py-1.5 bg-white rounded-xl font-black text-2xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none text-pink-500 shadow-sm"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-white/80 p-2 rounded-2xl border border-pink-100 flex items-center justify-between shadow-inner">
+              <span className="text-[10px] font-black text-gray-400 uppercase ml-1">報酬合計</span>
+              <div className="flex items-center text-pink-500 mr-1">
+                <span className="text-lg font-black mr-0.5 opacity-30">¥</span>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="numeric"
-                  value={editReward[key]}
+                  value={editReward.amount !== '' ? Number(editReward.amount).toLocaleString() : ''}
                   placeholder="0"
                   onFocus={(e) => e.target.select()}
-                  onChange={(e) => setEditReward({ ...editReward, [key]: e.target.value })}
-                  className="w-full text-center py-1.5 bg-white rounded-xl font-black text-2xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none text-pink-500 shadow-sm"
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/,/g, '');
+                    if (/^\d*$/.test(v)) setEditReward({ ...editReward, amount: v });
+                  }}
+                  className="w-32 text-right bg-transparent font-black text-2xl border-none focus:outline-none focus:ring-0 tracking-tighter"
                 />
               </div>
-            ))}
-          </div>
+            </div>
 
-          <div className="bg-white/80 p-2 rounded-2xl border border-pink-100 flex items-center justify-between shadow-inner">
-            <span className="text-[10px] font-black text-gray-400 uppercase ml-1">報酬合計</span>
-            <div className="flex items-center text-pink-500 mr-1">
-              <span className="text-lg font-black mr-0.5 opacity-30">¥</span>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={editReward.amount !== '' ? Number(editReward.amount).toLocaleString() : ''}
-                placeholder="0"
-                onFocus={(e) => e.target.select()}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/,/g, '');
-                  if (/^\d*$/.test(v)) setEditReward({ ...editReward, amount: v });
-                }}
-                className="w-32 text-right bg-transparent font-black text-2xl border-none focus:outline-none focus:ring-0 tracking-tighter"
-              />
+            <div className="flex gap-2 pt-0.5">
+              <button onClick={onSave} className="flex-[3] bg-pink-500 text-white font-black py-3 rounded-2xl text-lg shadow-lg active:scale-95 transition-all">
+                実績保存 💾
+              </button>
+              <button
+                onClick={() => setEditReward({ f: '', first: '', main: '', amount: '' })}
+                className="flex-1 bg-gray-100 text-gray-400 font-black py-3 rounded-2xl text-[11px] active:scale-95 border border-gray-200"
+              >
+                クリア
+              </button>
             </div>
           </div>
-
-          <div className="flex gap-2 pt-0.5">
-            <button onClick={onSave} className="flex-[3] bg-pink-500 text-white font-black py-3 rounded-2xl text-lg shadow-lg active:scale-95 transition-all">
-              実績保存 💾
-            </button>
-            <button
-              onClick={() => setEditReward({ f: '', first: '', main: '', amount: '' })}
-              className="flex-1 bg-gray-100 text-gray-400 font-black py-3 rounded-2xl text-[11px] active:scale-95 border border-gray-200"
-            >
-              クリア
-            </button>
-          </div>
-        </div>
+        )
       ) : (isRequested && !isModified) ? (
         <div className="space-y-2 pt-2">
           <div className="bg-purple-100/30 rounded-2xl py-3 text-center border border-purple-200">
             <p className="text-purple-500 font-black text-sm italic">承認をお待ちください☕️</p>
           </div>
           
-          {/* ★修正: 削除ボタンを表示 */}
           {onDelete && (
             <button 
               onClick={() => {
-                // ワンクッション置いて削除実行
                 if(window.confirm('この申請を取り消しますか？')) {
                   onDelete();
                 }
