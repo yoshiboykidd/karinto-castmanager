@@ -88,12 +88,11 @@ export async function GET(request: NextRequest) {
 
           const existingStatusMap = new Map(existingShifts?.map(s => [String(s.login_id), s.status]));
           
-          // ★修正ポイント: 配列を2つに分ける
-          const officialBatch: any[] = [];   // 全書き換え用（青）
-          const requestedBatch: any[] = [];  // 部分更新用（緑・紫）
+          const officialBatch: any[] = [];
+          const requestedBatch: any[] = [];
           
-          const unmatchedNames: string[] = []; 
-          const processedLoginIds = new Set<string>();
+          // ★追加: HPで見つかった人のIDを記録するセット
+          const foundLoginIds = new Set<string>();
 
           const tryAddShift = (rawName: string, timeText: string) => {
             const cleanName = normalize(rawName);
@@ -102,26 +101,25 @@ export async function GET(request: NextRequest) {
             if (cleanName && timeMatch) {
               const loginId = nameMap.get(cleanName);
               if (loginId) {
-                if (processedLoginIds.has(loginId)) return;
-                processedLoginIds.add(loginId);
+                // ★追加: 「この人はHPにいたよ」とマーク
+                foundLoginIds.add(loginId);
 
                 const currentStatus = existingStatusMap.get(loginId);
                 const hpStart = timeMatch[1].padStart(5, '0');
                 const hpEnd = timeMatch[2].padStart(5, '0');
 
                 if (currentStatus === 'requested') {
-                  // ★修正: 申請中の場合は「裏の時間(HP)」だけを更新するデータを詰める
-                  // ここに start_time を入れないことで、既存の申請時間を守る
+                  // 申請中の場合は裏の時間だけ更新
                   requestedBatch.push({
                     login_id: loginId,
                     shift_date: dateStrDB,
                     hp_display_name: cleanName,
-                    is_official_pre_exist: true, // HPにあるのでフラグON
+                    is_official_pre_exist: true,
                     hp_start_time: hpStart,
                     hp_end_time: hpEnd
                   });
                 } else {
-                  // ★修正: 確定の場合は、表も裏もすべて上書き
+                  // 確定の場合は全更新
                   officialBatch.push({
                     login_id: loginId,
                     shift_date: dateStrDB,
@@ -129,14 +127,12 @@ export async function GET(request: NextRequest) {
                     is_official_pre_exist: true,
                     hp_start_time: hpStart,
                     hp_end_time: hpEnd,
-                    start_time: hpStart, // 表の時間もHPに合わせる
+                    start_time: hpStart,
                     end_time: hpEnd,
                     status: 'official',
                     is_official: true
                   });
                 }
-              } else {
-                unmatchedNames.push(rawName);
               }
             }
           };
@@ -155,21 +151,62 @@ export async function GET(request: NextRequest) {
             tryAddShift(box.find('h3').text(), timeText);
           });
 
-          // ★修正: 2回に分けて送信
-          const totalCount = officialBatch.length + requestedBatch.length;
-          
-          if (totalCount > 0) {
-            // 1. 確定シフトを一括更新
-            if (officialBatch.length > 0) {
-              await supabase.from('shifts').upsert(officialBatch, { onConflict: 'login_id, shift_date' });
-            }
-            // 2. 申請中シフトを部分更新（start_time等を消さないため）
-            if (requestedBatch.length > 0) {
-              await supabase.from('shifts').upsert(requestedBatch, { onConflict: 'login_id, shift_date' });
-            }
-            return `✅ ${shop.name} ${format(targetDate, 'MM/dd')} (${totalCount}件)`;
+          // ★追加: HPから消えた人を削除するロジック
+          const deleteIds: string[] = [];
+          const resetRequestIds: any[] = [];
+
+          if (existingShifts) {
+            existingShifts.forEach((shift) => {
+              const sId = String(shift.login_id);
+              // DBにはあるのに、今回のHPスキャンで見つからなかった場合
+              if (!foundLoginIds.has(sId)) {
+                if (shift.status === 'official') {
+                  // 確定シフトなら削除リストへ (お休みになった)
+                  deleteIds.push(sId);
+                } else if (shift.status === 'requested') {
+                  // 申請中なら、HP時間を消して「新規申請」扱いに戻す (緑 -> 紫)
+                  resetRequestIds.push({
+                    login_id: sId,
+                    shift_date: dateStrDB,
+                    hp_start_time: null,
+                    hp_end_time: null,
+                    is_official_pre_exist: false
+                  });
+                }
+              }
+            });
+          }
+
+          // DB操作実行
+          let logMsg = `✅ ${shop.name} ${format(targetDate, 'MM/dd')}`;
+          let updateCount = 0;
+
+          // 1. 確定シフト更新
+          if (officialBatch.length > 0) {
+            await supabase.from('shifts').upsert(officialBatch, { onConflict: 'login_id, shift_date' });
+            updateCount += officialBatch.length;
+          }
+          // 2. 申請中シフト更新
+          if (requestedBatch.length > 0) {
+            await supabase.from('shifts').upsert(requestedBatch, { onConflict: 'login_id, shift_date' });
+            updateCount += requestedBatch.length;
+          }
+          // 3. 消えた人を削除
+          if (deleteIds.length > 0) {
+            await supabase.from('shifts').delete()
+              .in('login_id', deleteIds)
+              .eq('shift_date', dateStrDB);
+            logMsg += ` (削除${deleteIds.length}件)`;
+          }
+          // 4. 申請中の人のHP時間リセット
+          if (resetRequestIds.length > 0) {
+            await supabase.from('shifts').upsert(resetRequestIds, { onConflict: 'login_id, shift_date' });
+          }
+
+          if (updateCount === 0 && deleteIds.length === 0) {
+            return `💤 ${shop.name} ${format(targetDate, 'MM/dd')} (変更なし)`;
           } else {
-            return `💤 ${shop.name} ${format(targetDate, 'MM/dd')} (0件)`;
+            return `${logMsg} (更新${updateCount}件)`;
           }
 
         } catch (err: any) {
