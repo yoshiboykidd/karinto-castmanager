@@ -1,6 +1,6 @@
 'use client';
 
-import { format, startOfDay, isAfter } from 'date-fns'; // ★追加
+import { format, startOfDay, isAfter } from 'date-fns'; // ★復活
 import { ja } from 'date-fns/locale';
 
 type DailyDetailProps = {
@@ -26,7 +26,7 @@ export default function DailyDetail({
 }: DailyDetailProps) {
   if (!date) return null;
 
-  // ★追加: 未来の日付判定 (時間情報を無視して日付だけで比較)
+  // ★復活: 未来判定
   const today = startOfDay(new Date());
   const targetDate = startOfDay(date);
   const isFuture = isAfter(targetDate, today);
@@ -117,17 +117,25 @@ export default function DailyDetail({
         )}
       </div>
 
-      {/* 実績入力フォーム (シフトがあり、かつ未来ではない場合のみ表示) */}
-      {(isOfficial || isModified) && displayOfficialS !== 'OFF' ? (
+      {/* ★ロジック分岐:
+        1. 確定シフト(Official) かつ お休みじゃない場合
+           -> 未来なら「まだ入力できません」
+           -> 当日/過去なら「入力フォーム」
+        2. 申請中(Requested) の場合
+           -> 「承認待ち」＆「取り消しボタン」
+      */}
+      
+      {isOfficial && displayOfficialS !== 'OFF' ? (
         
-        // ★修正: 未来ならメッセージのみ、当日以前なら入力フォームを表示
         isFuture ? (
+          // 未来の確定シフト
           <div className="pt-4 border-t border-gray-100/50 text-center">
             <p className="text-xs font-bold text-gray-300 italic">
               実績入力は当日以降に可能です ⏳
             </p>
           </div>
         ) : (
+          // 当日or過去の確定シフト -> 入力フォーム
           <div className="space-y-1.5 pt-2 border-t border-gray-100/50">
             <div className="grid grid-cols-3 gap-2">
               {(['f', 'first', 'main'] as const).map((key) => (
@@ -180,10 +188,14 @@ export default function DailyDetail({
             </div>
           </div>
         )
-      ) : (isRequested && !isModified) ? (
+
+      ) : isRequested ? (
+        // 申請中（新規・変更問わず） -> 承認待ちバッジ ＆ 取り消しボタン
         <div className="space-y-2 pt-2">
-          <div className="bg-purple-100/30 rounded-2xl py-3 text-center border border-purple-200">
-            <p className="text-purple-500 font-black text-sm italic">承認をお待ちください☕️</p>
+          <div className={`rounded-2xl py-3 text-center border ${isModified ? 'bg-green-100/30 border-green-200' : 'bg-purple-100/30 border-purple-200'}`}>
+            <p className={`${isModified ? 'text-green-600' : 'text-purple-500'} font-black text-sm italic`}>
+              承認をお待ちください☕️
+            </p>
           </div>
           
           {onDelete && (
