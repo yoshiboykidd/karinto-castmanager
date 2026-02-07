@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
-import { format, isValid, parseISO } from 'date-fns';
+import { format, isValid, parseISO, isToday } from 'date-fns'; // ★isTodayを追加
 
 type CastHeaderProps = {
   shopName: string;
@@ -23,22 +23,30 @@ export default function CastHeader({
   const [seasonalEmoji, setSeasonalEmoji] = useState('☃️');
   const [isPanicMode, setIsPanicMode] = useState(false);
 
-  // ★修正: 時間表示のロジック（変換できなければそのまま表示）
-  const formattedTime = (() => {
+  // ★修正: 時間表示のロジック強化
+  // 「今日」なら時間だけ、「過去/未来」なら日付も出して、止まっているのか判断しやすくする
+  const formattedTime = useMemo(() => {
     if (!syncTime) return '--:--';
+    
     try {
-      // まず日付として解析を試みる
-      const date = typeof syncTime === 'string' ? parseISO(syncTime) : new Date(syncTime);
-      if (isValid(date)) {
-        return format(date, 'HH:mm');
+      // 文字列ならパース、すでにDateならそのまま使う
+      const date = typeof syncTime === 'string' ? parseISO(syncTime) : syncTime;
+
+      if (!isValid(date)) {
+        // 日付として無効なら、文字列そのまま返す（例: "15:00" など手動入力値の場合）
+        return String(syncTime);
       }
-      // 日付じゃなければ（"15:30" とかの文字列なら）そのまま返す
-      return syncTime;
+
+      // 今日なら時間だけ、違うなら日付もつける
+      if (isToday(date)) {
+        return format(date, 'HH:mm');
+      } else {
+        return format(date, 'M/d HH:mm');
+      }
     } catch (e) {
-      // エラーになっても元の文字列を返す（--:--にはしない）
-      return syncTime;
+      return '--:--';
     }
-  })();
+  }, [syncTime]);
 
   useEffect(() => {
     const month = new Date().getMonth() + 1;
@@ -126,7 +134,9 @@ export default function CastHeader({
                 <span className={`text-[8px] font-black uppercase tracking-tighter mb-0.5
                   ${isThemed ? 'text-white/70' : 'text-green-600/50'}
                 `}>HP SYNC</span>
-                <span className={`text-[13px] font-black tracking-tight
+                {/* 文字数が増える可能性があるので文字サイズ調整 */}
+                <span className={`font-black tracking-tight whitespace-nowrap
+                  ${formattedTime.length > 5 ? 'text-[11px]' : 'text-[13px]'}
                   ${isThemed ? 'text-white' : 'text-green-600'}
                 `}>{formattedTime}</span>
               </div>
