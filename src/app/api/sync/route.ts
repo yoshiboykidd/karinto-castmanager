@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
         .eq('home_shop_id', shop.id);
 
       if (castError || !castList || castList.length === 0) {
-        return [`⚠️ Skip ${shop.name}: 名簿取得失敗`];
+        return [`⚠️ Skip ${shop.name}: 名簿なし`];
       }
 
       const normalize = (val: string) => {
@@ -69,14 +69,18 @@ export async function GET(request: NextRequest) {
 
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 4000); 
+          const timeoutId = setTimeout(() => controller.abort(), 6000); // タイムアウト延長
 
+          // ★修正: User-Agentを追加してブラウザのふりをする
           const res = await fetch(url, { 
             cache: 'no-store',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
             signal: controller.signal
           }).finally(() => clearTimeout(timeoutId));
 
-          if (!res.ok) return `❌ ${shop.name} ${format(targetDate, 'MM/dd')} HTTP Error`;
+          if (!res.ok) return `❌ ${shop.name} HTTP ${res.status}`;
           
           const html = await res.text();
           const $ = cheerio.load(html);
@@ -90,20 +94,23 @@ export async function GET(request: NextRequest) {
           
           const officialBatch: any[] = [];
           const requestedBatch: any[] = [];
-          const foundLoginIds = new Set<string>();
+          const foundLoginIds = new Set<string>(); // 「HPに名前があった人」リスト
+          const debugTimeErrors: string[] = []; // 時間が読めなかった人のリスト
 
-          // ★修正: 時間の正規表現を強化 (ハイフン、波線、チルダ、全角半角スペースに対応)
-          const timeRegex = /(\d{1,2}:\d{2})[\s\-～〜~]+(\d{1,2}:\d{2})/;
+          // ★修正: 時間正規表現をさらに緩く (数字とコロンさえあれば拾う)
+          // 例: "12:00～21:00", "12:00 - 21:00", "12:0021:00" など
+          const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
 
           const tryAddShift = (rawName: string, timeText: string) => {
             const cleanName = normalize(rawName);
-            const timeMatch = timeText.match(timeRegex);
+            const loginId = nameMap.get(cleanName);
 
-            if (cleanName && timeMatch) {
-              const loginId = nameMap.get(cleanName);
-              if (loginId) {
-                foundLoginIds.add(loginId); // ★発見マーク
+            if (loginId) {
+              // ★重要: 名前が見つかった時点で「発見」とする（時間が読めなくても削除しない！）
+              foundLoginIds.add(loginId);
 
+              const timeMatch = timeText.match(timeRegex);
+              if (timeMatch) {
                 const currentStatus = existingStatusMap.get(loginId);
                 const hpStart = timeMatch[1].padStart(5, '0');
                 const hpEnd = timeMatch[2].padStart(5, '0');
@@ -131,26 +138,26 @@ export async function GET(request: NextRequest) {
                     is_official: true
                   });
                 }
+              } else {
+                // 名前はあるけど時間が読めなかった場合ログに残す
+                if (timeText.trim() !== "" && timeText.includes(":")) {
+                   debugTimeErrors.push(`${cleanName}[${timeText}]`);
+                }
               }
             }
           };
 
+          // スクレイピング実行
+          // セレクタを広げて、liタグだけでなく .dataBox 内も探す
           $('li').each((_, element) => { tryAddShift($(element).find('h3').text(), $(element).text()); });
           $('.dataBox').each((_, element) => {
-            const box = $(element);
-            let timeText = "";
-            box.find('p').each((_, p) => {
-                const t = $(p).text();
-                // ★修正: 判定用Regexも強化
-                if (timeRegex.test(t)) {
-                    timeText = t;
-                    return false;
-                }
-            });
-            tryAddShift(box.find('h3').text(), timeText);
+             const box = $(element);
+             const name = box.find('h3').text() || box.find('.name').text() || "";
+             const time = box.text();
+             tryAddShift(name, time);
           });
 
-          // 削除・リセット対象の計算
+          // 削除・リセットロジック
           const deleteIds: string[] = [];
           const resetRequestIds: any[] = [];
 
@@ -158,12 +165,11 @@ export async function GET(request: NextRequest) {
             existingShifts.forEach((shift) => {
               const sId = String(shift.login_id);
               
-              // DBにいるのに、今回のスキャンで見つからなかった場合
+              // 「DBにある」かつ「今回名前が見つからなかった」場合のみ削除候補
               if (!foundLoginIds.has(sId)) {
                 if (shift.status === 'official') {
-                  deleteIds.push(sId); // 確定なら削除
+                  deleteIds.push(sId);
                 } else if (shift.status === 'requested') {
-                  // 申請中なら、HP時間情報を消して「新規申請(紫)」状態に戻す
                   resetRequestIds.push({
                     login_id: sId,
                     shift_date: dateStrDB,
@@ -176,6 +182,7 @@ export async function GET(request: NextRequest) {
             });
           }
 
+          // DB更新実行
           let logMsg = `✅ ${shop.name} ${format(targetDate, 'MM/dd')}`;
           let updateCount = 0;
 
@@ -188,25 +195,26 @@ export async function GET(request: NextRequest) {
             updateCount += requestedBatch.length;
           }
           if (deleteIds.length > 0) {
-            // ★安全策: statusがofficialのものだけを確実に消す条件を追加
             await supabase.from('shifts').delete()
               .in('login_id', deleteIds)
               .eq('shift_date', dateStrDB)
               .eq('status', 'official'); 
-            logMsg += ` (削除${deleteIds.length}件)`;
+            logMsg += ` (削除${deleteIds.length})`;
           }
           if (resetRequestIds.length > 0) {
             await supabase.from('shifts').upsert(resetRequestIds, { onConflict: 'login_id, shift_date' });
+            logMsg += ` (リセット${resetRequestIds.length})`;
           }
 
-          if (updateCount === 0 && deleteIds.length === 0) {
-            return `💤 ${shop.name} ${format(targetDate, 'MM/dd')} (変更なし)`;
-          } else {
-            return `${logMsg} (更新${updateCount}件)`;
+          // 時間読み取りエラーがあればログに追加
+          if (debugTimeErrors.length > 0) {
+            logMsg += ` ⚠️時間不明: ${debugTimeErrors.join(', ')}`;
           }
+
+          return `${logMsg} (更新${updateCount})`;
 
         } catch (err: any) {
-          return `❌ Error: ${err.message}`;
+          return `❌ Err ${shop.name}: ${err.message}`;
         }
       });
 
@@ -215,31 +223,21 @@ export async function GET(request: NextRequest) {
       return localLogs;
 
     } catch (e: any) {
-      return [`❌ Fatal Error ${shop.name}: ${e.message}`];
+      return [`❌ Fatal ${shop.name}: ${e.message}`];
     }
   };
 
   try {
     const allResults: string[][] = [];
-    
     for (const shop of targetShops) {
       const shopLogs = await processShop(shop);
       allResults.push(shopLogs);
-      
-      const nowISO = new Date().toISOString();
-      await supabase
-        .from('sync_logs')
-        .upsert({ id: 1, last_sync_at: nowISO }, { onConflict: 'id' });
-
+      await supabase.from('sync_logs').upsert({ id: 1, last_sync_at: new Date().toISOString() }, { onConflict: 'id' });
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     const flatLogs = allResults.flat();
-    const diffSec = ((Date.now() - startTime) / 1000).toFixed(1);
-    
-    flatLogs.push(`🏁 Group ${group || 'ALL'} 完了！所要時間: ${diffSec}秒`);
-
-    return NextResponse.json({ success: true, group: group, logs: flatLogs });
+    return NextResponse.json({ success: true, logs: flatLogs });
 
   } catch (error: any) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
