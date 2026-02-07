@@ -62,6 +62,36 @@ export default function DashboardContent() {
     requestDetails = {}, setRequestDetails = () => {}, handleBulkSubmit = () => {}
   } = requestManagerData || {};
 
+  // ★追加: シフト削除機能
+  const handleDeleteShift = async () => {
+    // ログインIDや選択中の日付がなければ中断
+    if (!safeProfile?.login_id || !nav.selected.single) return;
+
+    try {
+      const dateStr = format(nav.selected.single, 'yyyy-MM-dd');
+
+      // 削除実行
+      const { error } = await supabase
+        .from('shifts')
+        .delete()
+        .eq('login_id', safeProfile.login_id)
+        .eq('shift_date', dateStr)
+        .eq('status', 'requested'); // 安全策：「申請中」のみ削除可
+
+      if (error) throw error;
+
+      alert('申請を取り消しました 🗑️');
+      
+      // 画面を閉じてデータを再取得
+      nav.setSelected({ single: undefined, multi: [] });
+      fetchInitialData(router); 
+
+    } catch (e) {
+      console.error(e);
+      alert('削除に失敗しました...');
+    }
+  };
+
   useEffect(() => { 
     setMounted(true);
     fetchInitialData(router); 
@@ -87,12 +117,9 @@ export default function DashboardContent() {
       <div className="pb-4">
         <CastHeader 
           shopName={data?.shop?.shop_name || "かりんと"} 
-          
-          // ★修正：ここを正しいデータパスに戻しました！これで時間は表示されます
           syncTime={data?.syncAt} 
-          
           displayName={safeProfile.display_name} 
-          version="v3.6.3"
+          version="v3.6.4"
           bgColor={currentTheme.header}
         />
       </div>
@@ -157,6 +184,9 @@ export default function DashboardContent() {
               setEditReward={setEditReward} 
               onSave={handleSaveAchievement} 
               isEditable={!!isEditable} 
+              
+              // ★追加: ここで削除関数を渡す
+              onDelete={handleDeleteShift}
             />
           )
         ) : (

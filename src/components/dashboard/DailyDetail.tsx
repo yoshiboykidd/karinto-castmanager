@@ -10,6 +10,7 @@ type DailyDetailProps = {
   editReward: { f: string; first: string; main: string; amount: string };
   setEditReward: (val: any) => void;
   onSave: () => void;
+  onDelete?: () => void; // ★追加: 削除機能を受け取る
   isEditable: boolean;
 };
 
@@ -20,6 +21,7 @@ export default function DailyDetail({
   editReward,
   setEditReward,
   onSave,
+  onDelete, // ★追加
   isEditable
 }: DailyDetailProps) {
   if (!date) return null;
@@ -166,8 +168,25 @@ export default function DailyDetail({
           </div>
         </div>
       ) : (isRequested && !isModified) ? (
-        <div className="bg-purple-100/30 rounded-2xl py-3 text-center border border-purple-200">
-          <p className="text-purple-500 font-black text-sm italic">承認をお待ちください☕️</p>
+        <div className="space-y-2 pt-2">
+          <div className="bg-purple-100/30 rounded-2xl py-3 text-center border border-purple-200">
+            <p className="text-purple-500 font-black text-sm italic">承認をお待ちください☕️</p>
+          </div>
+          
+          {/* ★修正: 削除ボタンを表示 */}
+          {onDelete && (
+            <button 
+              onClick={() => {
+                // ワンクッション置いて削除実行
+                if(window.confirm('この申請を取り消しますか？')) {
+                  onDelete();
+                }
+              }}
+              className="w-full py-3 bg-red-50 text-red-500 font-black rounded-2xl border border-red-100 shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
+              申請を取り消す 🗑️
+            </button>
+          )}
         </div>
       ) : null}
     </section>
