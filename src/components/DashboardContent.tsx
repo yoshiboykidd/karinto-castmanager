@@ -62,33 +62,56 @@ export default function DashboardContent() {
     requestDetails = {}, setRequestDetails = () => {}, handleBulkSubmit = () => {}
   } = requestManagerData || {};
 
-  // ★追加: シフト削除機能
+  // ★改善版: シフト削除機能
   const handleDeleteShift = async () => {
-    // ログインIDや選択中の日付がなければ中断
     if (!safeProfile?.login_id || !nav.selected.single) return;
 
     try {
       const dateStr = format(nav.selected.single, 'yyyy-MM-dd');
-
-      // 削除実行
-      const { error } = await supabase
-        .from('shifts')
-        .delete()
-        .eq('login_id', safeProfile.login_id)
-        .eq('shift_date', dateStr)
-        .eq('status', 'requested'); // 安全策：「申請中」のみ削除可
-
-      if (error) throw error;
-
-      alert('申請を取り消しました 🗑️');
       
-      // 画面を閉じてデータを再取得
+      // まず、対象のシフトデータを探す
+      const targetShift = safeShifts.find((s: any) => s.shift_date === dateStr);
+      
+      if (!targetShift) return;
+
+      // ★ロジック分岐: 元々HPにデータがあったか？ (hp_start_time が存在し、かつ OFF ではない)
+      const hasOriginalShift = targetShift.hp_start_time && targetShift.hp_start_time !== 'OFF';
+
+      if (hasOriginalShift) {
+        // 【パターンA】変更申請の取り消し -> 元に戻す (UPDATE)
+        const { error } = await supabase
+          .from('shifts')
+          .update({
+            status: 'official',               // 確定に戻す
+            start_time: targetShift.hp_start_time, // 時間も元に戻す
+            end_time: targetShift.hp_end_time,
+            is_official_pre_exist: true       // 元々あったフラグは念のため維持
+          })
+          .eq('login_id', safeProfile.login_id)
+          .eq('shift_date', dateStr);
+
+        if (error) throw error;
+        alert('変更を取り消し、元のシフトに戻しました 🔄');
+
+      } else {
+        // 【パターンB】新規申請の取り消し -> 削除する (DELETE)
+        const { error } = await supabase
+          .from('shifts')
+          .delete()
+          .eq('login_id', safeProfile.login_id)
+          .eq('shift_date', dateStr);
+
+        if (error) throw error;
+        alert('申請を取り消しました 🗑️');
+      }
+      
+      // 画面更新
       nav.setSelected({ single: undefined, multi: [] });
       fetchInitialData(router); 
 
     } catch (e) {
       console.error(e);
-      alert('削除に失敗しました...');
+      alert('処理に失敗しました...');
     }
   };
 
@@ -119,7 +142,7 @@ export default function DashboardContent() {
           shopName={data?.shop?.shop_name || "かりんと"} 
           syncTime={data?.syncAt} 
           displayName={safeProfile.display_name} 
-          version="v3.6.4"
+          version="v3.6.5"
           bgColor={currentTheme.header}
         />
       </div>
@@ -184,8 +207,6 @@ export default function DashboardContent() {
               setEditReward={setEditReward} 
               onSave={handleSaveAchievement} 
               isEditable={!!isEditable} 
-              
-              // ★追加: ここで削除関数を渡す
               onDelete={handleDeleteShift}
             />
           )
