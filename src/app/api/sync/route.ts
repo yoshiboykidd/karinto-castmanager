@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
           .replace(/\s+/g, '') 
           .replace(/[（\(\[].*?[）\)\]]/g, '') 
           .replace(/\d+/g, '') 
-          .replace(/[^\u3040-\u309F]/g, '') // ひらがなのみ抽出
+          .replace(/[^\u3040-\u309F]/g, '') 
           .trim();
         return s;
       };
@@ -101,14 +101,12 @@ export async function GET(request: NextRequest) {
           const requestedBatch: any[] = [];
           const foundLoginIds = new Set<string>();
 
-          // 時間正規表現
           const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
 
           const tryAddShift = (rawName: string, timeText: string) => {
             if (!rawName) return;
 
             const cleanName = normalize(rawName);
-            // ひらがな1〜3文字のみ対象（ゴミ除外）
             if (!/^[ぁ-ん]{1,3}$/.test(cleanName)) return;
 
             const loginId = nameMap.get(cleanName);
@@ -160,7 +158,6 @@ export async function GET(request: NextRequest) {
              tryAddShift(name, time);
           });
 
-          // 削除候補計算
           const deleteIds: string[] = [];
           const resetRequestIds: any[] = [];
 
@@ -186,7 +183,6 @@ export async function GET(request: NextRequest) {
           let logMsg = `✅ ${shop.name} ${format(targetDate, 'MM/dd')}`;
           let updateCount = 0;
 
-          // 1. 更新実行
           if (officialBatch.length > 0) {
             await supabase.from('shifts').upsert(officialBatch, { onConflict: 'login_id, shift_date' });
             updateCount += officialBatch.length;
@@ -196,15 +192,11 @@ export async function GET(request: NextRequest) {
             updateCount += requestedBatch.length;
           }
 
-          // 2. 削除・リセット実行（安全装置の条件緩和）
           const currentShiftCount = existingShifts?.length || 0;
-          
-          // ★修正: 「更新データが正しく見つかっている(officialBatch > 0)」なら、
-          // 削除量が多くても「DBの正常化処理」とみなして許可する。
           const isSafeToDelete = 
             (currentShiftCount < 5) || 
             (deleteIds.length / currentShiftCount) < 0.8 ||
-            (officialBatch.length > 0); // ← これを追加！
+            (officialBatch.length > 0);
 
           if (isSafeToDelete) {
             if (deleteIds.length > 0) {
@@ -219,7 +211,6 @@ export async function GET(request: NextRequest) {
               logMsg += ` (リセット:${resetRequestIds.length})`;
             }
           } else {
-            // 万が一、1人も更新できず、かつ全員消そうとした時だけ止める
             logMsg += ` ⚠️削除停止(異常検知: ${deleteIds.length}/${currentShiftCount}消失)`;
           }
 
@@ -248,6 +239,13 @@ export async function GET(request: NextRequest) {
     for (const shop of targetShops) {
       const shopLogs = await processShop(shop);
       allResults.push(shopLogs);
+      
+      // ★復活！これが抜けていました。毎回時間を更新します。
+      const nowISO = new Date().toISOString();
+      await supabase
+        .from('sync_logs')
+        .upsert({ id: 1, last_sync_at: nowISO }, { onConflict: 'id' });
+
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
