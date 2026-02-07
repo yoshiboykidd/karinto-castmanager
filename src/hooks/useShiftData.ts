@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { format, parseISO, startOfToday, isAfter } from 'date-fns';
+import { format, parseISO, startOfToday, isAfter, isValid } from 'date-fns';
 
 export function useShiftData() {
   const [supabase] = useState(() => createBrowserClient(
@@ -21,66 +21,87 @@ export function useShiftData() {
   }, []);
 
   const fetchInitialData = useCallback(async (router: any) => {
-    setLoading(true); // ★リロード中であることを明示
+    setLoading(true);
     try {
+      // 1. セッション取得
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return router.push('/login');
       
-      const loginId = session.user.email?.replace('@karinto-internal.com', '');
+      // 2. IDの抽出と「数値化」 (★重要: DBが数値型の場合、文字だとヒットしません)
+      const rawId = session.user.email?.replace('@karinto-internal.com', '');
+      const loginId = Number(rawId); 
+
+      console.log(`🔍 検索開始: ID=${loginId} (元=${rawId})`);
+
+      // 3. プロフィール取得
+      const { data: profile, error: profileError } = await supabase
+        .from('cast_members')
+        .select('*')
+        .eq('login_id', loginId)
+        .single();
       
-      // ★修正: キャッシュ回避のために、あえて .maybeSingle() に変えたり、
-      // ニュース取得の .limit(3) を変えたりはできませんが、
-      // App Routerの仕様上、クライアントサイドでの fetch は基本キャッシュされません。
-      // 問題は「状態(state)が更新されていない」ことかもしれません。
-      
-      const { data: profile } = await supabase.from('cast_members').select('*').eq('login_id', loginId).single();
-      
+      if (profileError) {
+        console.error("❌ プロフィール取得失敗 (RLSかID違い):", profileError);
+      }
+
       if (profile) {
+        console.log("✅ プロフィール発見:", profile.hp_display_name);
         const myShopId = profile.home_shop_id || 'main';
         
+        // 4. 一括取得
         const [shopRes, shiftsRes, newsRes, syncRes] = await Promise.all([
           supabase.from('shop_master').select('*').eq('shop_id', myShopId).single(),
-          // ★修正: データ取得時に .order() を確実に指定
-          supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
+          
+          // ★シフト取得: 数値化したIDで検索
+          supabase.from('shifts')
+            .select('*')
+            .eq('login_id', loginId)
+            .order('shift_date', { ascending: true }),
+
           supabase.from('news').select('*').or(`shop_id.eq.${myShopId},shop_id.eq.all`).order('created_at', { ascending: false }).limit(3),
           
-          // id=1 のデータ（全体の最終更新時間）を取得
+          // 最終更新時間 (id=1)
           supabase.from('sync_logs').select('last_sync_at').eq('id', 1).single()
         ]);
         
+        // ★デバッグログ: ここで何件取れたか確認してください
+        console.log(`📊 シフト取得数: ${shiftsRes.data?.length}件`);
+        if (shiftsRes.error) console.error("❌ シフト取得エラー:", shiftsRes.error);
+
         setData({
           shifts: shiftsRes.data || [], 
           profile, 
           shop: shopRes.data || null, 
           news: newsRes.data || [],
-          // 時間のフォーマット処理 (ここも日付オブジェクトとして保持するほうがHeaderで使いやすい)
-          syncAt: (syncRes.data && syncRes.data.last_sync_at) 
-            ? syncRes.data.last_sync_at // ★修正: string変換せず、ISO文字列のまま渡す（Header側でパースさせる）
-            : ''
+          // 時間はそのまま渡してHeader側で整形させる
+          syncAt: (syncRes.data && syncRes.data.last_sync_at) ? syncRes.data.last_sync_at : ''
         });
+      } else {
+        console.warn("⚠️ プロフィールが見つからないため、シフト取得をスキップしました");
       }
+
     } catch (err) {
       console.error("Fetch error:", err);
     } finally {
       setLoading(false);
     }
-  }, [supabase]); // ★依存配列にsupabaseを追加
+  }, [supabase]); 
 
-  // --- 集計ロジックは変更なし ---
+  // --- 集計ロジック ---
   const getMonthlyTotals = useCallback((viewDate: Date) => {
     if (!mounted || !viewDate || !data.shifts) return { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 };
     
     const today = startOfToday();
     
+    // フィルタリング
     const filtered = (data.shifts || [])
       .filter((s: any) => {
         if (!s.shift_date) return false;
         const d = parseISO(s.shift_date);
-        
-        // ★念のため日付オブジェクト変換の安全性を確保
-        if (isNaN(d.getTime())) return false;
+        if (!isValid(d)) return false;
 
         const isPastOrToday = !isAfter(d, today);
+        // ★official または 申請中でも「既存確定(is_official_pre_exist)」なら計算対象
         const isOfficialInfo = s.status === 'official' || s.is_official_pre_exist === true;
         
         return (
@@ -91,16 +112,14 @@ export function useShiftData() {
         );
       });
 
-      // reduce処理...
+      // 集計
       return filtered.reduce((acc: any, s: any) => {
         let dur = 0;
-        // 時間計算ロジック
         if (s.start_time && s.end_time && s.start_time.includes(':') && s.start_time !== 'OFF') {
           try {
             const [sH, sM] = s.start_time.split(':').map(Number);
             const [eH, eM] = s.end_time.split(':').map(Number);
             if (!isNaN(sH) && !isNaN(eH)) {
-              // 24時超え計算 (eH < sH なら翌日とみなす)
               const endH = eH < sH ? eH + 24 : eH;
               dur = endH + (eM || 0) / 60 - (sH + (sM || 0) / 60);
             }
@@ -112,7 +131,7 @@ export function useShiftData() {
           f: acc.f + (Number(s.f_count) || 0), 
           first: acc.first + (Number(s.first_request_count) || 0), 
           main: acc.main + (Number(s.main_request_count) || 0), 
-          count: acc.count + 1, // ★単純な件数カウント
+          count: acc.count + 1, 
           hours: acc.hours + dur 
         };
       }, { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 });
