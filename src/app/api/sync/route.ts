@@ -53,10 +53,16 @@ export async function GET(request: NextRequest) {
         return [`⚠️ Skip ${shop.name}: 名簿なし`];
       }
 
+      // 名前正規化: スペース削除、カッコと中身を削除、全角英数変換
       const normalize = (val: string) => {
         if (!val) return "";
-        let s = val.replace(/\s+/g, '').replace(/[（\(\[].*?[）\)\]]/g, '').replace(/（\d+）/g, ''); 
-        return s.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+        let s = val
+          .replace(/\s+/g, '') // スペース
+          .replace(/[（\(\[].*?[）\)\]]/g, '') // カッコとその中身（年齢など）を全削除
+          .replace(/\d+/g, '') // 残った数字も削除
+          .replace(/[^\u3040-\u309F]/g, '') // ★最強: ひらがな以外をすべて削除（記号なども消す）
+          .trim();
+        return s;
       };
 
       const nameMap = new Map(castList.map(c => [normalize(c.hp_display_name), String(c.login_id)]));
@@ -69,9 +75,8 @@ export async function GET(request: NextRequest) {
 
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 6000); // タイムアウト延長
+          const timeoutId = setTimeout(() => controller.abort(), 6000); 
 
-          // ★修正: User-Agentを追加してブラウザのふりをする
           const res = await fetch(url, { 
             cache: 'no-store',
             headers: {
@@ -94,20 +99,24 @@ export async function GET(request: NextRequest) {
           
           const officialBatch: any[] = [];
           const requestedBatch: any[] = [];
-          const foundLoginIds = new Set<string>(); // 「HPに名前があった人」リスト
-          const debugTimeErrors: string[] = []; // 時間が読めなかった人のリスト
+          const foundLoginIds = new Set<string>();
 
-          // ★修正: 時間正規表現をさらに緩く (数字とコロンさえあれば拾う)
-          // 例: "12:00～21:00", "12:00 - 21:00", "12:0021:00" など
+          // 時間正規表現
           const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
 
           const tryAddShift = (rawName: string, timeText: string) => {
+            if (!rawName) return;
+
             const cleanName = normalize(rawName);
+
+            // ★絶対ルール: ひらがな1文字〜3文字以外は即却下
+            // これでイベント名やコース名は確実に弾かれる
+            if (!/^[ぁ-ん]{1,3}$/.test(cleanName)) return;
+
             const loginId = nameMap.get(cleanName);
 
             if (loginId) {
-              // ★重要: 名前が見つかった時点で「発見」とする（時間が読めなくても削除しない！）
-              foundLoginIds.add(loginId);
+              foundLoginIds.add(loginId); // 名前があれば「発見」とする
 
               const timeMatch = timeText.match(timeRegex);
               if (timeMatch) {
@@ -138,18 +147,15 @@ export async function GET(request: NextRequest) {
                     is_official: true
                   });
                 }
-              } else {
-                // 名前はあるけど時間が読めなかった場合ログに残す
-                if (timeText.trim() !== "" && timeText.includes(":")) {
-                   debugTimeErrors.push(`${cleanName}[${timeText}]`);
-                }
               }
             }
           };
 
-          // スクレイピング実行
-          // セレクタを広げて、liタグだけでなく .dataBox 内も探す
-          $('li').each((_, element) => { tryAddShift($(element).find('h3').text(), $(element).text()); });
+          $('li').each((_, element) => { 
+            const name = $(element).find('h3').text();
+            const time = $(element).text(); 
+            tryAddShift(name, time); 
+          });
           $('.dataBox').each((_, element) => {
              const box = $(element);
              const name = box.find('h3').text() || box.find('.name').text() || "";
@@ -157,18 +163,17 @@ export async function GET(request: NextRequest) {
              tryAddShift(name, time);
           });
 
-          // 削除・リセットロジック
+          // 削除候補の計算
           const deleteIds: string[] = [];
           const resetRequestIds: any[] = [];
 
           if (existingShifts) {
             existingShifts.forEach((shift) => {
               const sId = String(shift.login_id);
-              
-              // 「DBにある」かつ「今回名前が見つからなかった」場合のみ削除候補
+              // DBにあるのに、今回のスキャンで見つからなかった場合
               if (!foundLoginIds.has(sId)) {
                 if (shift.status === 'official') {
-                  deleteIds.push(sId);
+                  deleteIds.push(sId); // 削除候補
                 } else if (shift.status === 'requested') {
                   resetRequestIds.push({
                     login_id: sId,
@@ -182,10 +187,10 @@ export async function GET(request: NextRequest) {
             });
           }
 
-          // DB更新実行
           let logMsg = `✅ ${shop.name} ${format(targetDate, 'MM/dd')}`;
           let updateCount = 0;
 
+          // 1. 更新実行
           if (officialBatch.length > 0) {
             await supabase.from('shifts').upsert(officialBatch, { onConflict: 'login_id, shift_date' });
             updateCount += officialBatch.length;
@@ -194,24 +199,32 @@ export async function GET(request: NextRequest) {
             await supabase.from('shifts').upsert(requestedBatch, { onConflict: 'login_id, shift_date' });
             updateCount += requestedBatch.length;
           }
-          if (deleteIds.length > 0) {
-            await supabase.from('shifts').delete()
-              .in('login_id', deleteIds)
-              .eq('shift_date', dateStrDB)
-              .eq('status', 'official'); 
-            logMsg += ` (削除${deleteIds.length})`;
-          }
-          if (resetRequestIds.length > 0) {
-            await supabase.from('shifts').upsert(resetRequestIds, { onConflict: 'login_id, shift_date' });
-            logMsg += ` (リセット${resetRequestIds.length})`;
+
+          // 2. 削除・リセット実行 (安全装置付き)
+          const currentShiftCount = existingShifts?.length || 0;
+          const isSafeToDelete = currentShiftCount < 5 || (deleteIds.length / currentShiftCount) < 0.8;
+
+          if (isSafeToDelete) {
+            if (deleteIds.length > 0) {
+              await supabase.from('shifts').delete()
+                .in('login_id', deleteIds)
+                .eq('shift_date', dateStrDB)
+                .eq('status', 'official'); 
+              logMsg += ` (お休み反映:${deleteIds.length})`;
+            }
+            if (resetRequestIds.length > 0) {
+              await supabase.from('shifts').upsert(resetRequestIds, { onConflict: 'login_id, shift_date' });
+              logMsg += ` (申請中リセット:${resetRequestIds.length})`;
+            }
+          } else {
+            logMsg += ` ⚠️削除停止(安全装置発動: ${deleteIds.length}/${currentShiftCount}が消失判定)`;
           }
 
-          // 時間読み取りエラーがあればログに追加
-          if (debugTimeErrors.length > 0) {
-            logMsg += ` ⚠️時間不明: ${debugTimeErrors.join(', ')}`;
+          if (updateCount === 0 && deleteIds.length === 0) {
+            return `💤 ${shop.name} ${format(targetDate, 'MM/dd')} (変更なし)`;
+          } else {
+            return `${logMsg} (更新${updateCount})`;
           }
-
-          return `${logMsg} (更新${updateCount})`;
 
         } catch (err: any) {
           return `❌ Err ${shop.name}: ${err.message}`;
@@ -232,7 +245,6 @@ export async function GET(request: NextRequest) {
     for (const shop of targetShops) {
       const shopLogs = await processShop(shop);
       allResults.push(shopLogs);
-      await supabase.from('sync_logs').upsert({ id: 1, last_sync_at: new Date().toISOString() }, { onConflict: 'id' });
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
