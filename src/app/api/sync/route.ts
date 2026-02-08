@@ -65,7 +65,11 @@ export async function GET(request: NextRequest) {
         return s;
       };
 
-      const nameMap = new Map(castList.map(c => [normalize(c.hp_display_name), String(c.login_id)]));
+      // ★修正1: ここでIDを必ず8桁の文字列（0埋め）に変換してマップを作る
+      const nameMap = new Map(castList.map(c => [
+        normalize(c.hp_display_name), 
+        String(c.login_id).padStart(8, '0') // 例: 600037 -> "00600037"
+      ]));
 
       const dayPromises = Array.from({ length: 7 }).map(async (_, i) => {
         const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
@@ -90,12 +94,17 @@ export async function GET(request: NextRequest) {
           const html = await res.text();
           const $ = cheerio.load(html);
 
+          // 既存データの取得（比較用）
           const { data: existingShifts } = await supabase
             .from('shifts')
             .select('login_id, status')
             .eq('shift_date', dateStrDB);
-
-          const existingStatusMap = new Map(existingShifts?.map(s => [String(s.login_id), s.status]));
+          
+          // ★修正2: 既存データのIDも必ず8桁文字列にして比較用マップを作る
+          const existingStatusMap = new Map(existingShifts?.map(s => [
+            String(s.login_id).padStart(8, '0'), 
+            s.status
+          ]));
           
           const officialBatch: any[] = [];
           const requestedBatch: any[] = [];
@@ -109,7 +118,7 @@ export async function GET(request: NextRequest) {
             const cleanName = normalize(rawName);
             if (!/^[ぁ-ん]{1,3}$/.test(cleanName)) return;
 
-            const loginId = nameMap.get(cleanName);
+            const loginId = nameMap.get(cleanName); // ここで取得するIDは既に8桁0埋め済み
 
             if (loginId) {
               foundLoginIds.add(loginId); 
@@ -121,7 +130,7 @@ export async function GET(request: NextRequest) {
 
                 if (currentStatus === 'requested') {
                   requestedBatch.push({
-                    login_id: loginId,
+                    login_id: loginId, // 8桁IDで保存
                     shift_date: dateStrDB,
                     hp_display_name: cleanName,
                     is_official_pre_exist: true,
@@ -130,7 +139,7 @@ export async function GET(request: NextRequest) {
                   });
                 } else {
                   officialBatch.push({
-                    login_id: loginId,
+                    login_id: loginId, // 8桁IDで保存
                     shift_date: dateStrDB,
                     hp_display_name: cleanName,
                     is_official_pre_exist: true,
@@ -163,7 +172,8 @@ export async function GET(request: NextRequest) {
 
           if (existingShifts) {
             existingShifts.forEach((shift) => {
-              const sId = String(shift.login_id);
+              // ★修正3: 削除チェック時もIDを8桁文字列に揃える
+              const sId = String(shift.login_id).padStart(8, '0');
               if (!foundLoginIds.has(sId)) {
                 if (shift.status === 'official') {
                   deleteIds.push(sId);
@@ -240,7 +250,6 @@ export async function GET(request: NextRequest) {
       const shopLogs = await processShop(shop);
       allResults.push(shopLogs);
       
-      // ★復活！これが抜けていました。毎回時間を更新します。
       const nowISO = new Date().toISOString();
       await supabase
         .from('sync_logs')
