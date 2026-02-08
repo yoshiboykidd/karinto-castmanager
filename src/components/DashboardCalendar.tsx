@@ -61,12 +61,8 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const dateStr = format(day, 'yyyy-MM-dd');
           const dNum = day.getDate();
           
-          // ★修正ポイント: 日付比較を安全にする
-          const s = Array.isArray(shifts) ? shifts.find((x: any) => {
-             if (!x.shift_date) return false;
-             // 文字列の前方一致 (yyyy-MM-dd) で比較するのが一番安全
-             return x.shift_date.startsWith(dateStr);
-          }) : null;
+          // 前方一致（.startsWith）にすることで、日付形式の違いを無視してヒットさせます
+const s = Array.isArray(shifts) ? shifts.find((x: any) => x.shift_date && x.shift_date.startsWith(dateStr)) : null;
 
           const isOfficial = s?.status === 'official';
           const isRequested = s?.status === 'requested';
