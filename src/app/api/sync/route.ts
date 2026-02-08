@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { addDays, format } from 'date-fns';
 
-export const maxDuration = 60; // Vercel Proの場合。無料版は自動で10秒になります
+export const maxDuration = 60; 
 export const dynamic = 'force-dynamic';
 
 const ALL_SHOPS = [
@@ -29,7 +29,6 @@ export async function GET(request: NextRequest) {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const JST_OFFSET = 9 * 60 * 60 * 1000;
   
-  // パラメータ ?shop=0〜11 を取得
   const shopIdx = parseInt(request.nextUrl.searchParams.get('shop') || '-1');
 
   if (shopIdx < 0 || shopIdx >= ALL_SHOPS.length) {
@@ -39,7 +38,6 @@ export async function GET(request: NextRequest) {
   const shop = ALL_SHOPS[shopIdx];
 
   try {
-    // 1. マスターデータ（キャスト名簿）を取得
     const { data: allCast } = await supabase.from('cast_members').select('login_id, hp_display_name, home_shop_id');
     const logs: string[] = [];
 
@@ -49,11 +47,9 @@ export async function GET(request: NextRequest) {
       return toHiragana(s);
     };
 
-    // 当該店舗のキャストのみ抽出してMap化
     const shopCast = allCast?.filter(c => String(c.home_shop_id).trim().padStart(3, '0') === shop.id || String(parseInt(c.home_shop_id || '0')) === String(parseInt(shop.id))) || [];
     const nameMap = new Map(shopCast.map(c => [normalize(c.hp_display_name), String(c.login_id).trim().padStart(8, '0')]));
 
-    // 2. 7日分を順番に処理
     for (let i = 0; i < 7; i++) {
       const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
       const dateStrDB = format(targetDate, 'yyyy-MM-dd');
@@ -67,7 +63,6 @@ export async function GET(request: NextRequest) {
         const upsertBatch: any[] = [];
         const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
 
-        // 既存のステータスを確認するために一旦取得
         const { data: existingShifts } = await supabase
           .from('shifts')
           .select('login_id, status')
@@ -89,8 +84,7 @@ export async function GET(request: NextRequest) {
             const end = timeMatch[2].padStart(5, '0');
             const currentStatus = statusMap.get(loginId);
 
-            // 【最重要：上書きロジック】
-            // キャストからの「変更申請中(requested)」はHP同期よりも優先し、上書きしない。
+            // 【黄金律：変更申請を保護】
             if (currentStatus === 'requested') return;
 
             upsertBatch.push({
@@ -100,9 +94,9 @@ export async function GET(request: NextRequest) {
               is_official_pre_exist: true,
               hp_start_time: start,
               hp_end_time: end,
-              start_time: start,      // 女子ページ表示用
-              end_time: end,        // 女子ページ表示用
-              status: 'official',     // 確定状態として保存
+              start_time: start,
+              end_time: end,
+              status: 'official',
               is_official: true,
               updated_at: new Date().toISOString()
             });
@@ -116,13 +110,23 @@ export async function GET(request: NextRequest) {
       } catch (e: any) { logs.push(`${dateStrDB.slice(5)} Err`); }
     }
 
-    // 3. 同期成功ログ（生存確認用）を記録
-    await supabase.from('sync_logs').upsert({
-      id: shopIdx,
-      shop_name: shop.name,
-      last_sync_at: new Date().toISOString(),
-      status: 'success'
-    }, { onConflict: 'id' });
+    // --- sync_logs 更新ロジック (カラム: id, last_sync_at のみ対応) ---
+    // ID 1 (固定) のレコードを更新し、全店舗の誰かが動いていることを証明する
+    const FIXED_LOG_ID = 1; // 1行目を常に更新
+
+    // upsert で IDを指定して強制更新。IDがUUID型でもInt型でも通るように、
+    // IDが存在しなくても新規作成するように動きます。
+    try {
+        await supabase.from('sync_logs').upsert({
+          id: FIXED_LOG_ID, 
+          last_sync_at: new Date().toISOString()
+        }, { onConflict: 'id' });
+    } catch (logErr) {
+        // ID指定がどうしても通らない場合のバックアップ（単なる挿入）
+        await supabase.from('sync_logs').insert({
+          last_sync_at: new Date().toISOString()
+        });
+    }
 
     return NextResponse.json({ success: true, shop: shop.name, logs });
   } catch (e: any) { 
