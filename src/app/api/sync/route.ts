@@ -21,6 +21,14 @@ const ALL_SHOPS = [
   { id: '012', name: '小岩', baseUrl: 'https://www.karin10koiwa.com/attend.php' }, 
 ];
 
+// ★ひらがな変換ヘルパー
+function toHiragana(str: string) {
+  return str.replace(/[\u30a1-\u30f6]/g, function(match) {
+    var chr = match.charCodeAt(0) - 0x60;
+    return String.fromCharCode(chr);
+  });
+}
+
 export async function GET(request: NextRequest) {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -48,7 +56,7 @@ export async function GET(request: NextRequest) {
     const logs: string[] = [];
 
     for (const shop of targetShops) {
-      // 1. 店舗キャスト特定
+      // 1. IDズレ許容でキャスト特定
       const shopCast = allCastMembers?.filter(c => {
         if (!c.home_shop_id) return false;
         const dbId = String(c.home_shop_id).trim(); 
@@ -57,23 +65,18 @@ export async function GET(request: NextRequest) {
         return dbId === targetId || dbId === targetIdShort;
       }) || [];
 
-      // ★ここが新機能: カタカナをひらがなに変換して照合する
+      // ★最強の名前整形（強制ひらがな化）
       const normalize = (val: string) => {
         if (!val) return "";
         let s = val
-          .normalize('NFKC') // 半角カナを全角に、全角英数を半角に
-          .replace(/[（\(\[].*?[）\)\]]/g, '') // (22)などを削除
-          .replace(/[\d\s\u3000]+/g, '') // 数字・空白・全角スペース削除
-          .replace(/[^\p{L}\p{N}]/gu, '') // 絵文字記号削除
+          .normalize('NFKC') 
+          .replace(/[（\(\[].*?[）\)\]]/g, '') 
+          .replace(/[\d\s\u3000]+/g, '') 
+          .replace(/[^\p{L}\p{N}]/gu, '') 
           .trim();
-
-        // カタカナ → ひらがな 変換（ミカ → みか）
-        s = s.replace(/[\u30a1-\u30f6]/g, function(match) {
-            var chr = match.charCodeAt(0) - 0x60;
-            return String.fromCharCode(chr);
-        });
         
-        return s;
+        // 最後に必ず「ひらがな」にする
+        return toHiragana(s);
       };
 
       const nameMap = new Map(shopCast.map(c => [
@@ -101,6 +104,7 @@ export async function GET(request: NextRequest) {
           const html = await res.text();
           const $ = cheerio.load(html);
 
+          // 既存データの取得
           const { data: existingShifts } = await supabase
             .from('shifts')
             .select('login_id, status')
@@ -114,24 +118,23 @@ export async function GET(request: NextRequest) {
           const officialBatch: any[] = [];
           const requestedBatch: any[] = [];
           const foundLoginIds = new Set<string>();
-          const unmatchedNames = new Set<string>(); 
+          const unmatchedNames = new Set<string>();
           const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
           const nowISO = new Date().toISOString();
 
-          // スクレイピング
           $('h3, .name, .cast_name, span.name, div.name, strong').each((_, nameEl) => { 
             const $name = $(nameEl);
             const rawName = $name.text().trim();
-            const cleanName = normalize(rawName); // ここで「ミカ」が「みか」になる
+            const cleanName = normalize(rawName); // ここで「ミカ」→「みか」に
             
             if (!cleanName || cleanName.length < 1) return;
 
             const loginId = nameMap.get(cleanName);
             
             if (!loginId) {
-               // 名前っぽいのにDBにない場合ログに残す
+               // 名前っぽいのにDBにない場合
                if (!rawName.includes('時間') && rawName.length < 15) {
-                   unmatchedNames.add(`${rawName}(${cleanName})`);
+                   unmatchedNames.add(`${rawName}(→${cleanName})`);
                }
                return; 
             }
@@ -182,32 +185,19 @@ export async function GET(request: NextRequest) {
             updateCount += requestedBatch.length;
           }
 
-          // 削除処理
+          // ★重要：削除処理を一時的に「無効化」しました
+          // これで「見つからない＝削除」という事故が起きなくなります
+          /*
           const deleteIds: string[] = [];
-          if (existingShifts) {
-            existingShifts.forEach((shift) => {
-              const sId = String(shift.login_id).trim().padStart(8, '0');
-              if (!foundLoginIds.has(sId) && shift.status === 'official') {
-                deleteIds.push(sId);
-              }
-            });
-          }
-          if (deleteIds.length > 0) {
-             const currentShiftCount = existingShifts?.length || 0;
-             if (currentShiftCount < 5 || (deleteIds.length / currentShiftCount) < 0.8 || officialBatch.length > 0) {
-               await supabase.from('shifts').delete().in('login_id', deleteIds).eq('shift_date', dateStrDB).eq('status', 'official');
-             }
-          }
+          // ... (削除ロジックをコメントアウト) ...
+          */
 
           let logMsg = `✅ ${shop.name} ${format(targetDate, 'MM/dd')} (更新${updateCount})`;
           
           if (unmatchedNames.size > 0) {
              const names = Array.from(unmatchedNames).join(', ');
+             // ログに「誰が見つからなかったか」を明記
              logMsg += ` ⚠️ 不一致: [${names}]`;
-          }
-          
-          if (updateCount === 0 && deleteIds.length === 0 && unmatchedNames.size === 0) {
-             return `💤 ${shop.name} ${format(targetDate, 'MM/dd')} (変化なし)`;
           }
           
           return logMsg;
