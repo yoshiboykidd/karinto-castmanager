@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
         return s;
       };
 
-      // ★修正1: ここでIDを必ず8桁の文字列（0埋め）に変換してマップを作る
+      // IDを8桁文字列（0埋め）に揃える
       const nameMap = new Map(castList.map(c => [
         normalize(c.hp_display_name), 
         String(c.login_id).padStart(8, '0') // 例: 600037 -> "00600037"
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
             .select('login_id, status')
             .eq('shift_date', dateStrDB);
           
-          // ★修正2: 既存データのIDも必ず8桁文字列にして比較用マップを作る
+          // 既存データのIDも必ず8桁文字列にして比較用マップを作る
           const existingStatusMap = new Map(existingShifts?.map(s => [
             String(s.login_id).padStart(8, '0'), 
             s.status
@@ -111,6 +111,9 @@ export async function GET(request: NextRequest) {
           const foundLoginIds = new Set<string>();
 
           const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
+          
+          // ★ここで現在時刻を生成（updated_at用）
+          const nowISO = new Date().toISOString();
 
           const tryAddShift = (rawName: string, timeText: string) => {
             if (!rawName) return;
@@ -118,7 +121,7 @@ export async function GET(request: NextRequest) {
             const cleanName = normalize(rawName);
             if (!/^[ぁ-ん]{1,3}$/.test(cleanName)) return;
 
-            const loginId = nameMap.get(cleanName); // ここで取得するIDは既に8桁0埋め済み
+            const loginId = nameMap.get(cleanName); // 8桁ID取得
 
             if (loginId) {
               foundLoginIds.add(loginId); 
@@ -130,16 +133,17 @@ export async function GET(request: NextRequest) {
 
                 if (currentStatus === 'requested') {
                   requestedBatch.push({
-                    login_id: loginId, // 8桁IDで保存
+                    login_id: loginId,
                     shift_date: dateStrDB,
                     hp_display_name: cleanName,
                     is_official_pre_exist: true,
                     hp_start_time: hpStart,
-                    hp_end_time: hpEnd
+                    hp_end_time: hpEnd,
+                    updated_at: nowISO // ★時間を更新
                   });
                 } else {
                   officialBatch.push({
-                    login_id: loginId, // 8桁IDで保存
+                    login_id: loginId,
                     shift_date: dateStrDB,
                     hp_display_name: cleanName,
                     is_official_pre_exist: true,
@@ -148,7 +152,8 @@ export async function GET(request: NextRequest) {
                     start_time: hpStart,
                     end_time: hpEnd,
                     status: 'official',
-                    is_official: true
+                    is_official: true,
+                    updated_at: nowISO // ★時間を更新
                   });
                 }
               }
@@ -172,7 +177,7 @@ export async function GET(request: NextRequest) {
 
           if (existingShifts) {
             existingShifts.forEach((shift) => {
-              // ★修正3: 削除チェック時もIDを8桁文字列に揃える
+              // 削除判定時もIDを8桁文字列に揃える
               const sId = String(shift.login_id).padStart(8, '0');
               if (!foundLoginIds.has(sId)) {
                 if (shift.status === 'official') {
@@ -183,7 +188,8 @@ export async function GET(request: NextRequest) {
                     shift_date: dateStrDB,
                     hp_start_time: null,
                     hp_end_time: null,
-                    is_official_pre_exist: false
+                    is_official_pre_exist: false,
+                    updated_at: nowISO // ★時間を更新
                   });
                 }
               }
