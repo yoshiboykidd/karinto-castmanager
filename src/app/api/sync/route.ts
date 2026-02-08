@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
         if (!res.ok) { logs.push(`${dateStrDB} HTTP ${res.status}`); continue; }
         
         const $ = cheerio.load(await res.text());
+        const foundLoginIds = new Set<string>();
         const upsertBatch: any[] = [];
         const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
 
@@ -83,19 +84,16 @@ export async function GET(request: NextRequest) {
             const hpEnd = timeMatch[2].padStart(5, '0');
             const dbShift = existingMap.get(loginId);
 
-            // 【自動連動ロジック】
+            foundLoginIds.add(loginId); // HPに存在したキャストを記録
+
             if (dbShift?.status === 'requested') {
-              // HP側の時間と、キャストが申請している時間が「一致した」かチェック
               if (dbShift.start_time === hpStart && dbShift.end_time === hpEnd) {
-                // 一致した＝管理者がHP側を直してくれたということ。
-                // 自動的に 'official' に戻して、以後の同期対象にする。
+                // 自動承認
               } else {
-                // 不一致＝まだHPが直っていない。キャストの申請表示を守るため、今回はスルー。
-                return;
+                return; // 申請保護
               }
             }
 
-            // それ以外（新規、または既存の確定シフト、または自動承認条件クリア）
             upsertBatch.push({
               login_id: loginId,
               shift_date: dateStrDB,
@@ -105,25 +103,35 @@ export async function GET(request: NextRequest) {
               hp_end_time: hpEnd,
               start_time: hpStart,
               end_time: hpEnd,
-              status: 'official', // HPに載っている＝確定(official)
+              status: 'official',
               is_official: true,
               updated_at: new Date().toISOString()
             });
           }
         });
 
+        // 【HP完全連動：削除ロジック】
+        // HPになかったキャストで、DB上で 'official' のものは「お休み」と判断して削除
+        const idsToRemove = (existingShifts || [])
+          .map(s => String(s.login_id).trim().padStart(8, '0'))
+          .filter(id => !foundLoginIds.has(id) && existingMap.get(id)?.status === 'official');
+
+        if (idsToRemove.length > 0) {
+          await supabase
+            .from('shifts')
+            .delete()
+            .eq('shift_date', dateStrDB)
+            .in('login_id', idsToRemove);
+        }
+
         if (upsertBatch.length > 0) {
           await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
         }
-        logs.push(`${dateStrDB.slice(5)} (${upsertBatch.length}件)`);
+        logs.push(`${dateStrDB.slice(5)} (+${upsertBatch.length}/-${idsToRemove.length})`);
       } catch (e: any) { logs.push(`${dateStrDB.slice(5)} Err`); }
     }
 
-    // --- sync_logs 更新 (id=1 のレコードをタイムスタンプとして活用) ---
-    await supabase.from('sync_logs').upsert({
-      id: 1, 
-      last_sync_at: new Date().toISOString()
-    }, { onConflict: 'id' });
+    await supabase.from('sync_logs').upsert({ id: 1, last_sync_at: new Date().toISOString() }, { onConflict: 'id' });
 
     return NextResponse.json({ success: true, shop: shop.name, logs });
   } catch (e: any) { 
