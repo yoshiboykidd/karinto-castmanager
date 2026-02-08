@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { addDays, format } from 'date-fns';
 
-export const maxDuration = 60; 
+export const maxDuration = 60; // Vercel Proの場合。無料版は自動で10秒になります
 export const dynamic = 'force-dynamic';
 
 const ALL_SHOPS = [
@@ -29,16 +29,17 @@ export async function GET(request: NextRequest) {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const JST_OFFSET = 9 * 60 * 60 * 1000;
   
-  // 【重要】?shop=0, ?shop=1 のように店舗番号で指定
+  // パラメータ ?shop=0〜11 を取得
   const shopIdx = parseInt(request.nextUrl.searchParams.get('shop') || '-1');
 
   if (shopIdx < 0 || shopIdx >= ALL_SHOPS.length) {
-    return NextResponse.json({ success: false, message: "Valid 'shop' index required (0-11)" }, { status: 400 });
+    return NextResponse.json({ success: false, message: "Valid 'shop' index (0-11) is required." }, { status: 400 });
   }
 
   const shop = ALL_SHOPS[shopIdx];
 
   try {
+    // 1. マスターデータ（キャスト名簿）を取得
     const { data: allCast } = await supabase.from('cast_members').select('login_id, hp_display_name, home_shop_id');
     const logs: string[] = [];
 
@@ -48,10 +49,11 @@ export async function GET(request: NextRequest) {
       return toHiragana(s);
     };
 
+    // 当該店舗のキャストのみ抽出してMap化
     const shopCast = allCast?.filter(c => String(c.home_shop_id).trim().padStart(3, '0') === shop.id || String(parseInt(c.home_shop_id || '0')) === String(parseInt(shop.id))) || [];
     const nameMap = new Map(shopCast.map(c => [normalize(c.hp_display_name), String(c.login_id).trim().padStart(8, '0')]));
 
-    // 1店舗につき1週間分なら、Vercelの10秒制限に余裕で収まります
+    // 2. 7日分を順番に処理
     for (let i = 0; i < 7; i++) {
       const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
       const dateStrDB = format(targetDate, 'yyyy-MM-dd');
@@ -65,6 +67,14 @@ export async function GET(request: NextRequest) {
         const upsertBatch: any[] = [];
         const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
 
+        // 既存のステータスを確認するために一旦取得
+        const { data: existingShifts } = await supabase
+          .from('shifts')
+          .select('login_id, status')
+          .eq('shift_date', dateStrDB);
+        
+        const statusMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s.status]));
+
         $('h3, .name, .cast_name, span.name, div.name, strong').each((_, nameEl) => {
           const rawName = $(nameEl).text();
           const cleanName = normalize(rawName);
@@ -77,10 +87,23 @@ export async function GET(request: NextRequest) {
           if (timeMatch) {
             const start = timeMatch[1].padStart(5, '0');
             const end = timeMatch[2].padStart(5, '0');
+            const currentStatus = statusMap.get(loginId);
+
+            // 【最重要：上書きロジック】
+            // キャストからの「変更申請中(requested)」はHP同期よりも優先し、上書きしない。
+            if (currentStatus === 'requested') return;
+
             upsertBatch.push({
-              login_id: loginId, shift_date: dateStrDB, hp_display_name: cleanName,
-              is_official_pre_exist: true, hp_start_time: start, hp_end_time: end,
-              start_time: start, end_time: end, status: 'official', is_official: true,
+              login_id: loginId,
+              shift_date: dateStrDB,
+              hp_display_name: cleanName,
+              is_official_pre_exist: true,
+              hp_start_time: start,
+              hp_end_time: end,
+              start_time: start,      // 女子ページ表示用
+              end_time: end,        // 女子ページ表示用
+              status: 'official',     // 確定状態として保存
+              is_official: true,
               updated_at: new Date().toISOString()
             });
           }
@@ -93,6 +116,16 @@ export async function GET(request: NextRequest) {
       } catch (e: any) { logs.push(`${dateStrDB.slice(5)} Err`); }
     }
 
+    // 3. 同期成功ログ（生存確認用）を記録
+    await supabase.from('sync_logs').upsert({
+      id: shopIdx,
+      shop_name: shop.name,
+      last_sync_at: new Date().toISOString(),
+      status: 'success'
+    }, { onConflict: 'id' });
+
     return NextResponse.json({ success: true, shop: shop.name, logs });
-  } catch (e: any) { return NextResponse.json({ success: false, message: e.message }, { status: 500 }); }
+  } catch (e: any) { 
+    return NextResponse.json({ success: false, message: e.message }, { status: 500 }); 
+  }
 }
