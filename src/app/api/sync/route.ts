@@ -28,74 +28,71 @@ function toHiragana(str: string) {
 export async function GET(request: NextRequest) {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const JST_OFFSET = 9 * 60 * 60 * 1000;
-  const group = request.nextUrl.searchParams.get('group');
+  
+  // 【重要】?shop=0, ?shop=1 のように店舗番号で指定
+  const shopIdx = parseInt(request.nextUrl.searchParams.get('shop') || '-1');
 
-  let targetShops = group === '1' ? ALL_SHOPS.slice(0, 3) : group === '2' ? ALL_SHOPS.slice(3, 6) : group === '3' ? ALL_SHOPS.slice(6, 9) : group === '4' ? ALL_SHOPS.slice(9, 12) : ALL_SHOPS;
+  if (shopIdx < 0 || shopIdx >= ALL_SHOPS.length) {
+    return NextResponse.json({ success: false, message: "Valid 'shop' index required (0-11)" }, { status: 400 });
+  }
+
+  const shop = ALL_SHOPS[shopIdx];
 
   try {
     const { data: allCast } = await supabase.from('cast_members').select('login_id, hp_display_name, home_shop_id');
     const logs: string[] = [];
 
-    for (const shop of targetShops) {
-      const normalize = (val: string) => {
-        if (!val) return "";
-        let s = val.normalize('NFKC').replace(/[（\(\[].*?[）\)\]]/g, '').replace(/[\n\r\t\s\u3000]+/g, '').replace(/[^\p{L}\p{N}]/gu, '').trim();
-        return toHiragana(s);
-      };
+    const normalize = (val: string) => {
+      if (!val) return "";
+      let s = val.normalize('NFKC').replace(/[（\(\[].*?[）\)\]]/g, '').replace(/[\n\r\t\s\u3000]+/g, '').replace(/[^\p{L}\p{N}]/gu, '').trim();
+      return toHiragana(s);
+    };
 
-      const shopCast = allCast?.filter(c => String(c.home_shop_id).trim().padStart(3, '0') === shop.id || String(parseInt(c.home_shop_id || '0')) === String(parseInt(shop.id))) || [];
-      const nameMap = new Map(shopCast.map(c => [normalize(c.hp_display_name), String(c.login_id).trim().padStart(8, '0')]));
+    const shopCast = allCast?.filter(c => String(c.home_shop_id).trim().padStart(3, '0') === shop.id || String(parseInt(c.home_shop_id || '0')) === String(parseInt(shop.id))) || [];
+    const nameMap = new Map(shopCast.map(c => [normalize(c.hp_display_name), String(c.login_id).trim().padStart(8, '0')]));
 
-      for (let i = 0; i < 7; i++) {
-        const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
-        const dateStrDB = format(targetDate, 'yyyy-MM-dd');
-        const url = `${shop.baseUrl}?date_get=${format(targetDate, 'yyyy/MM/dd')}&t=${Date.now()}`;
+    // 1店舗につき1週間分なら、Vercelの10秒制限に余裕で収まります
+    for (let i = 0; i < 7; i++) {
+      const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
+      const dateStrDB = format(targetDate, 'yyyy-MM-dd');
+      const url = `${shop.baseUrl}?date_get=${format(targetDate, 'yyyy/MM/dd')}&t=${Date.now()}`;
 
-        try {
-          const res = await fetch(url, { cache: 'no-store', headers: { 'User-Agent': 'Mozilla/5.0' } });
-          if (!res.ok) { logs.push(`❌ ${shop.name} HTTP ${res.status}`); continue; }
-          
-          const $ = cheerio.load(await res.text());
-          const upsertBatch: any[] = [];
-          const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
+      try {
+        const res = await fetch(url, { cache: 'no-store', headers: { 'User-Agent': 'Mozilla/5.0' } });
+        if (!res.ok) { logs.push(`${dateStrDB} HTTP ${res.status}`); continue; }
+        
+        const $ = cheerio.load(await res.text());
+        const upsertBatch: any[] = [];
+        const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
 
-          $('h3, .name, .cast_name, span.name, div.name, strong').each((_, nameEl) => {
-            const rawName = $(nameEl).text();
-            const cleanName = normalize(rawName);
-            const loginId = nameMap.get(cleanName);
-            if (!loginId) return;
+        $('h3, .name, .cast_name, span.name, div.name, strong').each((_, nameEl) => {
+          const rawName = $(nameEl).text();
+          const cleanName = normalize(rawName);
+          const loginId = nameMap.get(cleanName);
+          if (!loginId) return;
 
-            const context = $(nameEl).text() + " " + $(nameEl).parent().text() + " " + $(nameEl).parent().parent().text();
-            const timeMatch = context.match(timeRegex);
+          const context = $(nameEl).text() + " " + $(nameEl).parent().text() + " " + $(nameEl).parent().parent().text();
+          const timeMatch = context.match(timeRegex);
 
-            if (timeMatch) {
-              const start = timeMatch[1].padStart(5, '0');
-              const end = timeMatch[2].padStart(5, '0');
-
-              // ガードを外して強制的に最新情報をバッチに入れる
-              upsertBatch.push({
-                login_id: loginId,
-                shift_date: dateStrDB,
-                hp_display_name: cleanName,
-                is_official_pre_exist: true,
-                hp_start_time: start,
-                hp_end_time: end,
-                start_time: start,
-                end_time: end,
-                status: 'official', // 強制的に確定状態で保存
-                is_official: true,
-                updated_at: new Date().toISOString()
-              });
-            }
-          });
-
-          if (upsertBatch.length > 0) {
-            await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
+          if (timeMatch) {
+            const start = timeMatch[1].padStart(5, '0');
+            const end = timeMatch[2].padStart(5, '0');
+            upsertBatch.push({
+              login_id: loginId, shift_date: dateStrDB, hp_display_name: cleanName,
+              is_official_pre_exist: true, hp_start_time: start, hp_end_time: end,
+              start_time: start, end_time: end, status: 'official', is_official: true,
+              updated_at: new Date().toISOString()
+            });
           }
-          logs.push(`✅ ${shop.name} ${dateStrDB.slice(5)} (${upsertBatch.length}件)`);
-        } catch (e: any) { logs.push(`❌ ${shop.name} ${dateStrDB.slice(5)} Err`); }
-      }
+        });
+
+        if (upsertBatch.length > 0) {
+          await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
+        }
+        logs.push(`${dateStrDB.slice(5)} (${upsertBatch.length}件)`);
+      } catch (e: any) { logs.push(`${dateStrDB.slice(5)} Err`); }
     }
-    return NextResponse.json({ success: true, logs });
+
+    return NextResponse.json({ success: true, shop: shop.name, logs });
   } catch (e: any) { return NextResponse.json({ success: false, message: e.message }, { status: 500 }); }
 }
