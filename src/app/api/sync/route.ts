@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
 
     const shopCast = allCast?.filter(c => String(c.home_shop_id).trim().padStart(3, '0') === shop.id || String(parseInt(c.home_shop_id || '0')) === String(parseInt(shop.id))) || [];
     const nameMap = new Map(shopCast.map(c => [normalize(c.hp_display_name), String(c.login_id).trim().padStart(8, '0')]));
+    const targetShopCastIds = shopCast.map(c => String(c.login_id).trim().padStart(8, '0'));
 
     for (let i = 0; i < 7; i++) {
       const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
@@ -59,14 +60,15 @@ export async function GET(request: NextRequest) {
         if (!res.ok) { logs.push(`${dateStrDB} HTTP ${res.status}`); continue; }
         
         const $ = cheerio.load(await res.text());
-        const foundLoginIds = new Set<string>();
+        const foundInHP = new Set<string>();
         const upsertBatch: any[] = [];
         const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
 
         const { data: existingShifts } = await supabase
           .from('shifts')
           .select('login_id, status, start_time, end_time')
-          .eq('shift_date', dateStrDB);
+          .eq('shift_date', dateStrDB)
+          .like('login_id', `${shop.id}%`); // 当該店舗のIDで絞り込み
         
         const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
 
@@ -84,11 +86,11 @@ export async function GET(request: NextRequest) {
             const hpEnd = timeMatch[2].padStart(5, '0');
             const dbShift = existingMap.get(loginId);
 
-            foundLoginIds.add(loginId); // HPに存在したキャストを記録
+            foundInHP.add(loginId);
 
             if (dbShift?.status === 'requested') {
               if (dbShift.start_time === hpStart && dbShift.end_time === hpEnd) {
-                // 自動承認
+                // 自動承認へ
               } else {
                 return; // 申請保護
               }
@@ -110,24 +112,28 @@ export async function GET(request: NextRequest) {
           }
         });
 
-        // 【HP完全連動：削除ロジック】
-        // HPになかったキャストで、DB上で 'official' のものは「お休み」と判断して削除
-        const idsToRemove = (existingShifts || [])
-          .map(s => String(s.login_id).trim().padStart(8, '0'))
-          .filter(id => !foundLoginIds.has(id) && existingMap.get(id)?.status === 'official');
+        // 【HP完全連動ロジック：削除】
+        // HPに1人以上見つかった場合のみ、削除処理を実行（空振り全消し防止）
+        let removeCount = 0;
+        if (foundInHP.size > 0) {
+          const idsToRemove = (existingShifts || [])
+            .map(s => String(s.login_id).trim().padStart(8, '0'))
+            .filter(id => !foundInHP.has(id) && existingMap.get(id)?.status === 'official');
 
-        if (idsToRemove.length > 0) {
-          await supabase
-            .from('shifts')
-            .delete()
-            .eq('shift_date', dateStrDB)
-            .in('login_id', idsToRemove);
+          if (idsToRemove.length > 0) {
+            await supabase
+              .from('shifts')
+              .delete()
+              .eq('shift_date', dateStrDB)
+              .in('login_id', idsToRemove);
+            removeCount = idsToRemove.length;
+          }
         }
 
         if (upsertBatch.length > 0) {
           await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
         }
-        logs.push(`${dateStrDB.slice(5)} (+${upsertBatch.length}/-${idsToRemove.length})`);
+        logs.push(`${dateStrDB.slice(5)} (+${upsertBatch.length}/-${removeCount})`);
       } catch (e: any) { logs.push(`${dateStrDB.slice(5)} Err`); }
     }
 
