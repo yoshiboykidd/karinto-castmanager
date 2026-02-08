@@ -30,9 +30,8 @@ export async function GET(request: NextRequest) {
   const JST_OFFSET = 9 * 60 * 60 * 1000;
   
   const shopIdx = parseInt(request.nextUrl.searchParams.get('shop') || '-1');
-
   if (shopIdx < 0 || shopIdx >= ALL_SHOPS.length) {
-    return NextResponse.json({ success: false, message: "Valid 'shop' index (0-11) is required." }, { status: 400 });
+    return NextResponse.json({ success: false, message: "Valid 'shop' index required." }, { status: 400 });
   }
 
   const shop = ALL_SHOPS[shopIdx];
@@ -65,10 +64,10 @@ export async function GET(request: NextRequest) {
 
         const { data: existingShifts } = await supabase
           .from('shifts')
-          .select('login_id, status')
+          .select('login_id, status, start_time, end_time')
           .eq('shift_date', dateStrDB);
         
-        const statusMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s.status]));
+        const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
 
         $('h3, .name, .cast_name, span.name, div.name, strong').each((_, nameEl) => {
           const rawName = $(nameEl).text();
@@ -80,23 +79,33 @@ export async function GET(request: NextRequest) {
           const timeMatch = context.match(timeRegex);
 
           if (timeMatch) {
-            const start = timeMatch[1].padStart(5, '0');
-            const end = timeMatch[2].padStart(5, '0');
-            const currentStatus = statusMap.get(loginId);
+            const hpStart = timeMatch[1].padStart(5, '0');
+            const hpEnd = timeMatch[2].padStart(5, '0');
+            const dbShift = existingMap.get(loginId);
 
-            // 【黄金律：変更申請を保護】
-            if (currentStatus === 'requested') return;
+            // 【自動連動ロジック】
+            if (dbShift?.status === 'requested') {
+              // HP側の時間と、キャストが申請している時間が「一致した」かチェック
+              if (dbShift.start_time === hpStart && dbShift.end_time === hpEnd) {
+                // 一致した＝管理者がHP側を直してくれたということ。
+                // 自動的に 'official' に戻して、以後の同期対象にする。
+              } else {
+                // 不一致＝まだHPが直っていない。キャストの申請表示を守るため、今回はスルー。
+                return;
+              }
+            }
 
+            // それ以外（新規、または既存の確定シフト、または自動承認条件クリア）
             upsertBatch.push({
               login_id: loginId,
               shift_date: dateStrDB,
               hp_display_name: cleanName,
               is_official_pre_exist: true,
-              hp_start_time: start,
-              hp_end_time: end,
-              start_time: start,
-              end_time: end,
-              status: 'official',
+              hp_start_time: hpStart,
+              hp_end_time: hpEnd,
+              start_time: hpStart,
+              end_time: hpEnd,
+              status: 'official', // HPに載っている＝確定(official)
               is_official: true,
               updated_at: new Date().toISOString()
             });
@@ -110,23 +119,11 @@ export async function GET(request: NextRequest) {
       } catch (e: any) { logs.push(`${dateStrDB.slice(5)} Err`); }
     }
 
-    // --- sync_logs 更新ロジック (カラム: id, last_sync_at のみ対応) ---
-    // ID 1 (固定) のレコードを更新し、全店舗の誰かが動いていることを証明する
-    const FIXED_LOG_ID = 1; // 1行目を常に更新
-
-    // upsert で IDを指定して強制更新。IDがUUID型でもInt型でも通るように、
-    // IDが存在しなくても新規作成するように動きます。
-    try {
-        await supabase.from('sync_logs').upsert({
-          id: FIXED_LOG_ID, 
-          last_sync_at: new Date().toISOString()
-        }, { onConflict: 'id' });
-    } catch (logErr) {
-        // ID指定がどうしても通らない場合のバックアップ（単なる挿入）
-        await supabase.from('sync_logs').insert({
-          last_sync_at: new Date().toISOString()
-        });
-    }
+    // --- sync_logs 更新 (id=1 のレコードをタイムスタンプとして活用) ---
+    await supabase.from('sync_logs').upsert({
+      id: 1, 
+      last_sync_at: new Date().toISOString()
+    }, { onConflict: 'id' });
 
     return NextResponse.json({ success: true, shop: shop.name, logs });
   } catch (e: any) { 
