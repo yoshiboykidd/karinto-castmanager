@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
     const logs: string[] = [];
 
     for (const shop of targetShops) {
-      // 柔軟なID検索（6でも006でもOK）
+      // 1. IDのズレを許容してDBからメンバーを検索
       const shopCast = allCastMembers?.filter(c => {
         if (!c.home_shop_id) return false;
         const dbId = String(c.home_shop_id).trim(); 
@@ -92,6 +92,7 @@ export async function GET(request: NextRequest) {
           const html = await res.text();
           const $ = cheerio.load(html);
 
+          // 既存シフト取得
           const { data: existingShifts } = await supabase
             .from('shifts')
             .select('login_id, status')
@@ -108,26 +109,30 @@ export async function GET(request: NextRequest) {
           const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
           const nowISO = new Date().toISOString();
 
-          // ★ここが修正ポイント！
-          // .cast_name も探すように追加しました
-          $('li, .dataBox').each((_, el) => { 
-            const rawName = 
-              $(el).find('h3').text() || 
-              $(el).find('.name').text() || 
-              $(el).find('.cast_name').text() || // ←これを追加！
-              "";
-            
-            const timeText = $(el).text(); 
-            
+          // ★ここが最大の修正ポイント！
+          // 「枠」を探すのではなく、「名前要素」を直接探す戦略に変更
+          // 診断ツールで見つかったタグ（h3, .name, .cast_name）を全て対象にする
+          $('h3, .name, .cast_name, span.name, div.name, strong').each((_, nameEl) => { 
+            const $name = $(nameEl);
+            const rawName = $name.text().trim();
             const cleanName = normalize(rawName);
-            if (!cleanName) return;
-
-            const loginId = nameMap.get(cleanName);
             
-            if (loginId) {
-              foundLoginIds.add(loginId); 
-              const timeMatch = timeText.match(timeRegex);
-              if (timeMatch) {
+            // 名前がDBにあるか確認
+            const loginId = nameMap.get(cleanName);
+            if (!loginId) return; // 知らない名前は無視
+
+            // 重複チェック（同じ人がPC版とスマホ版で2回出るのを防ぐ）
+            if (foundLoginIds.has(loginId)) return;
+
+            // ★重要：時間の探し方
+            // 名前の「親」や「親の親」のテキストをまとめて取得し、そこに時間が書かれていないか探す
+            // これなら構造が li だろうが tr だろうが関係なく見つかる
+            const contextText = $name.text() + " " + $name.parent().text() + " " + $name.parent().parent().text();
+            
+            const timeMatch = contextText.match(timeRegex);
+            if (timeMatch) {
+                foundLoginIds.add(loginId); 
+
                 const currentStatus = existingStatusMap.get(loginId);
                 const hpStart = timeMatch[1].padStart(5, '0');
                 const hpEnd = timeMatch[2].padStart(5, '0');
@@ -153,7 +158,6 @@ export async function GET(request: NextRequest) {
                     is_official: true
                   });
                 }
-              }
             }
           });
 
@@ -172,11 +176,12 @@ export async function GET(request: NextRequest) {
             updateCount += requestedBatch.length;
           }
 
-          // 削除処理
+          // 削除処理（Webから消えた人を削除）
           const deleteIds: string[] = [];
           if (existingShifts) {
             existingShifts.forEach((shift) => {
               const sId = String(shift.login_id).trim().padStart(8, '0');
+              // Webで見つからず、かつDB上では「確定(official)」の人だけ消す
               if (!foundLoginIds.has(sId) && shift.status === 'official') {
                 deleteIds.push(sId);
               }
@@ -184,6 +189,7 @@ export async function GET(request: NextRequest) {
           }
           if (deleteIds.length > 0) {
              const currentShiftCount = existingShifts?.length || 0;
+             // 安全装置：全員消えるような異常事態でなければ実行
              if (currentShiftCount < 5 || (deleteIds.length / currentShiftCount) < 0.8 || officialBatch.length > 0) {
                await supabase.from('shifts').delete().in('login_id', deleteIds).eq('shift_date', dateStrDB).eq('status', 'official');
              }
