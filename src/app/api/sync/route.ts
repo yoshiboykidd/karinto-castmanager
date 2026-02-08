@@ -37,77 +37,64 @@ export async function GET(request: NextRequest) {
     const logs: string[] = [];
 
     for (const shop of targetShops) {
-      const shopCast = allCast?.filter(c => String(c.home_shop_id).trim().padStart(3, '0') === shop.id || String(parseInt(c.home_shop_id || '0')) === String(parseInt(shop.id))) || [];
-
       const normalize = (val: string) => {
         if (!val) return "";
-        let s = val
-          .normalize('NFKC')
-          .replace(/[（\(\[].*?[）\)\]]/g, '') // 括弧内削除
-          .replace(/[\n\r\t]/g, '')           // ★改行・タブを完全に消去
-          .replace(/[\d\s\u3000]+/g, '')      // 数字・空白（全角含）削除
-          .replace(/[^\p{L}\p{N}]/gu, '')     // 絵文字等削除
-          .trim();
+        let s = val.normalize('NFKC').replace(/[（\(\[].*?[）\)\]]/g, '').replace(/[\n\r\t\s\u3000]+/g, '').replace(/[^\p{L}\p{N}]/gu, '').trim();
         return toHiragana(s);
       };
 
+      const shopCast = allCast?.filter(c => String(c.home_shop_id).trim().padStart(3, '0') === shop.id || String(parseInt(c.home_shop_id || '0')) === String(parseInt(shop.id))) || [];
       const nameMap = new Map(shopCast.map(c => [normalize(c.hp_display_name), String(c.login_id).trim().padStart(8, '0')]));
 
-      const dayPromises = Array.from({ length: 7 }).map(async (_, i) => {
+      for (let i = 0; i < 7; i++) {
         const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
         const dateStrDB = format(targetDate, 'yyyy-MM-dd');
         const url = `${shop.baseUrl}?date_get=${format(targetDate, 'yyyy/MM/dd')}&t=${Date.now()}`;
 
         try {
           const res = await fetch(url, { cache: 'no-store', headers: { 'User-Agent': 'Mozilla/5.0' } });
-          if (!res.ok) return `❌ ${shop.name} HTTP ${res.status}`;
-          const $ = cheerio.load(await res.text());
-
-          const { data: existing } = await supabase.from('shifts').select('login_id, status').eq('shift_date', dateStrDB);
-          const existingStatusMap = new Map(existing?.map(s => [String(s.login_id).trim().padStart(8, '0'), s.status]));
+          if (!res.ok) { logs.push(`❌ ${shop.name} HTTP ${res.status}`); continue; }
           
-          const officialBatch: any[] = [];
-          const requestedBatch: any[] = [];
-          const foundLoginIds = new Set<string>();
-          const unmatchedNames = new Set<string>();
+          const $ = cheerio.load(await res.text());
+          const upsertBatch: any[] = [];
           const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
 
           $('h3, .name, .cast_name, span.name, div.name, strong').each((_, nameEl) => {
             const rawName = $(nameEl).text();
             const cleanName = normalize(rawName);
-            if (!cleanName) return;
-
             const loginId = nameMap.get(cleanName);
-            if (!loginId) {
-              if (!rawName.includes('時間') && rawName.length < 15) unmatchedNames.add(cleanName);
-              return;
-            }
-            if (foundLoginIds.has(loginId)) return;
+            if (!loginId) return;
 
             const context = $(nameEl).text() + " " + $(nameEl).parent().text() + " " + $(nameEl).parent().parent().text();
             const timeMatch = context.match(timeRegex);
 
             if (timeMatch) {
-              foundLoginIds.add(loginId);
-              const data = {
-                login_id: loginId, shift_date: dateStrDB, hp_display_name: cleanName,
-                is_official_pre_exist: true, hp_start_time: timeMatch[1].padStart(5, '0'), hp_end_time: timeMatch[2].padStart(5, '0'), updated_at: new Date().toISOString()
-              };
-              if (existingStatusMap.get(loginId) === 'requested') requestedBatch.push(data);
-              else officialBatch.push({ ...data, start_time: data.hp_start_time, end_time: data.hp_end_time, status: 'official', is_official: true });
+              const start = timeMatch[1].padStart(5, '0');
+              const end = timeMatch[2].padStart(5, '0');
+
+              // ガードを外して強制的に最新情報をバッチに入れる
+              upsertBatch.push({
+                login_id: loginId,
+                shift_date: dateStrDB,
+                hp_display_name: cleanName,
+                is_official_pre_exist: true,
+                hp_start_time: start,
+                hp_end_time: end,
+                start_time: start,
+                end_time: end,
+                status: 'official', // 強制的に確定状態で保存
+                is_official: true,
+                updated_at: new Date().toISOString()
+              });
             }
           });
 
-          if (officialBatch.length > 0) await supabase.from('shifts').upsert(officialBatch, { onConflict: 'login_id, shift_date' });
-          if (requestedBatch.length > 0) await supabase.from('shifts').upsert(requestedBatch, { onConflict: 'login_id, shift_date' });
-
-          let logMsg = `✅ ${shop.name} ${format(targetDate, 'MM/dd')} (更新${officialBatch.length + requestedBatch.length})`;
-          if (unmatchedNames.size > 0) logMsg += ` ⚠️ 不一致: [${Array.from(unmatchedNames).join(', ')}]`;
-          return logMsg;
-        } catch (e: any) { return `❌ Err ${shop.name}: ${e.message}`; }
-      });
-
-      logs.push(...(await Promise.all(dayPromises)));
+          if (upsertBatch.length > 0) {
+            await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
+          }
+          logs.push(`✅ ${shop.name} ${dateStrDB.slice(5)} (${upsertBatch.length}件)`);
+        } catch (e: any) { logs.push(`❌ ${shop.name} ${dateStrDB.slice(5)} Err`); }
+      }
     }
     return NextResponse.json({ success: true, logs });
   } catch (e: any) { return NextResponse.json({ success: false, message: e.message }, { status: 500 }); }
