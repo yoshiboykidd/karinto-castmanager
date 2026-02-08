@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay, isValid, isAfter, startOfDay, isToday } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay, isValid, isAfter, startOfDay, parseISO } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface DashboardCalendarProps {
@@ -15,6 +15,14 @@ interface DashboardCalendarProps {
 
 export default function DashboardCalendar({ shifts, selectedDates, onSelect, month, onMonthChange, isRequestMode }: DashboardCalendarProps) {
   const [holidays, setHolidays] = useState<string[]>([]);
+
+  // ★デバッグ: シフトデータが届いているか確認
+  useEffect(() => {
+    console.log("📅 Calendar received shifts:", shifts?.length, "items");
+    if (shifts?.length > 0) {
+      console.log("🔍 Sample shift date format:", shifts[0].shift_date);
+    }
+  }, [shifts]);
 
   useEffect(() => {
     if (!month || !isValid(month)) return;
@@ -53,7 +61,13 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const dateStr = format(day, 'yyyy-MM-dd');
           const dNum = day.getDate();
           
-          const s = Array.isArray(shifts) ? shifts.find((x: any) => x.shift_date === dateStr) : null;
+          // ★修正ポイント: 日付比較を安全にする
+          const s = Array.isArray(shifts) ? shifts.find((x: any) => {
+             if (!x.shift_date) return false;
+             // 文字列の前方一致 (yyyy-MM-dd) で比較するのが一番安全
+             return x.shift_date.startsWith(dateStr);
+          }) : null;
+
           const isOfficial = s?.status === 'official';
           const isRequested = s?.status === 'requested';
           const isModified = isRequested && s?.is_official_pre_exist;
@@ -61,6 +75,7 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const refStart = isModified ? s?.hp_start_time : s?.start_time;
           const hasOfficialBase = (isOfficial || isModified) && refStart && refStart !== 'OFF';
 
+          // 以下、表示ロジックはそのまま
           const isFuture = isAfter(startOfDay(day), today);
           const canSelect = !isRequestMode || isFuture;
 
@@ -76,10 +91,13 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const dayOfWeek = getDay(day);
           const isHoliday = holidays.includes(dateStr);
           let textColor = 'text-gray-900';
+          
+          // ★修正: ピンク丸判定の優先度を整理
           if (hasOfficialBase) textColor = 'text-white';
           else if (isHoliday || dayOfWeek === 0) textColor = 'text-red-500';
           else if (dayOfWeek === 6) textColor = 'text-blue-500';
-          else if (isSelected) textColor = 'text-pink-500';
+          
+          if (isSelected) textColor = 'text-pink-500'; // 選択中はピンク文字
 
           return (
             <div 
@@ -93,6 +111,7 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
               ${!isSelected && isSoine ? 'bg-yellow-200 border border-yellow-300' : ''}
               ${isRequestMode && !isFuture ? 'opacity-40 grayscale-[0.5] cursor-not-allowed' : ''}`}
             >
+              {/* 数字 (z-20) */}
               <span className={`z-20 text-[16px] font-black ${textColor}`}>{dNum}</span>
 
               {/* 確定ピンク丸 (z-10) */}
@@ -103,7 +122,7 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
               {isModified && <div className="absolute inset-0.5 rounded-full border-[5px] border-green-500 z-[15] animate-pulse" />}
               {isRequested && !isModified && <div className="absolute inset-1 rounded-full border-2 border-purple-400 border-dashed animate-pulse z-10" />}
 
-              {/* ★修正：ピンク丸の有無に関わらずドットを表示 (z-30なので一番上に来る) */}
+              {/* ドット (z-30) */}
               {isKarin && (
                 <div className="absolute top-1 right-1 h-2 w-2 rounded-full bg-orange-500 shadow-sm z-30 ring-2 ring-white" />
               )}
