@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { format, parseISO, startOfToday, isAfter, isValid } from 'date-fns';
+import { format, parseISO, startOfToday, isAfter } from 'date-fns';
 
 export function useShiftData() {
   const [supabase] = useState(() => createBrowserClient(
@@ -20,86 +20,57 @@ export function useShiftData() {
     setMounted(true);
   }, []);
 
-  const fetchInitialData = useCallback(async (router: any) => {
-    setLoading(true);
+  const fetchInitialData = async (router: any) => {
     try {
-      // 1. セッション取得
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return router.push('/login');
       
-      // 2. IDの抽出 (★修正: Number()を使わず、文字列のまま扱う！)
-      // 例: "00600037@..." -> "00600037" (0を残す)
       const loginId = session.user.email?.replace('@karinto-internal.com', '');
       
-      console.log(`🔍 検索開始: ID="${loginId}" (文字列として検索)`);
-
-      // 3. プロフィール取得
-      const { data: profile, error: profileError } = await supabase
-        .from('cast_members')
-        .select('*')
-        .eq('login_id', loginId) // 文字列IDで検索
-        .single();
+      const { data: profile } = await supabase.from('cast_members').select('*').eq('login_id', loginId).single();
       
-      if (profileError) {
-        console.error("❌ プロフィール取得失敗:", profileError);
-      }
-
       if (profile) {
-        console.log("✅ プロフィール発見:", profile.hp_display_name);
         const myShopId = profile.home_shop_id || 'main';
         
-        // 4. 一括取得
+        // ★修正: ここを「動いていた時の状態」である id=1 固定に戻します
+        // これならデータが存在するのでエラーにならず、他のデータ（シフトや数字）も道連れに消えません
         const [shopRes, shiftsRes, newsRes, syncRes] = await Promise.all([
           supabase.from('shop_master').select('*').eq('shop_id', myShopId).single(),
-          
-          // ★シフト取得: ここも文字列IDで検索
-          supabase.from('shifts')
-            .select('*')
-            .eq('login_id', loginId)
-            .order('shift_date', { ascending: true }),
-
+          supabase.from('shifts').select('*').eq('login_id', loginId).order('shift_date', { ascending: true }),
           supabase.from('news').select('*').or(`shop_id.eq.${myShopId},shop_id.eq.all`).order('created_at', { ascending: false }).limit(3),
           
-          // 最終更新時間 (id=1)
+          // id=1 のデータ（全体の最終更新時間）を取得
           supabase.from('sync_logs').select('last_sync_at').eq('id', 1).single()
         ]);
         
-        console.log(`📊 シフト取得成功: ${shiftsRes.data?.length}件`);
-
         setData({
           shifts: shiftsRes.data || [], 
           profile, 
           shop: shopRes.data || null, 
           news: newsRes.data || [],
-          // 時間はそのまま渡してHeader側で整形させる
-          syncAt: (syncRes.data && syncRes.data.last_sync_at) ? syncRes.data.last_sync_at : ''
+          // 時間のフォーマット処理
+          syncAt: (syncRes.data && syncRes.data.last_sync_at) 
+            ? format(parseISO(syncRes.data.last_sync_at), 'HH:mm') 
+            : '--:--'
         });
-      } else {
-        console.warn("⚠️ プロフィールが見つからないため、シフト取得をスキップしました");
       }
-
     } catch (err) {
       console.error("Fetch error:", err);
     } finally {
       setLoading(false);
     }
-  }, [supabase]); 
+  };
 
-  // --- 集計ロジック ---
   const getMonthlyTotals = useCallback((viewDate: Date) => {
-    if (!mounted || !viewDate || !data.shifts) return { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 };
+    if (!mounted || !viewDate) return { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 };
     
     const today = startOfToday();
     
-    // フィルタリング
-    const filtered = (data.shifts || [])
+    return (data.shifts || [])
       .filter((s: any) => {
         if (!s.shift_date) return false;
         const d = parseISO(s.shift_date);
-        if (!isValid(d)) return false;
-
         const isPastOrToday = !isAfter(d, today);
-        // ★official または 申請中でも「既存確定(is_official_pre_exist)」なら計算対象
         const isOfficialInfo = s.status === 'official' || s.is_official_pre_exist === true;
         
         return (
@@ -108,20 +79,19 @@ export function useShiftData() {
           isPastOrToday && 
           isOfficialInfo
         );
-      });
-
-      // 集計
-      return filtered.reduce((acc: any, s: any) => {
+      })
+      .reduce((acc, s: any) => {
         let dur = 0;
         if (s.start_time && s.end_time && s.start_time.includes(':') && s.start_time !== 'OFF') {
           try {
             const [sH, sM] = s.start_time.split(':').map(Number);
             const [eH, eM] = s.end_time.split(':').map(Number);
             if (!isNaN(sH) && !isNaN(eH)) {
-              const endH = eH < sH ? eH + 24 : eH;
-              dur = endH + (eM || 0) / 60 - (sH + (sM || 0) / 60);
+              dur = (eH < sH ? eH + 24 : eH) + (eM || 0) / 60 - (sH + (sM || 0) / 60);
             }
-          } catch (e) { dur = 0; }
+          } catch (e) {
+            dur = 0;
+          }
         }
 
         return { 
