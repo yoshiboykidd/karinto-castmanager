@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { createCast } from '@/app/admin/actions';
+import { createCast } from '@/app/(admin)/admin/actions';
 
 export default function CastRegister({ targetShopId }: { targetShopId: string }) {
   const [supabase] = useState(() => createBrowserClient(
