@@ -31,7 +31,6 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const group = searchParams.get('group');
 
-  // グループ分け処理
   let targetShops = [];
   if (group === '1') targetShops = ALL_SHOPS.slice(0, 3);
   else if (group === '2') targetShops = ALL_SHOPS.slice(3, 6);
@@ -40,7 +39,6 @@ export async function GET(request: NextRequest) {
   else targetShops = ALL_SHOPS;
 
   try {
-    // 1. キャスト名簿を一括取得
     const { data: allCastMembers, error: castError } = await supabase
       .from('cast_members')
       .select('login_id, hp_display_name, home_shop_id');
@@ -50,33 +48,30 @@ export async function GET(request: NextRequest) {
     const logs: string[] = [];
 
     for (const shop of targetShops) {
-      // ★ここが診断ツールで成功した「柔軟な検索ロジック」です
-      // DBのIDが '006' でも '6' でも ' 6 ' でもヒットさせます
+      // 柔軟なID検索（6でも006でもOK）
       const shopCast = allCastMembers?.filter(c => {
         if (!c.home_shop_id) return false;
         const dbId = String(c.home_shop_id).trim(); 
-        const targetId = shop.id; // '006'
-        const targetIdShort = String(parseInt(shop.id)); // '6'
+        const targetId = shop.id; 
+        const targetIdShort = String(parseInt(shop.id)); 
         return dbId === targetId || dbId === targetIdShort;
       }) || [];
 
-      // 名前整形関数（診断ツールと同じ強力なもの）
+      // 名前整形関数
       const normalize = (val: string) => {
         if (!val) return "";
         return val
-          .replace(/[（\(\[].*?[）\)\]]/g, '') // (22)などを消す
-          .replace(/\d+/g, '') // 数字を消す
-          .replace(/\s+/g, '') // 空白を消す
+          .replace(/[（\(\[].*?[）\)\]]/g, '') 
+          .replace(/\d+/g, '') 
+          .replace(/\s+/g, '') 
           .trim();
       };
 
-      // 名前辞書を作成
       const nameMap = new Map(shopCast.map(c => [
         normalize(c.hp_display_name), 
         String(c.login_id).trim().padStart(8, '0') 
       ]));
 
-      // 1週間分ループ
       const dayPromises = Array.from({ length: 7 }).map(async (_, i) => {
         const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
         const dateStrDB = format(targetDate, 'yyyy-MM-dd');
@@ -97,7 +92,6 @@ export async function GET(request: NextRequest) {
           const html = await res.text();
           const $ = cheerio.load(html);
 
-          // 既存シフト取得
           const { data: existingShifts } = await supabase
             .from('shifts')
             .select('login_id, status')
@@ -114,15 +108,20 @@ export async function GET(request: NextRequest) {
           const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
           const nowISO = new Date().toISOString();
 
-          // スクレイピング実行
+          // ★ここが修正ポイント！
+          // .cast_name も探すように追加しました
           $('li, .dataBox').each((_, el) => { 
-            const rawName = $(el).find('h3').text() || $(el).find('.name').text() || "";
+            const rawName = 
+              $(el).find('h3').text() || 
+              $(el).find('.name').text() || 
+              $(el).find('.cast_name').text() || // ←これを追加！
+              "";
+            
             const timeText = $(el).text(); 
             
             const cleanName = normalize(rawName);
             if (!cleanName) return;
 
-            // ★ここで診断ツールと同じ判定を行う
             const loginId = nameMap.get(cleanName);
             
             if (loginId) {
@@ -158,7 +157,7 @@ export async function GET(request: NextRequest) {
             }
           });
 
-          // DB保存処理
+          // DB保存
           let updateCount = 0;
           if (officialBatch.length > 0) {
             const { error } = await supabase
@@ -204,7 +203,7 @@ export async function GET(request: NextRequest) {
       logs.push(...dayResults.filter((r): r is string => r !== null));
     }
     
-    // ログ記録
+    // ログ保存
     const nowISO = new Date().toISOString();
     await supabase.from('sync_logs').upsert({ id: 1, last_sync_at: nowISO }, { onConflict: 'id' });
 
