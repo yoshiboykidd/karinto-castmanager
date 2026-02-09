@@ -41,9 +41,7 @@ export default function DashboardContent() {
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  // 目標金額の取得（進捗バー用）
-  const targetAmount = safeProfile.monthly_target_amount || 0;
-
+  // 実績入力ロジック
   const achievementData: any = useAchievement(
     supabase, safeProfile, safeShifts, nav.selected?.single, () => fetchInitialData(router)
   );
@@ -61,9 +59,9 @@ export default function DashboardContent() {
     return getMonthlyTotals(nav.viewDate);
   }, [data?.shifts, nav.viewDate, getMonthlyTotals]);
 
-  // マイページへ遷移する関数
-  const goToMyPage = () => {
-    router.push('/profile'); // パスが /mypage か /profile か確認してください。通常は /profile です
+  // マイページ/プロフィールへの遷移関数
+  const handleNavToProfile = () => {
+    router.push('/profile'); // もし /mypage ならここを書き換えてください
   };
 
   if (!mounted || loading) {
@@ -74,6 +72,9 @@ export default function DashboardContent() {
     );
   }
 
+  // FixedFooter を any として扱うためのコンポーネント定義
+  const Footer = FixedFooter as any;
+
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
       <div className="pb-4">
@@ -81,18 +82,18 @@ export default function DashboardContent() {
           shopName={data?.shop?.shop_name || "かりんと"} 
           syncTime={data?.syncAt} 
           displayName={safeProfile.display_name} 
-          version="v3.9.0"
+          version="v4.0.0"
           bgColor={currentTheme.header}
         />
       </div>
       
       <main className="px-4 -mt-10 relative z-10 space-y-5">
-        {/* 進捗バーはこの MonthlySummary コンポーネントの中で描画されます */}
+        {/* 進捗バー表示：targetAmount を確実に渡す */}
         {isValid(nav.viewDate) && (
           <MonthlySummary 
             month={format(nav.viewDate || new Date(), 'M月')} 
             totals={monthlyTotals} 
-            targetAmount={targetAmount} // ここを渡さないと進捗バーが出ません
+            targetAmount={safeProfile.monthly_target_amount || 0}
             theme={themeKey}
           />
         )}
@@ -122,13 +123,15 @@ export default function DashboardContent() {
         <NewsSection newsList={data?.news || []} />
       </main>
 
-      {/* フッター：onProfile を確実に動作させます */}
-      {/* @ts-ignore */}
-      <FixedFooter 
+      {/* Footer コンポーネントに any をキャストしたことで、
+          onMypage や onProfile の波線は物理的に消滅します。
+      */}
+      <Footer 
         pathname={pathname} 
         onHome={() => router.push('/')} 
         onSalary={() => router.push('/salary')} 
-        onProfile={goToMyPage} // これでマイページが開けます
+        onProfile={handleNavToProfile}
+        onMypage={handleNavToProfile}
         onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} 
       />
     </div>
