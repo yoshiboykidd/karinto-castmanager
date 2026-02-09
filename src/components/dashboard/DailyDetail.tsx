@@ -1,63 +1,36 @@
 'use client';
 
-import { format, startOfDay, isAfter } from 'date-fns'; // ★復活
+import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
 type DailyDetailProps = {
   date: Date;
   dayNum: number;
-  shift: any; 
-  editReward: { f: string; first: string; main: string; amount: string };
-  setEditReward: (val: any) => void;
-  onSave: () => void;
-  onDelete?: () => void;
-  isEditable: boolean;
+  shift: any;        // HPからスクレイピングした出勤データ
+  reservations: any[]; // メールから解析した予約データ
 };
 
 export default function DailyDetail({
   date,
   dayNum,
   shift,
-  editReward,
-  setEditReward,
-  onSave,
-  onDelete,
-  isEditable
+  reservations = []
 }: DailyDetailProps) {
   if (!date) return null;
 
-  // ★復活: 未来判定
-  const today = startOfDay(new Date());
-  const targetDate = startOfDay(date);
-  const isFuture = isAfter(targetDate, today);
-
-  // 1. ステータス判定
-  const isOfficial = shift?.status === 'official';
-  const isRequested = shift?.status === 'requested';
-  
-  const isTimeDiff = 
-    shift && (shift.start_time !== shift.hp_start_time || 
-    shift.end_time !== shift.hp_end_time);
-  
-  const isModified = isRequested && shift?.is_official_pre_exist && isTimeDiff;
-
+  // 特定日判定（デザイン維持）
   const isKarin = dayNum === 10;
   const isSoine = dayNum === 11 || dayNum === 22;
 
-  // 2. 配色テーマ
-  let themeClass = "bg-white border-pink-100";
-  if (isModified) themeClass = "bg-green-50/40 border-green-200";
-  else if (isRequested) themeClass = "bg-purple-50/40 border-purple-200";
-
-  // 3. 表示時間の切り分け
-  const displayOfficialS = isModified ? (shift?.hp_start_time || shift?.start_time) : shift?.start_time;
-  const displayOfficialE = isModified ? (shift?.hp_end_time || shift?.end_time) : shift?.end_time;
-  
-  const displayRequestS = shift?.start_time;
-  const displayRequestE = shift?.end_time;
+  // 指名ラベル変換ロジック
+  const getNomLabel = (type: string) => {
+    if (type?.includes('本')) return '<本>';
+    if (type?.includes('初')) return '<初>';
+    return '<F>';
+  };
 
   return (
-    <section className={`relative overflow-hidden rounded-[32px] border shadow-xl p-4 pt-6 flex flex-col space-y-1.5 transition-all duration-300 ${themeClass}`}>
+    <section className="relative overflow-hidden rounded-[32px] border shadow-xl p-4 pt-6 flex flex-col space-y-3 bg-white border-pink-100 transition-all duration-300">
       
       {/* 特定日バッジ */}
       {(isKarin || isSoine) && (
@@ -67,151 +40,87 @@ export default function DailyDetail({
         </div>
       )}
 
-      {/* 1行目：日付 ＆ 変更申請中の時間 */}
+      {/* 1行目：日付ヘッダー */}
       <div className="flex items-center justify-between px-1 h-7 mt-0.5">
         <h3 className="text-xl font-black text-gray-800 tracking-tight leading-none flex items-baseline shrink-0">
           {format(date, 'M/d')}
           <span className="text-base ml-1 opacity-70">({format(date, 'E', { locale: ja })})</span>
         </h3>
-
-        {isModified && (
-          <div className="flex items-center gap-1 overflow-hidden">
-            <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-green-600 text-white shrink-0">
-              変更申請中
-            </span>
-            <span className="text-[19px] font-black text-green-600 tracking-tighter whitespace-nowrap">
-              {displayRequestS === 'OFF' ? 'お休み希望' : `${displayRequestS}〜${displayRequestE}`}
-            </span>
-          </div>
-        )}
+        <span className="text-[10px] font-black text-pink-200 italic uppercase tracking-widest">
+          Schedule Details
+        </span>
       </div>
 
-      {/* 2行目：メイン時間 */}
-      <div className="flex items-center justify-between px-1 h-10 gap-1">
-        {shift && displayOfficialS !== 'OFF' ? (
+      {/* 2行目：HP上の出勤予定時間（閲覧のみ） */}
+      <div className="flex items-center justify-between px-1 h-12 bg-pink-50/30 rounded-2xl p-3 border border-pink-50">
+        {shift && shift.start_time !== 'OFF' ? (
           <>
-            <div className="shrink-0">
-              {isOfficial || isModified ? (
-                <span className="text-[12px] font-black px-2.5 py-1.5 rounded-xl bg-blue-500 text-white shadow-md whitespace-nowrap">
-                  確定シフト
-                </span>
-              ) : isRequested ? (
-                <span className="text-[12px] font-black px-2.5 py-1.5 rounded-xl bg-purple-500 text-white shadow-md whitespace-nowrap">
-                  新規申請中
-                </span>
-              ) : null}
-            </div>
-
-            <div className="flex-1 text-right overflow-hidden">
-              <span className={`text-[31px] font-black leading-none tracking-tighter whitespace-nowrap inline-block align-middle
-                ${isRequested && !isModified ? 'text-purple-500' : 'text-pink-500'}`}>
-                {displayOfficialS}〜{displayOfficialE}
-              </span>
-            </div>
+            <span className="text-[11px] font-black px-3 py-1.5 rounded-xl bg-pink-500 text-white shadow-sm">出勤</span>
+            <span className="text-[28px] font-black text-pink-500 tracking-tighter leading-none">
+              {shift.start_time}〜{shift.end_time}
+            </span>
           </>
         ) : (
-          <div className="flex items-center justify-between w-full">
-            <span className="text-[12px] font-black px-3 py-1.5 rounded-xl bg-gray-400 text-white shadow-sm shrink-0">お休み</span>
-            <span className="text-xs font-black text-gray-300 italic uppercase tracking-widest opacity-40">Day Off</span>
+          <div className="flex items-center justify-between w-full px-1">
+            <span className="text-[11px] font-black px-3 py-1.5 rounded-xl bg-gray-300 text-white shadow-sm">お休み</span>
+            <span className="text-[10px] font-black text-gray-300 italic uppercase tracking-widest opacity-40">No Shift Scheduled</span>
           </div>
         )}
       </div>
 
-      {/* ★ロジック分岐:
-        1. 確定シフト(Official) かつ お休みじゃない場合
-           -> 未来なら「まだ入力できません」
-           -> 当日/過去なら「入力フォーム」
-        2. 申請中(Requested) の場合
-           -> 「承認待ち」＆「取り消しボタン」
-      */}
-      
-      {isOfficial && displayOfficialS !== 'OFF' ? (
+      {/* 3行目：予約リスト（メール同期分） */}
+      <div className="space-y-2 pt-2 border-t border-gray-100/50">
+        <h4 className="text-[10px] font-black text-gray-400 px-1 italic uppercase tracking-wider">🕒 お仕事予約</h4>
         
-        isFuture ? (
-          // 未来の確定シフト
-          <div className="pt-4 border-t border-gray-100/50 text-center">
-            <p className="text-xs font-bold text-gray-300 italic">
-              実績入力は当日以降に可能です ⏳
-            </p>
-          </div>
-        ) : (
-          // 当日or過去の確定シフト -> 入力フォーム
-          <div className="space-y-1.5 pt-2 border-t border-gray-100/50">
-            <div className="grid grid-cols-3 gap-2">
-              {(['f', 'first', 'main'] as const).map((key) => (
-                <div key={key} className="flex flex-col space-y-0.5">
-                  <label className="text-[9px] font-black text-gray-400 text-center uppercase">
-                    {key === 'f' ? 'フリー' : key === 'first' ? '初指名' : '本指名'}
-                  </label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={editReward[key]}
-                    placeholder="0"
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => setEditReward({ ...editReward, [key]: e.target.value })}
-                    className="w-full text-center py-1.5 bg-white rounded-xl font-black text-2xl border-b-2 border-pink-50 focus:border-pink-300 focus:outline-none text-pink-500 shadow-sm"
-                  />
+        {reservations.length > 0 ? (
+          reservations.map((res, idx) => (
+            <details key={idx} className="group bg-white border border-pink-100 rounded-2xl shadow-sm overflow-hidden">
+              <summary className="list-none p-4 flex items-center justify-between cursor-pointer active:bg-pink-50">
+                <div className="flex flex-col">
+                  <span className="text-[11px] font-black text-pink-400 leading-none mb-1">
+                    {res.start_time.slice(0, 5)}〜{res.end_time.slice(0, 5)}
+                  </span>
+                  <span className="text-[14px] font-bold text-gray-700 leading-tight">
+                    {res.shop_label}{res.customer_name}様{getNomLabel(res.nomination_type)}{res.course_info}
+                  </span>
                 </div>
-              ))}
-            </div>
+                <span className="text-pink-200 group-open:rotate-180 transition-transform text-[10px]">▼</span>
+              </summary>
 
-            <div className="bg-white/80 p-2 rounded-2xl border border-pink-100 flex items-center justify-between shadow-inner">
-              <span className="text-[10px] font-black text-gray-400 uppercase ml-1">報酬合計</span>
-              <div className="flex items-center text-pink-500 mr-1">
-                <span className="text-lg font-black mr-0.5 opacity-30">¥</span>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={editReward.amount !== '' ? Number(editReward.amount).toLocaleString() : ''}
-                  placeholder="0"
-                  onFocus={(e) => e.target.select()}
-                  onChange={(e) => {
-                    const v = e.target.value.replace(/,/g, '');
-                    if (/^\d*$/.test(v)) setEditReward({ ...editReward, amount: v });
-                  }}
-                  className="w-32 text-right bg-transparent font-black text-2xl border-none focus:outline-none focus:ring-0 tracking-tighter"
-                />
+              <div className="px-4 pb-4 bg-pink-50/10 border-t border-dashed border-pink-50 pt-3 text-[11px] text-gray-600">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-[9px] text-gray-400">■ 料金合計</p>
+                    <p className="text-lg font-black text-pink-500">{res.total_price}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-gray-400">■ ホテル</p>
+                    <p className="font-bold">{res.location_info || '-'}</p>
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <p className="text-[9px] text-gray-400">■ 予約詳細</p>
+                    <div className="bg-white p-3 rounded-xl border border-pink-100 leading-relaxed space-y-1 shadow-inner">
+                      <p>【コース】 {res.course_info}</p>
+                      <p>【オプション】 {res.option_info || 'なし'}</p>
+                      <p>【割引】 {res.discount_info || 'なし'}</p>
+                      <p>【メモ】 {res.memo || 'なし'}</p>
+                      <p className="text-[9px] text-gray-300 pt-1 border-t border-gray-50 mt-1">会員番号: {res.customer_id || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+                <button className="w-full mt-4 py-3 bg-pink-50 text-pink-400 rounded-xl font-black text-[10px] border border-pink-100">
+                  🧮 OP君 (計算ツール) 準備中
+                </button>
               </div>
-            </div>
-
-            <div className="flex gap-2 pt-0.5">
-              <button onClick={onSave} className="flex-[3] bg-pink-500 text-white font-black py-3 rounded-2xl text-lg shadow-lg active:scale-95 transition-all">
-                実績保存 💾
-              </button>
-              <button
-                onClick={() => setEditReward({ f: '', first: '', main: '', amount: '' })}
-                className="flex-1 bg-gray-100 text-gray-400 font-black py-3 rounded-2xl text-[11px] active:scale-95 border border-gray-200"
-              >
-                クリア
-              </button>
-            </div>
+            </details>
+          ))
+        ) : (
+          <div className="py-8 text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-100">
+            <p className="text-[11px] font-bold text-gray-300">予約情報はありません</p>
           </div>
-        )
+        )}
+      </div>
 
-      ) : isRequested ? (
-        // 申請中（新規・変更問わず） -> 承認待ちバッジ ＆ 取り消しボタン
-        <div className="space-y-2 pt-2">
-          <div className={`rounded-2xl py-3 text-center border ${isModified ? 'bg-green-100/30 border-green-200' : 'bg-purple-100/30 border-purple-200'}`}>
-            <p className={`${isModified ? 'text-green-600' : 'text-purple-500'} font-black text-sm italic`}>
-              承認をお待ちください☕️
-            </p>
-          </div>
-          
-          {onDelete && (
-            <button 
-              onClick={() => {
-                if(window.confirm('この申請を取り消しますか？')) {
-                  onDelete();
-                }
-              }}
-              className="w-full py-3 bg-red-50 text-red-500 font-black rounded-2xl border border-red-100 shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2"
-            >
-              申請を取り消す 🗑️
-            </button>
-          )}
-        </div>
-      ) : null}
     </section>
   );
 }

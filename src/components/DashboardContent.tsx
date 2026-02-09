@@ -1,223 +1,128 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation'; 
-import { format, isValid } from 'date-fns';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+// ★波線対策：日付操作の道具をインポート
+import { isSameDay, parseISO } from 'date-fns';
 import { useShiftData } from '@/hooks/useShiftData';
-import { useAchievement } from '@/hooks/useAchievement';
-import { useRequestManager } from '@/hooks/useRequestManager';
-import { useNavigation } from '@/hooks/useNavigation';
-import CastHeader from '@/components/dashboard/CastHeader';
-import MonthlySummary from '@/components/dashboard/MonthlySummary';
-import DashboardCalendar from '@/components/DashboardCalendar';
-import DailyDetail from '@/components/dashboard/DailyDetail';
-import RequestList from '@/components/dashboard/RequestList';
-import NewsSection from '@/components/dashboard/NewsSection';
-import FixedFooter from '@/components/dashboard/FixedFooter';
 
-// テーマ設定
-const THEME_CONFIG: any = {
-  pink:   { header: 'bg-pink-300',   calendar: 'bg-pink-50 border-pink-100',   text: 'text-pink-400' },
-  blue:   { header: 'bg-cyan-300',   calendar: 'bg-cyan-50 border-cyan-100',   text: 'text-cyan-400' },
-  yellow: { header: 'bg-yellow-300', calendar: 'bg-yellow-50 border-yellow-100', text: 'text-yellow-500' },
-  white:  { header: 'bg-gray-400',   calendar: 'bg-gray-50 border-gray-200',   text: 'text-gray-400' },
-  black:  { header: 'bg-gray-800',   calendar: 'bg-gray-100 border-gray-300',  text: 'text-gray-800' },
-  red:    { header: 'bg-red-500',    calendar: 'bg-red-50 border-red-100',     text: 'text-red-500' },
-};
+// コンポーネントのインポート（既存のフォルダ構成に準拠）
+import CastHeader from './dashboard/CastHeader';
+import CalendarSection from './dashboard/CalendarSection';
+import DailyDetail from './dashboard/DailyDetail';
+import FixedFooter from './dashboard/FixedFooter';
 
 export default function DashboardContent() {
   const router = useRouter();
-  const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
-
-  const { data, loading, fetchInitialData, getMonthlyTotals, supabase } = useShiftData();
-  const nav = useNavigation();
-
-  const safeProfile = data?.profile || {};
-  const targetAmount = safeProfile.monthly_target_amount || 0;
-  const themeKey = safeProfile.theme_color || 'pink';
-  const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
-
-  const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
-
-  const achievementData: any = useAchievement(
-    supabase, safeProfile, safeShifts, nav.selected.single, () => fetchInitialData(router)
-  );
   
-  const { 
-    editReward = { f: '', first: '', main: '', amount: '' }, 
-    setEditReward = () => {}, 
-    handleSaveAchievement = () => {}, 
-    isEditable = false, 
-    selectedShift = null 
-  } = achievementData || {};
+  // 既存のカスタムフックからSupabaseとデータを取得
+  const { data, loading, supabase, fetchInitialData } = useShiftData();
+  
+  // 状態管理
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
-  const requestManagerData: any = useRequestManager(
-    supabase, safeProfile, safeShifts, nav.selected.multi, 
-    () => fetchInitialData(router), 
-    () => nav.setSelected({ single: undefined, multi: [] })
-  );
+  // 初回データ読み込み
+  useEffect(() => {
+    fetchInitialData(router);
+  }, [fetchInitialData, router]);
 
-  const {
-    requestDetails = {}, setRequestDetails = () => {}, handleBulkSubmit = () => {}
-  } = requestManagerData || {};
+  // ★「ゆうか」さんの予約をリアルタイムで監視するロジック
+  useEffect(() => {
+    if (!data?.profile?.login_id || !supabase) return;
 
-  // ★改善版: シフト削除機能
-  const handleDeleteShift = async () => {
-    if (!safeProfile?.login_id || !nav.selected.single) return;
-
-    try {
-      const dateStr = format(nav.selected.single, 'yyyy-MM-dd');
+    // 1. 既存の予約をDBから取得
+    const fetchReservations = async () => {
+      const { data: resData, error } = await supabase
+        .from('reservations')
+        .select('*')
+        .eq('cast_login_id', data.profile.login_id);
       
-      // まず、対象のシフトデータを探す
-      const targetShift = safeShifts.find((s: any) => s.shift_date === dateStr);
-      
-      if (!targetShift) return;
-
-      // ★ロジック分岐: 元々HPにデータがあったか？ (hp_start_time が存在し、かつ OFF ではない)
-      const hasOriginalShift = targetShift.hp_start_time && targetShift.hp_start_time !== 'OFF';
-
-      if (hasOriginalShift) {
-        // 【パターンA】変更申請の取り消し -> 元に戻す (UPDATE)
-        const { error } = await supabase
-          .from('shifts')
-          .update({
-            status: 'official',               // 確定に戻す
-            start_time: targetShift.hp_start_time, // 時間も元に戻す
-            end_time: targetShift.hp_end_time,
-            is_official_pre_exist: true       // 元々あったフラグは念のため維持
-          })
-          .eq('login_id', safeProfile.login_id)
-          .eq('shift_date', dateStr);
-
-        if (error) throw error;
-        alert('変更を取り消し、元のシフトに戻しました 🔄');
-
-      } else {
-        // 【パターンB】新規申請の取り消し -> 削除する (DELETE)
-        const { error } = await supabase
-          .from('shifts')
-          .delete()
-          .eq('login_id', safeProfile.login_id)
-          .eq('shift_date', dateStr);
-
-        if (error) throw error;
-        alert('申請を取り消しました 🗑️');
+      if (!error && resData) {
+        setReservations(resData);
       }
-      
-      // 画面更新
-      nav.setSelected({ single: undefined, multi: [] });
-      fetchInitialData(router); 
+    };
 
-    } catch (e) {
-      console.error(e);
-      alert('処理に失敗しました...');
-    }
-  };
+    fetchReservations();
 
-  useEffect(() => { 
-    setMounted(true);
-    fetchInitialData(router); 
-  }, []);
+    // 2. Realtime監視（Workerが書き込んだ瞬間に画面を更新）
+    const channel = supabase
+      .channel('dashboard_res_realtime')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'reservations',
+        filter: `cast_login_id=eq.${data.profile.login_id}` 
+      }, (payload) => {
+        setReservations(prev => [...prev, payload.new]);
+      })
+      .subscribe();
 
-  const monthlyTotals = useMemo(() => {
-    if (!nav.viewDate || !data?.shifts) return { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 };
-    return getMonthlyTotals(nav.viewDate);
-  }, [data?.shifts, nav.viewDate, getMonthlyTotals]);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [data?.profile?.login_id, supabase]);
 
-  const goToMyPage = () => router.push('/mypage');
-
-  if (!mounted || loading) {
-    return <div className="min-h-screen flex items-center justify-center font-black text-pink-300 animate-pulse text-5xl italic tracking-tighter">KARINTO...</div>;
+  // ローディング画面
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#FFFDFE]">
+        <div className="font-black text-pink-200 animate-pulse text-4xl italic tracking-tighter">
+          KARINTO...
+        </div>
+      </div>
+    );
   }
 
-  const safeViewDate = nav.viewDate || new Date();
-  const isRequest = nav.isRequestMode;
+  // 選択された日付に届いている予約だけを抽出
+  const dailyReservations = reservations.filter(res => {
+    try {
+      const resDate = typeof res.reservation_time === 'string' 
+        ? parseISO(res.reservation_time) 
+        : new Date(res.reservation_time);
+      return isSameDay(resDate, selectedDate);
+    } catch (e) {
+      return false;
+    }
+  });
+
+  // ヘッダー情報の整理
+  const headerShopName = data?.shop?.shop_name || "マイページ";
+  const headerDisplayName = data?.profile?.display_name || "キャスト";
+  const headerSyncTime = data?.syncAt;
 
   return (
-    <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
-      
-      <div className="pb-4">
-        <CastHeader 
-          shopName={data?.shop?.shop_name || "かりんと"} 
-          syncTime={data?.syncAt} 
-          displayName={safeProfile.display_name} 
-          version="v3.6.5"
-          bgColor={currentTheme.header}
+    <div className="min-h-screen bg-[#FFFDFE] pb-32">
+      <CastHeader 
+        shopName={headerShopName}
+        displayName={headerDisplayName}
+        syncTime={headerSyncTime}
+      />
+
+      <main className="px-4 space-y-4 mt-4">
+        {/* カレンダーセクション */}
+        <CalendarSection 
+          shifts={data?.shifts || []} 
+          onDateSelect={(date) => setSelectedDate(date)}
         />
-      </div>
-      
-      <main className="px-4 -mt-8 relative z-10 space-y-3">
-        {isValid(safeViewDate) && (
-          <MonthlySummary 
-            month={format(safeViewDate, 'M月')} 
-            totals={monthlyTotals} 
-            targetAmount={targetAmount}
-            theme={themeKey}
-          />
-        )}
 
-        {/* タブ：hidden を追加して非表示化 */}
-        <div className="hidden flex p-1 bg-gray-100/80 rounded-2xl border border-gray-200 shadow-inner">
-          <button 
-            onClick={() => nav.toggleMode(false)} 
-            className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all duration-300 flex items-center justify-center gap-1
-              ${!isRequest 
-                ? `bg-white ${currentTheme.text} shadow-sm` 
-                : 'text-gray-400 hover:text-gray-500'}`
+        {/* 詳細カード（ここに予約が流れます） */}
+        <DailyDetail 
+          date={selectedDate}
+          dayNum={selectedDate.getDate()}
+          // シフトデータから該当日の出勤時間を探す
+          shift={data?.shifts?.find((s: any) => {
+            try {
+              return isSameDay(parseISO(s.date), selectedDate);
+            } catch {
+              return false;
             }
-          >
-            実績入力
-          </button>
-          <button 
-            onClick={() => nav.toggleMode(true)} 
-            className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all duration-300 flex items-center justify-center gap-1
-              ${isRequest 
-                ? 'bg-white text-cyan-500 shadow-sm' 
-                : 'text-gray-400 hover:text-cyan-400'}`
-            }
-          >
-            シフト申請
-          </button>
-        </div>
-        
-        {/* カレンダー：isRequest を強制的に false の色設定（currentTheme.calendar）に固定 */}
-        <section className={`p-3 rounded-[32px] border shadow-sm text-center transition-colors duration-500
-          ${currentTheme.calendar}`}>
-          <DashboardCalendar 
-            shifts={safeShifts as any} 
-            selectedDates={nav.selected.single} // 常に単一選択モード
-            onSelect={nav.handleDateSelect} 
-            month={safeViewDate} 
-            onMonthChange={nav.setViewDate} 
-            isRequestMode={false} // 強制的に閲覧モード
-          />
-        </section>
-
-        {/* 常に DailyDetail（詳細表示）を出す設定 */}
-        {(nav.selected.single instanceof Date && isValid(nav.selected.single)) && (
-          <DailyDetail 
-            date={nav.selected.single} 
-            dayNum={nav.selected.single.getDate()} 
-            shift={selectedShift} 
-            editReward={editReward} 
-            setEditReward={setEditReward} 
-            onSave={handleSaveAchievement} 
-            isEditable={!!isEditable} 
-            onDelete={handleDeleteShift}
-          />
-        )}
-        
-        <NewsSection newsList={data?.news || []} />
+          })}
+          reservations={dailyReservations}
+        />
       </main>
 
-      <FixedFooter 
-        pathname={pathname} 
-        onHome={() => router.push('/')} 
-        onSalary={() => router.push('/salary')} 
-        onProfile={goToMyPage}
-        onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} 
-      />
+      <FixedFooter />
     </div>
   );
 }
