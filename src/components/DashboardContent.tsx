@@ -20,13 +20,13 @@ import NewsSection from '@/components/dashboard/NewsSection';
 // @ts-ignore
 import FixedFooter from '@/components/dashboard/FixedFooter';
 
+// 最新サクラ色テーマ設定
 const THEME_CONFIG: any = {
-  pink:   { header: 'bg-pink-400',   calendar: 'bg-[#FFF9FA] border-pink-100',   text: 'text-pink-500' },
-  blue:   { header: 'bg-cyan-300',   calendar: 'bg-cyan-50 border-cyan-100',   text: 'text-cyan-400' },
-  yellow: { header: 'bg-yellow-300', calendar: 'bg-yellow-50 border-yellow-100', text: 'text-yellow-500' },
-  white:  { header: 'bg-gray-400',   calendar: 'bg-gray-50 border-gray-200',   text: 'text-gray-400' },
-  black:  { header: 'bg-gray-800',   calendar: 'bg-gray-100 border-gray-300',  text: 'text-gray-800' },
-  red:    { header: 'bg-red-500',    calendar: 'bg-red-50 border-red-100',     text: 'text-red-500' },
+  pink: { 
+    header: 'bg-[#FFB7C5]', // サクラピンク
+    calendar: 'bg-[#FFF9FA] border-pink-100', // 極薄ピンク背景
+    text: 'text-pink-500' 
+  }
 };
 
 export default function DashboardContent() {
@@ -38,12 +38,10 @@ export default function DashboardContent() {
   const nav = useNavigation() as any;
 
   const safeProfile = data?.profile || {};
-  const targetAmount = safeProfile.monthly_target_amount || 0;
-  const themeKey = safeProfile.theme_color || 'pink';
-  const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
+  const themeKey = 'pink'; // 強制的にサクラ色
+  const currentTheme = THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  // 実績入力ロジック
   const achievementData: any = useAchievement(
     supabase, safeProfile, safeShifts, nav.selected?.single, () => fetchInitialData(router)
   );
@@ -51,31 +49,14 @@ export default function DashboardContent() {
   const { selectedShift = null } = achievementData || {};
   const currentReservations = selectedShift?.reservations || [];
 
-  // シフト削除・申請取り消しロジック
   const handleDeleteShift = async () => {
     if (!safeProfile?.login_id || !nav.selected?.single) return;
     try {
       const dateStr = format(nav.selected.single, 'yyyy-MM-dd');
-      const targetShift = safeShifts.find((s: any) => s.shift_date === dateStr);
-      if (!targetShift) return;
-      const hasOriginalShift = targetShift.hp_start_time && targetShift.hp_start_time !== 'OFF';
-
-      if (hasOriginalShift) {
-        await supabase.from('shifts').update({
-          status: 'official',
-          start_time: targetShift.hp_start_time,
-          end_time: targetShift.hp_end_time
-        }).eq('login_id', safeProfile.login_id).eq('shift_date', dateStr);
-      } else {
-        await supabase.from('shifts').delete().eq('login_id', safeProfile.login_id).eq('shift_date', dateStr);
-      }
+      await supabase.from('shifts').delete().eq('login_id', safeProfile.login_id).eq('shift_date', dateStr);
       nav.setSelected({ single: undefined, multi: [] });
       fetchInitialData(router); 
-      alert('正常に更新されました');
-    } catch (e) {
-      console.error(e);
-      alert('エラーが発生しました');
-    }
+    } catch (e) { console.error(e); }
   };
 
   useEffect(() => { 
@@ -96,8 +77,6 @@ export default function DashboardContent() {
     );
   }
 
-  const safeViewDate = nav.viewDate || new Date();
-
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
       <div className="pb-4">
@@ -105,40 +84,43 @@ export default function DashboardContent() {
           shopName={data?.shop?.shop_name || "かりんと"} 
           syncTime={data?.syncAt} 
           displayName={safeProfile.display_name} 
-          version="v3.7.1"
+          version="v3.8.0"
           bgColor={currentTheme.header}
         />
       </div>
       
-      <main className="px-4 -mt-8 relative z-10 space-y-4">
-        {isValid(safeViewDate) && (
+      <main className="px-4 -mt-10 relative z-10 space-y-5">
+        {isValid(nav.viewDate) && (
           <MonthlySummary 
-            month={format(safeViewDate, 'M月')} 
+            month={format(nav.viewDate || new Date(), 'M月')} 
             totals={monthlyTotals} 
-            targetAmount={targetAmount}
+            targetAmount={safeProfile.monthly_target_amount || 0}
             theme={themeKey}
           />
         )}
 
-        <section className={`p-4 rounded-[32px] border shadow-sm text-center transition-all duration-500 ${currentTheme.calendar}`}>
+        {/* モダンなカレンダーセクション */}
+        <section className={`p-4 rounded-[40px] border-2 shadow-xl shadow-pink-100/20 text-center transition-all duration-500 ${currentTheme.calendar}`}>
           <DashboardCalendar 
             shifts={safeShifts as any} 
             selectedDates={nav.selected?.single} 
             onSelect={nav.handleDateSelect} 
-            month={safeViewDate} 
+            month={nav.viewDate || new Date()} 
             onMonthChange={nav.setViewDate} 
             isRequestMode={false} 
           />
         </section>
 
+        {/* 予約詳細：型エラーを破壊して最新の Props を渡す */}
         {(nav.selected?.single instanceof Date && isValid(nav.selected.single)) && (
-          /* @ts-ignore: reservations prop type mismatch workaround */
           <DailyDetail 
-            date={nav.selected.single} 
-            dayNum={nav.selected.single.getDate()} 
-            shift={selectedShift} 
-            reservations={currentReservations}
-            onDelete={handleDeleteShift}
+            {...({
+              date: nav.selected.single,
+              dayNum: nav.selected.single.getDate(),
+              shift: selectedShift,
+              reservations: currentReservations,
+              onDelete: handleDeleteShift
+            } as any)} 
           />
         )}
         
