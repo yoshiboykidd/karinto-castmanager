@@ -157,8 +157,8 @@ export default function DashboardContent() {
           />
         )}
 
-        {/* タブ */}
-        <div className="flex p-1 bg-gray-100/80 rounded-2xl border border-gray-200 shadow-inner">
+        {/* タブ：hidden を追加して非表示化 */}
+        <div className="hidden flex p-1 bg-gray-100/80 rounded-2xl border border-gray-200 shadow-inner">
           <button 
             onClick={() => nav.toggleMode(false)} 
             className={`flex-1 py-2.5 text-xs font-black rounded-xl transition-all duration-300 flex items-center justify-center gap-1
@@ -181,42 +181,30 @@ export default function DashboardContent() {
           </button>
         </div>
         
-        {/* カレンダー */}
+        {/* カレンダー：isRequest を強制的に false の色設定（currentTheme.calendar）に固定 */}
         <section className={`p-3 rounded-[32px] border shadow-sm text-center transition-colors duration-500
-          ${isRequest 
-            ? 'bg-cyan-50 border-cyan-100'
-            : currentTheme.calendar
-          }`}>
+          ${currentTheme.calendar}`}>
           <DashboardCalendar 
             shifts={safeShifts as any} 
-            selectedDates={isRequest ? nav.selected.multi : nav.selected.single} 
+            selectedDates={nav.selected.single} // 常に単一選択モード
             onSelect={nav.handleDateSelect} 
             month={safeViewDate} 
             onMonthChange={nav.setViewDate} 
-            isRequestMode={isRequest} 
+            isRequestMode={false} // 強制的に閲覧モード
           />
         </section>
 
-        {!isRequest ? (
-          (nav.selected.single instanceof Date && isValid(nav.selected.single)) && (
-            <DailyDetail 
-              date={nav.selected.single} 
-              dayNum={nav.selected.single.getDate()} 
-              shift={selectedShift} 
-              editReward={editReward} 
-              setEditReward={setEditReward} 
-              onSave={handleSaveAchievement} 
-              isEditable={!!isEditable} 
-              onDelete={handleDeleteShift}
-            />
-          )
-        ) : (
-          <RequestList 
-            multiDates={nav.selected.multi} 
-            requestDetails={requestDetails} 
-            setRequestDetails={setRequestDetails} 
-            shifts={safeShifts as any} 
-            onSubmit={handleBulkSubmit} 
+        {/* 常に DailyDetail（詳細表示）を出す設定 */}
+        {(nav.selected.single instanceof Date && isValid(nav.selected.single)) && (
+          <DailyDetail 
+            date={nav.selected.single} 
+            dayNum={nav.selected.single.getDate()} 
+            shift={selectedShift} 
+            editReward={editReward} 
+            setEditReward={setEditReward} 
+            onSave={handleSaveAchievement} 
+            isEditable={!!isEditable} 
+            onDelete={handleDeleteShift}
           />
         )}
         
