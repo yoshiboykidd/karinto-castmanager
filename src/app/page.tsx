@@ -18,7 +18,7 @@ import DashboardCalendar from '@/components/DashboardCalendar';
 import DailyDetail from '@/components/dashboard/DailyDetail';
 import RequestList from '@/components/dashboard/RequestList';
 import NewsSection from '@/components/dashboard/NewsSection';
-import FixedFooter from '@/components/dashboard/FixedFooter'; 
+import FixedFooter from '@/components/dashboard/FixedFooter';
 
 function DashboardShell() {
   const router = useRouter();
@@ -29,51 +29,26 @@ function DashboardShell() {
 
   // 2. ナビゲーション
   const nav = useNavigation() as any;
-  const { 
-    isRequestMode, 
-    toggleMode, 
-    viewDate, 
-    setViewDate, 
-    selected, 
-    handleDateSelect, 
-    setSelected 
-  } = nav;
+  const { isRequestMode, toggleMode, viewDate, setViewDate, selected, handleDateSelect, setSelected } = nav;
 
-  // 3. 実績入力ロジック【editReward の波線を消すための核心】
-  // フックの戻り値を any でキャストし、TypeScriptの型チェックを回避します
-  const achievementProps = useAchievement(
-    supabase, 
-    data.profile, 
-    data.shifts, 
-    selected?.single, 
-    () => fetchInitialData(router)
+  // 3. 実績入力ロジック（表示用の selectedShift だけを取得）
+  const ach = useAchievement(
+    supabase, data.profile, data.shifts, selected?.single, () => fetchInitialData(router)
   ) as any;
-
-  const { 
-    editReward, 
-    setEditReward, 
-    handleSaveAchievement, 
-    isEditable, 
-    selectedShift 
-  } = achievementProps;
+  const { selectedShift } = ach;
 
   // 4. 申請ロジック
-  const requestProps = useRequestManager(
-    supabase, 
-    data.profile, 
-    data.shifts, 
-    selected?.multi, 
+  const req = useRequestManager(
+    supabase, data.profile, data.shifts, selected?.multi, 
     () => fetchInitialData(router), 
     () => setSelected({ single: undefined, multi: [] })
   ) as any;
-  
-  const { requestDetails, setRequestDetails, handleBulkSubmit } = requestProps;
+  const { requestDetails, setRequestDetails, handleBulkSubmit } = req;
 
   useEffect(() => { 
     fetchInitialData(router); 
   }, [router, fetchInitialData]);
 
-  // viewDate の型エラー対策（前回のビルドエラー箇所）
   const monthlyTotals = useMemo(() => {
     const safeDate = viewDate instanceof Date ? viewDate : new Date();
     return getMonthlyTotals(safeDate);
@@ -114,16 +89,16 @@ function DashboardShell() {
           />
         </section>
 
+        {/* 【ここが修正のポイント！】
+            エラーの元凶だった Props をすべて削除し、
+            DailyDetail.tsx が求めている 3つだけを渡すようにしました。
+        */}
         {!isRequestMode ? (
           selected?.single && (
             <DailyDetail 
               date={selected.single} 
               dayNum={selected.single.getDate()} 
               shift={selectedShift} 
-              editReward={editReward} 
-              setEditReward={setEditReward} 
-              onSave={handleSaveAchievement} 
-              isEditable={!!isEditable} 
             />
           )
         ) : (
