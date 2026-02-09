@@ -5,9 +5,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { AlertTriangle, X, ArrowRight } from 'lucide-react';
 
-// 【修正：ここが波線の正体】
-// DashboardContent.tsx の中身は "export default function DailyDetail" です。
-// 名前が違うため、読み込み側で「DashboardContent」という仮の名前をつけて実体（DailyDetail）を呼び出します。
+// ダッシュボード（中身はDailyDetail）を読み込む
 const DashboardContent = dynamic(() => import('@/components/DashboardContent'), { 
   ssr: false,
   loading: () => (
@@ -38,9 +36,9 @@ function PasswordAlertChecker() {
         <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center mb-4 mx-auto">
           <AlertTriangle className="w-6 h-6 text-rose-500" />
         </div>
-        <div className="text-center mb-6">
-          <h2 className="text-lg font-black text-gray-800 mb-2">パスワードを変更してください</h2>
-          <p className="text-sm text-gray-500 leading-relaxed font-medium">
+        <div className="text-center mb-6 text-gray-800">
+          <h2 className="text-lg font-black mb-2 text-gray-800">パスワードを変更してください</h2>
+          <p className="text-sm leading-relaxed font-medium">
             現在のパスワードは初期設定の<span className="font-bold text-rose-500 mx-1">0000</span>のままです。
           </p>
         </div>
@@ -59,17 +57,26 @@ function PasswordAlertChecker() {
 }
 
 export default function Page() {
+  // クラッシュを防ぐため、マウントされるまで表示を待つ
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
+  const today = new Date();
+
   return (
     <Suspense fallback={null}>
       <main className="min-h-screen bg-[#FFFDFE]">
-        {/* 【真っ白の原因を解消】
-          アップロードされた DashboardContent.tsx (DailyDetail) は
-          date, dayNum, reservations の3つが絶対に必要です。
-          これを渡さないと、中身が undefined になり画面が真っ白（クラッシュ）になります。
+        {/* 【真っ白の解決】
+          DashboardContent.tsx の 26行目 props (date, dayNum, reservations) 
+          を正しく渡すことで、date-fns の内部エラーを回避します。
         */}
         <DashboardContent 
-          date={new Date()} 
-          dayNum={new Date().getDate()} 
+          date={today} 
+          dayNum={today.getDate()} 
           reservations={[]} 
         />
         
