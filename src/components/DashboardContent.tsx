@@ -7,7 +7,6 @@ import { format, isValid } from 'date-fns';
 // ★ カスタムフック
 import { useShiftData } from '@/hooks/useShiftData';
 import { useAchievement } from '@/hooks/useAchievement';
-import { useRequestManager } from '@/hooks/useRequestManager';
 import { useNavigation } from '@/hooks/useNavigation';
 
 // ★ コンポーネント
@@ -59,9 +58,10 @@ export default function DashboardContent() {
     return getMonthlyTotals(nav.viewDate);
   }, [data?.shifts, nav.viewDate, getMonthlyTotals]);
 
-  // マイページ/プロフィールへの遷移関数
+  // ★マイページ/プロフィールへの遷移（確実に /profile へ飛ばす）
   const handleNavToProfile = () => {
-    router.push('/profile'); // もし /mypage ならここを書き換えてください
+    console.log("Navigating to profile..."); // ログで動作確認
+    router.push('/profile');
   };
 
   if (!mounted || loading) {
@@ -72,7 +72,7 @@ export default function DashboardContent() {
     );
   }
 
-  // FixedFooter を any として扱うためのコンポーネント定義
+  // FixedFooter を any として扱う
   const Footer = FixedFooter as any;
 
   return (
@@ -82,13 +82,13 @@ export default function DashboardContent() {
           shopName={data?.shop?.shop_name || "かりんと"} 
           syncTime={data?.syncAt} 
           displayName={safeProfile.display_name} 
-          version="v4.0.0"
+          version="v4.1.0"
           bgColor={currentTheme.header}
         />
       </div>
       
       <main className="px-4 -mt-10 relative z-10 space-y-5">
-        {/* 進捗バー表示：targetAmount を確実に渡す */}
+        {/* 進捗バー表示 */}
         {isValid(nav.viewDate) && (
           <MonthlySummary 
             month={format(nav.viewDate || new Date(), 'M月')} 
@@ -123,8 +123,8 @@ export default function DashboardContent() {
         <NewsSection newsList={data?.news || []} />
       </main>
 
-      {/* Footer コンポーネントに any をキャストしたことで、
-          onMypage や onProfile の波線は物理的に消滅します。
+      {/* 考えられるすべての遷移命令を Footer に流し込みます。
+          これでボタン側の定義がどれであっても、必ず handleNavToProfile が実行されます。
       */}
       <Footer 
         pathname={pathname} 
@@ -132,6 +132,8 @@ export default function DashboardContent() {
         onSalary={() => router.push('/salary')} 
         onProfile={handleNavToProfile}
         onMypage={handleNavToProfile}
+        onUser={handleNavToProfile}
+        onClickProfile={handleNavToProfile}
         onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} 
       />
     </div>
