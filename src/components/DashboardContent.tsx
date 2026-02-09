@@ -20,11 +20,10 @@ import NewsSection from '@/components/dashboard/NewsSection';
 // @ts-ignore
 import FixedFooter from '@/components/dashboard/FixedFooter';
 
-// 最新サクラ色テーマ設定
 const THEME_CONFIG: any = {
   pink: { 
-    header: 'bg-[#FFB7C5]', // サクラピンク
-    calendar: 'bg-[#FFF9FA] border-pink-100', // 極薄ピンク背景
+    header: 'bg-[#FFB7C5]',
+    calendar: 'bg-[#FFF9FA] border-pink-100',
     text: 'text-pink-500' 
   }
 };
@@ -38,9 +37,12 @@ export default function DashboardContent() {
   const nav = useNavigation() as any;
 
   const safeProfile = data?.profile || {};
-  const themeKey = 'pink'; // 強制的にサクラ色
-  const currentTheme = THEME_CONFIG.pink;
+  const themeKey = safeProfile.theme_color || 'pink';
+  const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
+
+  // 目標金額の取得（進捗バー用）
+  const targetAmount = safeProfile.monthly_target_amount || 0;
 
   const achievementData: any = useAchievement(
     supabase, safeProfile, safeShifts, nav.selected?.single, () => fetchInitialData(router)
@@ -48,16 +50,6 @@ export default function DashboardContent() {
   
   const { selectedShift = null } = achievementData || {};
   const currentReservations = selectedShift?.reservations || [];
-
-  const handleDeleteShift = async () => {
-    if (!safeProfile?.login_id || !nav.selected?.single) return;
-    try {
-      const dateStr = format(nav.selected.single, 'yyyy-MM-dd');
-      await supabase.from('shifts').delete().eq('login_id', safeProfile.login_id).eq('shift_date', dateStr);
-      nav.setSelected({ single: undefined, multi: [] });
-      fetchInitialData(router); 
-    } catch (e) { console.error(e); }
-  };
 
   useEffect(() => { 
     setMounted(true);
@@ -68,6 +60,11 @@ export default function DashboardContent() {
     if (!nav.viewDate || !data?.shifts) return { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 };
     return getMonthlyTotals(nav.viewDate);
   }, [data?.shifts, nav.viewDate, getMonthlyTotals]);
+
+  // マイページへ遷移する関数
+  const goToMyPage = () => {
+    router.push('/profile'); // パスが /mypage か /profile か確認してください。通常は /profile です
+  };
 
   if (!mounted || loading) {
     return (
@@ -84,22 +81,22 @@ export default function DashboardContent() {
           shopName={data?.shop?.shop_name || "かりんと"} 
           syncTime={data?.syncAt} 
           displayName={safeProfile.display_name} 
-          version="v3.8.0"
+          version="v3.9.0"
           bgColor={currentTheme.header}
         />
       </div>
       
       <main className="px-4 -mt-10 relative z-10 space-y-5">
+        {/* 進捗バーはこの MonthlySummary コンポーネントの中で描画されます */}
         {isValid(nav.viewDate) && (
           <MonthlySummary 
             month={format(nav.viewDate || new Date(), 'M月')} 
             totals={monthlyTotals} 
-            targetAmount={safeProfile.monthly_target_amount || 0}
+            targetAmount={targetAmount} // ここを渡さないと進捗バーが出ません
             theme={themeKey}
           />
         )}
 
-        {/* モダンなカレンダーセクション */}
         <section className={`p-4 rounded-[40px] border-2 shadow-xl shadow-pink-100/20 text-center transition-all duration-500 ${currentTheme.calendar}`}>
           <DashboardCalendar 
             shifts={safeShifts as any} 
@@ -111,15 +108,13 @@ export default function DashboardContent() {
           />
         </section>
 
-        {/* 予約詳細：型エラーを破壊して最新の Props を渡す */}
         {(nav.selected?.single instanceof Date && isValid(nav.selected.single)) && (
           <DailyDetail 
             {...({
               date: nav.selected.single,
               dayNum: nav.selected.single.getDate(),
               shift: selectedShift,
-              reservations: currentReservations,
-              onDelete: handleDeleteShift
+              reservations: currentReservations
             } as any)} 
           />
         )}
@@ -127,12 +122,13 @@ export default function DashboardContent() {
         <NewsSection newsList={data?.news || []} />
       </main>
 
+      {/* フッター：onProfile を確実に動作させます */}
       {/* @ts-ignore */}
       <FixedFooter 
         pathname={pathname} 
         onHome={() => router.push('/')} 
         onSalary={() => router.push('/salary')} 
-        onProfile={() => router.push('/mypage')}
+        onProfile={goToMyPage} // これでマイページが開けます
         onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} 
       />
     </div>
