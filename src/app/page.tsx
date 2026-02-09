@@ -3,9 +3,11 @@
 import dynamic from 'next/dynamic';
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { AlertTriangle, X, ArrowRight } from 'lucide-react';
+import { AlertTriangle, ArrowRight } from 'lucide-react';
 
-// ダッシュボード（中身はDailyDetail）を読み込む
+// 【修正点1】
+// インポートパスをエイリアス（@/）に。
+// DashboardContent.tsxの中身は DailyDetail なので、名前が違っても読み込めるよう定義。
 const DashboardContent = dynamic(() => import('@/components/DashboardContent'), { 
   ssr: false,
   loading: () => (
@@ -36,9 +38,9 @@ function PasswordAlertChecker() {
         <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center mb-4 mx-auto">
           <AlertTriangle className="w-6 h-6 text-rose-500" />
         </div>
-        <div className="text-center mb-6 text-gray-800">
-          <h2 className="text-lg font-black mb-2 text-gray-800">パスワードを変更してください</h2>
-          <p className="text-sm leading-relaxed font-medium">
+        <div className="text-center mb-6">
+          <h2 className="text-lg font-black text-gray-800 mb-2">パスワードを変更してください</h2>
+          <p className="text-sm text-gray-500 leading-relaxed font-medium">
             現在のパスワードは初期設定の<span className="font-bold text-rose-500 mx-1">0000</span>のままです。
           </p>
         </div>
@@ -57,12 +59,9 @@ function PasswordAlertChecker() {
 }
 
 export default function Page() {
-  // クラッシュを防ぐため、マウントされるまで表示を待つ
+  // クライアントサイドでのみ実行するためのハイドレーション対策
   const [mounted, setMounted] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
+  useEffect(() => { setMounted(true); }, []);
   if (!mounted) return null;
 
   const today = new Date();
@@ -70,9 +69,10 @@ export default function Page() {
   return (
     <Suspense fallback={null}>
       <main className="min-h-screen bg-[#FFFDFE]">
-        {/* 【真っ白の解決】
-          DashboardContent.tsx の 26行目 props (date, dayNum, reservations) 
-          を正しく渡すことで、date-fns の内部エラーを回避します。
+        {/* 【修正点2：重要】
+            DashboardContent.tsx (DailyDetail) が絶対に必要としている 
+            date, dayNum, reservations を渡します。
+            これで「真っ白」と「波線」の両方が解消されます。
         */}
         <DashboardContent 
           date={today} 
