@@ -3,13 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation'; 
 import { format, isValid } from 'date-fns';
-
-// ★ カスタムフック
 import { useShiftData } from '@/hooks/useShiftData';
 import { useAchievement } from '@/hooks/useAchievement';
 import { useNavigation } from '@/hooks/useNavigation';
-
-// ★ コンポーネント
 import CastHeader from '@/components/dashboard/CastHeader';
 import MonthlySummary from '@/components/dashboard/MonthlySummary';
 import DashboardCalendar from '@/components/DashboardCalendar';
@@ -72,7 +68,7 @@ export default function DashboardContent() {
           shopName={data?.shop?.shop_name || "かりんと"} 
           syncTime={data?.syncAt} 
           displayName={safeProfile.display_name} 
-          version="v4.3.0"
+          version="v4.5.0"
           bgColor={currentTheme.header}
         />
       </div>
@@ -112,7 +108,6 @@ export default function DashboardContent() {
         <NewsSection newsList={data?.news || []} />
       </main>
 
-      {/* 📍 エラーの元（120行目付近）を完全に修正しました！ */}
       {/* @ts-ignore */}
       <FixedFooter 
         pathname={pathname} 

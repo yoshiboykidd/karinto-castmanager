@@ -12,11 +12,11 @@ interface FixedFooterProps {
 export default function FixedFooter({ pathname, onLogout }: FixedFooterProps) {
   const router = useRouter();
 
-  // 各メニューのリンク先とアイコン、ラベルの設定
   const menuItems = [
     { label: 'ホーム', icon: Home, path: '/', action: () => router.push('/') },
     { label: '実績', icon: BarChart2, path: '/salary', action: () => router.push('/salary') },
-    { label: 'マイページ', icon: User, path: '/profile', action: () => router.push('/profile') },
+    // 📍 404回避のため /mypage に固定
+    { label: 'マイページ', icon: User, path: '/mypage', action: () => router.push('/mypage') },
     { label: 'ログアウト', icon: LogOut, path: null, action: onLogout },
   ];
 
