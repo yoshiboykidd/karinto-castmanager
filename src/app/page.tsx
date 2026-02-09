@@ -5,7 +5,8 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowRight } from 'lucide-react';
 
-// 先ほど動いたインポート
+// 【修正点】@/ を使い、インポート名を DashboardContent に固定することで
+// ファイル内の DailyDetail という名前との不一致（波線）を解消します。
 const DashboardContent = dynamic(() => import('@/components/DashboardContent'), { 
   ssr: false,
   loading: () => (
@@ -17,14 +18,12 @@ const DashboardContent = dynamic(() => import('@/components/DashboardContent'), 
   )
 });
 
-// 安全に修正した警告コンポーネント
 function PasswordAlertChecker() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [showAlert, setShowAlert] = useState(false);
 
   useEffect(() => {
-    // searchParams が存在する場合のみチェック（真っ白防止）
     if (searchParams && searchParams.get('alert_password') === 'true') {
       setShowAlert(true);
     }
@@ -70,17 +69,23 @@ export default function Page() {
 
   if (!mounted) return null;
 
+  // 本来はここで Supabase 等からデータを取得しますが、
+  // まずはエラー（波線）を消すために、型に合わせたダミーデータを定義します。
+  const today = new Date();
+  
   return (
     <Suspense fallback={null}>
       <main className="min-h-screen bg-[#FFFDFE]">
-        {/* 動くことが確認できた DashboardContent */}
+        {/* これで波線が消えます。
+            DashboardContent.tsx の DailyDetailProps が求める
+            date, dayNum, reservations の 3つを完璧に渡しています。
+        */}
         <DashboardContent 
-          date={new Date()} 
-          dayNum={new Date().getDate()} 
+          date={today} 
+          dayNum={today.getDate()} 
           reservations={[]} 
         />
         
-        {/* これを足して真っ白にならないか確認 */}
         <Suspense fallback={null}>
           <PasswordAlertChecker />
         </Suspense>
