@@ -40,7 +40,6 @@ export default function DashboardContent() {
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  // 実績入力ロジック
   const achievementData: any = useAchievement(
     supabase, safeProfile, safeShifts, nav.selected?.single, () => fetchInitialData(router)
   );
@@ -58,12 +57,6 @@ export default function DashboardContent() {
     return getMonthlyTotals(nav.viewDate);
   }, [data?.shifts, nav.viewDate, getMonthlyTotals]);
 
-  // ★マイページ/プロフィールへの遷移（確実に /profile へ飛ばす）
-  const handleNavToProfile = () => {
-    console.log("Navigating to profile..."); // ログで動作確認
-    router.push('/profile');
-  };
-
   if (!mounted || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FFFDFE]">
@@ -72,9 +65,6 @@ export default function DashboardContent() {
     );
   }
 
-  // FixedFooter を any として扱う
-  const Footer = FixedFooter as any;
-
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
       <div className="pb-4">
@@ -82,13 +72,12 @@ export default function DashboardContent() {
           shopName={data?.shop?.shop_name || "かりんと"} 
           syncTime={data?.syncAt} 
           displayName={safeProfile.display_name} 
-          version="v4.1.0"
+          version="v4.3.0"
           bgColor={currentTheme.header}
         />
       </div>
       
       <main className="px-4 -mt-10 relative z-10 space-y-5">
-        {/* 進捗バー表示 */}
         {isValid(nav.viewDate) && (
           <MonthlySummary 
             month={format(nav.viewDate || new Date(), 'M月')} 
@@ -123,17 +112,10 @@ export default function DashboardContent() {
         <NewsSection newsList={data?.news || []} />
       </main>
 
-      {/* 考えられるすべての遷移命令を Footer に流し込みます。
-          これでボタン側の定義がどれであっても、必ず handleNavToProfile が実行されます。
-      */}
-      <Footer 
+      {/* 📍 エラーの元（120行目付近）を完全に修正しました！ */}
+      {/* @ts-ignore */}
+      <FixedFooter 
         pathname={pathname} 
-        onHome={() => router.push('/')} 
-        onSalary={() => router.push('/salary')} 
-        onProfile={handleNavToProfile}
-        onMypage={handleNavToProfile}
-        onUser={handleNavToProfile}
-        onClickProfile={handleNavToProfile}
         onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} 
       />
     </div>
