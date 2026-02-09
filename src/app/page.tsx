@@ -5,8 +5,8 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { AlertTriangle, ArrowRight } from 'lucide-react';
 
-// 相対パスを物理的に解決し、波線を消します
-const DashboardContent = dynamic(() => import('../../components/DashboardContent'), { 
+// 【波線解決：1】パスをエイリアス（@/）に固定。これでビルド時の「ファイル未発見」を防ぎます。
+const DashboardContent = dynamic(() => import('@/components/DashboardContent'), { 
   ssr: false,
   loading: () => (
     <div className="min-h-screen flex items-center justify-center bg-[#FFFDFE]">
@@ -31,7 +31,7 @@ function PasswordAlertChecker() {
   if (!showAlert) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4 bg-slate-900/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl border-2 border-pink-100">
         <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center mb-4 mx-auto text-rose-500">
           <AlertTriangle />
@@ -42,11 +42,12 @@ function PasswordAlertChecker() {
             現在のパスワードは初期設定の<span className="font-bold text-rose-500 mx-1">0000</span>のままです。
           </p>
         </div>
-        <div className="flex flex-col gap-3">
-          <button onClick={() => router.push('/profile')} className="w-full bg-rose-500 text-white font-bold py-3.5 rounded-xl">
-            今すぐ変更する
+        <div className="flex flex-col gap-3 text-sm">
+          <button onClick={() => router.push('/profile')} className="w-full bg-rose-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-rose-200 flex items-center justify-center gap-2 transition-all active:scale-95">
+            <span>今すぐ変更する</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
-          <button onClick={() => setShowAlert(false)} className="w-full bg-gray-50 text-gray-400 font-bold py-3 rounded-xl text-xs">
+          <button onClick={() => setShowAlert(false)} className="w-full bg-gray-50 text-gray-400 font-bold py-3 rounded-xl text-xs hover:bg-gray-100 transition-all">
             あとでする
           </button>
         </div>
@@ -59,7 +60,7 @@ export default function Page() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
-  // 画面が準備できるまで何も出さない（クラッシュ防止）
+  // ビルド時のハイドレーションエラーを防止
   if (!mounted) return null;
 
   const today = new Date();
@@ -67,8 +68,9 @@ export default function Page() {
   return (
     <Suspense fallback={null}>
       <main className="min-h-screen bg-[#FFFDFE]">
-        {/* 【重要】DashboardContent.tsx (DailyDetail) が求めている 
-            Props を全て渡すことで、JavaScriptエラー（真っ白）を回避します。
+        {/* 【波線解決：2】
+            DashboardContent（DailyDetail）に必須の引数を全て正しい型で渡します。
+            これで date の波線が消え、ビルドが通るようになります。
         */}
         <DashboardContent 
           date={today} 
