@@ -48,14 +48,24 @@ export default function MyPage() {
     fetchData();
   }, [router, supabase]);
 
-  // 2. ポップアップ警告（確実に出すために useEffect の位置を調整）
-  useEffect(() => {
-    if (!loading && profile && String(profile.password) === '0000') {
-      setTimeout(() => {
-        alert('⚠️ セキュリティ警告\nパスワードが初期設定(0000)のままです。安全のため、今すぐ変更してください！');
-      }, 500);
+  // 2. パスワード変更関数
+  const handlePasswordChange = async () => {
+    if (!profile?.login_id) return;
+    if (!newPassword || newPassword.length < 4) {
+      alert('パスワードは4文字以上で入力してください');
+      return;
     }
-  }, [loading, profile]);
+    try {
+      const { error } = await supabase.from('cast_members').update({ password: newPassword }).eq('login_id', profile.login_id);
+      if (!error) { 
+        alert('パスワードを変更しました✨'); 
+        setNewPassword('');
+        window.location.reload();
+      }
+    } catch (e) {
+      alert('変更に失敗しました...');
+    }
+  };
 
   // 3. 設定保存関数
   const handleSaveSettings = async () => {
@@ -69,29 +79,10 @@ export default function MyPage() {
     } finally { setIsSaving(false); }
   };
 
-  // 4. パスワード変更関数（ここがボタンより上にないと波線が出ます）
-  const handlePasswordChange = async () => {
-    if (!profile?.login_id) return;
-    if (!newPassword || newPassword.length < 4) {
-      alert('パスワードは4文字以上で入力してください');
-      return;
-    }
-    try {
-      const { error } = await supabase.from('cast_members').update({ password: newPassword }).eq('login_id', profile.login_id);
-      if (!error) { 
-        alert('パスワードを変更しました✨'); 
-        setNewPassword('');
-        window.location.reload();
-      } else {
-        throw error;
-      }
-    } catch (e) {
-      alert('変更に失敗しました...');
-    }
-  };
-
   const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
-  const isDangerPassword = profile?.password === '0000';
+  
+  // 📍 判定強化版: 文字列・数値どちらの 0000 も逃さない
+  const isDangerPassword = profile && (String(profile.password) === '0000' || profile.password === 0);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#FFFDFE]">
@@ -101,6 +92,14 @@ export default function MyPage() {
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800 overflow-x-hidden">
+      
+      {/* 📍 警告バー: 画面の一番上、ヘッダーより上に絶対出す */}
+      {isDangerPassword && (
+        <div className="bg-rose-500 text-white text-[11px] font-black py-2.5 px-4 text-center animate-bounce">
+          ⚠️ セキュリティ警告：初期パスワード(0000)を変更してください！
+        </div>
+      )}
+
       <CastHeader shopName="マイページ" displayName={profile?.display_name} bgColor={currentTheme.bg} />
       
       <main className="px-5 mt-4 space-y-3">
