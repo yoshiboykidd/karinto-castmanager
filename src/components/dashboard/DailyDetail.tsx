@@ -1,113 +1,152 @@
 'use client';
 
-import React from 'react';
-import { format } from 'date-fns';
+import { format, startOfDay, isAfter } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { Clock, Star, Coins, Calendar as CalIcon, Heart } from 'lucide-react';
 
-interface DailyDetailProps {
+type DailyDetailProps = {
   date: Date;
   dayNum: number;
-  shift: any; // 取得したシフト/予約データ
-}
+  shift: any; 
+  reservations?: any[]; // 予約データ
+  theme?: string; // カラー設定連動用
+};
 
-export default function DailyDetail({ date, dayNum, shift }: DailyDetailProps) {
-  // 自動計算ロジック（仮：実際のロジックに合わせて調整してください）
-  const baseReward = shift?.reward || 0;
-  const pointReward = (shift?.points || 0) * 100; // 1pt = 100円計算など
-  const total = baseReward + pointReward;
+export default function DailyDetail({
+  date,
+  dayNum,
+  shift,
+  reservations = [],
+  theme = 'pink'
+}: DailyDetailProps) {
+  if (!date) return null;
+
+  const today = startOfDay(new Date());
+  const targetDate = startOfDay(date);
+  const isFuture = isAfter(targetDate, today);
+
+  // 1. ステータス判定（確定シフトのみを扱う）
+  const isOfficial = shift?.status === 'official';
+  
+  // 特定日判定
+  const isKarin = dayNum === 10;
+  const isSoine = dayNum === 11 || dayNum === 22;
+
+  // テーマカラー設定
+  const themeColors: any = {
+    pink: 'text-pink-500',
+    blue: 'text-cyan-600',
+    yellow: 'text-yellow-600',
+    red: 'text-red-500',
+    black: 'text-gray-800',
+    white: 'text-gray-600'
+  };
+  const accentColor = themeColors[theme] || themeColors.pink;
+
+  // 表示時間（HP確定時間を優先）
+  const displayOfficialS = shift?.start_time || 'OFF';
+  const displayOfficialE = shift?.end_time || '';
 
   return (
-    <div className="mt-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* 日付ヘッダー：サクラピンクのグラデーション */}
-      <div className="flex items-center gap-2 mb-3 px-2">
-        <div className="w-10 h-10 rounded-2xl bg-pink-500 flex items-center justify-center text-white shadow-lg shadow-pink-100">
-          <span className="text-lg font-black">{dayNum}</span>
+    <section className={`relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-4 pt-6 flex flex-col space-y-2 transition-all duration-300`}>
+      
+      {/* 特定日バッジ（当時のまま） */}
+      {(isKarin || isSoine) && (
+        <div className={`absolute top-0 left-0 right-0 py-0.5 text-center font-black text-[10px] tracking-[0.2em] shadow-sm z-20
+          ${isKarin ? 'bg-gradient-to-r from-orange-400 to-orange-500 text-white' : 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white'}`}>
+          {isKarin ? 'かりんとの日' : '添い寝の日'}
         </div>
-        <div>
-          <h3 className="text-sm font-black text-gray-800">
-            {format(date, 'yyyy年 M月 d日', { locale: ja })}
-          </h3>
-          <p className="text-[10px] font-bold text-pink-400 uppercase tracking-widest">Reservation Detail</p>
-        </div>
+      )}
+
+      {/* 1行目：日付（当時のデザインを維持） */}
+      <div className="flex items-center justify-between px-1 h-7 mt-0.5">
+        <h3 className="text-xl font-black text-gray-800 tracking-tight leading-none flex items-baseline shrink-0">
+          {format(date, 'M/d')}
+          <span className="text-base ml-1 opacity-70">({format(date, 'E', { locale: ja })})</span>
+        </h3>
       </div>
 
-      {/* メインカード：サクラ色の淡い背景 */}
-      <div className="bg-[#FFF5F7] rounded-[32px] p-6 border border-pink-100 shadow-sm relative overflow-hidden">
-        {/* 背景の装飾アイコン */}
-        <Heart className="absolute -right-4 -top-4 w-24 h-24 text-pink-200/30 rotate-12" />
+      {/* 2行目：メイン時間（当時のデザインを維持） */}
+      <div className="flex items-center justify-between px-1 h-10 gap-1">
+        {isOfficial && displayOfficialS !== 'OFF' ? (
+          <>
+            <div className="shrink-0">
+              <span className="text-[12px] font-black px-2.5 py-1.5 rounded-xl bg-blue-500 text-white shadow-md whitespace-nowrap">
+                確定シフト
+              </span>
+            </div>
 
-        {!shift ? (
-          <div className="py-10 text-center">
-            <p className="text-gray-400 font-bold text-sm">この日の予約・出勤はありません</p>
-          </div>
+            <div className="flex-1 text-right overflow-hidden">
+              <span className={`text-[31px] font-black leading-none tracking-tighter whitespace-nowrap inline-block align-middle ${accentColor}`}>
+                {displayOfficialS}〜{displayOfficialE}
+              </span>
+            </div>
+          </>
         ) : (
-          <div className="space-y-6 relative z-10">
-            
-            {/* 時間セクション */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white rounded-xl shadow-sm">
-                  <Clock className="w-5 h-5 text-pink-500" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold text-pink-400">勤務時間</p>
-                  <p className="text-base font-black text-gray-800">
-                    {shift.start_time || '19:00'} 〜 {shift.end_time || '24:00'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="h-px bg-pink-100 w-full" />
-
-            {/* 自動計算報酬セクション */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white/60 p-4 rounded-2xl border border-pink-50">
-                <div className="flex items-center gap-2 mb-1">
-                  <Coins className="w-4 h-4 text-orange-400" />
-                  <span className="text-[10px] font-bold text-gray-500">基本報酬</span>
-                </div>
-                <p className="text-lg font-black text-gray-800">
-                  ¥{baseReward.toLocaleString()}
-                </p>
-              </div>
-
-              <div className="bg-white/60 p-4 rounded-2xl border border-pink-50">
-                <div className="flex items-center gap-2 mb-1">
-                  <Star className="w-4 h-4 text-yellow-400" />
-                  <span className="text-[10px] font-bold text-gray-500">ポイント報酬</span>
-                </div>
-                <p className="text-lg font-black text-gray-800">
-                  ¥{pointReward.toLocaleString()}
-                </p>
-              </div>
-            </div>
-
-            {/* 合計金額：一番目立たせる */}
-            <div className="bg-gradient-to-br from-pink-500 to-rose-500 rounded-3xl p-5 text-white shadow-xl shadow-pink-200">
-              <div className="flex justify-between items-end">
-                <div>
-                  <p className="text-xs font-bold opacity-80 mb-1">本日の推定合計報酬</p>
-                  <p className="text-3xl font-black italic tracking-tighter">
-                    <span className="text-sm mr-1">¥</span>
-                    {total.toLocaleString()}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-bold opacity-70">AUTO CALCULATED</p>
-                </div>
-              </div>
-            </div>
-
+          <div className="flex items-center justify-between w-full">
+            <span className="text-[12px] font-black px-3 py-1.5 rounded-xl bg-gray-400 text-white shadow-sm shrink-0">お休み</span>
+            <span className="text-xs font-black text-gray-300 italic uppercase tracking-widest opacity-40">Day Off</span>
           </div>
         )}
       </div>
 
-      {/* 補足メッセージ */}
-      <p className="text-center mt-4 text-[10px] font-bold text-pink-300 italic">
-        ※金額は自動集計による概算です。確定金額は給与明細を確認してください。
-      </p>
-    </div>
+      {/* 予約・実績セクション（手動入力から自動表示へ） */}
+      {isOfficial && displayOfficialS !== 'OFF' && (
+        <div className="pt-2 border-t border-gray-100/50 space-y-3">
+          
+          {/* 予約詳細リスト */}
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Reservation Details</p>
+            {reservations.length > 0 ? (
+              reservations.map((res: any, idx: number) => (
+                <div key={idx} className="bg-gray-50/50 rounded-2xl p-3 border border-gray-100 flex justify-between items-center shadow-sm">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold text-gray-400 leading-none mb-1">{res.startTime}〜{res.endTime}</span>
+                    <span className="text-sm font-black text-gray-700 leading-none">{res.course || 'コース未定'}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg bg-white border border-pink-100 ${accentColor}`}>
+                      {res.type || 'フリー'}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="py-4 text-center bg-gray-50/30 rounded-2xl border border-dashed border-gray-200">
+                <p className="text-xs font-bold text-gray-300 italic">予約データはありません ☕️</p>
+              </div>
+            )}
+          </div>
+
+          {/* 自動計算された実績表示（当時のデザインパーツを再利用） */}
+          {!isFuture && (
+            <div className="bg-white/80 p-3 rounded-[24px] border border-pink-100 shadow-inner space-y-2">
+              <div className="flex items-center justify-between border-b border-pink-50 pb-2">
+                <span className="text-[10px] font-black text-gray-400 uppercase">自動計算の実績</span>
+                <div className={`flex items-center ${accentColor}`}>
+                  <span className="text-sm font-black mr-0.5 opacity-50">¥</span>
+                  <span className="text-2xl font-black tracking-tighter">
+                    {(shift?.reward_amount || 0).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                <div className="text-center">
+                  <p className="text-[8px] font-black text-gray-300 uppercase">フリー</p>
+                  <p className={`text-lg font-black ${accentColor}`}>{shift?.reward_f || 0}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[8px] font-black text-gray-300 uppercase">初指名</p>
+                  <p className={`text-lg font-black ${accentColor}`}>{shift?.reward_first || 0}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[8px] font-black text-gray-300 uppercase">本指名</p>
+                  <p className={`text-lg font-black ${accentColor}`}>{shift?.reward_main || 0}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }

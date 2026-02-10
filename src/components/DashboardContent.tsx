@@ -16,11 +16,12 @@ import NewsSection from '@/components/dashboard/NewsSection';
 import FixedFooter from '@/components/dashboard/FixedFooter';
 
 const THEME_CONFIG: any = {
-  pink: { 
-    header: 'bg-[#FFB7C5]', // 柔らかいサクラ色
-    calendar: 'bg-[#FFF9FA] border-pink-100', // 極薄サクラ背景
-    text: 'text-pink-500' 
-  }
+  pink:   { header: 'bg-[#FFB7C5]', calendar: 'bg-[#FFF9FA] border-pink-100', accent: 'pink' },
+  blue:   { header: 'bg-cyan-300',   calendar: 'bg-cyan-50 border-cyan-100',   accent: 'blue' },
+  yellow: { header: 'bg-yellow-300', calendar: 'bg-yellow-50 border-yellow-100', accent: 'yellow' },
+  white:  { header: 'bg-gray-400',   calendar: 'bg-white border-gray-100',     accent: 'gray' },
+  black:  { header: 'bg-gray-800',   calendar: 'bg-gray-50 border-gray-200',   accent: 'black' },
+  red:    { header: 'bg-red-500',    calendar: 'bg-red-50 border-red-100',     accent: 'red' },
 };
 
 export default function DashboardContent() {
@@ -61,6 +62,9 @@ export default function DashboardContent() {
     );
   }
 
+  // ★ 波線対策：表示する月を確実に文字列として生成
+  const displayMonth = isValid(nav.viewDate) ? format(nav.viewDate, 'M月') : format(new Date(), 'M月');
+
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
       <div className="pb-4">
@@ -68,20 +72,18 @@ export default function DashboardContent() {
           shopName={data?.shop?.shop_name || "かりんと"} 
           syncTime={data?.syncAt} 
           displayName={safeProfile.display_name} 
-          version="v4.7.0"
+          version="v4.8.1"
           bgColor={currentTheme.header}
         />
       </div>
       
       <main className="px-4 -mt-10 relative z-10 space-y-5">
-        {isValid(nav.viewDate) && (
-          <MonthlySummary 
-            month={format(nav.viewDate || new Date(), 'M月')} 
-            totals={monthlyTotals} 
-            targetAmount={safeProfile.monthly_target_amount || 0}
-            theme={themeKey}
-          />
-        )}
+        <MonthlySummary 
+          month={displayMonth} 
+          totals={monthlyTotals} 
+          targetAmount={safeProfile.monthly_target_amount || 0}
+          theme={themeKey}
+        />
 
         <section className={`p-4 rounded-[40px] border-2 shadow-xl shadow-pink-100/20 text-center transition-all duration-500 ${currentTheme.calendar}`}>
           <DashboardCalendar 
@@ -100,7 +102,8 @@ export default function DashboardContent() {
               date: nav.selected.single,
               dayNum: nav.selected.single.getDate(),
               shift: selectedShift,
-              reservations: currentReservations
+              reservations: currentReservations,
+              theme: themeKey
             } as any)} 
           />
         )}
@@ -108,7 +111,6 @@ export default function DashboardContent() {
         <NewsSection newsList={data?.news || []} />
       </main>
 
-      {/* 📍 修正：onLogoutだけを渡し、行き先はFooterに任せる */}
       {/* @ts-ignore */}
       <FixedFooter 
         pathname={pathname} 
