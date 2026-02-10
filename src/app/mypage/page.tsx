@@ -19,7 +19,10 @@ const THEMES = [
 export default function MyPage() {
   const router = useRouter();
   const pathname = usePathname();
-  const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
@@ -27,17 +30,25 @@ export default function MyPage() {
   const [targetAmount, setTargetAmount] = useState(''); 
   const [theme, setTheme] = useState('pink');
   const [isSaving, setIsSaving] = useState(false);
-  
+
+  // データ取得
   useEffect(() => {
     const fetchData = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { router.push('/login'); return; }
+        if (!user) {
+          router.push('/login');
+          return;
+        }
         
         const rawLoginId = user.email?.split('@')[0] || '';         
         const strippedLoginId = String(Number(rawLoginId));  
         
-        const { data: members } = await supabase.from('cast_members').select('*').in('login_id', [rawLoginId, strippedLoginId]);
+        const { data: members } = await supabase
+          .from('cast_members')
+          .select('*')
+          .in('login_id', [rawLoginId, strippedLoginId]);
+          
         const member = members?.[0];
         
         if (member) {
@@ -45,11 +56,32 @@ export default function MyPage() {
           setTargetAmount(String(member.monthly_target_amount || '')); 
           setTheme(member.theme_color || 'pink');
         }
-      } finally { setLoading(false); }
+      } finally {
+        setLoading(false);
+      }
     };
     fetchData();
   }, [router, supabase]);
 
+  // 設定保存（目標額・テーマ）
+  const handleSaveSettings = async () => {
+    if (!profile?.login_id) return;
+    setIsSaving(true);
+    try {
+      const cleanAmount = Number(String(targetAmount).replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))) || 0;
+      await supabase
+        .from('cast_members')
+        .update({ monthly_target_amount: cleanAmount, theme_color: theme })
+        .eq('login_id', profile.login_id);
+      
+      alert('設定を保存しました♪');
+      window.location.reload();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // パスワード更新
   const handlePasswordChange = async () => {
     if (!profile?.login_id || !newPassword) return;
     if (newPassword.length < 4) {
@@ -57,30 +89,26 @@ export default function MyPage() {
       return;
     }
     try {
-      const { error } = await supabase.from('cast_members').update({ password: newPassword }).eq('login_id', profile.login_id);
+      const { error } = await supabase
+        .from('cast_members')
+        .update({ password: newPassword })
+        .eq('login_id', profile.login_id);
+        
       if (!error) { 
         alert('パスワードを更新しました！');
         setNewPassword('');
         window.location.reload();
+      } else {
+        throw error;
       }
-    } catch (e) { alert('更新エラーが発生しました'); }
-  };
-
-  const handleSaveSettings = async () => {
-    if (!profile?.login_id) return;
-    setIsSaving(true);
-    try {
-      const cleanAmount = Number(String(targetAmount).replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))) || 0;
-      await supabase.from('cast_members').update({ monthly_target_amount: cleanAmount, theme_color: theme }).eq('login_id', profile.login_id);
-      alert('設定を保存しました♪');
-      window.location.reload();
-    } finally { setIsSaving(false); }
+    } catch (e) {
+      alert('更新エラーが発生しました');
+    }
   };
 
   const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
-
-  // 📍 【ここが最重要】ステートではなく、レンダリング時に直接判定する
-  // 以前見たログ「managed_by_supabase」という文字列そのものが返ってきている可能性も考慮
+  
+  // セキュリティ警告の判定（UI用）
   const isDanger = profile && (
     !profile.password || 
     String(profile.password) === '0000' || 
@@ -95,17 +123,15 @@ export default function MyPage() {
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800 overflow-x-hidden">
-      
-      {/* 📍 インラインで直接描画。これなら React の状態変化に関わらず、データがあれば即座に出ます */}
-      {isDanger && (
-        <div className="bg-rose-500 text-white text-[11px] font-black py-3 px-4 text-center sticky top-0 z-[100] animate-bounce shadow-lg">
-          ⚠️ セキュリティ警告：初期パスワードを変更してください！
-        </div>
-      )}
-
-      <CastHeader shopName="マイページ" displayName={profile?.display_name} bgColor={currentTheme.bg} />
+      <CastHeader 
+        shopName="マイページ" 
+        displayName={profile?.display_name} 
+        bgColor={currentTheme.bg} 
+      />
       
       <main className="px-5 mt-4 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        
+        {/* 目標金額セクション */}
         <section className="bg-white border border-pink-50 rounded-[32px] p-5 shadow-lg shadow-pink-100/10">
           <div className="flex items-center gap-2 mb-3 font-black text-gray-700">
             <span className="text-lg">💰</span>
@@ -123,6 +149,7 @@ export default function MyPage() {
           </div>
         </section>
 
+        {/* テーマカラーセクション */}
         <section className="bg-white border border-pink-50 rounded-[32px] p-5 shadow-lg shadow-pink-100/10">
           <div className="flex items-center gap-2 mb-3 font-black text-gray-700">
             <span className="text-lg">🎨</span>
@@ -130,21 +157,37 @@ export default function MyPage() {
           </div>
           <div className="grid grid-cols-6 gap-2">
             {THEMES.map((t) => (
-              <button key={t.id} onClick={() => setTheme(t.id)} className={`w-9 h-9 rounded-full mx-auto shadow-sm transition-all ${t.bg} ${theme === t.id ? `scale-110 ring-4 ring-white shadow-md` : 'opacity-40'}`} />
+              <button 
+                key={t.id} 
+                onClick={() => setTheme(t.id)} 
+                className={`w-9 h-9 rounded-full mx-auto shadow-sm transition-all ${t.bg} ${
+                  theme === t.id ? `scale-110 ring-4 ring-white shadow-md` : 'opacity-40'
+                }`} 
+              />
             ))}
           </div>
         </section>
 
-        <button onClick={handleSaveSettings} disabled={isSaving} className={`w-full py-4 rounded-2xl shadow-md font-black text-white text-md active:scale-95 transition-all flex items-center justify-center gap-2 ${isSaving ? 'bg-gray-300' : 'bg-gradient-to-r from-pink-400 to-rose-400'}`}>
+        {/* 保存ボタン */}
+        <button 
+          onClick={handleSaveSettings} 
+          disabled={isSaving} 
+          className={`w-full py-4 rounded-2xl shadow-md font-black text-white text-md active:scale-95 transition-all flex items-center justify-center gap-2 ${
+            isSaving ? 'bg-gray-300' : 'bg-gradient-to-r from-pink-400 to-rose-400'
+          }`}
+        >
           {isSaving ? 'Saving...' : '設定を保存する ✨'}
         </button>
 
-        <section className={`border-2 rounded-[32px] p-5 shadow-sm transition-all duration-500
-          ${isDanger ? 'bg-rose-50 border-rose-100 animate-pulse' : 'bg-gray-50 border-gray-100'}
-        `}>
+        {/* パスワード変更セクション（警告時に赤く光る） */}
+        <section className={`border-2 rounded-[32px] p-5 shadow-sm transition-all duration-500 ${
+          isDanger ? 'bg-rose-50 border-rose-100 animate-pulse' : 'bg-gray-50 border-gray-100'
+        }`}>
           <div className={`flex items-center gap-2 mb-3 font-black ${isDanger ? 'text-rose-500' : 'text-gray-500'}`}>
             <span className="text-lg">{isDanger ? '⚠️' : '🔒'}</span>
-            <h3 className="text-sm uppercase tracking-tight">{isDanger ? 'Security Alert' : 'Password'}</h3>
+            <h3 className="text-sm uppercase tracking-tight">
+              {isDanger ? 'Security Alert' : 'Password'}
+            </h3>
           </div>
           <div className="flex gap-2">
             <input 
@@ -156,9 +199,9 @@ export default function MyPage() {
             />
             <button 
               onClick={handlePasswordChange}
-              className={`px-4 py-2 font-black rounded-xl text-white text-xs shadow-sm active:scale-95 whitespace-nowrap
-                ${isDanger ? 'bg-rose-400' : 'bg-gray-400'}
-              `}
+              className={`px-4 py-2 font-black rounded-xl text-white text-xs shadow-sm active:scale-95 whitespace-nowrap ${
+                isDanger ? 'bg-rose-400' : 'bg-gray-400'
+              }`}
             >
               更新
             </button>
@@ -167,7 +210,13 @@ export default function MyPage() {
       </main>
 
       {/* @ts-ignore */}
-      <FixedFooter pathname={pathname || ''} onLogout={async () => { await supabase.auth.signOut(); router.push('/login'); }} />
+      <FixedFooter 
+        pathname={pathname || ''} 
+        onLogout={async () => { 
+          await supabase.auth.signOut(); 
+          router.push('/login'); 
+        }} 
+      />
     </div>
   );
 }
