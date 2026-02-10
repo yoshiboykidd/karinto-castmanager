@@ -1,128 +1,85 @@
 'use client';
 
 
-type MonthlySummaryProps = {
-  month: string;
-  totals: {
-    amount: number;
-    count: number;
-    hours: number;
-    f: number;
-    first: number;
-    main: number;
-  };
-  targetAmount?: number;
-  theme?: string;
-};
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Home, BarChart2, User, LogOut } from 'lucide-react';
 
 
-const THEME_STYLES: any = {
-  pink:   { bgFrom: 'from-[#FFE9ED]', bgTo: 'to-[#FFF5F7]', border: 'border-pink-200',  textMain: 'text-pink-600', textSub: 'text-pink-500',  textLabel: 'text-pink-400',  subBorder: 'border-pink-50',  bar: 'bg-pink-400' },
-  blue:   { bgFrom: 'from-blue-50',   bgTo: 'to-blue-100',   border: 'border-blue-200',  textMain: 'text-blue-600', textSub: 'text-blue-500',  textLabel: 'text-blue-400',  subBorder: 'border-blue-100', bar: 'bg-blue-400' },
-  black:  { bgFrom: 'from-gray-100',  bgTo: 'to-gray-200',   border: 'border-gray-300',  textMain: 'text-gray-800', textSub: 'text-gray-700',  textLabel: 'text-gray-500',  subBorder: 'border-gray-200', bar: 'bg-gray-700' },
-  white:  { bgFrom: 'from-white',     bgTo: 'to-gray-50',    border: 'border-gray-200',  textMain: 'text-gray-600', textSub: 'text-gray-500',  textLabel: 'text-gray-400',  subBorder: 'border-gray-100', bar: 'bg-gray-400' },
-  red:    { bgFrom: 'from-red-50',    bgTo: 'to-red-100',    border: 'border-red-200',   textMain: 'text-red-600',  textSub: 'text-red-500',   textLabel: 'text-red-400',   subBorder: 'border-red-100',  bar: 'bg-red-400' },
-  yellow: { bgFrom: 'from-yellow-50', bgTo: 'to-yellow-100', border: 'border-yellow-200', textMain: 'text-yellow-600', textSub: 'text-yellow-500', textLabel: 'text-yellow-400', subBorder: 'border-yellow-100', bar: 'bg-yellow-400' },
-};
+interface FixedFooterProps {
+  pathname: string;
+  onLogout?: () => void;
+}
 
 
-export default function MonthlySummary({ 
-  month, 
-  totals, 
-  targetAmount = 0, 
-  theme = 'pink' 
-}: MonthlySummaryProps) {
-  
-  const c = THEME_STYLES[theme] || THEME_STYLES.pink;
+export default function FixedFooter({ pathname, onLogout }: FixedFooterProps) {
+  const router = useRouter();
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
 
 
-  const progressPercent = targetAmount > 0 
-    ? Math.min(100, Math.floor((totals.amount / targetAmount) * 100)) 
-    : 0;
+  // ページ遷移が完了したら「押し中」の状態をリセット
+  useEffect(() => {
+    setPendingPath(null);
+  }, [pathname]);
+
+
+  const menuItems = [
+    { label: 'ホーム', icon: Home, path: '/', action: () => { setPendingPath('/'); router.push('/'); } },
+    { label: '実績', icon: BarChart2, path: '/salary', action: () => { setPendingPath('/salary'); router.push('/salary'); } },
+    { label: 'マイページ', icon: User, path: '/mypage', action: () => { setPendingPath('/mypage'); router.push('/mypage'); } },
+  ];
 
 
   return (
-    <section className={`bg-gradient-to-br ${c.bgFrom} ${c.bgTo} rounded-[32px] p-5 border ${c.border} relative overflow-hidden shadow-sm flex flex-col space-y-2`}>
-      
-      {/* 上段: 実績タイトル & バッジ（サイズを大きく復元） */}
-      <div className="flex items-center justify-between mb-1">
-        <h2 className={`text-[20px] font-black ${c.textSub} tracking-tighter leading-none shrink-0`}>
-          {month}の実績
-        </h2>
-        <div className="flex gap-1.5">
-          {/* 出勤バッジ */}
-          <div className={`bg-white/90 px-3 py-1.5 rounded-xl border ${c.subBorder} shadow-sm flex items-baseline justify-center min-w-[70px]`}>
-            <span className="text-[11px] font-bold text-gray-400 mr-1">出勤</span>
-            <span className={`text-[24px] font-black ${c.textSub} leading-none tracking-tighter`}>{totals.count}</span>
-            <span className="text-[11px] font-bold text-gray-400 ml-0.5">日</span>
-          </div>
-          {/* 稼働バッジ */}
-          <div className={`bg-white/90 px-3 py-1.5 rounded-xl border ${c.subBorder} shadow-sm flex items-baseline justify-center min-w-[70px]`}>
-            <span className="text-[11px] font-bold text-gray-400 mr-1">稼働</span>
-            <span className={`text-[24px] font-black ${c.textSub} leading-none tracking-tighter`}>{Math.round(totals.hours * 10) / 10}</span>
-            <span className="text-[11px] font-bold text-gray-400 ml-0.5">h</span>
-          </div>
-        </div>
-      </div>
-      
-      {/* メイン金額表示 */}
-      <div className="text-center flex flex-col items-center justify-center relative z-10 -my-1">
-        <p className={`text-[56px] font-black ${c.textMain} leading-none tracking-tighter filter drop-shadow-sm`}>
-          <span className="text-3xl mr-1 opacity-40 translate-y-[-6px] inline-block">¥</span>
-          {totals.amount.toLocaleString()}
-        </p>
-      </div>
+    <footer className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-8 pt-4 bg-gradient-to-t from-white via-white/95 to-transparent">
+      <nav className="max-w-md mx-auto bg-white/80 backdrop-blur-xl border border-pink-100 rounded-[32px] shadow-[0_8px_32px_rgba(255,182,193,0.15)] px-6 py-3">
+        <ul className="flex justify-between items-center">
+          {/* --- 通常メニュー --- */}
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            // ページが一致しているか、または今まさにそのボタンを押した瞬間ならアクティブ
+            const isActive = pathname === item.path || pendingPath === item.path;
+            
+            return (
+              <li key={item.label}>
+                <button
+                  onClick={item.action}
+                  className={`flex flex-col items-center gap-1 transition-all duration-200 ${
+                    isActive ? 'scale-110' : 'opacity-40 active:scale-90'
+                  }`}
+                >
+                  <div className={`p-2 rounded-2xl transition-colors duration-200 ${
+                    isActive ? 'bg-pink-400 text-white shadow-lg shadow-pink-200' : 'text-gray-400'
+                  }`}>
+                    <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                  </div>
+                  <span className={`text-[10px] font-black transition-colors duration-200 ${
+                    isActive ? 'text-pink-500' : 'text-gray-400'
+                  }`}>
+                    {item.label}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
 
 
-      {/* 目標＆進捗エリア（ハーフサイズ維持） */}
-      {targetAmount > 0 && (
-        <div className="bg-white/40 rounded-xl p-2.5 border border-white/50 shadow-sm mx-1">
-          
-          <div className="flex justify-between items-end mb-1.5 px-1">
-             <div className="flex items-center gap-2">
-                <span className="text-[9px] font-bold text-gray-400 tracking-widest bg-white/60 px-1.5 py-0.5 rounded">GOAL</span>
-                <span className={`text-[16px] font-black ${c.textSub} tracking-tight leading-none`}>
-                  ¥{targetAmount.toLocaleString()}
-                </span>
-             </div>
-             <div className="flex items-baseline">
-                <span className={`text-[20px] font-black ${c.textMain} leading-none tracking-tighter`}>
-                   {progressPercent}
-                </span>
-                <span className={`text-[10px] font-bold ${c.textLabel} ml-0.5`}>%</span>
-             </div>
-          </div>
-          
-          {/* バー（h-3.5） */}
-          <div className="w-full h-3.5 bg-gray-100 rounded-full overflow-hidden border border-white/60 shadow-inner relative">
-            <div 
-              className={`h-full ${c.bar} transition-all duration-1000 ease-out shadow-sm relative`} 
-              style={{ width: `${progressPercent}%` }}
+          {/* --- ログアウト（独立したボタンとして定義） --- */}
+          <li>
+            <button
+              onClick={onLogout}
+              className="flex flex-col items-center gap-1 transition-all duration-200 opacity-40 active:opacity-100 active:scale-90"
             >
-               <div className="absolute inset-0 w-full h-full opacity-30 bg-[repeating-linear-gradient(45deg,transparent,transparent_6px,#fff_6px,#fff_12px)]"></div>
-            </div>
-          </div>
-        </div>
-      )}
-
-
-      {/* 下段：内訳 */}
-      <div className={`grid grid-cols-3 bg-white/80 backdrop-blur-sm rounded-2xl border ${c.subBorder} shadow-sm divide-x divide-gray-100 py-2`}>
-        <div className="flex flex-col items-center justify-center space-y-0.5">
-          <p className={`text-[11px] ${c.textLabel} font-black leading-none tracking-widest scale-y-90`}>フリー</p>
-          <p className={`text-[26px] font-black ${c.textMain} leading-none tracking-tighter`}>{totals.f || 0}</p>
-        </div>
-        <div className="flex flex-col items-center justify-center space-y-0.5">
-          <p className={`text-[11px] ${c.textLabel} font-black leading-none tracking-widest scale-y-90`}>初指名</p>
-          <p className={`text-[26px] font-black ${c.textMain} leading-none tracking-tighter`}>{totals.first || 0}</p>
-        </div>
-        <div className="flex flex-col items-center justify-center space-y-0.5">
-          <p className={`text-[11px] ${c.textLabel} font-black leading-none tracking-widest scale-y-90`}>本指名</p>
-          <p className={`text-[26px] font-black ${c.textMain} leading-none tracking-tighter`}>{totals.main || 0}</p>
-        </div>
-      </div>
-
-
-    </section>
+              <div className="p-2 rounded-2xl text-gray-400 hover:text-rose-400">
+                <LogOut size={20} strokeWidth={2} />
+              </div>
+              <span className="text-[10px] font-black text-gray-400">
+                ログアウト
+              </span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+    </footer>
   );
 }
