@@ -17,9 +17,9 @@ import FixedFooter from '@/components/dashboard/FixedFooter';
 
 const THEME_CONFIG: any = {
   pink: { 
-    header: 'bg-[#FFB7C5]',
-    calendar: 'bg-[#FFF9FA] border-pink-100',
-    text: 'text-pink-500' 
+    header: 'bg-[#FFB7C5]', // 柔らかいサクラ
+    calendar: 'bg-white/80 backdrop-blur-xl border-pink-100/50 shadow-[0_20px_50px_rgba(255,182,193,0.1)]', 
+    text: 'text-pink-400' 
   }
 };
 
@@ -62,18 +62,18 @@ export default function DashboardContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
-      <div className="pb-4">
+    <div className="min-h-screen bg-[#FFFAFB] pb-36 font-sans overflow-x-hidden text-gray-800">
+      <div className="pb-6">
         <CastHeader 
           shopName={data?.shop?.shop_name || "かりんと"} 
           syncTime={data?.syncAt} 
           displayName={safeProfile.display_name} 
-          version="v4.5.0"
+          version="v4.6.0"
           bgColor={currentTheme.header}
         />
       </div>
       
-      <main className="px-4 -mt-10 relative z-10 space-y-5">
+      <main className="px-5 -mt-12 relative z-10 space-y-6">
         {isValid(nav.viewDate) && (
           <MonthlySummary 
             month={format(nav.viewDate || new Date(), 'M月')} 
@@ -83,7 +83,8 @@ export default function DashboardContent() {
           />
         )}
 
-        <section className={`p-4 rounded-[40px] border-2 shadow-xl shadow-pink-100/20 text-center transition-all duration-500 ${currentTheme.calendar}`}>
+        <section className={`p-5 rounded-[48px] border-2 transition-all duration-500 ${currentTheme.calendar}`}>
+          <div className="mb-2 text-[10px] font-black text-pink-200 uppercase tracking-[0.2em] italic">Schedule</div>
           <DashboardCalendar 
             shifts={safeShifts as any} 
             selectedDates={nav.selected?.single} 
