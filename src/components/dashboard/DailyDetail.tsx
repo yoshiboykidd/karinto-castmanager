@@ -1,10 +1,8 @@
 'use client';
 
-
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-
 
 // 📍 Workerから届くDBの型に合わせてインターフェースを調整
 interface Reservation {
@@ -19,7 +17,6 @@ interface Reservation {
   raw_body?: string;
 }
 
-
 interface DailyDetailProps {
   date: Date;
   dayNum: number;
@@ -28,10 +25,8 @@ interface DailyDetailProps {
   theme: string;
 }
 
-
 export default function DailyDetail({ date, dayNum, shift, reservations, theme }: DailyDetailProps) {
   const [openId, setOpenId] = useState<string | null>(null);
-
 
   // 📍 その日の予約だけを抽出し、時間順に並べる
   const todayReservations = useMemo(() => {
@@ -41,11 +36,9 @@ export default function DailyDetail({ date, dayNum, shift, reservations, theme }
       .sort((a, b) => a.start_time.localeCompare(b.start_time));
   }, [reservations, date]);
 
-
   const accentColor = theme === 'pink' ? 'text-pink-400' : 
                       theme === 'blue' ? 'text-cyan-500' : 
                       theme === 'yellow' ? 'text-yellow-500' : 'text-gray-500';
-
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -71,7 +64,6 @@ export default function DailyDetail({ date, dayNum, shift, reservations, theme }
         </div>
       </section>
 
-
       {/* 予約リストセクション */}
       <div className="space-y-2">
         <h4 className="px-2 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] italic">Reservations</h4>
@@ -87,15 +79,12 @@ export default function DailyDetail({ date, dayNum, shift, reservations, theme }
             if (res.nomination_type?.includes('本指名')) sourceLabel = '<本>';
             else if (res.nomination_type?.includes('フリー')) sourceLabel = '<F>';
 
-
             // 時間の整形 (HH:mm:ss -> HH:mm)
             const displayStart = res.start_time?.slice(0, 5) || '--:--';
             const displayEnd = res.end_time?.slice(0, 5) || '--:--';
 
-
             // 分数の抽出
             const duration = res.course_info?.match(/\d+/)?.[0] || '--';
-
 
             return (
               <div key={res.id} className="overflow-hidden transition-all duration-300">
@@ -113,7 +102,6 @@ export default function DailyDetail({ date, dayNum, shift, reservations, theme }
                   </div>
                   {openId === res.id ? <ChevronUp size={16} className="text-gray-300" /> : <ChevronDown size={16} className="text-gray-300" />}
                 </button>
-
 
                 {/* 詳細表示（アコーディオン） */}
                 {openId === res.id && (
