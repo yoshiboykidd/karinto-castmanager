@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
-import { format, isValid, parseISO, isToday } from 'date-fns'; // ★isTodayを追加
+import { format, isValid, parseISO, isToday } from 'date-fns';
 
 type CastHeaderProps = {
   shopName: string;
@@ -23,26 +23,13 @@ export default function CastHeader({
   const [seasonalEmoji, setSeasonalEmoji] = useState('☃️');
   const [isPanicMode, setIsPanicMode] = useState(false);
 
-  // ★修正: 時間表示のロジック強化
-  // 「今日」なら時間だけ、「過去/未来」なら日付も出して、止まっているのか判断しやすくする
   const formattedTime = useMemo(() => {
     if (!syncTime) return '--:--';
-    
     try {
-      // 文字列ならパース、すでにDateならそのまま使う
       const date = typeof syncTime === 'string' ? parseISO(syncTime) : syncTime;
-
-      if (!isValid(date)) {
-        // 日付として無効なら、文字列そのまま返す（例: "15:00" など手動入力値の場合）
-        return String(syncTime);
-      }
-
-      // 今日なら時間だけ、違うなら日付もつける
-      if (isToday(date)) {
-        return format(date, 'HH:mm');
-      } else {
-        return format(date, 'M/d HH:mm');
-      }
+      if (!isValid(date)) return String(syncTime);
+      if (isToday(date)) return format(date, 'HH:mm');
+      return format(date, 'M/d HH:mm');
     } catch (e) {
       return '--:--';
     }
@@ -60,7 +47,6 @@ export default function CastHeader({
 
   return (
     <>
-      {/* 緊急脱出用オーバーレイ */}
       {isPanicMode && (
         <div 
           className="fixed inset-0 bg-white z-[9999] flex flex-col items-center justify-center cursor-pointer"
@@ -72,20 +58,21 @@ export default function CastHeader({
         </div>
       )}
 
-      <header className={`px-5 pt-8 pb-5 rounded-b-[40px] shadow-sm relative transition-colors duration-500
+      {/* 📍 修正箇所: pt-7 pb-9 に変更して下側の余白を確保し、全体の重心を上げました */}
+      <header className={`px-5 pt-7 pb-9 rounded-b-[40px] shadow-sm relative transition-colors duration-500
         ${isThemed 
           ? `${bgColor} text-white border-b border-white/10` 
           : 'bg-white text-gray-800 border-b border-pink-50' 
         }
       `}>
-        <div className="flex justify-between items-end">
+        {/* 📍 修正箇所: items-end から items-center に変更して上下中央揃えに */}
+        <div className="flex justify-between items-center">
           
-          {/* --- 左サイド（名前エリア）: ここだけクリックでマイページへ --- */}
           <div 
             onClick={() => router.push('/mypage')}
-            className="flex flex-col space-y-1 cursor-pointer active:opacity-70 transition-opacity"
+            className="flex flex-col space-y-0.5 cursor-pointer active:opacity-70 transition-opacity"
           >
-            <p className={`text-[10px] font-black uppercase tracking-[0.2em] leading-none
+            <p className={`text-[10px] font-black uppercase tracking-[0.2em] leading-none mb-1
               ${isThemed ? 'text-white/70' : 'text-pink-300/80'}
             `}>
               - CastManager -
@@ -96,7 +83,7 @@ export default function CastHeader({
               {shopName || '店舗未設定'}
             </p>
 
-            <div className="pt-1">
+            <div className="pt-0.5">
               <h1 className="font-black leading-tight flex items-baseline">
                 <span className="text-[26px]">{displayName || 'キャスト'}</span>
                 <span className={`text-[13px] ml-1 font-bold
@@ -112,11 +99,9 @@ export default function CastHeader({
             </div>
           </div>
 
-          {/* --- 右サイド（ボタンエリア） --- */}
-          <div className="flex flex-col items-end space-y-2 pb-0.5">
-            
-            {/* HP同期時刻 */}
-            <div className={`w-[128px] h-[44px] rounded-xl border flex items-center justify-center gap-2 shadow-sm transition-colors
+          {/* 📍 修正箇所: ボタンエリアの上下間隔を少し詰めました */}
+          <div className="flex flex-col items-end space-y-1.5">
+            <div className={`w-[128px] h-[42px] rounded-xl border flex items-center justify-center gap-2 shadow-sm transition-colors
               ${isThemed 
                 ? 'bg-white/20 border-white/20 text-white' 
                 : 'bg-green-50/80 border-green-100'
@@ -134,7 +119,6 @@ export default function CastHeader({
                 <span className={`text-[8px] font-black uppercase tracking-tighter mb-0.5
                   ${isThemed ? 'text-white/70' : 'text-green-600/50'}
                 `}>HP SYNC</span>
-                {/* 文字数が増える可能性があるので文字サイズ調整 */}
                 <span className={`font-black tracking-tight whitespace-nowrap
                   ${formattedTime.length > 5 ? 'text-[11px]' : 'text-[13px]'}
                   ${isThemed ? 'text-white' : 'text-green-600'}
@@ -142,13 +126,12 @@ export default function CastHeader({
               </div>
             </div>
 
-            {/* 緊急脱出ボタン */}
             <button
               onClick={(e) => {
-                e.stopPropagation(); // 親のイベントを止める
+                e.stopPropagation();
                 setIsPanicMode(true);
               }}
-              className={`w-[128px] h-[44px] rounded-xl border flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 group z-10 cursor-pointer
+              className={`w-[128px] h-[42px] rounded-xl border flex items-center justify-center gap-2 shadow-sm transition-all active:scale-95 group z-10 cursor-pointer
                 ${isThemed
                   ? 'bg-white/20 border-white/20 text-white hover:bg-white/30'
                   : 'bg-rose-50/80 border-rose-100 hover:bg-rose-100'
@@ -167,7 +150,6 @@ export default function CastHeader({
                 `}>ESCAPE</span>
               </div>
             </button>
-            
           </div>
         </div>
       </header>
