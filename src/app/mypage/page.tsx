@@ -59,7 +59,6 @@ export default function MyPage() {
     } finally { setIsSaving(false); }
   };
 
-  // パスワード変更ロジック復活
   const handlePasswordChange = async () => {
     if (!profile?.login_id || !newPassword) return;
     const { error } = await supabase.from('cast_members').update({ password: newPassword }).eq('login_id', profile.login_id);
@@ -80,15 +79,11 @@ export default function MyPage() {
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800 overflow-x-hidden">
       <CastHeader shopName="マイページ" displayName={profile?.display_name} bgColor={currentTheme.bg} />
       
-      <main className="px-5 mt-6 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* 名前とIDのブロックを削除し、余白を調整 */}
+      <main className="px-5 mt-10 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
         
-        <div className="text-center">
-          <h2 className="text-2xl font-black text-gray-800 tracking-tighter">{profile?.display_name || "Guest"}</h2>
-          <p className="text-pink-300 text-[10px] font-black tracking-[0.2em] uppercase italic">ID: {profile?.login_id}</p>
-        </div>
-
         <div className="space-y-6">
-          {/* 📍 順序変更1：今月の目標金額を上に */}
+          {/* 今月の目標金額 */}
           <section className="bg-white border border-pink-50 rounded-[40px] p-8 shadow-xl shadow-pink-100/20 space-y-6">
             <div className="flex items-center gap-3 font-black text-gray-700">
               <div className="w-10 h-10 bg-pink-50 rounded-2xl flex items-center justify-center text-xl shadow-inner">💰</div>
@@ -106,7 +101,7 @@ export default function MyPage() {
             </div>
           </section>
 
-          {/* 📍 順序変更2：テーマカラーを下に */}
+          {/* テーマカラー */}
           <section className="bg-white border border-pink-50 rounded-[40px] p-8 shadow-xl shadow-pink-100/20 space-y-6">
             <div className="flex items-center gap-3 font-black text-gray-700">
               <div className="w-10 h-10 bg-pink-50 rounded-2xl flex items-center justify-center text-xl shadow-inner">🎨</div>
@@ -124,7 +119,7 @@ export default function MyPage() {
           </button>
         </div>
 
-        {/* 📍 パスワード変更セクションを復活 */}
+        {/* パスワード変更セクション */}
         <section className={`border-2 rounded-[40px] p-8 shadow-lg transition-all duration-500
           ${isDangerPassword ? 'bg-rose-50 border-rose-100 animate-pulse' : 'bg-gray-50 border-gray-100'}
         `}>
@@ -151,7 +146,7 @@ export default function MyPage() {
           </div>
         </section>
 
-        <button onClick={async () => { await supabase.auth.signOut(); router.push('/login'); }} className="w-full py-10 text-gray-300 text-xs font-black tracking-[0.3em] hover:text-rose-400 transition-colors uppercase italic">Logout</button>
+        {/* 📍 下部のLOGOUTボタンを削除しました */}
       </main>
 
       {/* @ts-ignore */}
