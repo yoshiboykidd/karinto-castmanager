@@ -1,105 +1,78 @@
 'use client';
 
-type MonthlySummaryProps = {
-  month: string;
-  totals: {
-    amount: number;
-    count: number;
-    hours: number;
-    f: number;
-    first: number;
-    main: number;
-  };
-  targetAmount?: number;
-  theme?: string;
-};
+import { useMemo } from 'react';
 
-const THEME_STYLES: any = {
-  pink:   { bgFrom: 'from-[#FFF9FA]', bgTo: 'to-[#FFF0F3]', border: 'border-pink-100',  textMain: 'text-[#FF8DA1]', textSub: 'text-[#FFB7C5]',  textLabel: 'text-pink-300',  subBorder: 'border-pink-50',  bar: 'bg-[#FFB7C5]' },
-  // 他のテーマは省略（必要なら追加可能）
-};
+export default function MonthlySummary({ month, totals, targetAmount, theme }: any) {
+  // 達成率の計算
+  const progress = useMemo(() => {
+    if (!targetAmount || targetAmount === 0) return 0;
+    return Math.min(Math.round((totals.amount / targetAmount) * 100), 100);
+  }, [totals.amount, targetAmount]);
 
-export default function MonthlySummary({ 
-  month, 
-  totals, 
-  targetAmount = 0, 
-  theme = 'pink' 
-}: MonthlySummaryProps) {
-  
-  const c = THEME_STYLES[theme] || THEME_STYLES.pink;
+  const accentColor = theme === 'pink' ? 'text-pink-500' : 
+                      theme === 'blue' ? 'text-cyan-500' : 
+                      theme === 'yellow' ? 'text-yellow-600' : 'text-gray-600';
 
-  const progressPercent = targetAmount > 0 
-    ? Math.min(100, Math.floor((totals.amount / targetAmount) * 100)) 
-    : 0;
+  const barColor = theme === 'pink' ? 'bg-pink-400' : 
+                   theme === 'blue' ? 'bg-cyan-400' : 
+                   theme === 'yellow' ? 'bg-yellow-400' : 'bg-gray-400';
 
   return (
-    <section className={`bg-gradient-to-br ${c.bgFrom} ${c.bgTo} rounded-[32px] p-5 border ${c.border} relative overflow-hidden shadow-sm flex flex-col space-y-2`}>
-      
-      <div className="flex items-center justify-between mb-1">
-        <h2 className={`text-[20px] font-black ${c.textSub} tracking-tighter leading-none shrink-0`}>
-          {month}の実績
-        </h2>
-        <div className="flex gap-1.5">
-          <div className={`bg-white/90 px-3 py-1.5 rounded-xl border ${c.subBorder} shadow-sm flex items-baseline justify-center min-w-[70px]`}>
-            <span className="text-[11px] font-bold text-gray-300 mr-1">出勤</span>
-            <span className={`text-[24px] font-black ${c.textSub} leading-none tracking-tighter`}>{totals.count}</span>
-            <span className="text-[11px] font-bold text-gray-400 ml-0.5">日</span>
-          </div>
-          <div className={`bg-white/90 px-3 py-1.5 rounded-xl border ${c.subBorder} shadow-sm flex items-baseline justify-center min-w-[70px]`}>
-            <span className="text-[11px] font-bold text-gray-300 mr-1">稼働</span>
-            <span className={`text-[24px] font-black ${c.textSub} leading-none tracking-tighter`}>{Math.round(totals.hours * 10) / 10}</span>
-            <span className="text-[11px] font-bold text-gray-400 ml-0.5">h</span>
-          </div>
+    <section className="bg-white/80 backdrop-blur-xl border border-white rounded-[40px] p-8 shadow-2xl shadow-pink-100/20 animate-in fade-in zoom-in duration-700">
+      <div className="flex justify-between items-end mb-6">
+        <div>
+          <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.3em] mb-1 italic">Monthly Performance</p>
+          <h2 className="text-5xl font-black text-gray-800 tracking-tighter italic">
+            {month}<span className={`ml-2 text-sm not-italic opacity-30`}>TOTAL</span>
+          </h2>
+        </div>
+        <div className="text-right">
+          <p className={`text-4xl font-black ${accentColor} tracking-tighter italic`}>
+            {progress}<span className="text-sm ml-1">%</span>
+          </p>
+          <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest italic">Achievement</p>
         </div>
       </div>
-      
-      <div className="text-center flex flex-col items-center justify-center relative z-10 -my-1">
-        <p className={`text-[56px] font-black ${c.textMain} leading-none tracking-tighter filter drop-shadow-sm`}>
-          <span className="text-3xl mr-1 opacity-40 translate-y-[-6px] inline-block">¥</span>
-          {totals.amount.toLocaleString()}
-        </p>
+
+      {/* 📍 達成率バー */}
+      <div className="h-4 bg-gray-100 rounded-full overflow-hidden mb-8 border border-gray-50 shadow-inner p-1">
+        <div 
+          className={`h-full ${barColor} rounded-full transition-all duration-1000 ease-out shadow-sm`}
+          style={{ width: `${progress}%` }}
+        />
       </div>
 
-      {targetAmount > 0 && (
-        <div className="bg-white/40 rounded-xl p-2.5 border border-white/50 shadow-sm mx-1">
-          <div className="flex justify-between items-end mb-1.5 px-1">
-             <div className="flex items-center gap-2">
-                <span className="text-[9px] font-bold text-gray-400 tracking-widest bg-white/60 px-1.5 py-0.5 rounded">GOAL</span>
-                <span className={`text-[16px] font-black ${c.textSub} tracking-tight leading-none`}>
-                  ¥{targetAmount.toLocaleString()}
-                </span>
-             </div>
-             <div className="flex items-baseline">
-                <span className={`text-[20px] font-black ${c.textMain} leading-none tracking-tighter`}>
-                   {progressPercent}
-                </span>
-                <span className={`text-[10px] font-bold ${c.textLabel} ml-0.5`}>%</span>
-             </div>
-          </div>
-          
-          <div className="w-full h-3.5 bg-gray-100 rounded-full overflow-hidden border border-white/60 shadow-inner relative">
-            <div 
-              className={`h-full ${c.bar} transition-all duration-1000 ease-out shadow-sm relative`} 
-              style={{ width: `${progressPercent}%` }}
-            >
-               <div className="absolute inset-0 w-full h-full opacity-30 bg-[repeating-linear-gradient(45deg,transparent,transparent_6px,#fff_6px,#fff_12px)]"></div>
+      {/* 📍 実績グリッド：数字を極太・斜体で強調 */}
+      <div className="grid grid-cols-2 gap-y-8 gap-x-4">
+        <div className="space-y-1">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest italic">Rewards</p>
+          <p className="text-2xl font-black text-gray-800 tracking-tighter italic">
+            ¥{totals.amount?.toLocaleString() || '0'}
+          </p>
+        </div>
+        <div className="space-y-1">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest italic">Avg Hourly</p>
+          <p className="text-2xl font-black text-gray-800 tracking-tighter italic">
+            ¥{totals.hours > 0 ? Math.round(totals.amount / totals.hours).toLocaleString() : '0'}
+          </p>
+        </div>
+        <div className="space-y-1">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest italic">Work Hours</p>
+          <p className="text-2xl font-black text-gray-800 tracking-tighter italic">
+            {totals.hours?.toFixed(1) || '0.0'}<span className="text-xs ml-1">h</span>
+          </p>
+        </div>
+        <div className="space-y-1 text-right border-l border-gray-100 pl-4">
+          <div className="flex justify-end gap-3">
+            <div className="text-center">
+              <p className="text-[9px] font-black text-pink-300 uppercase italic">Nom</p>
+              <p className="text-lg font-black text-gray-700 italic">{totals.main + totals.first}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[9px] font-black text-cyan-300 uppercase italic">Free</p>
+              <p className="text-lg font-black text-gray-700 italic">{totals.f}</p>
             </div>
           </div>
-        </div>
-      )}
-
-      <div className={`grid grid-cols-3 bg-white/80 backdrop-blur-sm rounded-2xl border ${c.subBorder} shadow-sm divide-x divide-gray-100 py-2`}>
-        <div className="flex flex-col items-center justify-center space-y-0.5">
-          <p className={`text-[11px] ${c.textLabel} font-black leading-none tracking-widest scale-y-90`}>フリー</p>
-          <p className={`text-[26px] font-black ${c.textMain} leading-none tracking-tighter`}>{totals.f || 0}</p>
-        </div>
-        <div className="flex flex-col items-center justify-center space-y-0.5">
-          <p className={`text-[11px] ${c.textLabel} font-black leading-none tracking-widest scale-y-90`}>初指名</p>
-          <p className={`text-[26px] font-black ${c.textMain} leading-none tracking-tighter`}>{totals.first || 0}</p>
-        </div>
-        <div className="flex flex-col items-center justify-center space-y-0.5">
-          <p className={`text-[11px] ${c.textLabel} font-black leading-none tracking-widest scale-y-90`}>本指名</p>
-          <p className={`text-[26px] font-black ${c.textMain} leading-none tracking-tighter`}>{totals.main || 0}</p>
         </div>
       </div>
     </section>
