@@ -28,6 +28,7 @@ export default function MyPage() {
   const [theme, setTheme] = useState('pink');
   const [isSaving, setIsSaving] = useState(false);
 
+  // 1. データ取得
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -47,13 +48,16 @@ export default function MyPage() {
     fetchData();
   }, [router, supabase]);
 
-  // ★ 📍 ポップアップ警告のロジック
+  // 2. ポップアップ警告（確実に出すために useEffect の位置を調整）
   useEffect(() => {
-    if (!loading && profile?.password === '0000') {
-      alert('⚠️ セキュリティ警告\nパスワードが初期設定(0000)のままです。安全のため、今すぐ変更してください！');
+    if (!loading && profile && String(profile.password) === '0000') {
+      setTimeout(() => {
+        alert('⚠️ セキュリティ警告\nパスワードが初期設定(0000)のままです。安全のため、今すぐ変更してください！');
+      }, 500);
     }
   }, [loading, profile]);
 
+  // 3. 設定保存関数
   const handleSaveSettings = async () => {
     if (!profile?.login_id) return;
     setIsSaving(true);
@@ -65,26 +69,41 @@ export default function MyPage() {
     } finally { setIsSaving(false); }
   };
 
+  // 4. パスワード変更関数（ここがボタンより上にないと波線が出ます）
   const handlePasswordChange = async () => {
-    if (!profile?.login_id || !newPassword) return;
-    const { error } = await supabase.from('cast_members').update({ password: newPassword }).eq('login_id', profile.login_id);
-    if (!error) { 
-      alert('パスワードを変更しました✨'); 
-      setNewPassword('');
-      window.location.reload(); // 状態を更新して警告を消す
+    if (!profile?.login_id) return;
+    if (!newPassword || newPassword.length < 4) {
+      alert('パスワードは4文字以上で入力してください');
+      return;
+    }
+    try {
+      const { error } = await supabase.from('cast_members').update({ password: newPassword }).eq('login_id', profile.login_id);
+      if (!error) { 
+        alert('パスワードを変更しました✨'); 
+        setNewPassword('');
+        window.location.reload();
+      } else {
+        throw error;
+      }
+    } catch (e) {
+      alert('変更に失敗しました...');
     }
   };
 
   const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
   const isDangerPassword = profile?.password === '0000';
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#FFFDFE] font-black text-pink-300 animate-pulse text-4xl italic">KARINTO...</div>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#FFFDFE]">
+      <div className="font-black text-pink-300 animate-pulse text-4xl italic tracking-tighter">KARINTO...</div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800 overflow-x-hidden">
       <CastHeader shopName="マイページ" displayName={profile?.display_name} bgColor={currentTheme.bg} />
       
-      <main className="px-5 mt-4 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <main className="px-5 mt-4 space-y-3">
         
         {/* 目標金額 */}
         <section className="bg-white border border-pink-50 rounded-[32px] p-5 shadow-lg shadow-pink-100/10">
@@ -121,21 +140,21 @@ export default function MyPage() {
           {isSaving ? 'Saving...' : '設定を保存する ✨'}
         </button>
 
-        {/* PW変更セクション（警告時に赤く光る） */}
-        <section id="password-section" className={`border-2 rounded-[32px] p-5 shadow-sm transition-all duration-500
+        {/* PW変更 */}
+        <section className={`border-2 rounded-[32px] p-5 shadow-sm transition-all duration-500
           ${isDangerPassword ? 'bg-rose-50 border-rose-100 animate-pulse' : 'bg-gray-50 border-gray-100'}
         `}>
           <div className={`flex items-center gap-2 mb-3 font-black ${isDangerPassword ? 'text-rose-500' : 'text-gray-500'}`}>
             <span className="text-lg">{isDangerPassword ? '⚠️' : '🔒'}</span>
-            <h3 className="text-sm">{isDangerPassword ? 'SECURITY ALERT' : 'Password'}</h3>
+            <h3 className="text-sm uppercase tracking-tight">{isDangerPassword ? 'Security Alert' : 'Password'}</h3>
           </div>
           <div className="flex gap-2">
             <input 
               type="text" 
-              placeholder="新PWを入力" 
+              placeholder="新PW" 
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="flex-1 px-4 py-2 rounded-xl bg-white border border-gray-100 font-bold text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-gray-100"
+              className="flex-1 px-4 py-2 rounded-xl bg-white border border-gray-200 font-bold text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-gray-100"
             />
             <button 
               onClick={handlePasswordChange}
