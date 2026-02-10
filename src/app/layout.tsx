@@ -2,26 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { useRouter } from 'next/navigation';
-import { Geist, Geist_Mono } from "next/font/google";
+import { useRouter, usePathname } from 'next/navigation';
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname(); // 画面遷移を検知するために使用
   const [supabase] = useState(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -29,63 +15,60 @@ export default function RootLayout({
   
   const [isAlertOpen, setIsAlertOpen] = useState(false);
 
+  // パスワードチェック関数
+  const checkPassword = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const rawId = user.email?.split('@')[0] || '';
+    const { data } = await supabase
+      .from('cast_members')
+      .select('password')
+      .in('login_id', [rawId, String(Number(rawId))])
+      .limit(1);
+
+    const pw = data?.[0]?.password;
+
+    // 「0000」または「読み取り不可」ならアラートを出す
+    if (!pw || String(pw) === '0000' || String(pw) === 'managed_by_supabase') {
+      setIsAlertOpen(true);
+    } else {
+      setIsAlertOpen(false);
+    }
+  };
+
+  // 初回ロード時 ＋ 画面遷移（pathname変更）のたびにチェック
   useEffect(() => {
-    const checkPassword = async () => {
-      // 1. ログインユーザーを取得
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // 2. IDを特定
-      const rawId = user.email?.split('@')[0] || '';
-      
-      // 3. パスワードの状態をDBから直接取得
-      const { data } = await supabase
-        .from('cast_members')
-        .select('password')
-        .in('login_id', [rawId, String(Number(rawId))])
-        .limit(1);
-
-      const pw = data?.[0]?.password;
-
-      // 4. 判定: 空、'0000'、またはブラウザの自動入力干渉(managed_by_supabase)の場合に警告
-      if (!pw || String(pw) === '0000' || String(pw) === 'managed_by_supabase') {
-        setIsAlertOpen(true);
-      }
-    };
-
     checkPassword();
-  }, [supabase]);
+  }, [pathname]); 
 
   return (
     <html lang="ja">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className="antialiased">
         {children}
 
-        {/* 📍 画面中央の強制ポップアップ（z-index 10000で最前面に固定） */}
+        {/* --- シンプルな中央アラート --- */}
         {isAlertOpen && (
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 animate-in fade-in duration-300">
-            {/* 背景を暗くぼかす */}
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+            {/* 背景：真っ黒ではなく少し透かすことで「アプリ感」を出します */}
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
             
-            {/* ポップアップ本体 */}
-            <div className="relative bg-white rounded-[40px] p-8 w-full max-w-sm shadow-2xl border-4 border-rose-400 animate-in zoom-in duration-300 text-center space-y-6">
-              <div className="text-6xl animate-bounce">⚠️</div>
-              <div className="space-y-2">
-                <h2 className="text-2xl font-black text-gray-800 tracking-tighter uppercase">Security Alert</h2>
-                <p className="text-sm font-bold text-gray-500 leading-relaxed">
-                  パスワードが初期設定(0000)のままです。<br />
-                  安全のため、今すぐ変更してください。
-                </p>
-              </div>
+            {/* 白い箱：ここが中央に出ます */}
+            <div className="relative bg-white rounded-[32px] p-8 w-[85%] max-w-[320px] text-center shadow-2xl border border-gray-100">
+              <div className="text-4xl mb-4">⚠️</div>
+              <h2 className="text-xl font-black mb-2 text-gray-800">セキュリティ警告</h2>
+              <p className="text-sm text-gray-500 font-bold mb-6 leading-relaxed">
+                初期パスワードのままです。<br />変更してください。
+              </p>
               
               <button
                 onClick={() => {
                   setIsAlertOpen(false);
                   router.push('/mypage');
                 }}
-                className="w-full py-5 bg-rose-500 text-white font-black rounded-[24px] shadow-lg shadow-rose-200 active:scale-95 transition-all text-lg"
+                className="w-full py-4 bg-rose-500 text-white font-black rounded-2xl active:scale-95 transition-transform"
               >
-                マイページで変更する ➔
+                設定画面へ移動する
               </button>
             </div>
           </div>
