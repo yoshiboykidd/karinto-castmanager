@@ -35,7 +35,6 @@ export default function MyPage() {
         if (!user) { router.push('/login'); return; }
         const rawLoginId = user.email?.split('@')[0] || '';         
         const strippedLoginId = String(Number(rawLoginId));  
-
         const { data: members } = await supabase.from('cast_members').select('*').in('login_id', [rawLoginId, strippedLoginId]);
         const member = members?.[0];
         if (member) {
@@ -65,8 +64,6 @@ export default function MyPage() {
     if (!error) { 
       alert('パスワードを変更しました✨'); 
       setNewPassword('');
-    } else {
-      alert('変更に失敗しました...');
     }
   };
 
@@ -79,74 +76,72 @@ export default function MyPage() {
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800 overflow-x-hidden">
       <CastHeader shopName="マイページ" displayName={profile?.display_name} bgColor={currentTheme.bg} />
       
-      {/* 名前とIDのブロックを削除し、余白を調整 */}
-      <main className="px-5 mt-10 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* space-y-3 で各枠の間隔を詰めました */}
+      <main className="px-5 mt-4 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
         
-        <div className="space-y-6">
-          {/* 今月の目標金額 */}
-          <section className="bg-white border border-pink-50 rounded-[40px] p-8 shadow-xl shadow-pink-100/20 space-y-6">
-            <div className="flex items-center gap-3 font-black text-gray-700">
-              <div className="w-10 h-10 bg-pink-50 rounded-2xl flex items-center justify-center text-xl shadow-inner">💰</div>
-              <h3 className="text-lg tracking-tight">今月の目標金額</h3>
-            </div>
-            <div className="relative">
-              <input 
-                type="text" 
-                inputMode="numeric" 
-                value={targetAmount} 
-                onChange={(e) => setTargetAmount(e.target.value)} 
-                className="w-full px-6 py-5 pl-12 rounded-3xl bg-gray-50 border-none font-black text-2xl text-gray-700 focus:ring-4 focus:ring-pink-100 transition-all" 
-              />
-              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-pink-300 font-black text-xl">¥</span>
-            </div>
-          </section>
-
-          {/* テーマカラー */}
-          <section className="bg-white border border-pink-50 rounded-[40px] p-8 shadow-xl shadow-pink-100/20 space-y-6">
-            <div className="flex items-center gap-3 font-black text-gray-700">
-              <div className="w-10 h-10 bg-pink-50 rounded-2xl flex items-center justify-center text-xl shadow-inner">🎨</div>
-              <h3 className="text-lg tracking-tight">テーマカラー</h3>
-            </div>
-            <div className="grid grid-cols-6 gap-3">
-              {THEMES.map((t) => (
-                <button key={t.id} onClick={() => setTheme(t.id)} className={`w-10 h-10 rounded-full mx-auto shadow-sm transition-all ${t.bg} ${theme === t.id ? `scale-125 ring-4 ring-white shadow-lg` : 'opacity-40 hover:opacity-100'}`} />
-              ))}
-            </div>
-          </section>
-
-          <button onClick={handleSaveSettings} disabled={isSaving} className={`w-full py-5 rounded-[32px] shadow-xl font-black text-white text-lg active:scale-95 transition-all flex items-center justify-center gap-3 ${isSaving ? 'bg-gray-300' : 'bg-gradient-to-r from-pink-400 to-rose-400'}`}>
-            {isSaving ? 'Saving...' : '設定を保存する ✨'}
-          </button>
-        </div>
-
-        {/* パスワード変更セクション */}
-        <section className={`border-2 rounded-[40px] p-8 shadow-lg transition-all duration-500
-          ${isDangerPassword ? 'bg-rose-50 border-rose-100 animate-pulse' : 'bg-gray-50 border-gray-100'}
-        `}>
-          <div className={`flex items-center gap-3 font-black mb-4 ${isDangerPassword ? 'text-rose-500' : 'text-gray-500'}`}>
-            <span className="text-xl">{isDangerPassword ? '⚠️' : '🔒'}</span>
-            <h3 className="text-lg">{isDangerPassword ? 'Security Alert' : 'Password'}</h3>
+        {/* 目標金額（p-5 に縮小） */}
+        <section className="bg-white border border-pink-50 rounded-[32px] p-5 shadow-lg shadow-pink-100/10">
+          <div className="flex items-center gap-2 mb-3 font-black text-gray-700">
+            <span className="text-lg">💰</span>
+            <h3 className="text-sm tracking-tight">目標金額</h3>
           </div>
-          <div className="space-y-4">
+          <div className="relative">
             <input 
               type="text" 
-              placeholder="新しいパスワード" 
+              inputMode="numeric" 
+              value={targetAmount} 
+              onChange={(e) => setTargetAmount(e.target.value)} 
+              className="w-full px-5 py-3 pl-10 rounded-2xl bg-gray-50 border-none font-black text-xl text-gray-700 focus:ring-2 focus:ring-pink-100 transition-all" 
+            />
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-300 font-black text-lg">¥</span>
+          </div>
+        </section>
+
+        {/* テーマカラー（p-5 に縮小） */}
+        <section className="bg-white border border-pink-50 rounded-[32px] p-5 shadow-lg shadow-pink-100/10">
+          <div className="flex items-center gap-2 mb-3 font-black text-gray-700">
+            <span className="text-lg">🎨</span>
+            <h3 className="text-sm tracking-tight">テーマカラー</h3>
+          </div>
+          <div className="grid grid-cols-6 gap-2">
+            {THEMES.map((t) => (
+              <button key={t.id} onClick={() => setTheme(t.id)} className={`w-9 h-9 rounded-full mx-auto shadow-sm transition-all ${t.bg} ${theme === t.id ? `scale-110 ring-4 ring-white shadow-md` : 'opacity-40'}`} />
+            ))}
+          </div>
+        </section>
+
+        {/* 設定保存ボタン（高さを抑えました） */}
+        <button onClick={handleSaveSettings} disabled={isSaving} className={`w-full py-4 rounded-2xl shadow-md font-black text-white text-md active:scale-95 transition-all flex items-center justify-center gap-2 ${isSaving ? 'bg-gray-300' : 'bg-gradient-to-r from-pink-400 to-rose-400'}`}>
+          {isSaving ? 'Saving...' : '設定を保存する ✨'}
+        </button>
+
+        {/* PW変更（大幅に中を詰めました） */}
+        <section className={`border-2 rounded-[32px] p-5 shadow-sm transition-all duration-500
+          ${isDangerPassword ? 'bg-rose-50 border-rose-100' : 'bg-gray-50 border-gray-100'}
+        `}>
+          <div className={`flex items-center gap-2 mb-3 font-black ${isDangerPassword ? 'text-rose-500' : 'text-gray-500'}`}>
+            <span className="text-lg">{isDangerPassword ? '⚠️' : '🔒'}</span>
+            <h3 className="text-sm">Password</h3>
+          </div>
+          <div className="flex gap-2">
+            <input 
+              type="text" 
+              placeholder="新PW" 
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-6 py-4 rounded-2xl bg-white border border-gray-100 font-bold text-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-100 transition-all"
+              className="flex-1 px-4 py-2 rounded-xl bg-white border border-gray-100 font-bold text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-gray-100"
             />
             <button 
               onClick={handlePasswordChange}
-              className={`w-full font-black py-4 rounded-2xl text-white shadow-md active:scale-95 transition-all
+              className={`px-4 py-2 font-black rounded-xl text-white text-xs shadow-sm active:scale-95 whitespace-nowrap
                 ${isDangerPassword ? 'bg-rose-400' : 'bg-gray-400'}
               `}
             >
-              パスワードを更新
+              更新
             </button>
           </div>
         </section>
 
-        {/* 📍 下部のLOGOUTボタンを削除しました */}
       </main>
 
       {/* @ts-ignore */}
