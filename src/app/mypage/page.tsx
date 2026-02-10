@@ -7,6 +7,7 @@ import CastHeader from '@/components/dashboard/CastHeader';
 // @ts-ignore
 import FixedFooter from '@/components/dashboard/FixedFooter';
 
+// 📍 ここが抜けていたため波線が出ていました
 const THEMES = [
   { id: 'pink',   name: 'サクラ',   bg: 'bg-[#FFB7C5]',   ring: 'ring-pink-200' },
   { id: 'blue',   name: 'マリン',   bg: 'bg-cyan-300',   ring: 'ring-cyan-200' },
@@ -27,47 +28,54 @@ export default function MyPage() {
   const [targetAmount, setTargetAmount] = useState(''); 
   const [theme, setTheme] = useState('pink');
   const [isSaving, setIsSaving] = useState(false);
+  
+  // 📍 警告フラグ
+  const [isAlertActive, setIsAlertActive] = useState(false);
 
-  // 1. データ取得
   useEffect(() => {
     const fetchData = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { router.push('/login'); return; }
+        
         const rawLoginId = user.email?.split('@')[0] || '';         
         const strippedLoginId = String(Number(rawLoginId));  
+        
         const { data: members } = await supabase.from('cast_members').select('*').in('login_id', [rawLoginId, strippedLoginId]);
         const member = members?.[0];
+        
         if (member) {
           setProfile(member);
           setTargetAmount(String(member.monthly_target_amount || '')); 
           setTheme(member.theme_color || 'pink');
+          
+          // 📍 RLS対策ロジック: パスワードが取れない、もしくは '0000' なら警告
+          if (!member.password || String(member.password) === '0000') {
+            setIsAlertActive(true);
+          }
         }
       } finally { setLoading(false); }
     };
     fetchData();
   }, [router, supabase]);
 
-  // 2. パスワード変更関数
   const handlePasswordChange = async () => {
-    if (!profile?.login_id) return;
-    if (!newPassword || newPassword.length < 4) {
+    if (!profile?.login_id || !newPassword) return;
+    if (newPassword.length < 4) {
       alert('パスワードは4文字以上で入力してください');
       return;
     }
     try {
       const { error } = await supabase.from('cast_members').update({ password: newPassword }).eq('login_id', profile.login_id);
       if (!error) { 
-        alert('パスワードを変更しました✨'); 
+        alert('パスワードを更新しました！');
+        setIsAlertActive(false);
         setNewPassword('');
         window.location.reload();
       }
-    } catch (e) {
-      alert('変更に失敗しました...');
-    }
+    } catch (e) { alert('更新エラーが発生しました'); }
   };
 
-  // 3. 設定保存関数
   const handleSaveSettings = async () => {
     if (!profile?.login_id) return;
     setIsSaving(true);
@@ -80,9 +88,6 @@ export default function MyPage() {
   };
 
   const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
-  
-  // 📍 判定強化版: 文字列・数値どちらの 0000 も逃さない
-  const isDangerPassword = profile && (String(profile.password) === '0000' || profile.password === 0);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#FFFDFE]">
@@ -93,16 +98,16 @@ export default function MyPage() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800 overflow-x-hidden">
       
-      {/* 📍 警告バー: 画面の一番上、ヘッダーより上に絶対出す */}
-      {isDangerPassword && (
-        <div className="bg-rose-500 text-white text-[11px] font-black py-2.5 px-4 text-center animate-bounce">
-          ⚠️ セキュリティ警告：初期パスワード(0000)を変更してください！
+      {/* 📍 強制表示警告バー */}
+      {isAlertActive && (
+        <div className="bg-rose-500 text-white text-[11px] font-black py-3 px-4 text-center sticky top-0 z-[100] animate-bounce shadow-lg">
+          ⚠️ セキュリティ警告：初期パスワードを変更してください！
         </div>
       )}
 
       <CastHeader shopName="マイページ" displayName={profile?.display_name} bgColor={currentTheme.bg} />
       
-      <main className="px-5 mt-4 space-y-3">
+      <main className="px-5 mt-4 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
         
         {/* 目標金額 */}
         <section className="bg-white border border-pink-50 rounded-[32px] p-5 shadow-lg shadow-pink-100/10">
@@ -139,26 +144,26 @@ export default function MyPage() {
           {isSaving ? 'Saving...' : '設定を保存する ✨'}
         </button>
 
-        {/* PW変更 */}
+        {/* PW変更セクション（警告時に赤く光る） */}
         <section className={`border-2 rounded-[32px] p-5 shadow-sm transition-all duration-500
-          ${isDangerPassword ? 'bg-rose-50 border-rose-100 animate-pulse' : 'bg-gray-50 border-gray-100'}
+          ${isAlertActive ? 'bg-rose-50 border-rose-100 animate-pulse' : 'bg-gray-50 border-gray-100'}
         `}>
-          <div className={`flex items-center gap-2 mb-3 font-black ${isDangerPassword ? 'text-rose-500' : 'text-gray-500'}`}>
-            <span className="text-lg">{isDangerPassword ? '⚠️' : '🔒'}</span>
-            <h3 className="text-sm uppercase tracking-tight">{isDangerPassword ? 'Security Alert' : 'Password'}</h3>
+          <div className={`flex items-center gap-2 mb-3 font-black ${isAlertActive ? 'text-rose-500' : 'text-gray-500'}`}>
+            <span className="text-lg">{isAlertActive ? '⚠️' : '🔒'}</span>
+            <h3 className="text-sm uppercase tracking-tight">{isAlertActive ? 'Security Alert' : 'Password'}</h3>
           </div>
           <div className="flex gap-2">
             <input 
               type="text" 
-              placeholder="新PW" 
+              placeholder="新PWを入力" 
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="flex-1 px-4 py-2 rounded-xl bg-white border border-gray-200 font-bold text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-gray-100"
+              className="flex-1 px-4 py-2 rounded-xl bg-white border border-gray-100 font-bold text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-gray-100"
             />
             <button 
               onClick={handlePasswordChange}
               className={`px-4 py-2 font-black rounded-xl text-white text-xs shadow-sm active:scale-95 whitespace-nowrap
-                ${isDangerPassword ? 'bg-rose-400' : 'bg-gray-400'}
+                ${isAlertActive ? 'bg-rose-400' : 'bg-gray-400'}
               `}
             >
               更新
