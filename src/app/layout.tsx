@@ -7,7 +7,7 @@ import "./globals.css";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const pathname = usePathname(); // 画面遷移を検知するために使用
+  const pathname = usePathname();
   const [supabase] = useState(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -15,7 +15,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   
   const [isAlertOpen, setIsAlertOpen] = useState(false);
 
-  // パスワードチェック関数
   const checkPassword = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -29,7 +28,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
     const pw = data?.[0]?.password;
 
-    // 「0000」または「読み取り不可」ならアラートを出す
     if (!pw || String(pw) === '0000' || String(pw) === 'managed_by_supabase') {
       setIsAlertOpen(true);
     } else {
@@ -37,7 +35,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     }
   };
 
-  // 初回ロード時 ＋ 画面遷移（pathname変更）のたびにチェック
   useEffect(() => {
     checkPassword();
   }, [pathname]); 
@@ -47,29 +44,35 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="antialiased">
         {children}
 
-        {/* --- シンプルな中央アラート --- */}
         {isAlertOpen && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-            {/* 背景：真っ黒ではなく少し透かすことで「アプリ感」を出します */}
-            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
             
-            {/* 白い箱：ここが中央に出ます */}
-            <div className="relative bg-white rounded-[32px] p-8 w-[85%] max-w-[320px] text-center shadow-2xl border border-gray-100">
-              <div className="text-4xl mb-4">⚠️</div>
-              <h2 className="text-xl font-black mb-2 text-gray-800">セキュリティ警告</h2>
-              <p className="text-sm text-gray-500 font-bold mb-6 leading-relaxed">
-                初期パスワードのままです。<br />変更してください。
+            <div className="relative bg-white rounded-[40px] p-8 w-full max-w-[340px] text-center shadow-2xl border border-gray-100 animate-in zoom-in duration-300">
+              <div className="text-5xl mb-4">⚠️</div>
+              <h2 className="text-xl font-black mb-2 text-gray-800 tracking-tighter">Security Alert</h2>
+              <p className="text-xs font-bold text-gray-400 mb-8 leading-relaxed">
+                初期パスワードのままです。<br />安全のため変更してください。
               </p>
               
-              <button
-                onClick={() => {
-                  setIsAlertOpen(false);
-                  router.push('/mypage');
-                }}
-                className="w-full py-4 bg-rose-500 text-white font-black rounded-2xl active:scale-95 transition-transform"
-              >
-                設定画面へ移動する
-              </button>
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    setIsAlertOpen(false);
+                    router.push('/mypage');
+                  }}
+                  className="w-full py-4 bg-rose-500 text-white font-black rounded-2xl shadow-lg shadow-rose-100 active:scale-95 transition-all"
+                >
+                  今すぐ変更する
+                </button>
+
+                <button
+                  onClick={() => setIsAlertOpen(false)}
+                  className="w-full py-3 text-gray-400 font-black text-xs active:scale-95 transition-all uppercase tracking-widest"
+                >
+                  後で設定する
+                </button>
+              </div>
             </div>
           </div>
         )}
