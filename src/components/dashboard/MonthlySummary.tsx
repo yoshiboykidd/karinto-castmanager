@@ -1,6 +1,5 @@
 'use client';
 
-
 type MonthlySummaryProps = {
   month: string;
   totals: {
@@ -15,7 +14,6 @@ type MonthlySummaryProps = {
   theme?: string;
 };
 
-
 const THEME_STYLES: any = {
   pink:   { bgFrom: 'from-[#FFE9ED]', bgTo: 'to-[#FFF5F7]', border: 'border-pink-200',  textMain: 'text-pink-600', textSub: 'text-pink-500',  textLabel: 'text-pink-400',  subBorder: 'border-pink-50',  bar: 'bg-pink-400' },
   blue:   { bgFrom: 'from-blue-50',   bgTo: 'to-blue-100',   border: 'border-blue-200',  textMain: 'text-blue-600', textSub: 'text-blue-500',  textLabel: 'text-blue-400',  subBorder: 'border-blue-100', bar: 'bg-blue-400' },
@@ -24,7 +22,6 @@ const THEME_STYLES: any = {
   black:  { bgFrom: 'from-gray-100',  bgTo: 'to-gray-200',   border: 'border-gray-300',  textMain: 'text-gray-800', textSub: 'text-gray-700',  textLabel: 'text-gray-500',  subBorder: 'border-gray-200', bar: 'bg-gray-700' },
   red:    { bgFrom: 'from-red-50',    bgTo: 'to-red-100',    border: 'border-red-200',   textMain: 'text-red-600',  textSub: 'text-red-500',   textLabel: 'text-red-400',   subBorder: 'border-red-100',  bar: 'bg-red-400' },
 };
-
 
 export default function MonthlySummary({ 
   month, 
@@ -36,11 +33,9 @@ export default function MonthlySummary({
   // マイページの設定に合わせてスタイルを選択
   const c = THEME_STYLES[theme] || THEME_STYLES.pink;
 
-
   const progressPercent = targetAmount > 0 
     ? Math.min(100, Math.floor((totals.amount / targetAmount) * 100)) 
     : 0;
-
 
   return (
     <section className={`bg-gradient-to-br ${c.bgFrom} ${c.bgTo} rounded-[32px] p-5 border ${c.border} relative overflow-hidden shadow-sm flex flex-col space-y-2`}>
@@ -74,7 +69,6 @@ export default function MonthlySummary({
         </p>
       </div>
 
-
       {/* 目標＆進捗バーエリア */}
       {targetAmount > 0 && (
         <div className="bg-white/40 rounded-xl p-2.5 border border-white/50 shadow-sm mx-1 relative z-10">
@@ -107,7 +101,6 @@ export default function MonthlySummary({
         </div>
       )}
 
-
       {/* 下段：内訳グリッド */}
       <div className={`grid grid-cols-3 bg-white/80 backdrop-blur-sm rounded-2xl border ${c.subBorder} shadow-sm divide-x divide-gray-100 py-2 relative z-10`}>
         <div className="flex flex-col items-center justify-center space-y-0.5">
@@ -123,7 +116,6 @@ export default function MonthlySummary({
           <p className={`text-[26px] font-black ${c.textMain} leading-none tracking-tighter`}>{totals.main || 0}</p>
         </div>
       </div>
-
 
     </section>
   );
