@@ -37,7 +37,7 @@ export default function DashboardContent() {
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  // 📍 パスワードが初期設定(0000)かどうかの判定を強化
+  // 📍 パスワードが初期設定(0000)かどうかの判定
   const isInitialPassword = useMemo(() => {
     if (!safeProfile.password) return false;
     return String(safeProfile.password) === '0000';
@@ -48,7 +48,8 @@ export default function DashboardContent() {
   );
   
   const { selectedShift = null } = achievementData || {};
-  const currentReservations = selectedShift?.reservations || [];
+  // 📍 変更点：旧来の achievementData からの取得ではなく、data.reservations (整理済み最新データ) を使用します
+  const currentReservations = data?.reservations || [];
 
   useEffect(() => { 
     setMounted(true);
@@ -73,7 +74,6 @@ export default function DashboardContent() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
       
-      {/* 📍 強制警告バー: これで「出ない」を物理的に解決します */}
       {isInitialPassword && (
         <div 
           onClick={() => router.push('/mypage')}
@@ -114,13 +114,11 @@ export default function DashboardContent() {
 
         {(nav.selected?.single instanceof Date && isValid(nav.selected.single)) && (
           <DailyDetail 
-            {...({
-              date: nav.selected.single,
-              dayNum: nav.selected.single.getDate(),
-              shift: selectedShift,
-              reservations: currentReservations,
-              theme: themeKey
-            } as any)} 
+            date={nav.selected.single}
+            dayNum={nav.selected.single.getDate()}
+            shift={selectedShift}
+            reservations={currentReservations} // 📍 最新の整理済み予約データを渡す
+            theme={themeKey}
           />
         )}
         
