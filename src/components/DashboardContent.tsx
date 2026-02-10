@@ -37,6 +37,12 @@ export default function DashboardContent() {
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
+  // 📍 パスワードが初期設定(0000)かどうかの判定を強化
+  const isInitialPassword = useMemo(() => {
+    if (!safeProfile.password) return false;
+    return String(safeProfile.password) === '0000';
+  }, [safeProfile.password]);
+
   const achievementData: any = useAchievement(
     supabase, safeProfile, safeShifts, nav.selected?.single, () => fetchInitialData(router)
   );
@@ -62,17 +68,27 @@ export default function DashboardContent() {
     );
   }
 
-  // ★ 波線対策：表示する月を確実に文字列として生成
   const displayMonth = isValid(nav.viewDate) ? format(nav.viewDate, 'M月') : format(new Date(), 'M月');
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
+      
+      {/* 📍 強制警告バー: これで「出ない」を物理的に解決します */}
+      {isInitialPassword && (
+        <div 
+          onClick={() => router.push('/mypage')}
+          className="bg-rose-500 text-white text-[11px] font-black py-3 px-4 text-center sticky top-0 z-[100] animate-bounce shadow-lg cursor-pointer"
+        >
+          ⚠️ セキュリティ警告：初期パスワード(0000)を変更してください！ここをタップ
+        </div>
+      )}
+
       <div className="pb-4">
         <CastHeader 
           shopName={data?.shop?.shop_name || "かりんと"} 
           syncTime={data?.syncAt} 
           displayName={safeProfile.display_name} 
-          version="v4.8.1"
+          version="v4.9.0"
           bgColor={currentTheme.header}
         />
       </div>
