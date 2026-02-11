@@ -37,16 +37,12 @@ export default function DashboardContent() {
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  // DBの last_sync_at を取得
-  const lastSyncAt = (data as any)?.last_sync_at || null;
-
   const achievementData: any = useAchievement(
     supabase, safeProfile, safeShifts, nav.selected?.single, () => fetchInitialData(router)
   );
   
   const { selectedShift = null } = achievementData || {};
 
-  // 選択された日付の予約のみを抽出
   const currentReservations = useMemo(() => {
     if (!(nav.selected?.single instanceof Date) || !data?.reservations) return [];
     const selectedDateStr = format(nav.selected.single, 'yyyy-MM-dd');
@@ -72,7 +68,8 @@ export default function DashboardContent() {
         <CastHeader 
           displayName={safeProfile.display_name} 
           shopName={safeProfile.shop_name || '店舗未設定'}
-          syncTime={lastSyncAt} 
+          /* 📍 DBカラム last_sync_at を syncTime プロパティへ正確に紐付け */
+          syncTime={data?.last_sync_at} 
           bgColor={currentTheme.header}
         />
       </div>

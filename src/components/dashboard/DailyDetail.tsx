@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { Clock, X, MapPin, Tag, Home } from 'lucide-react';
+import { Clock, X } from 'lucide-react';
 
 export default function DailyDetail({ date, dayNum, shift, reservations = [], theme = 'pink' }: any) {
   const [selectedRes, setSelectedRes] = useState<any>(null);
@@ -20,7 +20,7 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
   };
   const accentColor = themeColors[theme] || themeColors.pink;
 
-  // 📍 予約を「開始時間」の早い順にソート
+  // 📍 予約を時刻順（早い順）にソート
   const sortedReservations = useMemo(() => {
     return [...reservations].sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""));
   }, [reservations]);
@@ -40,9 +40,9 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
 
   return (
     <>
-      {/* 📍 space-y-3 から space-y-1.5 に変更し全体を詰める */}
-      <section className="relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-3 pt-9 flex flex-col space-y-1.5 subpixel-antialiased">
+      <section className="relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-3 pt-8 flex flex-col space-y-1 subpixel-antialiased text-gray-800">
         
+        {/* 特定日バー：py-1で狭く設定 */}
         {(isKarin || isSoine) && (
           <div className={`absolute top-0 left-0 right-0 py-1 text-center font-black text-[14px] tracking-[0.4em] z-20 text-white shadow-md [text-shadow:_1px_1px_0_rgba(0,0,0,0.2)]
             ${isKarin ? 'bg-gradient-to-r from-orange-400 to-orange-600' : 'bg-gradient-to-r from-yellow-400 to-yellow-600'}`}>
@@ -50,20 +50,22 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
           </div>
         )}
 
-        {/* 1. ヘッダー：全体を詰め (mt-2 -> mt-0.5) */}
-        <div className="flex flex-col items-center justify-center w-full px-1 mt-0.5 mb-1">
-          <div className="flex items-center justify-center gap-3 whitespace-nowrap">
-            <div className="flex items-baseline font-black text-gray-800 tracking-tighter [text-shadow:_0.5px_0_0_currentColor]">
+        {/* 1. ヘッダー：中央配置、数字28px / 記号14px、確定バッジw-11 */}
+        <div className="flex items-center justify-center w-full mt-1 mb-2">
+          <div className="flex items-center gap-2 whitespace-nowrap">
+            {/* 日付セクション */}
+            <div className="flex items-baseline font-black tracking-tighter [text-shadow:_0.5px_0_0_currentColor]">
               <span className="text-[28px] leading-none">{format(date, 'M')}</span>
               <span className="text-[14px] opacity-30 mx-0.5 font-bold">/</span>
               <span className="text-[28px] leading-none">{format(date, 'd')}</span>
-              <span className="text-[12px] opacity-30 ml-0.5 font-bold">({format(date, 'E', { locale: ja })})</span>
+              <span className="text-[14px] opacity-30 ml-0.5 font-bold">({format(date, 'E', { locale: ja })})</span>
             </div>
 
+            {/* シフトセクション */}
             {isOfficial ? (
               <div className="flex items-center gap-1.5">
-                {/* 📍 確定バッジ：文字サイズを text-[13px] に拡大（枠 w-11 h-7 維持） */}
-                <span className="w-11 h-7 flex items-center justify-center rounded-lg bg-blue-500 text-white text-[13px] font-black shrink-0 tracking-tighter">確定</span>
+                {/* 📍 確定バッジ：指名バッジと同じ w-11 h-7 / 文字 13px */}
+                <span className="w-11 h-7 flex items-center justify-center rounded-lg bg-blue-500 text-white text-[13px] font-black shrink-0 tracking-tighter shadow-sm">確定</span>
                 <div className={`flex items-baseline font-black tracking-tighter ${accentColor} [text-shadow:_0.6px_0_0_currentColor]`}>
                   <span className="text-[28px] leading-none">{shift?.start_time}</span>
                   <span className="text-[14px] mx-1 opacity-20 font-bold">〜</span>
@@ -71,19 +73,19 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
                 </div>
               </div>
             ) : (
-              <span className="text-[14px] font-black text-gray-200 italic uppercase tracking-[0.2em] leading-none">Day Off</span>
+              <span className="text-[14px] font-black text-gray-200 italic uppercase tracking-[0.2em] leading-none ml-2">Day Off</span>
             )}
           </div>
         </div>
 
-        {/* 2. 予約リスト：早い時間順に表示 */}
+        {/* 2. 予約リスト：時刻順ソート済み、余白詰め */}
         <div className="pt-2 border-t border-gray-100/50 space-y-1">
           {sortedReservations.length > 0 ? sortedReservations.map((res: any, idx: number) => (
             <button key={idx} onClick={() => setSelectedRes(res)} className="w-full bg-gray-50/50 rounded-xl p-1.5 px-2 border border-gray-100 flex items-center gap-1 shadow-sm active:bg-gray-100 transition-all overflow-hidden">
               <Clock size={19} className="text-gray-300 shrink-0" />
               <span className={`text-[13px] font-black w-7 h-7 flex items-center justify-center rounded-lg shrink-0 ${getBadgeStyle(res.service_type)}`}>{res.service_type || 'か'}</span>
               
-              {/* 📍 指名バッジ：文字サイズを text-[13px] に拡大（枠 w-11 h-7 維持） */}
+              {/* 指名バッジ：w-11 h-7 / 文字 13px に拡大 */}
               <span className={`text-[13px] font-black w-11 h-7 flex items-center justify-center rounded-lg shrink-0 tracking-tighter ${getBadgeStyle(res.nomination_category)}`}>
                 {res.nomination_category || 'FREE'}
               </span>
@@ -112,26 +114,14 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
         </div>
       </section>
 
-      {/* 詳細モーダル (デザイン維持) */}
+      {/* モーダル用スペース（内包：お客様の構成待ち） */}
       {selectedRes && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setSelectedRes(null)} />
-          <div className="relative bg-white w-full max-w-[340px] rounded-[28px] p-4 shadow-2xl flex flex-col space-y-3 subpixel-antialiased text-gray-800">
-            <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300"><X size={24} /></button>
-            <div className="pr-8">
-              <h4 className={`text-3xl font-black ${accentColor} tracking-tighter [text-shadow:_0.5px_0_0_currentColor]`}>
-                {selectedRes.start_time?.substring(0, 5)}<span className="text-lg mx-0.5 opacity-30 font-bold">〜</span>{selectedRes.end_time?.substring(0, 5)}
-              </h4>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className={`text-[13px] font-black px-1.5 py-0.5 rounded ${getBadgeStyle(selectedRes.service_type)}`}>{selectedRes.service_type || 'か'}</span>
-                <span className={`text-[13px] font-black px-1.5 py-0.5 rounded ${getBadgeStyle(selectedRes.nomination_category)}`}>{selectedRes.nomination_category || 'FREE'}</span>
-                <div className={`flex items-baseline font-black ${accentColor} ml-1`}>
-                   <span className="text-xs mr-0.5">¥</span>
-                   <span className="text-xl tracking-tight">{(selectedRes.total_price || 0).toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-            {/* モーダル内部は変更なし */}
+          <div className="relative bg-white w-full max-w-[340px] rounded-[28px] p-6 shadow-2xl animate-in zoom-in duration-200">
+             <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300 active:text-gray-500"><X size={24} /></button>
+             <h4 className="text-xl font-black">詳細構成 待機中</h4>
+             <p className="text-sm font-bold mt-2">{selectedRes.start_time}〜{selectedRes.end_time}</p>
           </div>
         </div>
       )}
