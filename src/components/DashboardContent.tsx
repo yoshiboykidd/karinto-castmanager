@@ -37,8 +37,8 @@ export default function DashboardContent() {
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  // 📍 型定義に依存せず DBの last_sync_at を安全に取得
-  const lastSyncTime = (data as any)?.last_sync_at || null;
+  // DBの last_sync_at を取得
+  const lastSyncAt = (data as any)?.last_sync_at || null;
 
   const achievementData: any = useAchievement(
     supabase, safeProfile, safeShifts, nav.selected?.single, () => fetchInitialData(router)
@@ -46,6 +46,7 @@ export default function DashboardContent() {
   
   const { selectedShift = null } = achievementData || {};
 
+  // 選択された日付の予約のみを抽出
   const currentReservations = useMemo(() => {
     if (!(nav.selected?.single instanceof Date) || !data?.reservations) return [];
     const selectedDateStr = format(nav.selected.single, 'yyyy-MM-dd');
@@ -71,7 +72,7 @@ export default function DashboardContent() {
         <CastHeader 
           displayName={safeProfile.display_name} 
           shopName={safeProfile.shop_name || '店舗未設定'}
-          syncTime={lastSyncTime} 
+          syncTime={lastSyncAt} 
           bgColor={currentTheme.header}
         />
       </div>
@@ -100,7 +101,7 @@ export default function DashboardContent() {
             date={nav.selected.single}
             dayNum={nav.selected.single.getDate()}
             shift={selectedShift}
-            reservations={currentReservations} 
+            reservations={currentReservations}
             theme={themeKey}
           />
         )}
