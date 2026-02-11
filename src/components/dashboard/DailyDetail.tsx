@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { X, Calculator, Trash2, Copy, MessageSquare, Edit3, StickyNote, Save, Calendar, UserCheck } from 'lucide-react';
+import { X, Calculator, Trash2, Copy, MessageSquare, Edit3, StickyNote, Save, Calendar } from 'lucide-react';
 
 export default function DailyDetail({ date, dayNum, shift, allShifts = [], reservations = [], theme = 'pink', supabase, onRefresh, myLoginId }: any) {
   const [selectedRes, setSelectedRes] = useState<any>(null);
@@ -53,6 +53,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   const hasValue = (val: string) => val && val !== 'なし' && val !== '延長なし' && val !== 'なし ' && val !== '';
 
+  // 履歴取得
   useEffect(() => {
     if (selectedRes && supabase && myLoginId) {
       const fetchHistory = async () => {
@@ -97,7 +98,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   return (
     <>
-      {/* 予約一覧セクション */}
+      {/* 予約一覧リスト */}
       <section className="relative overflow-hidden rounded-[32px] border border-gray-100 bg-white shadow-xl flex flex-col subpixel-antialiased">
         {eventInfo && (
           <div className={`w-full py-1.5 ${eventInfo.color} ${eventInfo.text} text-center text-[13px] font-black tracking-[0.2em] shadow-sm uppercase`}>
@@ -153,14 +154,12 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
           <div className="absolute inset-0" onClick={() => setSelectedRes(null)} />
           <div className="relative bg-white w-full max-w-[340px] rounded-[38px] overflow-hidden shadow-2xl animate-in zoom-in duration-150 flex flex-col text-gray-800">
             
-            {/* 特定日ラベル */}
             {eventInfo && (
               <div className={`w-full py-2 ${eventInfo.color} ${eventInfo.text} text-center text-[12px] font-black tracking-widest uppercase`}>
                 {eventInfo.label}
               </div>
             )}
             
-            {/* ヘッダー：バッジと時間を1行 */}
             <div className={`p-4 pb-4 flex items-center justify-center gap-3 relative border-b border-gray-50`}>
               <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300"><X size={24} /></button>
               <div className="flex gap-1 shrink-0 mt-2">
@@ -175,14 +174,14 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
             </div>
 
             <div className="px-5 py-4 bg-white space-y-4">
-              {/* コース名：大きく、長い名前も考慮 */}
+              {/* コース名 */}
               <div className="text-center border-b border-gray-50 pb-3">
                 <h3 className="text-[26px] font-black text-gray-800 leading-tight italic break-words">
                   {selectedRes.course_info}
                 </h3>
               </div>
 
-              {/* 金額 ＆ ホテル */}
+              {/* ① 合計金額 ＆ ホテル */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100 flex flex-col justify-center">
                   <p className="text-[9px] font-black text-gray-400 mb-0.5 uppercase tracking-widest text-center">合計金額</p>
@@ -197,7 +196,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 </div>
               </div>
 
-              {/* 📍 メモ ＆ OP計算君ボタン (合計金額の下) */}
+              {/* ② OP / メモ セクション */}
               <div className="space-y-2 text-left">
                 {hasValue(selectedRes.memo) && (
                   <div className="bg-yellow-50/50 p-2.5 rounded-xl border border-yellow-100 flex gap-2">
@@ -205,15 +204,24 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                     <p className="text-[12px] font-bold text-yellow-700 leading-tight italic">{selectedRes.memo}</p>
                   </div>
                 )}
+                {/* 保存済みキャストメモ */}
                 {hasValue(selectedRes.cast_memo) && !isEditingMemo && (
                   <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-100 flex gap-2 shadow-inner">
                     <StickyNote size={14} className="text-blue-400 shrink-0 mt-0.5" />
                     <p className="text-[12px] font-bold text-blue-700 leading-tight whitespace-pre-wrap">{selectedRes.cast_memo}</p>
                   </div>
                 )}
+                {/* 📍 キャストメモ入力フォーム（×で個別に閉じれる） */}
                 {isEditingMemo && (
                   <div className="bg-gray-50 p-3 rounded-2xl border-2 border-pink-200 space-y-2 animate-in slide-in-from-top-2 duration-200">
-                    <textarea value={memoDraft} onChange={(e) => setMemoDraft(e.target.value)} placeholder="メモを入力..." className="w-full h-24 bg-white rounded-xl p-3 text-[16px] font-bold border border-gray-100 focus:outline-none focus:ring-2 focus:ring-pink-400 shadow-inner" autoFocus />
+                    <div className="flex justify-between items-center px-1">
+                      <span className="text-[10px] font-black text-pink-400 uppercase tracking-widest">Cast Memo Form</span>
+                      {/* 📍 個別に閉じるための×ボタン */}
+                      <button onClick={() => setIsEditingMemo(false)} className="text-gray-300 hover:text-gray-500 transition-colors">
+                        <X size={20} />
+                      </button>
+                    </div>
+                    <textarea value={memoDraft} onChange={(e) => setMemoDraft(e.target.value)} placeholder="このお客様へのメモ..." className="w-full h-24 bg-white rounded-xl p-3 text-[16px] font-bold border border-gray-100 focus:outline-none focus:ring-2 focus:ring-pink-400 shadow-inner" autoFocus />
                     <button onClick={handleSaveMemo} className="w-full h-11 bg-pink-500 text-white rounded-xl flex items-center justify-center gap-2 font-black text-[14px] shadow-md active:scale-95 transition-all"><Save size={18} /> 保存する</button>
                   </div>
                 )}
@@ -223,7 +231,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 </button>
               </div>
               
-              {/* 📍 顧客情報カード (一番下に配置) */}
+              {/* ③ 顧客情報カード (最下部) */}
               <div className="bg-gray-900 rounded-[24px] p-3 text-white flex items-center justify-between gap-2 shadow-lg relative">
                 <div className="flex flex-col shrink-0 pl-1 text-left">
                   <div className="flex items-baseline gap-1">
@@ -242,15 +250,18 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                   <Copy size={13} className="text-gray-600 ml-0.5" />
                 </div>
               </div>
-
-              <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-gray-300 pt-1">
-                <UserCheck size={12} className="opacity-40" />Staff: <span className="text-gray-400">{selectedRes.staff_name || '---'}</span>
-              </div>
             </div>
 
+            {/* フッターアクション */}
             <div className="p-4 bg-gray-50 border-t border-gray-100 space-y-2">
-              {!isEditingMemo && <button onClick={() => setIsEditingMemo(true)} className="w-full h-12 rounded-xl bg-white border-2 border-pink-100 text-pink-500 flex items-center justify-center gap-2 font-black text-[14px] active:bg-pink-50 transition-all shadow-sm"><Edit3 size={18} /> キャストメモを残す</button>}
-              <button onClick={handleDelete} disabled={isDeleting} className={`w-full h-10 rounded-xl text-gray-400 flex items-center justify-center gap-2 font-bold text-[12px] active:bg-rose-50 transition-all ${isDeleting ? 'opacity-50' : ''}`}><Trash2 size={14} /> {isDeleting ? '消去中...' : '予約を取り消す'}</button>
+              {!isEditingMemo && (
+                <button onClick={() => setIsEditingMemo(true)} className="w-full h-12 rounded-xl bg-white border-2 border-pink-100 text-pink-500 flex items-center justify-center gap-2 font-black text-[14px] active:bg-pink-50 transition-all shadow-sm">
+                  <Edit3 size={18} /> キャストメモを残す
+                </button>
+              )}
+              <button onClick={handleDelete} disabled={isDeleting} className={`w-full h-10 rounded-xl text-gray-400 flex items-center justify-center gap-2 font-bold text-[12px] active:bg-rose-50 transition-all ${isDeleting ? 'opacity-50' : ''}`}>
+                <Trash2 size={14} /> {isDeleting ? '消去中...' : '予約を取り消す'}
+              </button>
             </div>
           </div>
         </div>
