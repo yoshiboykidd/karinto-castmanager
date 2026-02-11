@@ -17,11 +17,15 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   if (!date) return null;
 
-  // 📍 修正：特定日（イベント名）を確実に取得するロジック
+  // 📍 執念の特定日取得ロジック
+  // 自分のシフト(shift)が休みでも、全シフトデータ(allShifts)からその日のイベント名を探す
   const eventName = useMemo(() => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    const targetShift = allShifts.find((s: any) => (s.shift_date || s.date) === dateStr);
-    return targetShift?.event_name || targetShift?.event || null;
+    // その日の全キャストのシフトから、イベント名が入っているものを1つ探す
+    const dayEvent = allShifts.find((s: any) => 
+      (s.shift_date === dateStr || s.date === dateStr) && (s.event_name || s.event)
+    );
+    return dayEvent?.event_name || dayEvent?.event || null;
   }, [date, allShifts]);
 
   const isOfficial = shift?.status === 'official';
@@ -45,7 +49,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   const hasValue = (val: string) => val && val !== 'なし' && val !== '延長なし' && val !== 'なし ' && val !== '';
 
-  // 個人履歴取得
   useEffect(() => {
     if (selectedRes && supabase && myLoginId) {
       const fetchHistory = async () => {
@@ -94,8 +97,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
   return (
     <>
       <section className="relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-3 pt-8 flex flex-col space-y-1 subpixel-antialiased text-gray-800">
-        
-        {/* 📍 復活：日付・特定日・確定バッジ・シフト時間 */}
         <div className="flex items-center justify-center w-full mt-1 mb-2">
           <div className="flex items-center gap-2 whitespace-nowrap">
             <div className="flex items-baseline font-black tracking-tighter">
@@ -105,14 +106,13 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
               <span className="text-[12px] opacity-30 ml-0.5 font-bold">({format(date, 'E', { locale: ja })})</span>
             </div>
 
-            {/* 📍 特定日バッジ */}
+            {/* 📍 特定日（イベント名）バッジ */}
             {eventName && (
               <span className="bg-red-500 text-white text-[10px] px-2 py-1 rounded-lg font-black shrink-0 shadow-sm animate-pulse">
                 {eventName}
               </span>
             )}
 
-            {/* 確定 ＆ シフト時間 */}
             {isOfficial ? (
               <div className="flex items-center gap-1.5">
                 <span className="w-11 h-7 flex items-center justify-center rounded-lg bg-blue-500 text-white text-[13px] font-black shrink-0 tracking-tighter shadow-sm">確定</span>
@@ -149,13 +149,12 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
         </div>
       </section>
 
-      {/* 詳細モーダル（UI最適化版） */}
       {selectedRes && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-3 overflow-y-auto bg-black/90 backdrop-blur-sm pt-6 pb-32">
           <div className="absolute inset-0" onClick={() => setSelectedRes(null)} />
           <div className="relative bg-white w-full max-w-[340px] rounded-[38px] overflow-hidden shadow-2xl animate-in zoom-in duration-150 flex flex-col text-gray-800">
             <div className={`p-4 pb-5 ${accentBg} flex items-center justify-center gap-3 relative border-b border-gray-100`}>
-              <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300 active:text-gray-500"><X size={24} /></button>
+              <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300"><X size={24} /></button>
               <div className="flex gap-1 shrink-0">
                 <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black shadow-sm ${getBadgeStyle(selectedRes.service_type)}`}>{selectedRes.service_type || 'か'}</span>
                 <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black shadow-sm ${getBadgeStyle(selectedRes.nomination_category)}`}>{selectedRes.nomination_category || 'FREE'}</span>
@@ -167,7 +166,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
               </div>
             </div>
 
-            <div className="px-5 py-3 bg-white space-y-2 text-left">
+            <div className="px-5 py-3 bg-white space-y-2">
               <div className="text-center pt-1 border-b border-gray-50 pb-2">
                 <h3 className="text-[22px] font-black text-gray-800 leading-tight italic">{selectedRes.course_info}</h3>
               </div>
@@ -210,16 +209,16 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 </div>
               </div>
 
-              {/* メモ ＆ フォーム（配置修正版） */}
+              {/* キャストメモ ＆ フォーム（ズーム対策16px） */}
               <div className="space-y-2">
                 {hasValue(selectedRes.memo) && (
                   <div className="bg-yellow-50/50 p-2.5 rounded-xl border border-yellow-100 flex gap-2">
                     <MessageSquare size={14} className="text-yellow-400 shrink-0 mt-0.5" />
-                    <p className="text-[12px] font-bold text-yellow-700 leading-tight italic">{selectedRes.memo}</p>
+                    <p className="text-[12px] font-bold text-yellow-700 leading-tight italic text-left">{selectedRes.memo}</p>
                   </div>
                 )}
                 {hasValue(selectedRes.cast_memo) && !isEditingMemo && (
-                  <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-100 flex gap-2 shadow-inner">
+                  <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-100 flex gap-2 shadow-inner text-left">
                     <StickyNote size={14} className="text-blue-400 shrink-0 mt-0.5" />
                     <p className="text-[12px] font-bold text-blue-700 leading-tight whitespace-pre-wrap">{selectedRes.cast_memo}</p>
                   </div>
