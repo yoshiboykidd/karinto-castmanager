@@ -17,45 +17,29 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   if (!date) return null;
 
-  // 📍 執念の特定日（イベント名）抽出ロジック
-  const eventName = useMemo(() => {
-    if (!allShifts || allShifts.length === 0) return null;
-    const targetDate = format(date, 'yyyy-MM-dd');
-    const foundShift = allShifts.find((s: any) => {
-      const sDate = String(s.shift_date || s.date || "");
-      return sDate.includes(targetDate) && (s.event_name || s.event || s.event_title);
-    });
-    return foundShift?.event_name || foundShift?.event || foundShift?.event_title || null;
+  // 📍 判定ロジック：カレンダーの数値ルールを最優先し、次にDBを確認
+  const eventInfo = useMemo(() => {
+    const d = date.getDate();
+    // 1. カレンダーのハードコード（10, 11, 22）を最優先
+    if (d === 10) return { name: 'かりんとの日', color: 'bg-orange-500', text: 'text-white', sub: 'text-orange-100' };
+    if (d === 11 || d === 22) return { name: '添い寝の日', color: 'bg-yellow-400', text: 'text-yellow-900', sub: 'text-yellow-700' };
+
+    // 2. それ以外はDBからイベント名を探す
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const dbFound = allShifts.find((s: any) => 
+      (s.shift_date === dateStr || s.date === dateStr) && (s.event_name || s.event)
+    );
+    
+    if (dbFound) {
+      const name = dbFound.event_name || dbFound.event;
+      return { name, color: 'bg-pink-500', text: 'text-white', sub: 'text-pink-100' };
+    }
+
+    // 通常日
+    return { name: null, color: 'bg-gray-50', text: 'text-gray-800', sub: 'text-gray-400' };
   }, [date, allShifts]);
 
   const isOfficial = shift?.status === 'official';
-
-  // 📍 イベントに応じたヘッダー配色スタイルを定義
-  const headerStyle = useMemo(() => {
-    if (eventName?.includes('かりん')) {
-      return { bg: 'bg-orange-500', text: 'text-white', border: 'border-orange-600',subText: 'text-orange-100' };
-    }
-    if (eventName?.includes('添い寝')) {
-      return { bg: 'bg-yellow-400', text: 'text-yellow-900', border: 'border-yellow-500', subText: 'text-yellow-700' };
-    }
-    
-    // 通常時のテーマカラー設定
-    const themeColors: any = {
-      pink: { bg: 'bg-pink-50', text: 'text-pink-500', border: 'border-pink-100', subText: 'text-pink-300' },
-      blue: { bg: 'bg-cyan-50', text: 'text-cyan-600', border: 'border-cyan-100', subText: 'text-cyan-400' },
-      yellow: { bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-100', subText: 'text-yellow-400' },
-      red: { bg: 'bg-red-50', text: 'text-red-500', border: 'border-red-100', subText: 'text-red-300' },
-      black: { bg: 'bg-gray-800', text: 'text-white', border: 'border-gray-700', subText: 'text-gray-400' },
-      white: { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200', subText: 'text-gray-400' },
-    };
-    // イベントがある場合は少し濃くする、なければ通常の薄い色
-    if (eventName) {
-       const base = themeColors[theme] || themeColors.pink;
-       return { ...base, bg: base.bg.replace('50', '500'), text: 'text-white', subText: 'text-white/70' };
-    }
-    return themeColors[theme] || themeColors.pink;
-
-  }, [eventName, theme]);
 
   const getBadgeStyle = (label: string) => {
     switch (label) {
@@ -70,7 +54,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   const hasValue = (val: string) => val && val !== 'なし' && val !== '延長なし' && val !== 'なし ' && val !== '';
 
-  // 個人履歴取得
   useEffect(() => {
     if (selectedRes && supabase && myLoginId) {
       const fetchHistory = async () => {
@@ -84,10 +67,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
         if (!error && history) {
           const count = history.length;
           const lastVisit = count > 1 ? history[1].reservation_date : null;
-          setVisitInfo({
-            count: count === 1 ? '初' : count,
-            lastDate: lastVisit ? format(parseISO(lastVisit), 'yyyy/MM/dd') : null
-          });
+          setVisitInfo({ count: count === 1 ? '初' : count, lastDate: lastVisit ? format(parseISO(lastVisit), 'yyyy/MM/dd') : null });
         }
       };
       fetchHistory();
@@ -118,42 +98,40 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   return (
     <>
-      <section className={`relative overflow-hidden rounded-[32px] border shadow-xl flex flex-col subpixel-antialiased bg-white ${headerStyle.border}`}>
+      {/* 📍 予約一覧カード */}
+      <section className="relative overflow-hidden rounded-[32px] border bg-white border-gray-100 shadow-xl flex flex-col subpixel-antialiased">
         
-        {/* 📍 ヘッダー帯：イベントに応じた色を適用 */}
-        <div className={`w-full p-3 py-4 flex items-center justify-center gap-3 ${headerStyle.bg} ${headerStyle.text} transition-colors duration-300`}>
-          
-          {/* 日付表示 */}
-          <div className="flex items-baseline font-black tracking-tighter leading-none">
-            <span className="text-[28px]">{format(date, 'M')}</span>
-            <span className={`text-[14px] mx-0.5 ${headerStyle.subText}`}>/</span>
-            <span className="text-[28px]">{format(date, 'd')}</span>
-            <span className={`text-[12px] ml-0.5 ${headerStyle.subText}`}>({format(date, 'E', { locale: ja })})</span>
-          </div>
-
-          {/* 📍 イベント名（テキストで表示） */}
-          {eventName && (
-            <span className="text-[16px] font-black tracking-tight">{eventName}</span>
+        {/* 📍 ヘッダー：特定日に応じて色を塗り分ける */}
+        <div className={`w-full p-4 flex flex-col items-center justify-center gap-1 ${eventInfo.color} ${eventInfo.text} transition-colors duration-300`}>
+          {eventInfo.name && (
+            <span className="text-[12px] font-black tracking-widest uppercase opacity-80">{eventInfo.name}</span>
           )}
-
-          {/* 確定 ＆ シフト時間 */}
-          {isOfficial ? (
-            <div className="flex items-center gap-1.5 ml-1">
-              <span className="w-11 h-7 flex items-center justify-center rounded-lg bg-white/20 text-[13px] font-black shrink-0 tracking-tighter shadow-sm backdrop-blur-sm">確定</span>
-              <div className="flex items-baseline font-black tracking-tighter">
-                <span className="text-[24px] leading-none">{shift?.start_time}</span>
-                <span className={`text-[14px] mx-0.5 ${headerStyle.subText}`}>〜</span>
-                <span className="text-[24px] leading-none">{shift?.end_time}</span>
-              </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-baseline font-black tracking-tighter leading-none">
+              <span className="text-[32px]">{format(date, 'M')}</span>
+              <span className={`text-[16px] mx-0.5 opacity-40`}>/</span>
+              <span className="text-[32px]">{format(date, 'd')}</span>
+              <span className={`text-[14px] ml-0.5 opacity-60 font-bold`}>({format(date, 'E', { locale: ja })})</span>
             </div>
-          ) : (
-            <span className={`text-[14px] font-black uppercase tracking-[0.2em] leading-none ml-2 ${headerStyle.subText}`}>Day Off</span>
-          )}
+
+            {isOfficial ? (
+              <div className="flex items-center gap-2">
+                <span className="w-11 h-7 flex items-center justify-center rounded-lg bg-white/20 text-[13px] font-black shrink-0 tracking-tighter shadow-sm backdrop-blur-md border border-white/20">確定</span>
+                <div className="flex items-baseline font-black tracking-tighter">
+                  <span className="text-[28px] leading-none">{shift?.start_time}</span>
+                  <span className="text-[14px] mx-0.5 opacity-40">〜</span>
+                  <span className="text-[28px] leading-none">{shift?.end_time}</span>
+                </div>
+              </div>
+            ) : (
+              <span className="text-[14px] font-black opacity-30 uppercase tracking-[0.2em] leading-none ml-2">Day Off</span>
+            )}
+          </div>
         </div>
 
-        <div className="p-3 pt-1 space-y-1 text-gray-800">
+        <div className="p-3 space-y-1">
           {reservations.length > 0 ? [...reservations].sort((a, b) => (a.start_time || "").localeCompare(b.start_time || "")).map((res: any, idx: number) => (
-            <button key={idx} onClick={() => { setSelectedRes(res); setMemoDraft(res.cast_memo || ''); setIsEditingMemo(false); }} className="w-full bg-gray-50/50 rounded-xl p-1.5 px-2 border border-gray-100 flex items-center gap-1 shadow-sm active:bg-gray-100 transition-all overflow-hidden text-gray-800 text-left">
+            <button key={idx} onClick={() => { setSelectedRes(res); setMemoDraft(res.cast_memo || ''); setIsEditingMemo(false); }} className="w-full bg-gray-50/50 rounded-xl p-1.5 px-2 border border-gray-100 flex items-center gap-1 shadow-sm active:bg-gray-100 transition-all overflow-hidden text-gray-800">
               <span className={`text-[13px] font-black w-7 h-7 flex items-center justify-center rounded-lg shrink-0 ${getBadgeStyle(res.service_type)}`}>{res.service_type || 'か'}</span>
               <span className={`text-[13px] font-black w-11 h-7 flex items-center justify-center rounded-lg shrink-0 tracking-tighter ${getBadgeStyle(res.nomination_category)}`}>{res.nomination_category || 'FREE'}</span>
               <div className="flex items-center tracking-tighter shrink-0 font-black text-gray-700 ml-1">
@@ -172,27 +150,24 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
         </div>
       </section>
 
-      {/* 詳細モーダル */}
+      {/* 📍 詳細モーダル */}
       {selectedRes && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-3 overflow-y-auto bg-black/90 backdrop-blur-sm pt-6 pb-32">
           <div className="absolute inset-0" onClick={() => setSelectedRes(null)} />
           <div className="relative bg-white w-full max-w-[340px] rounded-[38px] overflow-hidden shadow-2xl animate-in zoom-in duration-150 flex flex-col text-gray-800">
             
-            {/* 📍 モーダルヘッダーもイベント色に対応 */}
-            <div className={`p-4 pb-5 ${headerStyle.bg} ${headerStyle.text} flex flex-col items-center justify-center gap-2 relative border-b ${headerStyle.border} transition-colors duration-300`}>
-              <button onClick={() => setSelectedRes(null)} className={`absolute top-4 right-4 opacity-70 hover:opacity-100 ${headerStyle.text}`}><X size={24} /></button>
-              
-              {/* イベント名表示 */}
-              {eventName && <span className="text-[14px] font-black tracking-tight opacity-90">{eventName}</span>}
-
-              <div className="flex gap-1 shrink-0 mt-1">
+            {/* 📍 モーダルヘッダーも色を適用 */}
+            <div className={`p-4 pb-5 ${eventInfo.color} ${eventInfo.text} flex flex-col items-center justify-center gap-1 relative border-b border-white/10 transition-colors duration-300`}>
+              <button onClick={() => setSelectedRes(null)} className={`absolute top-4 right-4 opacity-50 ${eventInfo.text}`}><X size={24} /></button>
+              {eventInfo.name && <span className="text-[11px] font-black tracking-[0.2em] uppercase opacity-70 mb-1">{eventInfo.name}</span>}
+              <div className="flex gap-1 shrink-0">
                 <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black shadow-sm ${getBadgeStyle(selectedRes.service_type)}`}>{selectedRes.service_type || 'か'}</span>
                 <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black shadow-sm ${getBadgeStyle(selectedRes.nomination_category)}`}>{selectedRes.nomination_category || 'FREE'}</span>
               </div>
-              <div className="flex items-baseline gap-0.5 font-black">
-                <span className="text-[28px] tracking-tighter leading-none">{selectedRes.start_time?.substring(0, 5)}</span>
-                <span className={`text-[16px] opacity-50 mx-0.5 ${headerStyle.subText}`}>/</span>
-                <span className="text-[28px] tracking-tighter leading-none">{selectedRes.end_time?.substring(0, 5)}</span>
+              <div className="flex items-baseline gap-0.5 font-black mt-1">
+                <span className="text-[32px] tracking-tighter leading-none">{selectedRes.start_time?.substring(0, 5)}</span>
+                <span className="text-[20px] opacity-30 mx-0.5">/</span>
+                <span className="text-[32px] tracking-tighter leading-none">{selectedRes.end_time?.substring(0, 5)}</span>
               </div>
             </div>
 
@@ -200,7 +175,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
               <div className="text-center pt-1 border-b border-gray-50 pb-2">
                 <h3 className="text-[22px] font-black text-gray-800 leading-tight italic">{selectedRes.course_info}</h3>
               </div>
-
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100 flex flex-col justify-center">
                   <p className="text-[9px] font-black text-gray-400 mb-0.5 uppercase tracking-widest text-center">合計金額</p>
@@ -214,8 +188,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                   <p className="text-[17px] font-black text-gray-800 truncate leading-none pt-1">{selectedRes.hotel_name || 'MR'}</p>
                 </div>
               </div>
-
-              {/* 顧客情報カード */}
               <div className="bg-gray-900 rounded-[24px] p-3 text-white flex items-center justify-between gap-2 shadow-lg relative">
                 <div className="flex flex-col shrink-0 pl-1 text-left">
                   <div className="flex items-baseline gap-1">
@@ -226,11 +198,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                       <span className="text-[11px] font-bold text-gray-500">{visitInfo.count === '初' ? '' : '回目'}</span>
                     </div>
                   </div>
-                  {visitInfo.lastDate && (
-                    <p className="text-[10px] font-bold text-gray-500 flex items-center gap-1 mt-0.5 italic">
-                      <Calendar size={10}/> 前回会った日: {visitInfo.lastDate}
-                    </p>
-                  )}
+                  {visitInfo.lastDate && <p className="text-[10px] font-bold text-gray-500 flex items-center gap-1 mt-0.5 italic"><Calendar size={10}/> 前回会った日: {visitInfo.lastDate}</p>}
                 </div>
                 <div className="flex items-center gap-1 bg-white/10 px-2.5 py-1.5 rounded-xl border border-white/5 active:bg-white/20 transition-all shrink-0">
                   <span className="text-[9px] font-black text-gray-500 uppercase tracking-tighter">No</span>
@@ -238,8 +206,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                   <Copy size={13} className="text-gray-600 ml-0.5" />
                 </div>
               </div>
-
-              {/* メモ ＆ フォーム（ズーム対策 16px） */}
               <div className="space-y-2">
                 {hasValue(selectedRes.memo) && (
                   <div className="bg-yellow-50/50 p-2.5 rounded-xl border border-yellow-100 flex gap-2">
@@ -260,24 +226,11 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                   </div>
                 )}
               </div>
-
-              <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-gray-300 pt-1">
-                <UserCheck size={12} className="opacity-40" />Staff: <span className="text-gray-400">{selectedRes.staff_name || '---'}</span>
-              </div>
             </div>
-
             <div className="p-4 bg-gray-50 border-t border-gray-100 space-y-2">
-              {!isEditingMemo && (
-                <button onClick={() => setIsEditingMemo(true)} className="w-full h-12 rounded-xl bg-white border-2 border-pink-100 text-pink-500 flex items-center justify-center gap-2 font-black text-[14px] active:bg-pink-50 transition-all shadow-sm">
-                  <Edit3 size={18} /> キャストメモを残す
-                </button>
-              )}
-              <button onClick={() => alert("OP計算君起動")} className="w-full h-14 rounded-2xl bg-blue-500 text-white flex items-center justify-center gap-2 font-black text-[16px] shadow-lg shadow-blue-100 active:scale-95 transition-all">
-                <Calculator size={20} /> OP計算君
-              </button>
-              <button onClick={handleDelete} disabled={isDeleting} className={`w-full h-10 rounded-xl text-gray-400 flex items-center justify-center gap-2 font-bold text-[12px] active:bg-rose-50 transition-all ${isDeleting ? 'opacity-50' : ''}`}>
-                <Trash2 size={14} /> {isDeleting ? '消去中...' : '予約を取り消す'}
-              </button>
+              {!isEditingMemo && <button onClick={() => setIsEditingMemo(true)} className="w-full h-12 rounded-xl bg-white border-2 border-pink-100 text-pink-500 flex items-center justify-center gap-2 font-black text-[14px] active:bg-pink-50 transition-all shadow-sm"><Edit3 size={18} /> キャストメモを残す</button>}
+              <button onClick={() => alert("OP計算君起動")} className="w-full h-14 rounded-2xl bg-blue-500 text-white flex items-center justify-center gap-2 font-black text-[16px] shadow-lg shadow-blue-100 active:scale-95 transition-all"><Calculator size={20} /> OP計算君</button>
+              <button onClick={handleDelete} disabled={isDeleting} className={`w-full h-10 rounded-xl text-gray-400 flex items-center justify-center gap-2 font-bold text-[12px] active:bg-rose-50 transition-all ${isDeleting ? 'opacity-50' : ''}`}><Trash2 size={14} /> {isDeleting ? '消去中...' : '予約を取り消す'}</button>
             </div>
           </div>
         </div>
