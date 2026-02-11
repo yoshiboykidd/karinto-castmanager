@@ -100,6 +100,10 @@ export default function MyPage() {
   };
 
   const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
+  
+  // 📍 同期時刻の取得をより強力（確実）に
+  const lastSyncTime = profile?.last_sync_at || profile?.sync_at || profile?.syncAt || null;
+
   const isDanger = profile && (!profile.password || String(profile.password) === '0000' || String(profile.password) === 'managed_by_supabase');
 
   if (loading) return (
@@ -110,11 +114,10 @@ export default function MyPage() {
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800 overflow-x-hidden">
-      {/* 📍 syncTime={profile?.last_sync_at} を追加しました */}
       <CastHeader 
         shopName="マイページ" 
         displayName={profile?.display_name} 
-        syncTime={profile?.last_sync_at} 
+        syncTime={lastSyncTime} 
         bgColor={currentTheme.bg} 
       />
       
@@ -142,7 +145,7 @@ export default function MyPage() {
           </div>
         </section>
 
-        <button onClick={handleSaveSettings} disabled={isSaving} className={`w-full py-4 rounded-2xl shadow-md font-black text-white text-md active:scale-95 transition-all ${isSaving ? 'bg-gray-300' : 'bg-gradient-to-r from-pink-400 to-rose-400'}`}>
+        <button onClick={handleSaveSettings} disabled={isSaving} className={`w-full py-4 rounded-2xl shadow-md font-black text-white text-md active:scale-95 transition-all flex items-center justify-center gap-2 ${isSaving ? 'bg-gray-300' : 'bg-gradient-to-r from-pink-400 to-rose-400'}`}>
           {isSaving ? 'Saving...' : '設定を保存する ✨'}
         </button>
 
@@ -166,6 +169,7 @@ export default function MyPage() {
         </section>
       </main>
 
+      {/* @ts-ignore */}
       <FixedFooter pathname={pathname || ''} onLogout={async () => { await supabase.auth.signOut(); router.push('/login'); }} />
     </div>
   );
