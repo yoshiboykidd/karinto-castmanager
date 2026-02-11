@@ -2,6 +2,7 @@
 
 import { format, startOfDay, isAfter } from 'date-fns';
 import { ja } from 'date-fns/locale';
+import { Clock } from 'lucide-react';
 
 type DailyDetailProps = {
   date: Date;
@@ -42,8 +43,19 @@ export default function DailyDetail({
   const displayOfficialS = shift?.start_time || 'OFF';
   const displayOfficialE = shift?.end_time || '';
 
+  // バッジの色設定用関数
+  const getBadgeStyle = (label: string) => {
+    switch (label) {
+      case 'か': return 'bg-blue-500 text-white';
+      case '添': return 'bg-pink-500 text-white';
+      case 'FREE': return 'bg-cyan-400 text-white';
+      case '初指': return 'bg-green-500 text-white';
+      case '本指': return 'bg-purple-500 text-white';
+      default: return 'bg-gray-100 text-gray-400';
+    }
+  };
+
   return (
-    // subpixel-antialiased を追加してスマホでの痩せ細りを防止
     <section className={`relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-4 pt-6 flex flex-col space-y-2 transition-all duration-300 subpixel-antialiased`}>
       
       {(isKarin || isSoine) && (
@@ -53,13 +65,15 @@ export default function DailyDetail({
         </div>
       )}
 
+      {/* 日付表示 */}
       <div className="flex items-center justify-between px-1 h-7 mt-0.5">
-        <h3 className="text-xl font-black text-gray-800 tracking-tight leading-none flex items-baseline shrink-0">
+        <h3 className="text-xl font-black text-gray-800 tracking-tight leading-none flex items-baseline shrink-0 [text-shadow:_0.3px_0_0_currentColor]">
           {format(date, 'M/d')}
           <span className="text-base ml-1 opacity-70">({format(date, 'E', { locale: ja })})</span>
         </h3>
       </div>
 
+      {/* シフト時間 */}
       <div className="flex items-center justify-between px-1 h-10 gap-1">
         {isOfficial && displayOfficialS !== 'OFF' ? (
           <>
@@ -69,7 +83,6 @@ export default function DailyDetail({
               </span>
             </div>
             <div className="flex-1 text-right overflow-hidden">
-              {/* text-shadow を 0.5px だけ入れて、スマホでもPC並みの Black 感を出す */}
               <span className={`text-[31px] font-black leading-none tracking-tighter whitespace-nowrap inline-block align-middle ${accentColor} [text-shadow:_0.5px_0_0_currentColor]`}>
                 {displayOfficialS}〜{displayOfficialE}
               </span>
@@ -86,22 +99,36 @@ export default function DailyDetail({
       {isOfficial && displayOfficialS !== 'OFF' && (
         <div className="pt-2 border-t border-gray-100/50 space-y-3">
           <div className="space-y-1.5">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Reservation Details</p>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">本日の予約</p>
             {reservations.length > 0 ? (
               reservations.map((res: any, idx: number) => (
-                <div key={idx} className="bg-gray-50/50 rounded-2xl p-3 border border-gray-100 flex justify-between items-center shadow-sm">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-gray-400 leading-none mb-1">
+                <div key={idx} className="bg-gray-50/50 rounded-2xl p-3 border border-gray-100 flex items-center shadow-sm">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* 時計アイコン */}
+                    <Clock size={14} className="text-gray-400 shrink-0" />
+                    
+                    {/* か/添 バッジ（データに区分があれば表示、なければ仮で表示） */}
+                    <span className={`text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-md shrink-0 ${getBadgeStyle(res.category || 'か')}`}>
+                      {res.category || 'か'}
+                    </span>
+
+                    {/* 時間 */}
+                    <span className="text-sm font-black text-gray-700 tracking-tighter [text-shadow:_0.2px_0_0_currentColor]">
                       {res.start_time?.substring(0, 5)}〜{res.end_time?.substring(0, 5)}
                     </span>
-                    <span className="text-sm font-black text-gray-700 leading-none">
-                      {res.course_info || 'コース未定'}
+
+                    {/* 指名種別バッジ */}
+                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md shrink-0 ${getBadgeStyle(res.nomination_type || 'FREE')}`}>
+                      {res.nomination_type || 'FREE'}
                     </span>
-                  </div>
-                  <div className="text-right">
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg bg-white border border-pink-100 ${accentColor}`}>
-                      {res.nomination_type || 'フリー'}
-                    </span>
+
+                    {/* コース時間・お客様名 */}
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-sm font-black text-gray-700">{res.course_info || '---'}分</span>
+                      <span className="text-xs font-bold text-gray-400 truncate max-w-[80px]">
+                        {res.customer_name ? `${res.customer_name}様` : '---'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))
@@ -112,30 +139,30 @@ export default function DailyDetail({
             )}
           </div>
 
+          {/* 自動計算実績 */}
           {!isFuture && (
             <div className="bg-white/80 p-3 rounded-[24px] border border-pink-100 shadow-inner space-y-2">
               <div className="flex items-center justify-between border-b border-pink-50 pb-2">
-                <span className="text-[10px] font-black text-gray-400 uppercase">自動計算の実績</span>
+                <span className="text-[10px] font-black text-gray-400 uppercase">実績合計</span>
                 <div className={`flex items-center ${accentColor}`}>
                   <span className="text-sm font-black mr-0.5 opacity-50">¥</span>
-                  {/* ここにも肉厚補正 */}
                   <span className="text-2xl font-black tracking-tighter [text-shadow:_0.4px_0_0_currentColor]">
                     {(shift?.reward_amount || 0).toLocaleString()}
                   </span>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-1">
-                <div className="text-center">
+              <div className="grid grid-cols-3 gap-1 text-center">
+                <div>
                   <p className="text-[8px] font-black text-gray-300 uppercase">フリー</p>
-                  <p className={`text-lg font-black ${accentColor} [text-shadow:_0.3px_0_0_currentColor]`}>{shift?.reward_f || 0}</p>
+                  <p className={`text-lg font-black ${accentColor}`}>{shift?.reward_f || 0}</p>
                 </div>
-                <div className="text-center">
+                <div>
                   <p className="text-[8px] font-black text-gray-300 uppercase">初指名</p>
-                  <p className={`text-lg font-black ${accentColor} [text-shadow:_0.3px_0_0_currentColor]`}>{shift?.reward_first || 0}</p>
+                  <p className={`text-lg font-black ${accentColor}`}>{shift?.reward_first || 0}</p>
                 </div>
-                <div className="text-center">
+                <div>
                   <p className="text-[8px] font-black text-gray-300 uppercase">本指名</p>
-                  <p className={`text-lg font-black ${accentColor} [text-shadow:_0.3px_0_0_currentColor]`}>{shift?.reward_main || 0}</p>
+                  <p className={`text-lg font-black ${accentColor}`}>{shift?.reward_main || 0}</p>
                 </div>
               </div>
             </div>
