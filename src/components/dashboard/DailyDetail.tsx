@@ -1,18 +1,16 @@
 'use client';
 
-
 import { format, startOfDay, isAfter } from 'date-fns';
 import { ja } from 'date-fns/locale';
-
+import { Clock, User, ShieldCheck } from 'lucide-react'; // アイコン追加で直感的に
 
 type DailyDetailProps = {
   date: Date;
   dayNum: number;
   shift: any; 
-  reservations?: any[]; // 予約データ
-  theme?: string; // カラー設定連動用
+  reservations?: any[]; 
+  theme?: string; 
 };
-
 
 export default function DailyDetail({
   date,
@@ -23,141 +21,139 @@ export default function DailyDetail({
 }: DailyDetailProps) {
   if (!date) return null;
 
-
   const today = startOfDay(new Date());
   const targetDate = startOfDay(date);
   const isFuture = isAfter(targetDate, today);
 
-
-  // 1. ステータス判定（確定シフトのみを扱う）
   const isOfficial = shift?.status === 'official';
-  
-  // 特定日判定
-  const isKarin = dayNum === 10;
-  const isSoine = dayNum === 11 || dayNum === 22;
-
-
-  // テーマカラー設定
   const themeColors: any = {
+    pink: 'text-pink-500 bg-pink-50 border-pink-100',
+    blue: 'text-cyan-600 bg-cyan-50 border-cyan-100',
+    yellow: 'text-yellow-600 bg-yellow-50 border-yellow-100',
+    black: 'text-gray-900 bg-gray-100 border-gray-200',
+  };
+  
+  // 文字色のみの指定
+  const textColors: any = {
     pink: 'text-pink-500',
     blue: 'text-cyan-600',
     yellow: 'text-yellow-600',
-    red: 'text-red-500',
-    black: 'text-gray-800',
-    white: 'text-gray-600'
+    black: 'text-gray-900',
   };
-  const accentColor = themeColors[theme] || themeColors.pink;
 
+  const accentColor = textColors[theme] || textColors.pink;
+  const cardTheme = themeColors[theme] || themeColors.pink;
 
-  // 表示時間（HP確定時間を優先）
   const displayOfficialS = shift?.start_time || 'OFF';
   const displayOfficialE = shift?.end_time || '';
 
-
   return (
-    <section className={`relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-4 pt-6 flex flex-col space-y-2 transition-all duration-300`}>
+    <section className="relative overflow-hidden rounded-[40px] border bg-white border-gray-100 shadow-2xl p-6 flex flex-col space-y-4 transition-all duration-300">
       
-      {/* 特定日バッジ（当時のまま） */}
-      {(isKarin || isSoine) && (
-        <div className={`absolute top-0 left-0 right-0 py-0.5 text-center font-black text-[10px] tracking-[0.2em] shadow-sm z-20
-          ${isKarin ? 'bg-gradient-to-r from-orange-400 to-orange-500 text-white' : 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white'}`}>
-          {isKarin ? 'かりんとの日' : '添い寝の日'}
-        </div>
-      )}
-
-
-      {/* 1行目：日付（当時のデザインを維持） */}
-      <div className="flex items-center justify-between px-1 h-7 mt-0.5">
-        <h3 className="text-xl font-black text-gray-800 tracking-tight leading-none flex items-baseline shrink-0">
+      {/* 1. 日付ヘッダー：より洗練された印象に */}
+      <div className="flex items-end justify-between px-1">
+        <h3 className="text-2xl font-black text-gray-900 tracking-tighter leading-none">
           {format(date, 'M/d')}
-          <span className="text-base ml-1 opacity-70">({format(date, 'E', { locale: ja })})</span>
+          <span className="text-sm ml-1 text-gray-400 font-bold uppercase">
+            {format(date, 'EEE', { locale: ja })}
+          </span>
         </h3>
+        {isOfficial && displayOfficialS !== 'OFF' && (
+          <span className="text-[10px] font-black px-3 py-1 rounded-full bg-blue-500 text-white shadow-sm uppercase tracking-widest">
+            Confirmed
+          </span>
+        )}
       </div>
 
-
-      {/* 2行目：メイン時間（当時のデザインを維持） */}
-      <div className="flex items-center justify-between px-1 h-10 gap-1">
+      {/* 2. メイン時間：text-[31px] のインパクト */}
+      <div className="px-1 py-2">
         {isOfficial && displayOfficialS !== 'OFF' ? (
-          <>
-            <div className="shrink-0">
-              <span className="text-[12px] font-black px-2.5 py-1.5 rounded-xl bg-blue-500 text-white shadow-md whitespace-nowrap">
-                確定シフト
-              </span>
-            </div>
-
-
-            <div className="flex-1 text-right overflow-hidden">
-              <span className={`text-[31px] font-black leading-none tracking-tighter whitespace-nowrap inline-block align-middle ${accentColor}`}>
-                {displayOfficialS}〜{displayOfficialE}
-              </span>
-            </div>
-          </>
+          <div className={`text-[42px] font-black leading-none tracking-tighter ${accentColor}`}>
+            {displayOfficialS}<span className="text-gray-200 mx-1">/</span>{displayOfficialE}
+          </div>
         ) : (
-          <div className="flex items-center justify-between w-full">
-            <span className="text-[12px] font-black px-3 py-1.5 rounded-xl bg-gray-400 text-white shadow-sm shrink-0">お休み</span>
-            <span className="text-xs font-black text-gray-300 italic uppercase tracking-widest opacity-40">Day Off</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[24px] font-black text-gray-300 italic uppercase tracking-tighter">Day Off</span>
           </div>
         )}
       </div>
 
+      {/* 3. 予約リスト：ここをインパクト重視に改造 */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Next Missions</p>
+          <span className="text-[10px] font-bold text-gray-300">{reservations.length}件の予約</span>
+        </div>
 
-      {/* 予約・実績セクション（手動入力から自動表示へ） */}
-      {isOfficial && displayOfficialS !== 'OFF' && (
-        <div className="pt-2 border-t border-gray-100/50 space-y-3">
-          
-          {/* 予約詳細リスト */}
-          <div className="space-y-1.5">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Reservation Details</p>
-            {reservations.length > 0 ? (
-              reservations.map((res: any, idx: number) => (
-                <div key={idx} className="bg-gray-50/50 rounded-2xl p-3 border border-gray-100 flex justify-between items-center shadow-sm">
+        {reservations.length > 0 ? (
+          <div className="space-y-2">
+            {reservations.map((res: any, idx: number) => (
+              <div key={idx} className="group relative bg-white rounded-[28px] p-5 border border-gray-100 shadow-sm active:scale-[0.98] transition-all">
+                {/* 予約カード内の時間：ここもデカめに */}
+                <div className="flex justify-between items-start mb-3">
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-gray-400 leading-none mb-1">{res.startTime}〜{res.endTime}</span>
-                    <span className="text-sm font-black text-gray-700 leading-none">{res.course || 'コース未定'}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg bg-white border border-pink-100 ${accentColor}`}>
-                      {res.type || 'フリー'}
+                    <span className="flex items-center gap-1 text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                      <Clock size={10} /> Time Slot
+                    </span>
+                    <span className={`text-[28px] font-black leading-none tracking-tighter ${accentColor}`}>
+                      {res.startTime}ー{res.endTime}
                     </span>
                   </div>
+                  <div className={`px-3 py-1.5 rounded-xl font-black text-[11px] border uppercase tracking-widest ${cardTheme}`}>
+                    {res.type || 'Free'}
+                  </div>
                 </div>
-              ))
-            ) : (
-              <div className="py-4 text-center bg-gray-50/30 rounded-2xl border border-dashed border-gray-200">
-                <p className="text-xs font-bold text-gray-300 italic">予約データはありません ☕️</p>
+
+                {/* 顧客・コース情報 */}
+                <div className="flex items-center gap-4 mt-2">
+                   <div className="flex-1">
+                      <span className="flex items-center gap-1 text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                        <User size={10} /> Course / Customer
+                      </span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-lg font-black text-gray-800 tracking-tight">{res.course || 'コース未定'}</span>
+                        <span className="text-xs font-bold text-gray-400">{res.customerName ? `${res.customerName} 様` : ''}</span>
+                      </div>
+                   </div>
+                </div>
               </div>
-            )}
+            ))}
           </div>
+        ) : (
+          <div className="py-8 text-center bg-gray-50/50 rounded-[32px] border border-dashed border-gray-200">
+            <p className="text-xs font-bold text-gray-300 italic tracking-widest uppercase">No Reservations Yet</p>
+          </div>
+        )}
+      </div>
 
-
-          {/* 自動計算された実績表示（当時のデザインパーツを再利用） */}
-          {!isFuture && (
-            <div className="bg-white/80 p-3 rounded-[24px] border border-pink-100 shadow-inner space-y-2">
-              <div className="flex items-center justify-between border-b border-pink-50 pb-2">
-                <span className="text-[10px] font-black text-gray-400 uppercase">自動計算の実績</span>
-                <div className={`flex items-center ${accentColor}`}>
-                  <span className="text-sm font-black mr-0.5 opacity-50">¥</span>
-                  <span className="text-2xl font-black tracking-tighter">
+      {/* 4. 実績表示：過去の日付のみ表示 */}
+      {!isFuture && isOfficial && (
+        <div className="mt-2 pt-4 border-t border-gray-50">
+          <div className={`rounded-[32px] p-5 border ${cardTheme} shadow-inner`}>
+            <div className="flex items-center justify-between mb-4">
+               <span className="flex items-center gap-1 text-[10px] font-black opacity-60 uppercase tracking-widest">
+                 <ShieldCheck size={12} /> Daily Result
+               </span>
+               <div className="flex items-baseline">
+                  <span className="text-sm font-black mr-1 opacity-50">¥</span>
+                  <span className="text-3xl font-black tracking-tighter">
                     {(shift?.reward_amount || 0).toLocaleString()}
                   </span>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-1">
-                <div className="text-center">
-                  <p className="text-[8px] font-black text-gray-300 uppercase">フリー</p>
-                  <p className={`text-lg font-black ${accentColor}`}>{shift?.reward_f || 0}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-[8px] font-black text-gray-300 uppercase">初指名</p>
-                  <p className={`text-lg font-black ${accentColor}`}>{shift?.reward_first || 0}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-[8px] font-black text-gray-300 uppercase">本指名</p>
-                  <p className={`text-lg font-black ${accentColor}`}>{shift?.reward_main || 0}</p>
-                </div>
-              </div>
+               </div>
             </div>
-          )}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: 'F', val: shift?.reward_f },
+                { label: '1st', val: shift?.reward_first },
+                { label: 'Main', val: shift?.reward_main }
+              ].map((item) => (
+                <div key={item.label} className="bg-white/60 backdrop-blur-sm rounded-2xl py-2 text-center">
+                  <p className="text-[9px] font-black opacity-40 uppercase">{item.label}</p>
+                  <p className="text-lg font-black">{item.val || 0}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </section>
