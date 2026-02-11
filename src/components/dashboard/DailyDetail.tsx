@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { format, startOfDay, isAfter } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { Clock } from 'lucide-react';
+import { Clock, X } from 'lucide-react';
 
 type DailyDetailProps = {
   date: Date;
@@ -19,14 +20,14 @@ export default function DailyDetail({
   reservations = [],
   theme = 'pink'
 }: DailyDetailProps) {
+  const [selectedRes, setSelectedRes] = useState<any>(null); // 別窓用の状態
+
   if (!date) return null;
 
   const today = startOfDay(new Date());
   const targetDate = startOfDay(date);
   const isFuture = isAfter(targetDate, today);
-
   const isOfficial = shift?.status === 'official';
-  
   const isKarin = dayNum === 10;
   const isSoine = dayNum === 11 || dayNum === 22;
 
@@ -43,7 +44,7 @@ export default function DailyDetail({
   const displayOfficialS = shift?.start_time || 'OFF';
   const displayOfficialE = shift?.end_time || '';
 
-  // バッジの色設定用関数
+  // バッジの色設定
   const getBadgeStyle = (label: string) => {
     switch (label) {
       case 'か': return 'bg-blue-500 text-white';
@@ -55,120 +56,132 @@ export default function DailyDetail({
     }
   };
 
+  // コース名から「分」だけを抽出するヘルパー（例：添い寝の日60分 → 60分）
+  const formatDuration = (info: string) => {
+    const match = info?.match(/\d+分/);
+    return match ? match[0] : info;
+  };
+
   return (
-    <section className={`relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-4 pt-6 flex flex-col space-y-2 transition-all duration-300 subpixel-antialiased`}>
-      
-      {(isKarin || isSoine) && (
-        <div className={`absolute top-0 left-0 right-0 py-0.5 text-center font-black text-[10px] tracking-[0.2em] shadow-sm z-20
-          ${isKarin ? 'bg-gradient-to-r from-orange-400 to-orange-500 text-white' : 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white'}`}>
-          {isKarin ? 'かりんとの日' : '添い寝の日'}
-        </div>
-      )}
+    <>
+      <section className="relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-4 pt-6 flex flex-col space-y-3 subpixel-antialiased">
+        
+        {(isKarin || isSoine) && (
+          <div className={`absolute top-0 left-0 right-0 py-0.5 text-center font-black text-[10px] tracking-[0.2em] z-20 text-white
+            ${isKarin ? 'bg-orange-500' : 'bg-yellow-500'}`}>
+            {isKarin ? 'かりんとの日' : '添い寝の日'}
+          </div>
+        )}
 
-      {/* 日付表示 */}
-      <div className="flex items-center justify-between px-1 h-7 mt-0.5">
-        <h3 className="text-xl font-black text-gray-800 tracking-tight leading-none flex items-baseline shrink-0 [text-shadow:_0.3px_0_0_currentColor]">
-          {format(date, 'M/d')}
-          <span className="text-base ml-1 opacity-70">({format(date, 'E', { locale: ja })})</span>
-        </h3>
-      </div>
-
-      {/* シフト時間 */}
-      <div className="flex items-center justify-between px-1 h-10 gap-1">
-        {isOfficial && displayOfficialS !== 'OFF' ? (
-          <>
-            <div className="shrink-0">
-              <span className="text-[12px] font-black px-2.5 py-1.5 rounded-xl bg-blue-500 text-white shadow-md whitespace-nowrap">
-                確定シフト
-              </span>
-            </div>
-            <div className="flex-1 text-right overflow-hidden">
-              <span className={`text-[31px] font-black leading-none tracking-tighter whitespace-nowrap inline-block align-middle ${accentColor} [text-shadow:_0.5px_0_0_currentColor]`}>
+        {/* 1. 日付と確定シフトを1行に集約 */}
+        <div className="flex items-center gap-2 px-1">
+          <h3 className="text-xl font-black text-gray-800 tracking-tight [text-shadow:_0.3px_0_0_currentColor] shrink-0">
+            {format(date, 'M/d')}
+            <span className="text-sm opacity-70">({format(date, 'E', { locale: ja })})</span>
+          </h3>
+          {isOfficial && displayOfficialS !== 'OFF' ? (
+            <div className="flex items-center gap-2 overflow-hidden">
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-blue-500 text-white shrink-0">確定シフト</span>
+              <span className={`text-xl font-black tracking-tighter ${accentColor} [text-shadow:_0.5px_0_0_currentColor] truncate`}>
                 {displayOfficialS}〜{displayOfficialE}
               </span>
             </div>
-          </>
-        ) : (
-          <div className="flex items-center justify-between w-full">
-            <span className="text-[12px] font-black px-3 py-1.5 rounded-xl bg-gray-400 text-white shadow-sm shrink-0">お休み</span>
-            <span className="text-xs font-black text-gray-300 italic uppercase tracking-widest opacity-40">Day Off</span>
-          </div>
-        )}
-      </div>
+          ) : (
+            <span className="text-sm font-black text-gray-300 italic uppercase">Day Off</span>
+          )}
+        </div>
 
-      {isOfficial && displayOfficialS !== 'OFF' && (
-        <div className="pt-2 border-t border-gray-100/50 space-y-3">
-          <div className="space-y-1.5">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">本日の予約</p>
+        {/* 2. 本日の予約リスト（1行形式） */}
+        {isOfficial && displayOfficialS !== 'OFF' && (
+          <div className="pt-2 border-t border-gray-100/50 space-y-1.5">
+            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1">本日の予約</p>
             {reservations.length > 0 ? (
               reservations.map((res: any, idx: number) => (
-                <div key={idx} className="bg-gray-50/50 rounded-2xl p-3 border border-gray-100 flex items-center shadow-sm">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {/* 時計アイコン */}
-                    <Clock size={14} className="text-gray-400 shrink-0" />
-                    
-                    {/* か/添 バッジ（データに区分があれば表示、なければ仮で表示） */}
-                    <span className={`text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-md shrink-0 ${getBadgeStyle(res.category || 'か')}`}>
-                      {res.category || 'か'}
-                    </span>
+                <button 
+                  key={idx} 
+                  onClick={() => setSelectedRes(res)} // タップで別窓を開く
+                  className="w-full bg-gray-50/50 rounded-xl p-2 px-3 border border-gray-100 flex items-center gap-2 shadow-sm active:bg-gray-100 transition-all overflow-hidden"
+                >
+                  <Clock size={12} className="text-gray-300 shrink-0" />
+                  
+                  {/* バッジ：か/添 */}
+                  <span className={`text-[9px] font-black w-4 h-4 flex items-center justify-center rounded shrink-0 ${getBadgeStyle(res.category || 'か')}`}>
+                    {res.category || 'か'}
+                  </span>
 
-                    {/* 時間 */}
-                    <span className="text-sm font-black text-gray-700 tracking-tighter [text-shadow:_0.2px_0_0_currentColor]">
-                      {res.start_time?.substring(0, 5)}〜{res.end_time?.substring(0, 5)}
-                    </span>
+                  {/* 時間 */}
+                  <span className="text-[13px] font-black text-gray-700 tracking-tighter shrink-0 [text-shadow:_0.2px_0_0_currentColor]">
+                    {res.start_time?.substring(0, 5)}〜{res.end_time?.substring(0, 5)}
+                  </span>
 
-                    {/* 指名種別バッジ */}
-                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md shrink-0 ${getBadgeStyle(res.nomination_type || 'FREE')}`}>
-                      {res.nomination_type || 'FREE'}
-                    </span>
+                  {/* バッジ：種別 */}
+                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded shrink-0 ${getBadgeStyle(res.nomination_type || 'FREE')}`}>
+                    {res.nomination_type || 'FREE'}
+                  </span>
 
-                    {/* コース時間・お客様名 */}
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-sm font-black text-gray-700">{res.course_info || '---'}分</span>
-                      <span className="text-xs font-bold text-gray-400 truncate max-w-[80px]">
-                        {res.customer_name ? `${res.customer_name}様` : '---'}
-                      </span>
-                    </div>
+                  {/* コース時間（分）と名前 */}
+                  <div className="flex items-center gap-1 overflow-hidden">
+                    <span className="text-[13px] font-black text-gray-700 shrink-0">{formatDuration(res.course_info)}</span>
+                    <span className="text-[11px] font-bold text-gray-400 truncate">
+                      {res.customer_name ? `${res.customer_name}様` : ''}
+                    </span>
                   </div>
-                </div>
+                </button>
               ))
             ) : (
-              <div className="py-4 text-center bg-gray-50/30 rounded-2xl border border-dashed border-gray-200">
-                <p className="text-xs font-bold text-gray-300 italic">予約データはありません ☕️</p>
+              <div className="py-3 text-center bg-gray-50/30 rounded-xl border border-dashed border-gray-200">
+                <p className="text-[10px] font-bold text-gray-300 italic">No Data</p>
               </div>
             )}
           </div>
+        )}
+      </section>
 
-          {/* 自動計算実績 */}
-          {!isFuture && (
-            <div className="bg-white/80 p-3 rounded-[24px] border border-pink-100 shadow-inner space-y-2">
-              <div className="flex items-center justify-between border-b border-pink-50 pb-2">
-                <span className="text-[10px] font-black text-gray-400 uppercase">実績合計</span>
-                <div className={`flex items-center ${accentColor}`}>
-                  <span className="text-sm font-black mr-0.5 opacity-50">¥</span>
-                  <span className="text-2xl font-black tracking-tighter [text-shadow:_0.4px_0_0_currentColor]">
-                    {(shift?.reward_amount || 0).toLocaleString()}
-                  </span>
-                </div>
+      {/* 3. 別窓（モーダル）：詳細表示 */}
+      {selectedRes && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedRes(null)} />
+          <div className="relative bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl space-y-4 subpixel-antialiased">
+            <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300 hover:text-gray-500">
+              <X size={24} />
+            </button>
+            
+            <div className="space-y-1">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Reservation Detail</p>
+              <h4 className={`text-2xl font-black ${accentColor} tracking-tighter`}>
+                {selectedRes.start_time} - {selectedRes.end_time}
+              </h4>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 pt-2">
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase">Customer</p>
+                <p className="text-lg font-black text-gray-800">{selectedRes.customer_name || '---'} 様</p>
               </div>
-              <div className="grid grid-cols-3 gap-1 text-center">
-                <div>
-                  <p className="text-[8px] font-black text-gray-300 uppercase">フリー</p>
-                  <p className={`text-lg font-black ${accentColor}`}>{shift?.reward_f || 0}</p>
-                </div>
-                <div>
-                  <p className="text-[8px] font-black text-gray-300 uppercase">初指名</p>
-                  <p className={`text-lg font-black ${accentColor}`}>{shift?.reward_first || 0}</p>
-                </div>
-                <div>
-                  <p className="text-[8px] font-black text-gray-300 uppercase">本指名</p>
-                  <p className={`text-lg font-black ${accentColor}`}>{shift?.reward_main || 0}</p>
-                </div>
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase">Type</p>
+                <p className="text-lg font-black text-gray-800">{selectedRes.nomination_type || 'FREE'}</p>
               </div>
             </div>
-          )}
+
+            <div className="pt-2">
+              <p className="text-[10px] font-black text-gray-400 uppercase">Course Info</p>
+              <p className="text-md font-bold text-gray-700 bg-gray-50 p-3 rounded-2xl border border-gray-100 mt-1">
+                {selectedRes.course_info || '---'}
+              </p>
+            </div>
+
+            {selectedRes.memo && (
+              <div className="pt-2">
+                <p className="text-[10px] font-black text-gray-400 uppercase">Memo</p>
+                <div className="text-sm font-medium text-gray-600 bg-blue-50/50 p-4 rounded-2xl border border-blue-100 mt-1 leading-relaxed">
+                  {selectedRes.memo}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
-    </section>
+    </>
   );
 }
