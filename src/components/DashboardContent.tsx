@@ -29,6 +29,7 @@ export default function DashboardContent() {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
 
+  // useShiftDataから必要な関数とデータを取得
   const { data, loading, fetchInitialData, getMonthlyTotals, supabase } = useShiftData();
   const nav = useNavigation() as any;
 
@@ -37,7 +38,8 @@ export default function DashboardContent() {
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  const lastSyncTime = (data as any)?.last_sync_at || (data as any)?.syncAt || null;
+  // Vercelビルドエラー対策: last_sync_atの存在チェックをanyで回避
+  const lastSyncTime = (data as any)?.last_sync_at || (data as any)?.syncAt || (data as any)?.profile?.last_sync_at || null;
 
   const achievementData: any = useAchievement(
     supabase, safeProfile, safeShifts, nav.selected?.single, () => fetchInitialData(router)
@@ -75,6 +77,7 @@ export default function DashboardContent() {
         />
       </div>
       
+      {/* 📍 メインコンテンツ：-mt-6 でヘッダーとの重なりを調整 */}
       <main className="px-4 -mt-6 relative z-10 space-y-5">
         <MonthlySummary 
           month={displayMonth} 
@@ -101,7 +104,7 @@ export default function DashboardContent() {
             shift={selectedShift}
             reservations={currentReservations} 
             theme={themeKey}
-            /* 📍 削除機能のために追加 */
+            /* 📍 予約取り消し機能（DB連携）のために追加 */
             supabase={supabase}
             onRefresh={() => fetchInitialData(router)}
           />
