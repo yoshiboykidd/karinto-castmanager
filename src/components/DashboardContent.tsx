@@ -37,6 +37,9 @@ export default function DashboardContent() {
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
+  // 📍 Vercelエラー対策：dataをanyとして扱い、last_sync_at または syncAt を探す
+  const lastSyncTime = (data as any)?.last_sync_at || (data as any)?.syncAt || null;
+
   const achievementData: any = useAchievement(
     supabase, safeProfile, safeShifts, nav.selected?.single, () => fetchInitialData(router)
   );
@@ -68,8 +71,7 @@ export default function DashboardContent() {
         <CastHeader 
           displayName={safeProfile.display_name} 
           shopName={safeProfile.shop_name || '店舗未設定'}
-          /* 📍 DBカラム last_sync_at を syncTime プロパティへ正確に紐付け */
-          syncTime={data?.last_sync_at} 
+          syncTime={lastSyncTime} 
           bgColor={currentTheme.header}
         />
       </div>
@@ -98,7 +100,7 @@ export default function DashboardContent() {
             date={nav.selected.single}
             dayNum={nav.selected.single.getDate()}
             shift={selectedShift}
-            reservations={currentReservations}
+            reservations={currentReservations} 
             theme={themeKey}
           />
         )}
