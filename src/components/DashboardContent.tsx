@@ -37,9 +37,27 @@ export default function DashboardContent() {
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  // 📍 店舗名の確定（shop_nameが空ならフォールバック）
+  // 📍 12店舗の判別ロジック
   const shopName = useMemo(() => {
-    return safeProfile.shop_name || (safeProfile as any).store_name || '店舗未設定';
+    const loginId = safeProfile.username || safeProfile.login_id || "";
+    const prefix = loginId.substring(0, 3);
+
+    const shopMap: Record<string, string> = {
+      '001': '神田',
+      '002': '赤坂',
+      '003': '秋葉原',
+      '004': '上野',
+      '005': '渋谷',
+      '006': '池袋西口',
+      '007': '五反田',
+      '008': '大宮',
+      '009': '吉祥寺',
+      '010': '大久保',
+      '011': '池袋東口',
+      '012': '小岩'
+    };
+
+    return shopMap[prefix] ? `${shopMap[prefix]}店` : '店舗未設定';
   }, [safeProfile]);
 
   const lastSyncTime = (data as any)?.last_sync_at || (data as any)?.syncAt || null;
@@ -96,6 +114,8 @@ export default function DashboardContent() {
             theme={themeKey}
             supabase={supabase}
             onRefresh={() => fetchInitialData(router)}
+            /* 📍 自分自身の login_id を渡す */
+            myLoginId={safeProfile.username || safeProfile.login_id}
           />
         )}
         
