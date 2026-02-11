@@ -37,7 +37,6 @@ export default function DashboardContent() {
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  // 📍 12店舗の正確な判別
   const shopName = useMemo(() => {
     const loginId = String(safeProfile.username || safeProfile.login_id || "");
     const prefix = loginId.substring(0, 3);
@@ -49,10 +48,9 @@ export default function DashboardContent() {
     return shopMap[prefix] ? `${shopMap[prefix]}店` : (safeProfile.shop_name || '店舗未設定');
   }, [safeProfile]);
 
-  // 📍 HP同期時刻取得の超強化（--:-- を防ぐ）
+  // 同期時刻を複数の階層から探す
   const lastSyncTime = useMemo(() => {
     const d = data as any;
-    // 1. data直下, 2. profile内, 3. 別の命名規則、の順に探す
     return d?.last_sync_at || d?.syncAt || safeProfile?.last_sync_at || safeProfile?.sync_at || null;
   }, [data, safeProfile]);
 
@@ -104,7 +102,7 @@ export default function DashboardContent() {
             date={nav.selected.single}
             dayNum={nav.selected.single.getDate()}
             shift={selectedShift}
-            allShifts={safeShifts} 
+            allShifts={safeShifts}
             reservations={currentReservations} 
             theme={themeKey}
             supabase={supabase}

@@ -17,15 +17,11 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   if (!date) return null;
 
-  // 📍 執念の特定日取得ロジック
-  // 自分のシフト(shift)が休みでも、全シフトデータ(allShifts)からその日のイベント名を探す
+  // 全キャストのデータからその日のイベント名を抽出
   const eventName = useMemo(() => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    // その日の全キャストのシフトから、イベント名が入っているものを1つ探す
-    const dayEvent = allShifts.find((s: any) => 
-      (s.shift_date === dateStr || s.date === dateStr) && (s.event_name || s.event)
-    );
-    return dayEvent?.event_name || dayEvent?.event || null;
+    const target = allShifts.find((s: any) => (s.shift_date || s.date) === dateStr && (s.event_name || s.event));
+    return target?.event_name || target?.event || null;
   }, [date, allShifts]);
 
   const isOfficial = shift?.status === 'official';
@@ -106,7 +102,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
               <span className="text-[12px] opacity-30 ml-0.5 font-bold">({format(date, 'E', { locale: ja })})</span>
             </div>
 
-            {/* 📍 特定日（イベント名）バッジ */}
             {eventName && (
               <span className="bg-red-500 text-white text-[10px] px-2 py-1 rounded-lg font-black shrink-0 shadow-sm animate-pulse">
                 {eventName}
@@ -130,7 +125,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
         <div className="pt-2 border-t border-gray-100/50 space-y-1">
           {reservations.length > 0 ? [...reservations].sort((a, b) => (a.start_time || "").localeCompare(b.start_time || "")).map((res: any, idx: number) => (
-            <button key={idx} onClick={() => { setSelectedRes(res); setMemoDraft(res.cast_memo || ''); setIsEditingMemo(false); }} className="w-full bg-gray-50/50 rounded-xl p-1.5 px-2 border border-gray-100 flex items-center gap-1 shadow-sm active:bg-gray-100 transition-all overflow-hidden text-gray-800">
+            <button key={idx} onClick={() => { setSelectedRes(res); setMemoDraft(res.cast_memo || ''); setIsEditingMemo(false); }} className="w-full bg-gray-50/50 rounded-xl p-1.5 px-2 border border-gray-100 flex items-center gap-1 shadow-sm active:bg-gray-100 transition-all overflow-hidden text-gray-800 text-left">
               <span className={`text-[13px] font-black w-7 h-7 flex items-center justify-center rounded-lg shrink-0 ${getBadgeStyle(res.service_type)}`}>{res.service_type || 'か'}</span>
               <span className={`text-[13px] font-black w-11 h-7 flex items-center justify-center rounded-lg shrink-0 tracking-tighter ${getBadgeStyle(res.nomination_category)}`}>{res.nomination_category || 'FREE'}</span>
               <div className="flex items-center tracking-tighter shrink-0 font-black text-gray-700 ml-1">
@@ -154,7 +149,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
           <div className="absolute inset-0" onClick={() => setSelectedRes(null)} />
           <div className="relative bg-white w-full max-w-[340px] rounded-[38px] overflow-hidden shadow-2xl animate-in zoom-in duration-150 flex flex-col text-gray-800">
             <div className={`p-4 pb-5 ${accentBg} flex items-center justify-center gap-3 relative border-b border-gray-100`}>
-              <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300"><X size={24} /></button>
+              <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300 active:text-gray-500"><X size={24} /></button>
               <div className="flex gap-1 shrink-0">
                 <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black shadow-sm ${getBadgeStyle(selectedRes.service_type)}`}>{selectedRes.service_type || 'か'}</span>
                 <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black shadow-sm ${getBadgeStyle(selectedRes.nomination_category)}`}>{selectedRes.nomination_category || 'FREE'}</span>
@@ -185,7 +180,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 </div>
               </div>
 
-              {/* 顧客情報カード */}
               <div className="bg-gray-900 rounded-[24px] p-3 text-white flex items-center justify-between gap-2 shadow-lg relative">
                 <div className="flex flex-col shrink-0 pl-1 text-left">
                   <div className="flex items-baseline gap-1">
@@ -209,7 +203,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 </div>
               </div>
 
-              {/* キャストメモ ＆ フォーム（ズーム対策16px） */}
               <div className="space-y-2">
                 {hasValue(selectedRes.memo) && (
                   <div className="bg-yellow-50/50 p-2.5 rounded-xl border border-yellow-100 flex gap-2">
