@@ -17,7 +17,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   if (!date) return null;
 
-  // 特定日判定：10日、11日、22日を優先し、次にDBを確認
+  // 特定日判定
   const eventInfo = useMemo(() => {
     const d = date.getDate();
     if (d === 10) return { label: 'かりんとの日', color: 'bg-[#FF9900]', text: 'text-white' };
@@ -97,15 +97,13 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   return (
     <>
+      {/* 予約一覧セクション */}
       <section className="relative overflow-hidden rounded-[32px] border border-gray-100 bg-white shadow-xl flex flex-col subpixel-antialiased">
-        {/* 特定日ラベル（枠上部） */}
         {eventInfo && (
           <div className={`w-full py-1.5 ${eventInfo.color} ${eventInfo.text} text-center text-[13px] font-black tracking-[0.2em] shadow-sm uppercase`}>
             {eventInfo.label}
           </div>
         )}
-
-        {/* リストヘッダー */}
         <div className="flex items-center justify-center w-full p-4 pb-2">
           <div className="flex items-center gap-4">
             <div className="flex items-baseline font-black tracking-tighter text-gray-800">
@@ -128,8 +126,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
             )}
           </div>
         </div>
-
-        {/* 予約一覧 */}
         <div className="p-3 pt-0 space-y-1">
           {reservations.length > 0 ? [...reservations].sort((a, b) => (a.start_time || "").localeCompare(b.start_time || "")).map((res: any, idx: number) => (
             <button key={idx} onClick={() => { setSelectedRes(res); setMemoDraft(res.cast_memo || ''); setIsEditingMemo(false); }} className="w-full bg-gray-50/50 rounded-xl p-1.5 px-2 border border-gray-100 flex items-center gap-1 shadow-sm active:bg-gray-100 transition-all overflow-hidden text-gray-800">
@@ -151,37 +147,42 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
         </div>
       </section>
 
-      {/* 詳細モーダル */}
+      {/* 予約詳細モーダル */}
       {selectedRes && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-3 overflow-y-auto bg-black/90 backdrop-blur-sm pt-6 pb-32">
           <div className="absolute inset-0" onClick={() => setSelectedRes(null)} />
           <div className="relative bg-white w-full max-w-[340px] rounded-[38px] overflow-hidden shadow-2xl animate-in zoom-in duration-150 flex flex-col text-gray-800">
             
-            {/* モーダル特定日ラベル */}
+            {/* 特定日ラベル */}
             {eventInfo && (
               <div className={`w-full py-2 ${eventInfo.color} ${eventInfo.text} text-center text-[12px] font-black tracking-widest uppercase`}>
                 {eventInfo.label}
               </div>
             )}
             
-            {/* 📍 ヘッダー：バッジと時間を1行で表示 */}
-            <div className={`p-4 pb-5 flex items-center justify-center gap-3 relative border-b border-gray-50`}>
+            {/* ヘッダー：バッジと時間を1行 */}
+            <div className={`p-4 pb-4 flex items-center justify-center gap-3 relative border-b border-gray-50`}>
               <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300"><X size={24} /></button>
-              <div className="flex gap-1 shrink-0">
+              <div className="flex gap-1 shrink-0 mt-2">
                 <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black shadow-sm ${getBadgeStyle(selectedRes.service_type)}`}>{selectedRes.service_type || 'か'}</span>
                 <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black shadow-sm ${getBadgeStyle(selectedRes.nomination_category)}`}>{selectedRes.nomination_category || 'FREE'}</span>
               </div>
-              <div className="flex items-baseline gap-0.5 font-black text-gray-900">
+              <div className="flex items-baseline gap-0.5 font-black mt-2 text-gray-900">
                 <span className="text-[32px] tracking-tighter leading-none">{selectedRes.start_time?.substring(0, 5)}</span>
                 <span className="text-[20px] opacity-20 mx-0.5">/</span>
                 <span className="text-[32px] tracking-tighter leading-none">{selectedRes.end_time?.substring(0, 5)}</span>
               </div>
             </div>
 
-            <div className="px-5 py-3 bg-white space-y-2">
-              <div className="text-center pt-1 border-b border-gray-50 pb-2">
-                <h3 className="text-[22px] font-black text-gray-800 leading-tight italic">{selectedRes.course_info}</h3>
+            <div className="px-5 py-4 bg-white space-y-4">
+              {/* コース名：大きく、長い名前も考慮 */}
+              <div className="text-center border-b border-gray-50 pb-3">
+                <h3 className="text-[26px] font-black text-gray-800 leading-tight italic break-words">
+                  {selectedRes.course_info}
+                </h3>
               </div>
+
+              {/* 金額 ＆ ホテル */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100 flex flex-col justify-center">
                   <p className="text-[9px] font-black text-gray-400 mb-0.5 uppercase tracking-widest text-center">合計金額</p>
@@ -195,28 +196,8 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                   <p className="text-[17px] font-black text-gray-800 truncate leading-none pt-1">{selectedRes.hotel_name || 'MR'}</p>
                 </div>
               </div>
-              
-              {/* 顧客カード */}
-              <div className="bg-gray-900 rounded-[24px] p-3 text-white flex items-center justify-between gap-2 shadow-lg relative">
-                <div className="flex flex-col shrink-0 pl-1 text-left">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-[18px] font-black tracking-tighter">{selectedRes.customer_name}</span>
-                    <span className="text-[12px] font-bold text-gray-400">様</span>
-                    <div className="flex items-baseline gap-0.5 ml-1">
-                      <span className="text-[20px] font-black text-pink-400 leading-none">{visitInfo.count}</span>
-                      <span className="text-[11px] font-bold text-gray-500">{visitInfo.count === '初' ? '' : '回目'}</span>
-                    </div>
-                  </div>
-                  {visitInfo.lastDate && <p className="text-[10px] font-bold text-gray-500 flex items-center gap-1 mt-0.5 italic"><Calendar size={10}/> 前回会った日: {visitInfo.lastDate}</p>}
-                </div>
-                <div className="flex items-center gap-1 bg-white/10 px-2.5 py-1.5 rounded-xl border border-white/5 active:bg-white/20 transition-all shrink-0">
-                  <span className="text-[9px] font-black text-gray-500 uppercase tracking-tighter">No</span>
-                  <span className="text-[20px] font-black tracking-widest leading-none select-all text-white">{selectedRes.customer_no || '---'}</span>
-                  <Copy size={13} className="text-gray-600 ml-0.5" />
-                </div>
-              </div>
 
-              {/* メモ ＆ フォーム（16pxズーム対策） */}
+              {/* 📍 メモ ＆ OP計算君ボタン (合計金額の下) */}
               <div className="space-y-2 text-left">
                 {hasValue(selectedRes.memo) && (
                   <div className="bg-yellow-50/50 p-2.5 rounded-xl border border-yellow-100 flex gap-2">
@@ -236,11 +217,39 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                     <button onClick={handleSaveMemo} className="w-full h-11 bg-pink-500 text-white rounded-xl flex items-center justify-center gap-2 font-black text-[14px] shadow-md active:scale-95 transition-all"><Save size={18} /> 保存する</button>
                   </div>
                 )}
+                {/* OP計算君ボタン */}
+                <button onClick={() => alert("OP計算君起動")} className="w-full h-14 rounded-2xl bg-blue-500 text-white flex items-center justify-center gap-2 font-black text-[16px] shadow-lg shadow-blue-100 active:scale-95 transition-all">
+                  <Calculator size={20} /> OP計算君
+                </button>
+              </div>
+              
+              {/* 📍 顧客情報カード (一番下に配置) */}
+              <div className="bg-gray-900 rounded-[24px] p-3 text-white flex items-center justify-between gap-2 shadow-lg relative">
+                <div className="flex flex-col shrink-0 pl-1 text-left">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-[18px] font-black tracking-tighter">{selectedRes.customer_name}</span>
+                    <span className="text-[12px] font-bold text-gray-400">様</span>
+                    <div className="flex items-baseline gap-0.5 ml-1">
+                      <span className="text-[20px] font-black text-pink-400 leading-none">{visitInfo.count}</span>
+                      <span className="text-[11px] font-bold text-gray-500">{visitInfo.count === '初' ? '' : '回目'}</span>
+                    </div>
+                  </div>
+                  {visitInfo.lastDate && <p className="text-[10px] font-bold text-gray-500 flex items-center gap-1 mt-0.5 italic"><Calendar size={10}/> 前回会った日: {visitInfo.lastDate}</p>}
+                </div>
+                <div className="flex items-center gap-1 bg-white/10 px-2.5 py-1.5 rounded-xl border border-white/5 active:bg-white/20 transition-all shrink-0">
+                  <span className="text-[9px] font-black text-gray-500 uppercase tracking-tighter">No</span>
+                  <span className="text-[20px] font-black tracking-widest leading-none select-all text-white">{selectedRes.customer_no || '---'}</span>
+                  <Copy size={13} className="text-gray-600 ml-0.5" />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-gray-300 pt-1">
+                <UserCheck size={12} className="opacity-40" />Staff: <span className="text-gray-400">{selectedRes.staff_name || '---'}</span>
               </div>
             </div>
+
             <div className="p-4 bg-gray-50 border-t border-gray-100 space-y-2">
               {!isEditingMemo && <button onClick={() => setIsEditingMemo(true)} className="w-full h-12 rounded-xl bg-white border-2 border-pink-100 text-pink-500 flex items-center justify-center gap-2 font-black text-[14px] active:bg-pink-50 transition-all shadow-sm"><Edit3 size={18} /> キャストメモを残す</button>}
-              <button onClick={() => alert("OP計算君起動")} className="w-full h-14 rounded-2xl bg-blue-500 text-white flex items-center justify-center gap-2 font-black text-[16px] shadow-lg shadow-blue-100 active:scale-95 transition-all"><Calculator size={20} /> OP計算君</button>
               <button onClick={handleDelete} disabled={isDeleting} className={`w-full h-10 rounded-xl text-gray-400 flex items-center justify-center gap-2 font-bold text-[12px] active:bg-rose-50 transition-all ${isDeleting ? 'opacity-50' : ''}`}><Trash2 size={14} /> {isDeleting ? '消去中...' : '予約を取り消す'}</button>
             </div>
           </div>
