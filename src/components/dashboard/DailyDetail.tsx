@@ -17,30 +17,45 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   if (!date) return null;
 
-  // 📍 特定日（イベント名）の判定ロジック
+  // 📍 執念の特定日（イベント名）抽出ロジック
   const eventName = useMemo(() => {
-    // 1. まずデータベース（全シフトデータ）の中に文字が入っているか探す
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const dbFound = allShifts.find((s: any) => 
-      (s.shift_date === dateStr || s.date === dateStr) && (s.event_name || s.event)
-    );
-    if (dbFound?.event_name || dbFound?.event) return dbFound.event_name || dbFound.event;
-
-    // 2. データベースが空の場合、カレンダーと同じ「数値ルール」で判定
-    const d = date.getDate();
-    if (d === 10) return 'かりんとの日';
-    if (d === 11 || d === 22) return '添い寝の日';
-
-    return null;
+    if (!allShifts || allShifts.length === 0) return null;
+    const targetDate = format(date, 'yyyy-MM-dd');
+    const foundShift = allShifts.find((s: any) => {
+      const sDate = String(s.shift_date || s.date || "");
+      return sDate.includes(targetDate) && (s.event_name || s.event || s.event_title);
+    });
+    return foundShift?.event_name || foundShift?.event || foundShift?.event_title || null;
   }, [date, allShifts]);
 
   const isOfficial = shift?.status === 'official';
-  const themeColors: any = {
-    pink: 'text-pink-500', blue: 'text-cyan-600', yellow: 'text-yellow-600',
-    red: 'text-red-500', black: 'text-gray-800', white: 'text-gray-600'
-  };
-  const accentColor = themeColors[theme] || themeColors.pink;
-  const accentBg = accentColor.replace('text', 'bg').replace('500', '50').replace('600', '50');
+
+  // 📍 イベントに応じたヘッダー配色スタイルを定義
+  const headerStyle = useMemo(() => {
+    if (eventName?.includes('かりん')) {
+      return { bg: 'bg-orange-500', text: 'text-white', border: 'border-orange-600',subText: 'text-orange-100' };
+    }
+    if (eventName?.includes('添い寝')) {
+      return { bg: 'bg-yellow-400', text: 'text-yellow-900', border: 'border-yellow-500', subText: 'text-yellow-700' };
+    }
+    
+    // 通常時のテーマカラー設定
+    const themeColors: any = {
+      pink: { bg: 'bg-pink-50', text: 'text-pink-500', border: 'border-pink-100', subText: 'text-pink-300' },
+      blue: { bg: 'bg-cyan-50', text: 'text-cyan-600', border: 'border-cyan-100', subText: 'text-cyan-400' },
+      yellow: { bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-100', subText: 'text-yellow-400' },
+      red: { bg: 'bg-red-50', text: 'text-red-500', border: 'border-red-100', subText: 'text-red-300' },
+      black: { bg: 'bg-gray-800', text: 'text-white', border: 'border-gray-700', subText: 'text-gray-400' },
+      white: { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200', subText: 'text-gray-400' },
+    };
+    // イベントがある場合は少し濃くする、なければ通常の薄い色
+    if (eventName) {
+       const base = themeColors[theme] || themeColors.pink;
+       return { ...base, bg: base.bg.replace('50', '500'), text: 'text-white', subText: 'text-white/70' };
+    }
+    return themeColors[theme] || themeColors.pink;
+
+  }, [eventName, theme]);
 
   const getBadgeStyle = (label: string) => {
     switch (label) {
@@ -55,7 +70,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   const hasValue = (val: string) => val && val !== 'なし' && val !== '延長なし' && val !== 'なし ' && val !== '';
 
-  // 自分（当人）との履歴取得
+  // 個人履歴取得
   useEffect(() => {
     if (selectedRes && supabase && myLoginId) {
       const fetchHistory = async () => {
@@ -103,44 +118,42 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   return (
     <>
-      {/* 予約一覧セクション */}
-      <section className="relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-3 pt-8 flex flex-col space-y-1 subpixel-antialiased text-gray-800">
-        <div className="flex items-center justify-center w-full mt-1 mb-2">
-          <div className="flex items-center gap-2 whitespace-nowrap">
-            {/* 日付表示 */}
-            <div className="flex items-baseline font-black tracking-tighter">
-              <span className="text-[28px] leading-none">{format(date, 'M')}</span>
-              <span className="text-[14px] opacity-30 mx-0.5 font-bold">/</span>
-              <span className="text-[28px] leading-none">{format(date, 'd')}</span>
-              <span className="text-[12px] opacity-30 ml-0.5 font-bold">({format(date, 'E', { locale: ja })})</span>
-            </div>
-
-            {/* 📍 特定日バッジ */}
-            {eventName && (
-              <span className="bg-red-500 text-white text-[10px] px-2 py-1 rounded-lg font-black shrink-0 shadow-sm animate-pulse">
-                {eventName}
-              </span>
-            )}
-
-            {/* 確定 ＆ 時間 */}
-            {isOfficial ? (
-              <div className="flex items-center gap-1.5">
-                <span className="w-11 h-7 flex items-center justify-center rounded-lg bg-blue-500 text-white text-[13px] font-black shrink-0 tracking-tighter shadow-sm">確定</span>
-                <div className={`flex items-baseline font-black tracking-tighter ${accentColor}`}>
-                  <span className="text-[28px] leading-none">{shift?.start_time}</span>
-                  <span className="text-[14px] mx-1 opacity-20 font-bold">〜</span>
-                  <span className="text-[28px] leading-none">{shift?.end_time}</span>
-                </div>
-              </div>
-            ) : (
-              <span className="text-[14px] font-black text-gray-200 italic uppercase tracking-[0.2em] leading-none ml-1">Day Off</span>
-            )}
+      <section className={`relative overflow-hidden rounded-[32px] border shadow-xl flex flex-col subpixel-antialiased bg-white ${headerStyle.border}`}>
+        
+        {/* 📍 ヘッダー帯：イベントに応じた色を適用 */}
+        <div className={`w-full p-3 py-4 flex items-center justify-center gap-3 ${headerStyle.bg} ${headerStyle.text} transition-colors duration-300`}>
+          
+          {/* 日付表示 */}
+          <div className="flex items-baseline font-black tracking-tighter leading-none">
+            <span className="text-[28px]">{format(date, 'M')}</span>
+            <span className={`text-[14px] mx-0.5 ${headerStyle.subText}`}>/</span>
+            <span className="text-[28px]">{format(date, 'd')}</span>
+            <span className={`text-[12px] ml-0.5 ${headerStyle.subText}`}>({format(date, 'E', { locale: ja })})</span>
           </div>
+
+          {/* 📍 イベント名（テキストで表示） */}
+          {eventName && (
+            <span className="text-[16px] font-black tracking-tight">{eventName}</span>
+          )}
+
+          {/* 確定 ＆ シフト時間 */}
+          {isOfficial ? (
+            <div className="flex items-center gap-1.5 ml-1">
+              <span className="w-11 h-7 flex items-center justify-center rounded-lg bg-white/20 text-[13px] font-black shrink-0 tracking-tighter shadow-sm backdrop-blur-sm">確定</span>
+              <div className="flex items-baseline font-black tracking-tighter">
+                <span className="text-[24px] leading-none">{shift?.start_time}</span>
+                <span className={`text-[14px] mx-0.5 ${headerStyle.subText}`}>〜</span>
+                <span className="text-[24px] leading-none">{shift?.end_time}</span>
+              </div>
+            </div>
+          ) : (
+            <span className={`text-[14px] font-black uppercase tracking-[0.2em] leading-none ml-2 ${headerStyle.subText}`}>Day Off</span>
+          )}
         </div>
 
-        <div className="pt-2 border-t border-gray-100/50 space-y-1">
+        <div className="p-3 pt-1 space-y-1 text-gray-800">
           {reservations.length > 0 ? [...reservations].sort((a, b) => (a.start_time || "").localeCompare(b.start_time || "")).map((res: any, idx: number) => (
-            <button key={idx} onClick={() => { setSelectedRes(res); setMemoDraft(res.cast_memo || ''); setIsEditingMemo(false); }} className="w-full bg-gray-50/50 rounded-xl p-1.5 px-2 border border-gray-100 flex items-center gap-1 shadow-sm active:bg-gray-100 transition-all overflow-hidden text-gray-800">
+            <button key={idx} onClick={() => { setSelectedRes(res); setMemoDraft(res.cast_memo || ''); setIsEditingMemo(false); }} className="w-full bg-gray-50/50 rounded-xl p-1.5 px-2 border border-gray-100 flex items-center gap-1 shadow-sm active:bg-gray-100 transition-all overflow-hidden text-gray-800 text-left">
               <span className={`text-[13px] font-black w-7 h-7 flex items-center justify-center rounded-lg shrink-0 ${getBadgeStyle(res.service_type)}`}>{res.service_type || 'か'}</span>
               <span className={`text-[13px] font-black w-11 h-7 flex items-center justify-center rounded-lg shrink-0 tracking-tighter ${getBadgeStyle(res.nomination_category)}`}>{res.nomination_category || 'FREE'}</span>
               <div className="flex items-center tracking-tighter shrink-0 font-black text-gray-700 ml-1">
@@ -165,15 +178,20 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
           <div className="absolute inset-0" onClick={() => setSelectedRes(null)} />
           <div className="relative bg-white w-full max-w-[340px] rounded-[38px] overflow-hidden shadow-2xl animate-in zoom-in duration-150 flex flex-col text-gray-800">
             
-            <div className={`p-4 pb-5 ${accentBg} flex items-center justify-center gap-3 relative border-b border-gray-100`}>
-              <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300 active:text-gray-500"><X size={24} /></button>
-              <div className="flex gap-1 shrink-0">
+            {/* 📍 モーダルヘッダーもイベント色に対応 */}
+            <div className={`p-4 pb-5 ${headerStyle.bg} ${headerStyle.text} flex flex-col items-center justify-center gap-2 relative border-b ${headerStyle.border} transition-colors duration-300`}>
+              <button onClick={() => setSelectedRes(null)} className={`absolute top-4 right-4 opacity-70 hover:opacity-100 ${headerStyle.text}`}><X size={24} /></button>
+              
+              {/* イベント名表示 */}
+              {eventName && <span className="text-[14px] font-black tracking-tight opacity-90">{eventName}</span>}
+
+              <div className="flex gap-1 shrink-0 mt-1">
                 <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black shadow-sm ${getBadgeStyle(selectedRes.service_type)}`}>{selectedRes.service_type || 'か'}</span>
                 <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black shadow-sm ${getBadgeStyle(selectedRes.nomination_category)}`}>{selectedRes.nomination_category || 'FREE'}</span>
               </div>
-              <div className="flex items-baseline gap-0.5 text-gray-900 font-black">
+              <div className="flex items-baseline gap-0.5 font-black">
                 <span className="text-[28px] tracking-tighter leading-none">{selectedRes.start_time?.substring(0, 5)}</span>
-                <span className="text-[16px] opacity-20 font-bold mx-0.5">/</span>
+                <span className={`text-[16px] opacity-50 mx-0.5 ${headerStyle.subText}`}>/</span>
                 <span className="text-[28px] tracking-tighter leading-none">{selectedRes.end_time?.substring(0, 5)}</span>
               </div>
             </div>
@@ -183,7 +201,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 <h3 className="text-[22px] font-black text-gray-800 leading-tight italic">{selectedRes.course_info}</h3>
               </div>
 
-              {/* 金額（38px） ＆ ホテル */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100 flex flex-col justify-center">
                   <p className="text-[9px] font-black text-gray-400 mb-0.5 uppercase tracking-widest text-center">合計金額</p>
@@ -198,7 +215,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 </div>
               </div>
 
-              {/* 顧客情報カード：様、回数、前回日付 */}
+              {/* 顧客情報カード */}
               <div className="bg-gray-900 rounded-[24px] p-3 text-white flex items-center justify-between gap-2 shadow-lg relative">
                 <div className="flex flex-col shrink-0 pl-1 text-left">
                   <div className="flex items-baseline gap-1">
@@ -222,7 +239,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 </div>
               </div>
 
-              {/* メモ ＆ フォーム（顧客カードの下） */}
+              {/* メモ ＆ フォーム（ズーム対策 16px） */}
               <div className="space-y-2">
                 {hasValue(selectedRes.memo) && (
                   <div className="bg-yellow-50/50 p-2.5 rounded-xl border border-yellow-100 flex gap-2">
@@ -238,11 +255,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 )}
                 {isEditingMemo && (
                   <div className="bg-gray-50 p-3 rounded-2xl border-2 border-pink-200 space-y-2 animate-in slide-in-from-top-2 duration-200">
-                    <div className="flex justify-between items-center px-1">
-                      <span className="text-[10px] font-black text-pink-400 uppercase tracking-widest">Cast Memo Form</span>
-                      <button onClick={() => setIsEditingMemo(false)}><X size={16} className="text-gray-300"/></button>
-                    </div>
-                    {/* 📍 ズーム対策 16px */}
                     <textarea value={memoDraft} onChange={(e) => setMemoDraft(e.target.value)} placeholder="メモを入力..." className="w-full h-24 bg-white rounded-xl p-3 text-[16px] font-bold border border-gray-100 focus:outline-none focus:ring-2 focus:ring-pink-400 shadow-inner" autoFocus />
                     <button onClick={handleSaveMemo} className="w-full h-11 bg-pink-500 text-white rounded-xl flex items-center justify-center gap-2 font-black text-[14px] shadow-md active:scale-95 transition-all"><Save size={18} /> 保存する</button>
                   </div>
