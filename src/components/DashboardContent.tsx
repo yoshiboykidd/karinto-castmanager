@@ -37,8 +37,8 @@ export default function DashboardContent() {
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  // 型エラー対策：dataからlast_sync_atを安全に取り出す
-  const lastSyncAt = (data as any)?.last_sync_at || null;
+  // 📍 型定義に依存せず DBの last_sync_at を安全に取得
+  const lastSyncTime = (data as any)?.last_sync_at || null;
 
   const achievementData: any = useAchievement(
     supabase, safeProfile, safeShifts, nav.selected?.single, () => fetchInitialData(router)
@@ -71,7 +71,7 @@ export default function DashboardContent() {
         <CastHeader 
           displayName={safeProfile.display_name} 
           shopName={safeProfile.shop_name || '店舗未設定'}
-          syncTime={lastSyncAt} 
+          syncTime={lastSyncTime} 
           bgColor={currentTheme.header}
         />
       </div>
@@ -100,7 +100,7 @@ export default function DashboardContent() {
             date={nav.selected.single}
             dayNum={nav.selected.single.getDate()}
             shift={selectedShift}
-            reservations={currentReservations}
+            reservations={currentReservations} 
             theme={themeKey}
           />
         )}
