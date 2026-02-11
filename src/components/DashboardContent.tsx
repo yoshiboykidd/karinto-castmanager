@@ -101,6 +101,9 @@ export default function DashboardContent() {
             shift={selectedShift}
             reservations={currentReservations} 
             theme={themeKey}
+            /* 📍 削除機能のために追加 */
+            supabase={supabase}
+            onRefresh={() => fetchInitialData(router)}
           />
         )}
         

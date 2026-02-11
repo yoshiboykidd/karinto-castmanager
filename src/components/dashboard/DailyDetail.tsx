@@ -5,8 +5,9 @@ import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { X, MapPin, Calculator, Trash2, Copy, UserCheck } from 'lucide-react';
 
-export default function DailyDetail({ date, dayNum, shift, reservations = [], theme = 'pink' }: any) {
+export default function DailyDetail({ date, dayNum, shift, reservations = [], theme = 'pink', supabase, onRefresh }: any) {
   const [selectedRes, setSelectedRes] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   if (!date) return null;
 
@@ -35,17 +36,29 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
 
   const hasValue = (val: string) => val && val !== 'なし' && val !== '延長なし' && val !== 'なし ' && val !== '';
 
-  const handleDelete = () => {
-    const ok = window.confirm("【注意】この予約を本当に取り消しますか？\n取り消すと一覧から消去され、元に戻せません。");
+  const handleDelete = async () => {
+    if (!selectedRes?.id) return;
+    const ok = window.confirm("【注意】この予約を本当に取り消しますか？\n取り消すと一覧から完全に消去され、元に戻せません。");
+    
     if (ok) {
-      alert("予約を取り消しました。");
-      setSelectedRes(null);
+      setIsDeleting(true);
+      try {
+        const { error } = await supabase.from('reservations').delete().eq('id', selectedRes.id);
+        if (error) throw error;
+        setSelectedRes(null);
+        if (onRefresh) onRefresh();
+      } catch (err) {
+        console.error(err);
+        alert("削除に失敗しました。");
+      } finally {
+        setIsDeleting(false);
+      }
     }
   };
 
   return (
     <>
-      {/* 予約一覧リスト（現状維持） */}
+      {/* 予約一覧リスト */}
       <section className="relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-3 pt-8 flex flex-col space-y-1 subpixel-antialiased text-gray-800">
         <div className="flex items-center justify-center w-full mt-1 mb-2">
           <div className="flex items-center gap-3 whitespace-nowrap">
@@ -69,9 +82,9 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
             )}
           </div>
         </div>
-        <div className="pt-2 border-t border-gray-100/50 space-y-1">
+        <div className="pt-2 border-t border-gray-100/50 space-y-1 text-gray-800">
           {sortedReservations.length > 0 ? sortedReservations.map((res: any, idx: number) => (
-            <button key={idx} onClick={() => setSelectedRes(res)} className="w-full bg-gray-50/50 rounded-xl p-1.5 px-2 border border-gray-100 flex items-center gap-1 shadow-sm active:bg-gray-100 transition-all overflow-hidden text-gray-800">
+            <button key={idx} onClick={() => setSelectedRes(res)} className="w-full bg-gray-50/50 rounded-xl p-1.5 px-2 border border-gray-100 flex items-center gap-1 shadow-sm active:bg-gray-100 transition-all overflow-hidden">
               <span className={`text-[13px] font-black w-7 h-7 flex items-center justify-center rounded-lg shrink-0 ${getBadgeStyle(res.service_type)}`}>{res.service_type || 'か'}</span>
               <span className={`text-[13px] font-black w-11 h-7 flex items-center justify-center rounded-lg shrink-0 tracking-tighter ${getBadgeStyle(res.nomination_category)}`}>{res.nomination_category || 'FREE'}</span>
               <div className="flex items-center tracking-tighter shrink-0 font-black text-gray-700 ml-1">
@@ -85,33 +98,33 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
               </div>
             </button>
           )) : (
-            <div className="py-2 text-center text-gray-300"><p className="text-[10px] font-bold italic uppercase">No Mission</p></div>
+            <div className="py-2 text-center text-gray-300 font-bold italic uppercase text-[10px]">No Mission</div>
           )}
         </div>
       </section>
 
-      {/* 📍 刷新版モーダル：サイズ統一・超高密度 */}
+      {/* 📍 刷新版詳細モーダル */}
       {selectedRes && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-3 overflow-y-auto bg-black/90 backdrop-blur-sm pt-6 pb-32">
           <div className="absolute inset-0" onClick={() => setSelectedRes(null)} />
           
-          <div className="relative bg-white w-full max-w-[340px] rounded-[38px] overflow-hidden shadow-2xl animate-in zoom-in duration-150 subpixel-antialiased flex flex-col">
+          <div className="relative bg-white w-full max-w-[340px] rounded-[38px] overflow-hidden shadow-2xl animate-in zoom-in duration-150 subpixel-antialiased flex flex-col text-gray-800">
             
             {/* 1. 最上部：バッジ（サイズ統一）と時間を完全に1行に並べる */}
             <div className={`p-4 pb-5 ${accentBg} flex items-center justify-center gap-3 relative border-b border-gray-100`}>
               <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300 active:text-gray-500"><X size={24} /></button>
               
-              {/* バッジ：w-11 h-7 でサイズを揃える */}
+              {/* バッジ：w-11 h-7 でサイズを統一 */}
               <div className="flex gap-1 shrink-0">
-                <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black ${getBadgeStyle(selectedRes.service_type)}`}>
+                <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black shadow-sm ${getBadgeStyle(selectedRes.service_type)}`}>
                   {selectedRes.service_type || 'か'}
                 </span>
-                <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black ${getBadgeStyle(selectedRes.nomination_category)}`}>
+                <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black shadow-sm ${getBadgeStyle(selectedRes.nomination_category)}`}>
                   {selectedRes.nomination_category || 'FREE'}
                 </span>
               </div>
               
-              {/* 時間：バッジとのバランスを考え text-[28px] に調整 */}
+              {/* 時間：バッジと並ぶバランスに調整 */}
               <div className="flex items-baseline gap-0.5 text-gray-900 font-black">
                 <span className="text-[28px] tracking-tighter leading-none">{selectedRes.start_time?.substring(0, 5)}</span>
                 <span className="text-[16px] opacity-20 font-bold mx-0.5">/</span>
@@ -122,14 +135,13 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
             {/* 2. ボディ：余白をspace-y-2に詰め込み */}
             <div className="px-5 py-3 bg-white space-y-2">
               
-              {/* コース名：大きく表示 */}
-              <div className="text-center pt-1">
+              <div className="text-center pt-1 border-b border-gray-50 pb-2">
                 <h3 className="text-[22px] font-black text-gray-800 leading-tight tracking-tight italic">
                   {selectedRes.course_info}
                 </h3>
               </div>
 
-              {/* 合計金額（特大 38px） ＆ ホテル（横並び） */}
+              {/* 合計金額（特大 38px） ＆ ホテル */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100 flex flex-col justify-center">
                   <p className="text-[9px] font-black text-gray-400 mb-0.5 uppercase tracking-widest">合計金額</p>
@@ -146,22 +158,22 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
                 </div>
               </div>
 
-              {/* 変動項目（ある時だけ） */}
+              {/* オプション・割引・延長 */}
               {(hasValue(selectedRes.extension) || hasValue(selectedRes.discount) || hasValue(selectedRes.options)) && (
                 <div className="bg-gray-50/50 rounded-xl p-2 space-y-1 border border-dashed border-gray-200">
                   {hasValue(selectedRes.extension) && <div className="flex justify-between items-center text-[12px] font-bold"><span className="text-gray-400">延長</span><span className="text-orange-600 font-black">{selectedRes.extension}</span></div>}
                   {hasValue(selectedRes.discount) && <div className="flex justify-between items-center text-[12px] font-bold"><span className="text-gray-400">割引</span><span className="text-red-500 font-black">{selectedRes.discount}</span></div>}
-                  {hasValue(selectedRes.options) && <div className="flex flex-col gap-0.5 pt-0.5 border-t border-gray-100"><span className="text-[10px] text-gray-400 font-bold uppercase">Options</span><span className="text-[12px] font-black text-blue-600 leading-tight">{selectedRes.options}</span></div>}
+                  {hasValue(selectedRes.options) && <div className="flex flex-col gap-0.5 pt-0.5 border-t border-gray-100"><span className="text-[10px] text-gray-300 font-bold uppercase">Options</span><span className="text-[12px] font-black text-blue-600 leading-tight">{selectedRes.options}</span></div>}
                 </div>
               )}
 
-              {/* 3. 顧客情報：スリムに1行集約 */}
+              {/* 3. 顧客情報：スリムに1行集約しつつ、文字サイズを強調 */}
               <div className="bg-gray-900 rounded-[24px] p-3 text-white flex items-center justify-between gap-2 shadow-lg">
                 <div className="flex items-baseline gap-1.5 shrink-0 pl-1">
-                  <span className="text-[18px] font-black tracking-tighter">{selectedRes.customer_name}</span>
-                  <span className="text-[16px] font-black text-pink-400">{selectedRes.visit_count || '0'}回</span>
+                  <span className="text-[20px] font-black tracking-tighter">{selectedRes.customer_name}</span>
+                  <span className="text-[18px] font-black text-pink-400">{selectedRes.visit_count || '0'}回</span>
                 </div>
-                {/* 検索用Noエリア */}
+                {/* コピー用Noエリア */}
                 <div className="flex items-center gap-1 bg-white/10 px-2.5 py-1.5 rounded-xl border border-white/5 active:bg-white/20 transition-all">
                   <span className="text-[9px] font-black text-gray-500 uppercase tracking-tighter">No</span>
                   <span className="text-[20px] font-black tracking-widest leading-none select-all text-white">
@@ -173,8 +185,7 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
 
               {/* スタッフ（最下部） */}
               <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-gray-300">
-                <UserCheck size={12} className="opacity-40" />
-                Staff: <span className="text-gray-400">{selectedRes.staff_name || '---'}</span>
+                <UserCheck size={12} className="opacity-40" />Staff: <span className="text-gray-400">{selectedRes.staff_name || '---'}</span>
               </div>
             </div>
 
@@ -183,8 +194,12 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
               <button onClick={() => alert("OP計算君起動")} className="w-full h-14 rounded-2xl bg-blue-500 text-white flex items-center justify-center gap-2 font-black text-[16px] shadow-lg shadow-blue-100 active:scale-95 transition-all">
                 <Calculator size={20} /> OP計算君
               </button>
-              <button onClick={handleDelete} className="w-full h-12 rounded-xl bg-white border-2 border-rose-100 text-rose-500 flex items-center justify-center gap-2 font-black text-[13px] active:bg-rose-50 transition-all">
-                <Trash2 size={16} /> この予約を取り消す
+              <button 
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className={`w-full h-12 rounded-xl bg-white border-2 border-rose-100 text-rose-500 flex items-center justify-center gap-2 font-black text-[13px] active:bg-rose-50 transition-all ${isDeleting ? 'opacity-50' : ''}`}
+              >
+                <Trash2 size={16} /> {isDeleting ? '削除中...' : 'この予約を取り消す'}
               </button>
             </div>
           </div>
