@@ -3,11 +3,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { X, Calculator, Trash2, Copy, MessageSquare, Edit3, StickyNote, Save, Calendar } from 'lucide-react';
+import { X, Calculator, Trash2, Copy, MessageSquare, Edit3, StickyNote, Save, Calendar, Loader2 } from 'lucide-react';
 
 export default function DailyDetail({ date, dayNum, shift, allShifts = [], reservations = [], theme = 'pink', supabase, onRefresh, myLoginId }: any) {
   const [selectedRes, setSelectedRes] = useState<any>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false); // 📍 削除中の状態管理
   const [isEditingMemo, setIsEditingMemo] = useState(false);
   const [memoDraft, setMemoDraft] = useState('');
   
@@ -16,6 +16,34 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
   });
 
   if (!date) return null;
+
+  // 📍 予約削除ロジックの実装
+  const handleDelete = async () => {
+    if (!selectedRes?.id || !supabase) return;
+    
+    if (!window.confirm("この予約を完全に削除しますか？\n（この操作は取り消せません）")) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('reservations')
+        .delete()
+        .eq('id', selectedRes.id);
+
+      if (error) throw error;
+
+      alert("予約を削除しました。");
+      setSelectedRes(null); // モーダルを閉じる
+      if (onRefresh) onRefresh(); // 親コンポーネントのリストを更新
+    } catch (err: any) {
+      console.error("Delete Error:", err);
+      alert("削除に失敗しました: " + err.message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // 特定日判定
   const eventInfo = useMemo(() => {
@@ -79,7 +107,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   return (
     <>
-      {/* 予約一覧リスト（上下をギリギリまで詰めた） */}
+      {/* 予約一覧リスト */}
       <section className="relative overflow-hidden rounded-[32px] border border-gray-100 bg-white shadow-xl flex flex-col subpixel-antialiased">
         {eventInfo && <div className={`w-full py-1 ${eventInfo.color} ${eventInfo.text} text-center text-[12px] font-black tracking-widest uppercase`}>{eventInfo.label}</div>}
         <div className="flex items-center justify-center w-full p-2">
@@ -128,7 +156,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
           <div className="relative bg-white w-full max-w-[340px] rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in duration-150 flex flex-col text-gray-800">
             {eventInfo && <div className={`w-full py-1 ${eventInfo.color} ${eventInfo.text} text-center text-[11px] font-black tracking-widest uppercase`}>{eventInfo.label}</div>}
             
-            {/* ヘッダー：1行レイアウト、余白詰め */}
             <div className="p-2 px-4 flex items-center justify-center gap-3 relative border-b border-gray-50">
               <button onClick={() => setSelectedRes(null)} className="absolute top-2 right-3 text-gray-300"><X size={20} /></button>
               <div className="flex gap-1 shrink-0">
@@ -147,7 +174,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 <h3 className="text-[26px] font-black text-gray-800 leading-tight italic break-words">{selectedRes.course_info}</h3>
               </div>
 
-              {/* ① 合計金額 */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-gray-50 p-2 rounded-xl border border-gray-100 flex flex-col justify-center text-center">
                   <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">合計金額</p>
@@ -162,7 +188,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 </div>
               </div>
 
-              {/* ② OP/メモ */}
               {hasValue(selectedRes.memo) && (
                 <div className="bg-yellow-50/50 p-2 rounded-lg border border-yellow-100 flex gap-1.5 text-left">
                   <MessageSquare size={12} className="text-yellow-400 shrink-0 mt-0.5" />
@@ -170,7 +195,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 </div>
               )}
 
-              {/* ③ 顧客情報 */}
               <div className="bg-gray-900 rounded-[20px] p-2 px-3 text-white flex items-center justify-between gap-2 shadow-lg">
                 <div className="flex flex-col shrink-0 text-left">
                   <div className="flex items-baseline gap-1">
@@ -187,7 +211,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 </div>
               </div>
 
-              {/* ④ 保存済みキャストメモ */}
               {hasValue(selectedRes.cast_memo) && !isEditingMemo && (
                 <div className="bg-blue-50/50 p-2 rounded-lg border border-blue-100 flex gap-1.5 shadow-inner text-left">
                   <StickyNote size={12} className="text-blue-400 shrink-0 mt-0.5" />
@@ -195,7 +218,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 </div>
               )}
 
-              {/* メモ入力フォーム（×で個別クローズ） */}
               {isEditingMemo && (
                 <div className="bg-gray-50 p-2 rounded-xl border-2 border-pink-200 space-y-2 animate-in slide-in-from-top-1 duration-150">
                   <div className="flex justify-between items-center px-1">
@@ -207,7 +229,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 </div>
               )}
 
-              {/* ⑤ キャストメモボタン ＆ ⑥ OP計算君 */}
               <div className="space-y-1.5 pt-1">
                 {!isEditingMemo && (
                   <button onClick={() => setIsEditingMemo(true)} className="w-full h-12 rounded-xl bg-white border-2 border-pink-100 text-pink-500 flex items-center justify-center gap-2 font-black text-[14px] shadow-sm">
@@ -219,10 +240,15 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 </button>
               </div>
 
-              {/* ⑦ 予約取り消し */}
+              {/* 📍 予約取り消しボタン（handleDeleteを接続） */}
               <div className="pt-1">
-                <button onClick={() => { if(window.confirm("消しますか？")) { /* delete logic */ } }} className="w-full h-10 rounded-xl text-gray-300 flex items-center justify-center gap-1 font-bold text-[11px]">
-                  <Trash2 size={13} /> 予約を取り消す
+                <button 
+                  onClick={handleDelete} 
+                  disabled={isDeleting}
+                  className="w-full h-10 rounded-xl text-gray-300 flex items-center justify-center gap-1 font-bold text-[11px] disabled:opacity-50"
+                >
+                  {isDeleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                  {isDeleting ? "削除中..." : "予約を取り消す"}
                 </button>
               </div>
             </div>
