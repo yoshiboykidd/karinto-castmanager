@@ -43,7 +43,8 @@ export default function DailyDetail({
   const displayOfficialE = shift?.end_time || '';
 
   return (
-    <section className={`relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-4 pt-6 flex flex-col space-y-2 transition-all duration-300`}>
+    // subpixel-antialiased を追加してスマホでの痩せ細りを防止
+    <section className={`relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-4 pt-6 flex flex-col space-y-2 transition-all duration-300 subpixel-antialiased`}>
       
       {(isKarin || isSoine) && (
         <div className={`absolute top-0 left-0 right-0 py-0.5 text-center font-black text-[10px] tracking-[0.2em] shadow-sm z-20
@@ -68,7 +69,8 @@ export default function DailyDetail({
               </span>
             </div>
             <div className="flex-1 text-right overflow-hidden">
-              <span className={`text-[31px] font-black leading-none tracking-tighter whitespace-nowrap inline-block align-middle ${accentColor}`}>
+              {/* text-shadow を 0.5px だけ入れて、スマホでもPC並みの Black 感を出す */}
+              <span className={`text-[31px] font-black leading-none tracking-tighter whitespace-nowrap inline-block align-middle ${accentColor} [text-shadow:_0.5px_0_0_currentColor]`}>
                 {displayOfficialS}〜{displayOfficialE}
               </span>
             </div>
@@ -89,17 +91,14 @@ export default function DailyDetail({
               reservations.map((res: any, idx: number) => (
                 <div key={idx} className="bg-gray-50/50 rounded-2xl p-3 border border-gray-100 flex justify-between items-center shadow-sm">
                   <div className="flex flex-col">
-                    {/* 📍 修正: 元のデザインサイズ(text-[10px])に戻し、キー名を修正 */}
                     <span className="text-[10px] font-bold text-gray-400 leading-none mb-1">
                       {res.start_time?.substring(0, 5)}〜{res.end_time?.substring(0, 5)}
                     </span>
-                    {/* 📍 修正: キー名を course_info に修正 */}
                     <span className="text-sm font-black text-gray-700 leading-none">
                       {res.course_info || 'コース未定'}
                     </span>
                   </div>
                   <div className="text-right">
-                    {/* 📍 修正: キー名を nomination_type に修正 */}
                     <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg bg-white border border-pink-100 ${accentColor}`}>
                       {res.nomination_type || 'フリー'}
                     </span>
@@ -119,7 +118,8 @@ export default function DailyDetail({
                 <span className="text-[10px] font-black text-gray-400 uppercase">自動計算の実績</span>
                 <div className={`flex items-center ${accentColor}`}>
                   <span className="text-sm font-black mr-0.5 opacity-50">¥</span>
-                  <span className="text-2xl font-black tracking-tighter">
+                  {/* ここにも肉厚補正 */}
+                  <span className="text-2xl font-black tracking-tighter [text-shadow:_0.4px_0_0_currentColor]">
                     {(shift?.reward_amount || 0).toLocaleString()}
                   </span>
                 </div>
@@ -127,15 +127,15 @@ export default function DailyDetail({
               <div className="grid grid-cols-3 gap-1">
                 <div className="text-center">
                   <p className="text-[8px] font-black text-gray-300 uppercase">フリー</p>
-                  <p className={`text-lg font-black ${accentColor}`}>{shift?.reward_f || 0}</p>
+                  <p className={`text-lg font-black ${accentColor} [text-shadow:_0.3px_0_0_currentColor]`}>{shift?.reward_f || 0}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-[8px] font-black text-gray-300 uppercase">初指名</p>
-                  <p className={`text-lg font-black ${accentColor}`}>{shift?.reward_first || 0}</p>
+                  <p className={`text-lg font-black ${accentColor} [text-shadow:_0.3px_0_0_currentColor]`}>{shift?.reward_first || 0}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-[8px] font-black text-gray-300 uppercase">本指名</p>
-                  <p className={`text-lg font-black ${accentColor}`}>{shift?.reward_main || 0}</p>
+                  <p className={`text-lg font-black ${accentColor} [text-shadow:_0.3px_0_0_currentColor]`}>{shift?.reward_main || 0}</p>
                 </div>
               </div>
             </div>
