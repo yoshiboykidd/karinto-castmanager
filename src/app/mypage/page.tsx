@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
 import { useRouter, usePathname } from 'next/navigation';
+import { useShiftData } from '@/hooks/useShiftData'; // 📍 TOPと同じフックを使用
 import CastHeader from '@/components/dashboard/CastHeader';
 // @ts-ignore
 import FixedFooter from '@/components/dashboard/FixedFooter';
@@ -20,52 +20,35 @@ export default function MyPage() {
   const router = useRouter();
   const pathname = usePathname();
   
-  // 📍 無限ループ防止：supabaseクライアントをuseStateで固定
-  const [supabase] = useState(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ));
+  // 📍 TOPページと全く同じデータ取得方法に統一
+  const { data, loading, fetchInitialData, supabase } = useShiftData();
 
-  const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<any>(null);
   const [newPassword, setNewPassword] = useState('');
   const [targetAmount, setTargetAmount] = useState(''); 
   const [theme, setTheme] = useState('pink');
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          router.push('/login');
-          return;
-        }
-        
-        const rawLoginId = user.email?.split('@')[0] || '';         
-        const strippedLoginId = String(Number(rawLoginId));  
-        
-        const { data: members } = await supabase
-          .from('cast_members')
-          .select('*')
-          .in('login_id', [rawLoginId, strippedLoginId]);
-          
-        const member = members?.[0];
-        
-        if (member) {
-          setProfile(member);
-          setTargetAmount(String(member.monthly_target_amount || '')); 
-          setTheme(member.theme_color || 'pink');
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [router, supabase]);
+  // プロフィールと同期時間の抽出
+  const profile = useMemo(() => data?.profile || null, [data]);
+  
+  // 📍 TOPページ（DashboardContent）のロジックを100%移植
+  const lastSyncTime = useMemo(() => {
+    const d = data as any;
+    return d?.last_sync_at || d?.syncAt || profile?.last_sync_at || profile?.sync_at || null;
+  }, [data, profile]);
 
+  useEffect(() => {
+    if (profile) {
+      setTargetAmount(String(profile.monthly_target_amount || ''));
+      setTheme(profile.theme_color || 'pink');
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    fetchInitialData(router);
+  }, [fetchInitialData, router]);
+
+  // 設定保存
   const handleSaveSettings = async () => {
     if (!profile?.login_id) return;
     setIsSaving(true);
@@ -83,6 +66,7 @@ export default function MyPage() {
     }
   };
 
+  // パスワード変更
   const handlePasswordChange = async () => {
     if (!profile?.login_id || !newPassword) return;
     if (newPassword.length < 6) {
@@ -111,27 +95,14 @@ export default function MyPage() {
     }
   };
 
-  const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
-  
-  // 📍 HPsync表示ロジック（TOPページと完全に同期）
-  const lastSyncTime = useMemo(() => {
-    return profile?.last_sync_at || profile?.sync_at || profile?.syncAt || null;
-  }, [profile]);
-
-  const isDanger = profile && (
-    !profile.password || 
-    String(profile.password) === '0000' || 
-    String(profile.password) === 'managed_by_supabase'
-  );
-
-  if (loading) return (
+  if (loading || !profile) return (
     <div className="min-h-screen flex items-center justify-center bg-[#FFFDFE]">
       <div className="font-black text-pink-300 animate-pulse text-4xl italic tracking-tighter">KARINTO...</div>
     </div>
   );
 
-  // 📍 データが取得できなかった場合のガード
-  if (!profile) return null;
+  const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
+  const isDanger = !profile.password || String(profile.password) === '0000' || String(profile.password) === 'managed_by_supabase';
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800 overflow-x-hidden">
@@ -143,7 +114,7 @@ export default function MyPage() {
       />
       
       <main className="px-5 mt-4 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
-        
+        {/* 目標金額 */}
         <section className="bg-white border border-pink-50 rounded-[32px] p-5 shadow-lg shadow-pink-100/10">
           <div className="flex items-center gap-2 mb-3 font-black text-gray-700">
             <span className="text-lg">💰</span>
@@ -155,12 +126,13 @@ export default function MyPage() {
               inputMode="numeric" 
               value={targetAmount} 
               onChange={(e) => setTargetAmount(e.target.value)} 
-              className="w-full px-5 py-3 pl-10 rounded-2xl bg-gray-50 border-none font-black text-xl text-gray-700 focus:ring-2 focus:ring-pink-100 transition-all" 
+              className="w-full px-5 py-3 pl-10 rounded-2xl bg-gray-50 border-none font-black text-xl text-gray-700 focus:ring-2 focus:ring-pink-100" 
             />
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-300 font-black text-lg">¥</span>
           </div>
         </section>
 
+        {/* テーマカラー */}
         <section className="bg-white border border-pink-50 rounded-[32px] p-5 shadow-lg shadow-pink-100/10">
           <div className="flex items-center gap-2 mb-3 font-black text-gray-700">
             <span className="text-lg">🎨</span>
@@ -179,6 +151,7 @@ export default function MyPage() {
           </div>
         </section>
 
+        {/* 保存ボタン */}
         <button 
           onClick={handleSaveSettings} 
           disabled={isSaving} 
@@ -189,6 +162,7 @@ export default function MyPage() {
           {isSaving ? 'Saving...' : '設定を保存する ✨'}
         </button>
 
+        {/* パスワード変更 */}
         <section className={`border-2 rounded-[32px] p-5 shadow-sm transition-all duration-500 ${
           isDanger ? 'bg-rose-50 border-rose-100 animate-pulse' : 'bg-gray-50 border-gray-100'
         }`}>
@@ -199,7 +173,6 @@ export default function MyPage() {
             </h3>
           </div>
           <div className="flex gap-2">
-            {/* 📍 text-[16px] でズームを防止 */}
             <input 
               type="text" 
               placeholder="6文字以上で入力" 
