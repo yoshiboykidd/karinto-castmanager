@@ -20,8 +20,8 @@ const THEME_CONFIG: any = {
   blue:   { header: 'bg-cyan-300',   calendar: 'bg-cyan-50 border-cyan-100',   accent: 'blue' },
   yellow: { header: 'bg-yellow-300', calendar: 'bg-yellow-50 border-yellow-100', accent: 'yellow' },
   white:  { header: 'bg-gray-400',   calendar: 'bg-white border-gray-100',     accent: 'gray' },
-  black:  { header: 'bg-gray-800',   calendar: 'bg-gray-50 border-gray-200',   accent: 'black' },
-  red:    { header: 'bg-red-500',    calendar: 'bg-red-50 border-red-100',     accent: 'red' },
+  black:  { header: 'bg-gray-800',   calendar: 'bg-gray-900 border-gray-700',   accent: 'black' },
+  red:    { header: 'bg-red-400',    calendar: 'bg-red-50 border-red-100',     accent: 'red' },
 };
 
 export default function DashboardContent() {
@@ -37,19 +37,20 @@ export default function DashboardContent() {
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  // 📍 パスワードが初期設定(0000)かどうかの判定
-  const isInitialPassword = useMemo(() => {
-    if (!safeProfile.password) return false;
-    return String(safeProfile.password) === '0000';
-  }, [safeProfile.password]);
+  // 型エラー対策：dataからlast_sync_atを安全に取り出す
+  const lastSyncAt = (data as any)?.last_sync_at || null;
 
   const achievementData: any = useAchievement(
     supabase, safeProfile, safeShifts, nav.selected?.single, () => fetchInitialData(router)
   );
   
   const { selectedShift = null } = achievementData || {};
-  // 📍 変更点：旧来の achievementData からの取得ではなく、data.reservations (整理済み最新データ) を使用します
-  const currentReservations = data?.reservations || [];
+
+  const currentReservations = useMemo(() => {
+    if (!(nav.selected?.single instanceof Date) || !data?.reservations) return [];
+    const selectedDateStr = format(nav.selected.single, 'yyyy-MM-dd');
+    return data.reservations.filter((res: any) => res.reservation_date === selectedDateStr);
+  }, [data?.reservations, nav.selected?.single]);
 
   useEffect(() => { 
     setMounted(true);
@@ -57,38 +58,20 @@ export default function DashboardContent() {
   }, [fetchInitialData, router]);
 
   const monthlyTotals = useMemo(() => {
-    if (!nav.viewDate || !data?.shifts) return { amount: 0, f: 0, first: 0, main: 0, count: 0, hours: 0 };
-    return getMonthlyTotals(nav.viewDate);
-  }, [data?.shifts, nav.viewDate, getMonthlyTotals]);
+    return getMonthlyTotals(nav.viewDate || new Date());
+  }, [getMonthlyTotals, nav.viewDate]);
 
-  if (!mounted || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FFFDFE]">
-        <div className="font-black text-pink-300 animate-pulse text-5xl italic tracking-tighter">KARINTO...</div>
-      </div>
-    );
-  }
+  const displayMonth = format(nav.viewDate || new Date(), 'M月');
 
-  const displayMonth = isValid(nav.viewDate) ? format(nav.viewDate, 'M月') : format(new Date(), 'M月');
+  if (!mounted || loading) return null;
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
-      
-      {isInitialPassword && (
-        <div 
-          onClick={() => router.push('/mypage')}
-          className="bg-rose-500 text-white text-[11px] font-black py-3 px-4 text-center sticky top-0 z-[100] animate-bounce shadow-lg cursor-pointer"
-        >
-          ⚠️ セキュリティ警告：初期パスワード(0000)を変更してください！ここをタップ
-        </div>
-      )}
-
-      <div className="pb-4">
+      <div className="relative">
         <CastHeader 
-          shopName={data?.shop?.shop_name || "かりんと"} 
-          syncTime={data?.syncAt} 
           displayName={safeProfile.display_name} 
-          version="v4.9.0"
+          shopName={safeProfile.shop_name || '店舗未設定'}
+          syncTime={lastSyncAt} 
           bgColor={currentTheme.header}
         />
       </div>
@@ -117,7 +100,7 @@ export default function DashboardContent() {
             date={nav.selected.single}
             dayNum={nav.selected.single.getDate()}
             shift={selectedShift}
-            reservations={currentReservations} // 📍 最新の整理済み予約データを渡す
+            reservations={currentReservations}
             theme={themeKey}
           />
         )}
@@ -125,7 +108,6 @@ export default function DashboardContent() {
         <NewsSection newsList={data?.news || []} />
       </main>
 
-      {/* @ts-ignore */}
       <FixedFooter 
         pathname={pathname} 
         onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} 
