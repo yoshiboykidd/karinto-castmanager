@@ -1,128 +1,257 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation'; 
-import { format, isValid } from 'date-fns';
-import { useShiftData } from '@/hooks/useShiftData';
-import { useAchievement } from '@/hooks/useAchievement';
-import { useNavigation } from '@/hooks/useNavigation';
-import CastHeader from '@/components/dashboard/CastHeader';
-import MonthlySummary from '@/components/dashboard/MonthlySummary';
-import DashboardCalendar from '@/components/DashboardCalendar';
-import DailyDetail from '@/components/dashboard/DailyDetail';
-import NewsSection from '@/components/dashboard/NewsSection';
+import { useState, useMemo, useEffect } from 'react';
+import { format, parseISO } from 'date-fns';
+import { ja } from 'date-fns/locale';
+import { X, Calculator, Trash2, Copy, MessageSquare, Edit3, StickyNote, Save, Calendar, UserCheck } from 'lucide-react';
 
-// @ts-ignore
-import FixedFooter from '@/components/dashboard/FixedFooter';
-
-const THEME_CONFIG: any = {
-  pink:   { header: 'bg-[#FFB7C5]', calendar: 'bg-[#FFF9FA] border-pink-100', accent: 'pink' },
-  blue:   { header: 'bg-cyan-300',   calendar: 'bg-cyan-50 border-cyan-100',   accent: 'blue' },
-  yellow: { header: 'bg-yellow-300', calendar: 'bg-yellow-50 border-yellow-100', accent: 'yellow' },
-  white:  { header: 'bg-gray-400',   calendar: 'bg-white border-gray-100',     accent: 'gray' },
-  black:  { header: 'bg-gray-800',   calendar: 'bg-gray-900 border-gray-700',   accent: 'black' },
-  red:    { header: 'bg-red-400',    calendar: 'bg-red-50 border-red-100',     accent: 'red' },
-};
-
-export default function DashboardContent() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
-
-  const { data, loading, fetchInitialData, getMonthlyTotals, supabase } = useShiftData();
-  const nav = useNavigation() as any;
-
-  const safeProfile = data?.profile || {};
-  const themeKey = safeProfile.theme_color || 'pink';
-  const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
-  const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
-
-  // 📍 12店舗の正確なマッピング
-  const shopName = useMemo(() => {
-    const loginId = safeProfile.username || safeProfile.login_id || "";
-    const prefix = loginId.substring(0, 3);
-
-    const shopMap: Record<string, string> = {
-      '001': '神田',
-      '002': '赤坂',
-      '003': '秋葉原',
-      '004': '上野',
-      '005': '渋谷',
-      '006': '池袋西口',
-      '007': '五反田',
-      '008': '大宮',
-      '009': '吉祥寺',
-      '010': '大久保',
-      '011': '池袋東口',
-      '012': '小岩'
-    };
-
-    return shopMap[prefix] ? `${shopMap[prefix]}店` : '店舗未設定';
-  }, [safeProfile]);
-
-  const lastSyncTime = (data as any)?.last_sync_at || (data as any)?.syncAt || null;
-
-  const achievementData: any = useAchievement(
-    supabase, safeProfile, safeShifts, nav.selected?.single, () => fetchInitialData(router)
-  );
+export default function DailyDetail({ date, dayNum, shift, reservations = [], theme = 'pink', supabase, onRefresh, myLoginId }: any) {
+  const [selectedRes, setSelectedRes] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isEditingMemo, setIsEditingMemo] = useState(false);
+  const [memoDraft, setMemoDraft] = useState('');
   
-  const { selectedShift = null } = achievementData || {};
+  const [visitInfo, setVisitInfo] = useState<{count: string | number, lastDate: string | null}>({
+    count: '--',
+    lastDate: null
+  });
 
-  const currentReservations = useMemo(() => {
-    if (!(nav.selected?.single instanceof Date) || !data?.reservations) return [];
-    const selectedDateStr = format(nav.selected.single, 'yyyy-MM-dd');
-    return data.reservations.filter((res: any) => res.reservation_date === selectedDateStr);
-  }, [data?.reservations, nav.selected?.single]);
+  if (!date) return null;
 
-  useEffect(() => { 
-    setMounted(true);
-    fetchInitialData(router); 
-  }, [fetchInitialData, router]);
+  // 📍 シフトが確定（official）かどうか
+  const isOfficial = shift?.status === 'official';
 
-  const monthlyTotals = useMemo(() => {
-    return getMonthlyTotals(nav.viewDate || new Date());
-  }, [getMonthlyTotals, nav.viewDate]);
+  const themeColors: any = {
+    pink: 'text-pink-500', blue: 'text-cyan-600', yellow: 'text-yellow-600',
+    red: 'text-red-500', black: 'text-gray-800', white: 'text-gray-600'
+  };
+  const accentColor = themeColors[theme] || themeColors.pink;
+  const accentBg = accentColor.replace('text', 'bg').replace('500', '50').replace('600', '50');
 
-  const displayMonth = format(nav.viewDate || new Date(), 'M月');
+  const getBadgeStyle = (label: string) => {
+    switch (label) {
+      case 'か': return 'bg-blue-500 text-white';
+      case '添': return 'bg-pink-500 text-white';
+      case 'FREE': return 'bg-cyan-400 text-white';
+      case '初指': return 'bg-green-500 text-white';
+      case '本指': return 'bg-purple-500 text-white';
+      default: return 'bg-gray-100 text-gray-400';
+    }
+  };
 
-  if (!mounted || loading) return null;
+  const hasValue = (val: string) => val && val !== 'なし' && val !== '延長なし' && val !== 'なし ' && val !== '';
+
+  // 📍 本人との履歴取得ロジック
+  useEffect(() => {
+    if (selectedRes && supabase && myLoginId) {
+      const fetchHistory = async () => {
+        const { data: history, error } = await supabase
+          .from('reservations')
+          .select('reservation_date')
+          .eq('login_id', myLoginId)
+          .eq('customer_no', selectedRes.customer_no)
+          .order('reservation_date', { ascending: false });
+        
+        if (!error && history) {
+          const count = history.length;
+          const lastVisit = count > 1 ? history[1].reservation_date : null;
+          setVisitInfo({
+            count: count === 1 ? '初' : count,
+            lastDate: lastVisit ? format(parseISO(lastVisit), 'yyyy/MM/dd') : null
+          });
+        }
+      };
+      fetchHistory();
+    }
+  }, [selectedRes, supabase, myLoginId]);
+
+  const handleSaveMemo = async () => {
+    if (!selectedRes?.id) return;
+    try {
+      await supabase.from('reservations').update({ cast_memo: memoDraft }).eq('id', selectedRes.id);
+      setIsEditingMemo(false);
+      setSelectedRes({ ...selectedRes, cast_memo: memoDraft });
+      if (onRefresh) onRefresh();
+    } catch (err) { alert("保存に失敗しました。"); }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedRes?.id) return;
+    if (window.confirm("この予約を本当に取り消しますか？")) {
+      setIsDeleting(true);
+      try {
+        await supabase.from('reservations').delete().eq('id', selectedRes.id);
+        setSelectedRes(null);
+        if (onRefresh) onRefresh();
+      } finally { setIsDeleting(false); }
+    }
+  };
 
   return (
-    <div className=\"min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800\">
-      <div className=\"relative\">
-        <CastHeader 
-          displayName={safeProfile.display_name} 
-          shopName={shopName} 
-          syncTime={lastSyncTime} 
-          bgColor={currentTheme.header}
-        />
-      </div>
-      
-      <main className=\"px-4 -mt-6 relative z-10 space-y-5\">
-        <MonthlySummary month={displayMonth} totals={monthlyTotals} targetAmount={safeProfile.monthly_target_amount || 0} theme={themeKey} />
-
-        <section className={`p-4 rounded-[40px] border-2 shadow-xl shadow-pink-100/20 text-center transition-all duration-500 ${currentTheme.calendar}`}>
-          <DashboardCalendar shifts={safeShifts as any} selectedDates={nav.selected?.single} onSelect={nav.handleDateSelect} month={nav.viewDate || new Date()} onMonthChange={nav.setViewDate} isRequestMode={false} />
-        </section>
-
-        {(nav.selected?.single instanceof Date && isValid(nav.selected.single)) && (
-          <DailyDetail 
-            date={nav.selected.single}
-            dayNum={nav.selected.single.getDate()}
-            shift={selectedShift}
-            reservations={currentReservations} 
-            theme={themeKey}
-            supabase={supabase}
-            onRefresh={() => fetchInitialData(router)}
-            /* 📍 個人履歴表示のためにキャスト本人の login_id を渡す */
-            myLoginId={safeProfile.username || safeProfile.login_id}
-          />
-        )}
+    <>
+      <section className="relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-3 pt-8 flex flex-col space-y-1 subpixel-antialiased text-gray-800">
         
-        <NewsSection newsList={data?.news || []} />
-      </main>
+        {/* 📍 復活：日付・確定バッジ・シフト時間エリア */}
+        <div className="flex items-center justify-center w-full mt-1 mb-2">
+          <div className="flex items-center gap-3 whitespace-nowrap">
+            {/* 日付表示 */}
+            <div className="flex items-baseline font-black tracking-tighter">
+              <span className="text-[28px] leading-none">{format(date, 'M')}</span>
+              <span className="text-[14px] opacity-30 mx-0.5 font-bold">/</span>
+              <span className="text-[28px] leading-none">{format(date, 'd')}</span>
+              <span className="text-[12px] opacity-30 ml-0.5 font-bold">({format(date, 'E', { locale: ja })})</span>
+            </div>
 
-      <FixedFooter pathname={pathname} onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} />
-    </div>
+            {/* 確定バッジ ＆ 時間表示 */}
+            {isOfficial ? (
+              <div className="flex items-center gap-1.5">
+                <span className="w-11 h-7 flex items-center justify-center rounded-lg bg-blue-500 text-white text-[13px] font-black shrink-0 tracking-tighter">確定</span>
+                <div className={`flex items-baseline font-black tracking-tighter ${accentColor}`}>
+                  <span className="text-[28px] leading-none">{shift?.start_time}</span>
+                  <span className="text-[14px] mx-1 opacity-20 font-bold">〜</span>
+                  <span className="text-[28px] leading-none">{shift?.end_time}</span>
+                </div>
+              </div>
+            ) : (
+              <span className="text-[14px] font-black text-gray-200 italic uppercase tracking-[0.2em] leading-none">Day Off</span>
+            )}
+          </div>
+        </div>
+
+        <div className="pt-2 border-t border-gray-100/50 space-y-1">
+          {reservations.length > 0 ? [...reservations].sort((a, b) => (a.start_time || "").localeCompare(b.start_time || "")).map((res: any, idx: number) => (
+            <button key={idx} onClick={() => { setSelectedRes(res); setMemoDraft(res.cast_memo || ''); setIsEditingMemo(false); }} className="w-full bg-gray-50/50 rounded-xl p-1.5 px-2 border border-gray-100 flex items-center gap-1 shadow-sm active:bg-gray-100 transition-all overflow-hidden text-gray-800">
+              <span className={`text-[13px] font-black w-7 h-7 flex items-center justify-center rounded-lg shrink-0 ${getBadgeStyle(res.service_type)}`}>{res.service_type || 'か'}</span>
+              <span className={`text-[13px] font-black w-11 h-7 flex items-center justify-center rounded-lg shrink-0 tracking-tighter ${getBadgeStyle(res.nomination_category)}`}>{res.nomination_category || 'FREE'}</span>
+              <div className="flex items-center tracking-tighter shrink-0 font-black text-gray-700 ml-1">
+                <span className="text-[19px]">{res.start_time?.substring(0, 5)}</span>
+                <span className="text-[10px] mx-0.5 opacity-30">〜</span>
+                <span className="text-[19px]">{res.end_time?.substring(0, 5)}</span>
+              </div>
+              <div className="flex items-baseline truncate ml-auto font-black">
+                <span className="text-[17px]">{res.customer_name}</span>
+                <span className="text-[10px] font-bold text-gray-400 ml-0.5">様</span>
+              </div>
+            </button>
+          )) : (
+            <div className="py-2 text-center text-gray-300 font-bold italic uppercase text-[10px]">No Mission</div>
+          )}
+        </div>
+      </section>
+
+      {/* 詳細モーダル（ここから下は変更なし：履歴・フォーム位置・16pxズーム対策維持） */}
+      {selectedRes && (
+        <div className="fixed inset-0 z-[100] flex items-start justify-center p-3 overflow-y-auto bg-black/90 backdrop-blur-sm pt-6 pb-32">
+          <div className="absolute inset-0" onClick={() => setSelectedRes(null)} />
+          
+          <div className="relative bg-white w-full max-w-[340px] rounded-[38px] overflow-hidden shadow-2xl animate-in zoom-in duration-150 flex flex-col text-gray-800">
+            <div className={`p-4 pb-5 ${accentBg} flex items-center justify-center gap-3 relative border-b border-gray-100`}>
+              <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300"><X size={24} /></button>
+              <div className="flex gap-1 shrink-0">
+                <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black shadow-sm ${getBadgeStyle(selectedRes.service_type)}`}>{selectedRes.service_type || 'か'}</span>
+                <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black shadow-sm ${getBadgeStyle(selectedRes.nomination_category)}`}>{selectedRes.nomination_category || 'FREE'}</span>
+              </div>
+              <div className="flex items-baseline gap-0.5 text-gray-900 font-black">
+                <span className="text-[28px] tracking-tighter leading-none">{selectedRes.start_time?.substring(0, 5)}</span>
+                <span className="text-[16px] opacity-20 font-bold mx-0.5">/</span>
+                <span className="text-[28px] tracking-tighter leading-none">{selectedRes.end_time?.substring(0, 5)}</span>
+              </div>
+            </div>
+
+            <div className="px-5 py-3 bg-white space-y-2">
+              <div className="text-center pt-1 border-b border-gray-50 pb-2">
+                <h3 className="text-[22px] font-black text-gray-800 leading-tight italic">{selectedRes.course_info}</h3>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100 flex flex-col justify-center">
+                  <p className="text-[9px] font-black text-gray-400 mb-0.5 uppercase tracking-widest text-center">合計金額</p>
+                  <div className="flex items-baseline justify-center font-black text-gray-900">
+                    <span className="text-sm mr-0.5">¥</span>
+                    <span className="text-[38px] tracking-tighter leading-none">{(selectedRes.total_price || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100 flex flex-col justify-center text-center">
+                  <p className="text-[9px] font-black text-gray-400 mb-0.5 uppercase tracking-widest">Hotel</p>
+                  <p className="text-[17px] font-black text-gray-800 truncate leading-none pt-1">{selectedRes.hotel_name || 'MR'}</p>
+                </div>
+              </div>
+
+              {hasValue(selectedRes.memo) && (
+                <div className="bg-yellow-50/50 p-2.5 rounded-xl border border-yellow-100 flex gap-2">
+                  <MessageSquare size={14} className="text-yellow-400 shrink-0 mt-0.5" />
+                  <p className="text-[12px] font-bold text-yellow-700 leading-tight italic">{selectedRes.memo}</p>
+                </div>
+              )}
+
+              {hasValue(selectedRes.cast_memo) && !isEditingMemo && (
+                <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-100 flex gap-2 shadow-inner">
+                  <StickyNote size={14} className="text-blue-400 shrink-0 mt-0.5" />
+                  <p className="text-[12px] font-bold text-blue-700 leading-tight whitespace-pre-wrap">{selectedRes.cast_memo}</p>
+                </div>
+              )}
+
+              <div className="bg-gray-900 rounded-[24px] p-3 text-white flex items-center justify-between gap-2 shadow-lg relative">
+                <div className="flex flex-col shrink-0 pl-1">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-[18px] font-black tracking-tighter">{selectedRes.customer_name}</span>
+                    <span className="text-[12px] font-bold text-gray-500">様</span>
+                    <div className="flex items-baseline gap-0.5 ml-1">
+                      <span className="text-[20px] font-black text-pink-400 leading-none">{visitInfo.count}</span>
+                      <span className="text-[11px] font-bold text-gray-500">{visitInfo.count === '初' ? '' : '回目'}</span>
+                    </div>
+                  </div>
+                  {visitInfo.lastDate && (
+                    <p className="text-[10px] font-bold text-gray-500 flex items-center gap-1 mt-0.5 italic">
+                      <Calendar size={10}/> 前回会った日: {visitInfo.lastDate}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 bg-white/10 px-2.5 py-1.5 rounded-xl border border-white/5 active:bg-white/20 transition-all shrink-0">
+                  <span className="text-[9px] font-black text-gray-500 uppercase tracking-tighter">No</span>
+                  <span className="text-[20px] font-black tracking-widest leading-none select-all text-white">{selectedRes.customer_no || '---'}</span>
+                  <Copy size={13} className="text-gray-600 ml-0.5" />
+                </div>
+              </div>
+
+              {isEditingMemo && (
+                <div className="bg-gray-50 p-3 rounded-2xl border-2 border-pink-200 space-y-2 animate-in slide-in-from-top-2 duration-200">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] font-black text-pink-400 uppercase tracking-widest">Cast Memo Form</span>
+                    <button onClick={() => setIsEditingMemo(false)}><X size={16} className="text-gray-300"/></button>
+                  </div>
+                  <textarea 
+                    value={memoDraft} 
+                    onChange={(e) => setMemoDraft(e.target.value)} 
+                    placeholder="このお客様へのメモを残す..." 
+                    className="w-full h-24 bg-white rounded-xl p-3 text-[16px] font-bold border border-gray-100 focus:outline-none focus:ring-2 focus:ring-pink-400 shadow-inner" 
+                    autoFocus 
+                  />
+                  <button onClick={handleSaveMemo} className="w-full h-11 bg-pink-500 text-white rounded-xl flex items-center justify-center gap-2 font-black text-[14px] shadow-md active:scale-95 transition-all"><Save size={18} /> 保存する</button>
+                </div>
+              )}
+
+              <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-gray-300 pt-1">
+                <UserCheck size={12} className="opacity-40" />Staff: <span className="text-gray-400">{selectedRes.staff_name || '---'}</span>
+              </div>
+            </div>
+
+            <div className="p-4 bg-gray-50 border-t border-gray-100 space-y-2">
+              {!isEditingMemo && (
+                <button onClick={() => setIsEditingMemo(true)} className="w-full h-12 rounded-xl bg-white border-2 border-pink-100 text-pink-500 flex items-center justify-center gap-2 font-black text-[14px] active:bg-pink-50 transition-all shadow-sm">
+                  <Edit3 size={18} /> キャストメモを残す
+                </button>
+              )}
+              <button onClick={() => alert("OP計算君起動")} className="w-full h-14 rounded-2xl bg-blue-500 text-white flex items-center justify-center gap-2 font-black text-[16px] shadow-lg shadow-blue-100 active:scale-95 transition-all">
+                <Calculator size={20} /> OP計算君
+              </button>
+              <button onClick={handleDelete} disabled={isDeleting} className={`w-full h-10 rounded-xl text-gray-400 flex items-center justify-center gap-2 font-bold text-[12px] active:bg-rose-50 transition-all ${isDeleting ? 'opacity-50' : ''}`}>
+                <Trash2 size={14} /> {isDeleting ? '消去中...' : '予約を取り消す'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
