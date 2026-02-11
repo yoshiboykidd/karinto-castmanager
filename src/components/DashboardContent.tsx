@@ -37,6 +37,11 @@ export default function DashboardContent() {
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
+  // 📍 店舗名の確定（shop_nameが空ならフォールバック）
+  const shopName = useMemo(() => {
+    return safeProfile.shop_name || (safeProfile as any).store_name || '店舗未設定';
+  }, [safeProfile]);
+
   const lastSyncTime = (data as any)?.last_sync_at || (data as any)?.syncAt || null;
 
   const achievementData: any = useAchievement(
@@ -69,29 +74,17 @@ export default function DashboardContent() {
       <div className="relative">
         <CastHeader 
           displayName={safeProfile.display_name} 
-          shopName={safeProfile.shop_name || '店舗未設定'}
+          shopName={shopName} 
           syncTime={lastSyncTime} 
           bgColor={currentTheme.header}
         />
       </div>
       
       <main className="px-4 -mt-6 relative z-10 space-y-5">
-        <MonthlySummary 
-          month={displayMonth} 
-          totals={monthlyTotals} 
-          targetAmount={safeProfile.monthly_target_amount || 0}
-          theme={themeKey}
-        />
+        <MonthlySummary month={displayMonth} totals={monthlyTotals} targetAmount={safeProfile.monthly_target_amount || 0} theme={themeKey} />
 
         <section className={`p-4 rounded-[40px] border-2 shadow-xl shadow-pink-100/20 text-center transition-all duration-500 ${currentTheme.calendar}`}>
-          <DashboardCalendar 
-            shifts={safeShifts as any} 
-            selectedDates={nav.selected?.single} 
-            onSelect={nav.handleDateSelect} 
-            month={nav.viewDate || new Date()} 
-            onMonthChange={nav.setViewDate} 
-            isRequestMode={false} 
-          />
+          <DashboardCalendar shifts={safeShifts as any} selectedDates={nav.selected?.single} onSelect={nav.handleDateSelect} month={nav.viewDate || new Date()} onMonthChange={nav.setViewDate} isRequestMode={false} />
         </section>
 
         {(nav.selected?.single instanceof Date && isValid(nav.selected.single)) && (
@@ -109,10 +102,7 @@ export default function DashboardContent() {
         <NewsSection newsList={data?.news || []} />
       </main>
 
-      <FixedFooter 
-        pathname={pathname} 
-        onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} 
-      />
+      <FixedFooter pathname={pathname} onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} />
     </div>
   );
 }

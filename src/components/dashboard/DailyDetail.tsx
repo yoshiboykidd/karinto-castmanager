@@ -38,7 +38,7 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
 
   const hasValue = (val: string) => val && val !== 'なし' && val !== '延長なし' && val !== 'なし ' && val !== '';
 
-  // 履歴取得
+  // 📍 自分と会った履歴の取得
   useEffect(() => {
     if (selectedRes && supabase) {
       const fetchPersonalHistory = async () => {
@@ -50,6 +50,7 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
         
         if (!error && history) {
           const count = history.length;
+          // history[1] が前回自分と会った日付
           const lastVisit = count > 1 ? history[1].reservation_date : null;
           setVisitInfo({
             count: count === 1 ? '初' : count,
@@ -61,7 +62,7 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
     }
   }, [selectedRes, supabase]);
 
-  // メモ保存
+  // 📍 キャストメモの保存（DB: cast_memo）
   const handleSaveMemo = async () => {
     if (!selectedRes?.id) return;
     try {
@@ -73,7 +74,6 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
     } catch (err) { alert("保存に失敗しました。"); }
   };
 
-  // 削除
   const handleDelete = async () => {
     if (!selectedRes?.id) return;
     if (window.confirm("【注意】この予約を本当に取り消しますか？")) {
@@ -88,11 +88,11 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
 
   return (
     <>
-      {/* 予約一覧リスト */}
       <section className="relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-3 pt-8 flex flex-col space-y-1 subpixel-antialiased text-gray-800">
+        {/* 一覧リストのヘッダー */}
         <div className="flex items-center justify-center w-full mt-1 mb-2">
           <div className="flex items-center gap-3">
-            <div className="flex items-baseline font-black tracking-tighter text-gray-800">
+            <div className="flex items-baseline font-black tracking-tighter">
               <span className="text-[28px] leading-none">{format(date, 'M')}</span>
               <span className="text-[14px] opacity-30 mx-0.5 font-bold">/</span>
               <span className="text-[28px] leading-none">{format(date, 'd')}</span>
@@ -110,6 +110,8 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
             )}
           </div>
         </div>
+        
+        {/* 予約リスト */}
         <div className="pt-2 border-t border-gray-100/50 space-y-1">
           {reservations.length > 0 ? [...reservations].sort((a, b) => (a.start_time || "").localeCompare(b.start_time || "")).map((res: any, idx: number) => (
             <button key={idx} onClick={() => { setSelectedRes(res); setMemoDraft(res.cast_memo || ''); setIsEditingMemo(false); }} className="w-full bg-gray-50/50 rounded-xl p-1.5 px-2 border border-gray-100 flex items-center gap-1 shadow-sm active:bg-gray-100 transition-all overflow-hidden text-gray-800">
@@ -120,7 +122,7 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
                 <span className="text-[10px] mx-0.5 opacity-30">〜</span>
                 <span className="text-[19px]">{res.end_time?.substring(0, 5)}</span>
               </div>
-              <div className="flex items-baseline truncate ml-auto font-black text-gray-800">
+              <div className="flex items-baseline truncate ml-auto font-black">
                 <span className="text-[17px]">{res.customer_name}</span>
                 <span className="text-[10px] font-bold text-gray-400 ml-0.5">様</span>
               </div>
@@ -136,23 +138,23 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-3 overflow-y-auto bg-black/90 backdrop-blur-sm pt-6 pb-32">
           <div className="absolute inset-0" onClick={() => setSelectedRes(null)} />
           
-          <div className="relative bg-white w-full max-w-[340px] rounded-[38px] overflow-hidden shadow-2xl animate-in zoom-in duration-150 subpixel-antialiased flex flex-col text-gray-800">
+          <div className="relative bg-white w-full max-w-[340px] rounded-[38px] overflow-hidden shadow-2xl animate-in zoom-in duration-150 flex flex-col">
             
-            {/* 1. ヘッダー：横並び */}
+            {/* ヘッダー */}
             <div className={`p-4 pb-5 ${accentBg} flex items-center justify-center gap-3 relative border-b border-gray-100`}>
-              <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300 active:text-gray-500"><X size={24} /></button>
+              <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300"><X size={24} /></button>
               <div className="flex gap-1 shrink-0">
-                <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black shadow-sm ${getBadgeStyle(selectedRes.service_type)}`}>{selectedRes.service_type || 'か'}</span>
-                <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black shadow-sm ${getBadgeStyle(selectedRes.nomination_category)}`}>{selectedRes.nomination_category || 'FREE'}</span>
+                <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black ${getBadgeStyle(selectedRes.service_type)}`}>{selectedRes.service_type || 'か'}</span>
+                <span className={`w-11 h-7 flex items-center justify-center rounded-lg text-[12px] font-black ${getBadgeStyle(selectedRes.nomination_category)}`}>{selectedRes.nomination_category || 'FREE'}</span>
               </div>
               <div className="flex items-baseline gap-0.5 text-gray-900 font-black">
                 <span className="text-[28px] tracking-tighter leading-none">{selectedRes.start_time?.substring(0, 5)}</span>
-                <span className="text-[16px] opacity-20 font-bold mx-0.5">/</span>
+                <span className="text-[18px] opacity-20 mx-0.5">/</span>
                 <span className="text-[28px] tracking-tighter leading-none">{selectedRes.end_time?.substring(0, 5)}</span>
               </div>
             </div>
 
-            {/* 2. ボディ */}
+            {/* ボディ */}
             <div className="px-5 py-3 bg-white space-y-2">
               <div className="text-center pt-1 border-b border-gray-50 pb-2">
                 <h3 className="text-[22px] font-black text-gray-800 leading-tight tracking-tight italic">{selectedRes.course_info}</h3>
@@ -167,13 +169,13 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
                     <span className="text-[38px] tracking-tighter leading-none">{(selectedRes.total_price || 0).toLocaleString()}</span>
                   </div>
                 </div>
-                <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100 flex flex-col justify-center text-center">
-                  <p className="text-[9px] font-black text-gray-400 mb-0.5 uppercase tracking-widest">Hotel</p>
-                  <p className="text-[17px] font-black text-gray-800 truncate leading-none pt-1">{selectedRes.hotel_name || 'MR'}</p>
+                <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100 flex flex-col justify-center">
+                  <p className="text-[9px] font-black text-gray-400 mb-0.5 uppercase tracking-widest text-center">Hotel</p>
+                  <p className="text-[17px] font-black text-gray-800 truncate leading-none pt-1 text-center">{selectedRes.hotel_name || 'MR'}</p>
                 </div>
               </div>
 
-              {/* OP・割引 */}
+              {/* OP・割引（表現を統一） */}
               {(hasValue(selectedRes.extension) || hasValue(selectedRes.discount) || hasValue(selectedRes.options)) && (
                 <div className="bg-gray-50/50 rounded-xl p-2.5 space-y-1.5 border border-dashed border-gray-200">
                   {hasValue(selectedRes.extension) && <div className="flex justify-between items-center text-[13px] font-black"><span className="text-gray-400 text-[11px] font-bold">延長設定</span><span>{selectedRes.extension}</span></div>}
@@ -182,7 +184,7 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
                 </div>
               )}
 
-              {/* 予約メモ表示（HP同期） */}
+              {/* 予約メモ（HP同期） */}
               {hasValue(selectedRes.memo) && (
                 <div className="bg-yellow-50/50 p-2.5 rounded-xl border border-yellow-100 flex gap-2">
                   <MessageSquare size={14} className="text-yellow-400 shrink-0 mt-0.5" />
@@ -190,15 +192,15 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
                 </div>
               )}
 
-              {/* キャストメモ表示（自分の記録） */}
+              {/* キャストメモ（表示） */}
               {hasValue(selectedRes.cast_memo) && !isEditingMemo && (
-                <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-100 flex gap-2 shadow-inner">
+                <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-100 flex gap-2">
                   <StickyNote size={14} className="text-blue-400 shrink-0 mt-0.5" />
                   <p className="text-[12px] font-bold text-blue-700 leading-tight whitespace-pre-wrap">{selectedRes.cast_memo}</p>
                 </div>
               )}
 
-              {/* 📍 3. 顧客情報（様を復活） */}
+              {/* 📍 顧客情報（様を復活 ＆ 回数・前回日付） */}
               <div className="bg-gray-900 rounded-[24px] p-3 text-white flex items-center justify-between gap-2 shadow-lg relative">
                 <div className="flex flex-col shrink-0 pl-1">
                   <div className="flex items-baseline gap-1">
@@ -211,7 +213,7 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
                   </div>
                   {visitInfo.lastDate && (
                     <p className="text-[10px] font-bold text-gray-500 flex items-center gap-1 mt-0.5 italic">
-                      前回: {visitInfo.lastDate}
+                      <Calendar size={10}/> 前回会った日: {visitInfo.lastDate}
                     </p>
                   )}
                 </div>
@@ -222,19 +224,19 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
                 </div>
               </div>
 
-              {/* 📍 4. キャストメモ入力フォーム（顧客情報の下に配置） */}
+              {/* 📍 フォーム配置：顧客情報カードのすぐ下に開く */}
               {isEditingMemo && (
                 <div className="bg-gray-50 p-3 rounded-2xl border-2 border-pink-200 space-y-2 animate-in slide-in-from-top-2 duration-200">
                   <div className="flex justify-between items-center px-1">
-                    <span className="text-[10px] font-black text-pink-400 uppercase tracking-[0.2em]">Form: Cast Memo</span>
-                    <button onClick={() => setIsEditingMemo(false)}><X size={16} className="text-gray-300" /></button>
+                    <span className="text-[10px] font-black text-pink-400 uppercase tracking-widest">Form: Cast Memo</span>
+                    <button onClick={() => setIsEditingMemo(false)}><X size={16} className="text-gray-300"/></button>
                   </div>
-                  {/* 📍 text-[16px] で iOS の自動ズームを防止 */}
+                  {/* 📍 text-[16px] でズーム問題を解決 */}
                   <textarea 
                     value={memoDraft} 
                     onChange={(e) => setMemoDraft(e.target.value)} 
-                    placeholder="この仕事の内容やお客様の印象をメモ..." 
-                    className="w-full h-24 bg-white rounded-xl p-3 text-[16px] font-bold border border-gray-100 focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all shadow-inner" 
+                    placeholder="このお客様へのメモを残す..." 
+                    className="w-full h-24 bg-white rounded-xl p-3 text-[16px] font-bold border border-gray-100 focus:outline-none focus:ring-2 focus:ring-pink-400 shadow-inner" 
                     autoFocus 
                   />
                   <button onClick={handleSaveMemo} className="w-full h-11 bg-pink-500 text-white rounded-xl flex items-center justify-center gap-2 font-black text-[14px] shadow-md active:scale-95 transition-all">
@@ -249,7 +251,7 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
               </div>
             </div>
 
-            {/* フッターボタン */}
+            {/* フッター */}
             <div className="p-4 bg-gray-50 border-t border-gray-100 space-y-2">
               {!isEditingMemo && (
                 <button onClick={() => setIsEditingMemo(true)} className="w-full h-12 rounded-xl bg-white border-2 border-pink-100 text-pink-500 flex items-center justify-center gap-2 font-black text-[14px] active:bg-pink-50 transition-all shadow-sm">
