@@ -41,10 +41,13 @@ export default function MyPage() {
         }
         const rawLoginId = user.email?.split('@')[0] || '';         
         const strippedLoginId = String(Number(rawLoginId));  
+        
+        // 📍 select('*') で全カラムを取得していることを再確認
         const { data: members } = await supabase
           .from('cast_members')
           .select('*')
           .in('login_id', [rawLoginId, strippedLoginId]);
+
         const member = members?.[0];
         if (member) {
           setProfile(member);
@@ -101,8 +104,13 @@ export default function MyPage() {
 
   const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
   
-  // 📍 同期時刻の取得をより強力（確実）に
-  const lastSyncTime = profile?.last_sync_at || profile?.sync_at || profile?.syncAt || null;
+  // 📍 TOPページのDashboardContentと100%同じ優先順位で同期時間を判定
+  const lastSyncTime = 
+    profile?.last_sync_at || 
+    profile?.sync_at || 
+    profile?.syncAt || 
+    profile?.updated_at || // 念のためのバックアップ
+    null;
 
   const isDanger = profile && (!profile.password || String(profile.password) === '0000' || String(profile.password) === 'managed_by_supabase');
 
@@ -117,22 +125,30 @@ export default function MyPage() {
       <CastHeader 
         shopName="マイページ" 
         displayName={profile?.display_name} 
-        syncTime={lastSyncTime} 
+        syncTime={lastSyncTime} // 📍 ここで確実に渡す
         bgColor={currentTheme.bg} 
       />
       
       <main className="px-5 mt-4 space-y-3">
+        {/* 目標金額 */}
         <section className="bg-white border border-pink-50 rounded-[32px] p-5 shadow-lg shadow-pink-100/10">
           <div className="flex items-center gap-2 mb-3 font-black text-gray-700">
             <span className="text-lg">💰</span>
             <h3 className="text-sm tracking-tight">目標金額</h3>
           </div>
           <div className="relative">
-            <input type="text" inputMode="numeric" value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} className="w-full px-5 py-3 pl-10 rounded-2xl bg-gray-50 border-none font-black text-xl text-gray-700 focus:ring-2 focus:ring-pink-100" />
+            <input 
+              type="text" 
+              inputMode="numeric" 
+              value={targetAmount} 
+              onChange={(e) => setTargetAmount(e.target.value)} 
+              className="w-full px-5 py-3 pl-10 rounded-2xl bg-gray-50 border-none font-black text-xl text-gray-700 focus:ring-2 focus:ring-pink-100" 
+            />
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-300 font-black text-lg">¥</span>
           </div>
         </section>
 
+        {/* テーマカラー */}
         <section className="bg-white border border-pink-50 rounded-[32px] p-5 shadow-lg shadow-pink-100/10">
           <div className="flex items-center gap-2 mb-3 font-black text-gray-700">
             <span className="text-lg">🎨</span>
@@ -145,10 +161,12 @@ export default function MyPage() {
           </div>
         </section>
 
+        {/* 保存ボタン */}
         <button onClick={handleSaveSettings} disabled={isSaving} className={`w-full py-4 rounded-2xl shadow-md font-black text-white text-md active:scale-95 transition-all flex items-center justify-center gap-2 ${isSaving ? 'bg-gray-300' : 'bg-gradient-to-r from-pink-400 to-rose-400'}`}>
           {isSaving ? 'Saving...' : '設定を保存する ✨'}
         </button>
 
+        {/* パスワード変更 */}
         <section className={`border-2 rounded-[32px] p-5 shadow-sm transition-all duration-500 ${isDanger ? 'bg-rose-50 border-rose-100 animate-pulse' : 'bg-gray-50 border-gray-100'}`}>
           <div className={`flex items-center gap-2 mb-3 font-black ${isDanger ? 'text-rose-500' : 'text-gray-500'}`}>
             <span className="text-lg">{isDanger ? '⚠️' : '🔒'}</span>
