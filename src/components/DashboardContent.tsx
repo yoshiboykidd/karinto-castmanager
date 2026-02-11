@@ -37,7 +37,7 @@ export default function DashboardContent() {
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  // 📍 001-012の店舗判別（確定版）
+  // 📍 12店舗の正確な判別ロジック
   const shopName = useMemo(() => {
     const loginId = String(safeProfile.username || safeProfile.login_id || "");
     const prefix = loginId.substring(0, 3);
@@ -49,12 +49,11 @@ export default function DashboardContent() {
     return shopMap[prefix] ? `${shopMap[prefix]}店` : (safeProfile.shop_name || '店舗未設定');
   }, [safeProfile]);
 
-  // 📍 HP同期（--:--）を解消するための全方位サーチ
+  // 📍 HP同期時刻（--:--）を解消するための全方位サーチ
   const lastSyncTime = useMemo(() => {
     const d = data as any;
-    // 優先順位をつけて取得（data直下 -> profile内 -> shiftデータ内）
-    return d?.last_sync_at || d?.syncAt || safeProfile?.last_sync_at || safeShifts[0]?.last_sync_at || null;
-  }, [data, safeProfile, safeShifts]);
+    return d?.last_sync_at || d?.syncAt || safeProfile?.last_sync_at || safeProfile?.sync_at || null;
+  }, [data, safeProfile]);
 
   const achievementData: any = useAchievement(
     supabase, safeProfile, safeShifts, nav.selected?.single, () => fetchInitialData(router)
@@ -95,16 +94,26 @@ export default function DashboardContent() {
       <main className="px-4 -mt-6 relative z-10 space-y-5">
         <MonthlySummary month={displayMonth} totals={monthlyTotals} targetAmount={safeProfile.monthly_target_amount || 0} theme={themeKey} />
 
+        {/* 📍 カレンダーセクション */}
         <section className={`p-4 rounded-[40px] border-2 shadow-xl shadow-pink-100/20 text-center transition-all duration-500 ${currentTheme.calendar}`}>
-          <DashboardCalendar shifts={safeShifts as any} selectedDates={nav.selected?.single} onSelect={nav.handleDateSelect} month={nav.viewDate || new Date()} onMonthChange={nav.setViewDate} isRequestMode={false} />
+          <DashboardCalendar 
+            shifts={safeShifts as any} 
+            selectedDates={nav.selected?.single} 
+            onSelect={nav.handleDateSelect} 
+            month={nav.viewDate || new Date()} 
+            onMonthChange={nav.setViewDate} 
+            isRequestMode={false}
+            theme={themeKey} // 👈 これにより黒背景時に文字が白くなります
+          />
         </section>
 
+        {/* 📍 日別詳細セクション */}
         {(nav.selected?.single instanceof Date && isValid(nav.selected.single)) && (
           <DailyDetail 
             date={nav.selected.single}
             dayNum={nav.selected.single.getDate()}
             shift={selectedShift}
-            allShifts={safeShifts} // 📍 特定日取得のために全シフトを渡す
+            allShifts={safeShifts}
             reservations={currentReservations} 
             theme={themeKey}
             supabase={supabase}
