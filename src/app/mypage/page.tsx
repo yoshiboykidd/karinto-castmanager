@@ -19,57 +19,75 @@ const THEMES = [
 export default function MyPage() {
   const router = useRouter();
   const pathname = usePathname();
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [newPassword, setNewPassword] = useState('');
-
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<any>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [targetAmount, setTargetAmount] = useState(''); 
+  const [theme, setTheme] = useState('pink');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // データ取得
   useEffect(() => {
-    const fetchProfile = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/login');
-        return;
+    const fetchData = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          router.push('/login');
+          return;
+        }
+        
+        const rawLoginId = user.email?.split('@')[0] || '';         
+        const strippedLoginId = String(Number(rawLoginId));  
+        
+        const { data: members } = await supabase
+          .from('cast_members')
+          .select('*')
+          .in('login_id', [rawLoginId, strippedLoginId]);
+          
+        const member = members?.[0];
+        
+        if (member) {
+          setProfile(member);
+          setTargetAmount(String(member.monthly_target_amount || '')); 
+          setTheme(member.theme_color || 'pink');
+        }
+      } finally {
+        setLoading(false);
       }
-
-      const { data, error } = await supabase
-        .from('cast_members')
-        .select('*')
-        .eq('login_id', session.user.email?.split('@')[0])
-        .single();
-
-      if (!error && data) {
-        setProfile(data);
-      }
-      setLoading(false);
     };
+    fetchData();
+  }, [router, supabase]);
 
-    fetchProfile();
-  }, [supabase, router]);
-
-  const handleThemeChange = async (themeId: string) => {
-    if (!profile) return;
-    const { error } = await supabase
-      .from('cast_members')
-      .update({ theme_color: themeId })
-      .eq('login_id', profile.login_id);
-
-    if (!error) {
-      setProfile({ ...profile, theme_color: themeId });
+  // 設定保存（目標額・テーマ）
+  const handleSaveSettings = async () => {
+    if (!profile?.login_id) return;
+    setIsSaving(true);
+    try {
+      const cleanAmount = Number(String(targetAmount).replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))) || 0;
+      await supabase
+        .from('cast_members')
+        .update({ monthly_target_amount: cleanAmount, theme_color: theme })
+        .eq('login_id', profile.login_id);
+      
+      alert('設定を保存しました♪');
+      window.location.reload();
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // 📍 認証(Auth)とDBテーブルの同時更新ロジックのみを移植
+  // 📍 パスワード更新（認証AuthとDBテーブルの両方を更新するように修正）
   const handlePasswordChange = async () => {
-    if (!newPassword || newPassword.length < 4) {
+    if (!profile?.login_id || !newPassword) return;
+    if (newPassword.length < 4) {
       alert('パスワードは4文字以上で入力してください');
       return;
     }
-
     try {
       // 1. 本物のログインパスワードを更新
       const { error: authError } = await supabase.auth.updateUser({
@@ -77,73 +95,97 @@ export default function MyPage() {
       });
       if (authError) throw authError;
 
-      // 2. テーブル側のパスワードカラムも更新
-      const { error: dbError } = await supabase
+      // 2. データベース側のパスワード表示用カラムも更新
+      const { error } = await supabase
         .from('cast_members')
         .update({ password: newPassword })
         .eq('login_id', profile.login_id);
-      if (dbError) throw dbError;
-
-      alert('パスワードを更新しました');
-      setProfile({ ...profile, password: newPassword });
-      setNewPassword('');
-    } catch (err: any) {
-      alert('更新失敗: ' + (err.message || 'エラー'));
+        
+      if (!error) { 
+        alert('パスワードを更新しました！');
+        setNewPassword('');
+        window.location.reload();
+      } else {
+        throw error;
+      }
+    } catch (e: any) {
+      alert('更新に失敗しました: ' + (e.message || 'エラー'));
     }
   };
 
-  if (loading || !profile) return null;
+  const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
+  
+  const isDanger = profile && (
+    !profile.password || 
+    String(profile.password) === '0000' || 
+    String(profile.password) === 'managed_by_supabase'
+  );
 
-  const currentTheme = THEMES.find(t => t.id === profile.theme_color) || THEMES[0];
-  const isDanger = profile.password === '0000';
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#FFFDFE]">
+      <div className="font-black text-pink-300 animate-pulse text-4xl italic tracking-tighter">KARINTO...</div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-[#FFFDFE] pb-32 font-sans overflow-x-hidden text-gray-800">
+    <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800 overflow-x-hidden">
       <CastHeader 
-        displayName={profile.display_name} 
-        shopName={profile.shop_name} 
-        syncTime={profile.last_sync_at}
-        bgColor={currentTheme.bg}
+        shopName="マイページ" 
+        displayName={profile?.display_name} 
+        bgColor={currentTheme.bg} 
       />
-
-      <main className="px-6 -mt-8 relative z-10 space-y-6">
-        <section className="bg-white rounded-[40px] p-8 shadow-xl shadow-pink-100/20 border border-gray-50 flex flex-col items-center">
-          <div className={`w-24 h-24 rounded-full ${currentTheme.bg} mb-4 flex items-center justify-center text-white text-3xl font-black shadow-inner ring-8 ${currentTheme.ring} ring-opacity-50`}>
-            {profile.display_name?.substring(0, 1)}
+      
+      <main className="px-5 mt-4 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        
+        {/* 目標金額セクション */}
+        <section className="bg-white border border-pink-50 rounded-[32px] p-5 shadow-lg shadow-pink-100/10">
+          <div className="flex items-center gap-2 mb-3 font-black text-gray-700">
+            <span className="text-lg">💰</span>
+            <h3 className="text-sm tracking-tight">目標金額</h3>
           </div>
-          <h2 className="text-2xl font-black text-gray-800 mb-1 italic">{profile.display_name}</h2>
-          <p className="text-gray-400 font-bold text-sm tracking-widest uppercase mb-6">{profile.login_id}</p>
-          
-          <div className="grid grid-cols-2 gap-4 w-full">
-            <div className="bg-gray-50 p-4 rounded-3xl text-center">
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-tighter mb-1">Target</p>
-              <p className="text-xl font-black text-gray-700">¥{(profile.monthly_target_amount || 0).toLocaleString()}</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-3xl text-center">
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-tighter mb-1">Point</p>
-              <p className="text-xl font-black text-gray-700">{profile.current_points || 0}pt</p>
-            </div>
+          <div className="relative">
+            <input 
+              type="text" 
+              inputMode="numeric" 
+              value={targetAmount} 
+              onChange={(e) => setTargetAmount(e.target.value)} 
+              className="w-full px-5 py-3 pl-10 rounded-2xl bg-gray-50 border-none font-black text-xl text-gray-700 focus:ring-2 focus:ring-pink-100 transition-all" 
+            />
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-300 font-black text-lg">¥</span>
           </div>
         </section>
 
-        <section className="bg-white rounded-[40px] p-6 shadow-xl shadow-pink-100/20 border border-gray-100">
-          <h3 className="text-[10px] font-black text-gray-400 ml-2 mb-4 uppercase tracking-widest">Color Theme</h3>
-          <div className="grid grid-cols-3 gap-3">
-            {THEMES.map((theme) => (
-              <button
-                key={theme.id}
-                onClick={() => handleThemeChange(theme.id)}
-                className={`flex flex-col items-center gap-2 p-3 rounded-3xl transition-all active:scale-95 ${
-                  profile.theme_color === theme.id ? 'bg-gray-900 text-white shadow-lg' : 'bg-gray-50 text-gray-500'
-                }`}
-              >
-                <div className={`w-8 h-8 rounded-full ${theme.bg} shadow-sm ring-2 ring-white`} />
-                <span className="text-[11px] font-black">{theme.name}</span>
-              </button>
+        {/* テーマカラーセクション */}
+        <section className="bg-white border border-pink-50 rounded-[32px] p-5 shadow-lg shadow-pink-100/10">
+          <div className="flex items-center gap-2 mb-3 font-black text-gray-700">
+            <span className="text-lg">🎨</span>
+            <h3 className="text-sm tracking-tight">テーマカラー</h3>
+          </div>
+          <div className="grid grid-cols-6 gap-2">
+            {THEMES.map((t) => (
+              <button 
+                key={t.id} 
+                onClick={() => setTheme(t.id)} 
+                className={`w-9 h-9 rounded-full mx-auto shadow-sm transition-all ${t.bg} ${
+                  theme === t.id ? `scale-110 ring-4 ring-white shadow-md` : 'opacity-40'
+                }`} 
+              />
             ))}
           </div>
         </section>
 
+        {/* 保存ボタン */}
+        <button 
+          onClick={handleSaveSettings} 
+          disabled={isSaving} 
+          className={`w-full py-4 rounded-2xl shadow-md font-black text-white text-md active:scale-95 transition-all flex items-center justify-center gap-2 ${
+            isSaving ? 'bg-gray-300' : 'bg-gradient-to-r from-pink-400 to-rose-400'
+          }`}
+        >
+          {isSaving ? 'Saving...' : '設定を保存する ✨'}
+        </button>
+
+        {/* パスワード変更セクション */}
         <section className={`border-2 rounded-[32px] p-5 shadow-sm transition-all duration-500 ${
           isDanger ? 'bg-rose-50 border-rose-100 animate-pulse' : 'bg-gray-50 border-gray-100'
         }`}>
@@ -173,9 +215,13 @@ export default function MyPage() {
         </section>
       </main>
 
+      {/* @ts-ignore */}
       <FixedFooter 
-        pathname={pathname} 
-        onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} 
+        pathname={pathname || ''} 
+        onLogout={async () => { 
+          await supabase.auth.signOut(); 
+          router.push('/login'); 
+        }} 
       />
     </div>
   );
