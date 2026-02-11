@@ -22,7 +22,6 @@ export default function MyPage() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [newPassword, setNewPassword] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -64,14 +63,13 @@ export default function MyPage() {
     }
   };
 
-  // 📍 認証連携パスワード変更ロジック
+  // 📍 認証(Auth)とDBテーブルの同時更新ロジックのみを移植
   const handlePasswordChange = async () => {
     if (!newPassword || newPassword.length < 4) {
       alert('パスワードは4文字以上で入力してください');
       return;
     }
 
-    setIsSaving(true);
     try {
       // 1. 本物のログインパスワードを更新
       const { error: authError } = await supabase.auth.updateUser({
@@ -91,8 +89,6 @@ export default function MyPage() {
       setNewPassword('');
     } catch (err: any) {
       alert('更新失敗: ' + (err.message || 'エラー'));
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -130,7 +126,7 @@ export default function MyPage() {
           </div>
         </section>
 
-        <section className="bg-white rounded-[40px] p-6 shadow-xl shadow-pink-100/20 border border-gray-50">
+        <section className="bg-white rounded-[40px] p-6 shadow-xl shadow-pink-100/20 border border-gray-100">
           <h3 className="text-[10px] font-black text-gray-400 ml-2 mb-4 uppercase tracking-widest">Color Theme</h3>
           <div className="grid grid-cols-3 gap-3">
             {THEMES.map((theme) => (
@@ -163,16 +159,15 @@ export default function MyPage() {
               placeholder="新PWを入力" 
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="flex-1 px-4 py-2 rounded-xl bg-white border border-gray-200 font-bold text-gray-700 text-sm focus:outline-none"
+              className="flex-1 px-4 py-2 rounded-xl bg-white border border-gray-200 font-bold text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-gray-100"
             />
             <button 
               onClick={handlePasswordChange}
-              disabled={isSaving}
               className={`px-4 py-2 font-black rounded-xl text-white text-xs shadow-sm active:scale-95 whitespace-nowrap ${
-                isSaving ? 'bg-gray-300' : (isDanger ? 'bg-rose-400' : 'bg-gray-400')
+                isDanger ? 'bg-rose-400' : 'bg-gray-400'
               }`}
             >
-              {isSaving ? '中' : '更新'}
+              更新
             </button>
           </div>
         </section>
