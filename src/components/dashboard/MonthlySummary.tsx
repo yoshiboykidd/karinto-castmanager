@@ -1,49 +1,22 @@
 'use client';
 
-type MonthlySummaryProps = {
-  month: string;
-  totals: {
-    amount: number;
-    count: number;
-    hours: number;
-    f: number;
-    first: number;
-    main: number;
+export default function MonthlySummary({ month, totals, targetAmount = 0, theme = 'pink' }: any) {
+  const THEME_STYLES: any = {
+    pink:   { bgFrom: 'from-[#FFE9ED]', bgTo: 'to-[#FFF5F7]', border: 'border-pink-200',  textMain: 'text-pink-600', textSub: 'text-pink-500',  textLabel: 'text-pink-400',  subBorder: 'border-pink-50',  bar: 'bg-pink-400' },
+    blue:   { bgFrom: 'from-blue-50',   bgTo: 'to-blue-100',   border: 'border-blue-200',  textMain: 'text-blue-600', textSub: 'text-blue-500',  textLabel: 'text-blue-400',  subBorder: 'border-blue-100', bar: 'bg-blue-400' },
+    yellow: { bgFrom: 'from-yellow-50', bgTo: 'to-yellow-100', border: 'border-yellow-200', textMain: 'text-yellow-600', textSub: 'text-yellow-500', textLabel: 'text-yellow-400', subBorder: 'border-yellow-100', bar: 'bg-yellow-400' },
+    white:  { bgFrom: 'from-white',     bgTo: 'to-gray-50',    border: 'border-gray-200',  textMain: 'text-gray-600', textSub: 'text-gray-500',  textLabel: 'text-gray-400',  subBorder: 'border-gray-100', bar: 'bg-gray-400' },
+    black:  { bgFrom: 'from-gray-100',  bgTo: 'to-gray-200',   border: 'border-gray-300',  textMain: 'text-gray-800', textSub: 'text-gray-700',  textLabel: 'text-gray-500',  subBorder: 'border-gray-200', bar: 'bg-gray-700' },
+    red:    { bgFrom: 'from-red-50',    bgTo: 'to-red-100',    border: 'border-red-200',   textMain: 'text-red-600',  textSub: 'text-red-500',   textLabel: 'text-red-400',   subBorder: 'border-red-100',  bar: 'bg-red-400' },
   };
-  targetAmount?: number;
-  theme?: string;
-};
-
-const THEME_STYLES: any = {
-  pink:   { bgFrom: 'from-[#FFE9ED]', bgTo: 'to-[#FFF5F7]', border: 'border-pink-200',  textMain: 'text-pink-600', textSub: 'text-pink-500',  textLabel: 'text-pink-400',  subBorder: 'border-pink-50',  bar: 'bg-pink-400' },
-  blue:   { bgFrom: 'from-blue-50',   bgTo: 'to-blue-100',   border: 'border-blue-200',  textMain: 'text-blue-600', textSub: 'text-blue-500',  textLabel: 'text-blue-400',  subBorder: 'border-blue-100', bar: 'bg-blue-400' },
-  yellow: { bgFrom: 'from-yellow-50', bgTo: 'to-yellow-100', border: 'border-yellow-200', textMain: 'text-yellow-600', textSub: 'text-yellow-500', textLabel: 'text-yellow-400', subBorder: 'border-yellow-100', bar: 'bg-yellow-400' },
-  white:  { bgFrom: 'from-white',     bgTo: 'to-gray-50',    border: 'border-gray-200',  textMain: 'text-gray-600', textSub: 'text-gray-500',  textLabel: 'text-gray-400',  subBorder: 'border-gray-100', bar: 'bg-gray-400' },
-  black:  { bgFrom: 'from-gray-100',  bgTo: 'to-gray-200',   border: 'border-gray-300',  textMain: 'text-gray-800', textSub: 'text-gray-700',  textLabel: 'text-gray-500',  subBorder: 'border-gray-200', bar: 'bg-gray-700' },
-  red:    { bgFrom: 'from-red-50',    bgTo: 'to-red-100',    border: 'border-red-200',   textMain: 'text-red-600',  textSub: 'text-red-500',   textLabel: 'text-red-400',   subBorder: 'border-red-100',  bar: 'bg-red-400' },
-};
-
-export default function MonthlySummary({ 
-  month, 
-  totals, 
-  targetAmount = 0, 
-  theme = 'pink' 
-}: MonthlySummaryProps) {
   
   const c = THEME_STYLES[theme] || THEME_STYLES.pink;
-
-  const progressPercent = targetAmount > 0 
-    ? Math.min(100, Math.floor((totals.amount / targetAmount) * 100)) 
-    : 0;
+  const progressPercent = targetAmount > 0 ? Math.min(100, Math.floor((totals.amount / targetAmount) * 100)) : 0;
 
   return (
-    // 全体に subpixel-antialiased を適用
     <section className={`bg-gradient-to-br ${c.bgFrom} ${c.bgTo} rounded-[32px] p-5 border ${c.border} relative overflow-hidden shadow-sm flex flex-col space-y-2 subpixel-antialiased`}>
-      
       <div className="flex items-center justify-between mb-1 relative z-10">
-        <h2 className={`text-[20px] font-black ${c.textSub} tracking-tighter leading-none shrink-0`}>
-          {month}の実績
-        </h2>
+        <h2 className={`text-[20px] font-black ${c.textSub} tracking-tighter leading-none shrink-0`}>{month}の実績</h2>
         <div className="flex gap-1.5">
           <div className={`bg-white/90 px-3 py-1.5 rounded-xl border ${c.subBorder} shadow-sm flex items-baseline justify-center min-w-[70px]`}>
             <span className="text-[11px] font-bold text-gray-400 mr-1">出勤</span>
@@ -58,7 +31,6 @@ export default function MonthlySummary({
         </div>
       </div>
       
-      {/* メイン金額表示：ここを最大級に肉厚にする(0.8px) */}
       <div className="text-center flex flex-col items-center justify-center relative z-10 -my-1">
         <p className={`text-[56px] font-black ${c.textMain} leading-none tracking-tighter filter drop-shadow-sm [text-shadow:_0.8px_0_0_currentColor]`}>
           <span className="text-3xl mr-1 opacity-40 translate-y-[-6px] inline-block">¥</span>
@@ -71,29 +43,21 @@ export default function MonthlySummary({
           <div className="flex justify-between items-end mb-1.5 px-1">
              <div className="flex items-center gap-2">
                 <span className="text-[9px] font-bold text-gray-400 tracking-widest bg-white/60 px-1.5 py-0.5 rounded">GOAL</span>
-                <span className={`text-[16px] font-black ${c.textSub} tracking-tight leading-none`}>
-                  ¥{targetAmount.toLocaleString()}
-                </span>
+                <span className={`text-[16px] font-black ${c.textSub} tracking-tight leading-none`}>¥{targetAmount.toLocaleString()}</span>
              </div>
              <div className="flex items-baseline">
-                <span className={`text-[20px] font-black ${c.textMain} leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>
-                   {progressPercent}
-                </span>
+                <span className={`text-[20px] font-black ${c.textMain} leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>{progressPercent}</span>
                 <span className={`text-[10px] font-bold ${c.textLabel} ml-0.5`}>%</span>
              </div>
           </div>
           <div className="w-full h-3.5 bg-gray-100 rounded-full overflow-hidden border border-white/60 shadow-inner relative">
-            <div 
-              className={`h-full ${c.bar} transition-all duration-1000 ease-out shadow-sm relative`} 
-              style={{ width: `${progressPercent}%` }}
-            >
+            <div className={`h-full ${c.bar} transition-all duration-1000 ease-out shadow-sm relative`} style={{ width: `${progressPercent}%` }}>
                <div className="absolute inset-0 w-full h-full opacity-30 bg-[repeating-linear-gradient(45deg,transparent,transparent_6px,#fff_6px,#fff_12px)]"></div>
             </div>
           </div>
         </div>
       )}
 
-      {/* 下段内訳：ここも肉厚に補正(0.4px) */}
       <div className={`grid grid-cols-3 bg-white/80 backdrop-blur-sm rounded-2xl border ${c.subBorder} shadow-sm divide-x divide-gray-100 py-2 relative z-10`}>
         <div className="flex flex-col items-center justify-center space-y-0.5">
           <p className={`text-[11px] ${c.textLabel} font-black leading-none tracking-widest scale-y-90`}>フリー</p>
