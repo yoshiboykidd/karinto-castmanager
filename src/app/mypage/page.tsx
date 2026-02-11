@@ -24,10 +24,10 @@ export default function MyPage() {
   const [newPassword, setNewPassword] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  const [supabase] = useState(() => createBrowserClient(
+  const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ));
+  );
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -48,6 +48,7 @@ export default function MyPage() {
       }
       setLoading(false);
     };
+
     fetchProfile();
   }, [supabase, router]);
 
@@ -57,10 +58,13 @@ export default function MyPage() {
       .from('cast_members')
       .update({ theme_color: themeId })
       .eq('login_id', profile.login_id);
-    if (!error) setProfile({ ...profile, theme_color: themeId });
+
+    if (!error) {
+      setProfile({ ...profile, theme_color: themeId });
+    }
   };
 
-  // 📍 認証(Auth)とDBテーブルの同時更新ロジック
+  // 📍 認証連携パスワード変更ロジック
   const handlePasswordChange = async () => {
     if (!newPassword || newPassword.length < 4) {
       alert('パスワードは4文字以上で入力してください');
@@ -107,7 +111,6 @@ export default function MyPage() {
       />
 
       <main className="px-6 -mt-8 relative z-10 space-y-6">
-        {/* プロフィールカード */}
         <section className="bg-white rounded-[40px] p-8 shadow-xl shadow-pink-100/20 border border-gray-50 flex flex-col items-center">
           <div className={`w-24 h-24 rounded-full ${currentTheme.bg} mb-4 flex items-center justify-center text-white text-3xl font-black shadow-inner ring-8 ${currentTheme.ring} ring-opacity-50`}>
             {profile.display_name?.substring(0, 1)}
@@ -127,8 +130,7 @@ export default function MyPage() {
           </div>
         </section>
 
-        {/* テーマ設定 */}
-        <section className="bg-white rounded-[40px] p-6 shadow-xl shadow-pink-100/20 border border-gray-100">
+        <section className="bg-white rounded-[40px] p-6 shadow-xl shadow-pink-100/20 border border-gray-50">
           <h3 className="text-[10px] font-black text-gray-400 ml-2 mb-4 uppercase tracking-widest">Color Theme</h3>
           <div className="grid grid-cols-3 gap-3">
             {THEMES.map((theme) => (
@@ -146,7 +148,6 @@ export default function MyPage() {
           </div>
         </section>
 
-        {/* パスワード変更 */}
         <section className={`border-2 rounded-[32px] p-5 shadow-sm transition-all duration-500 ${
           isDanger ? 'bg-rose-50 border-rose-100 animate-pulse' : 'bg-gray-50 border-gray-100'
         }`}>
@@ -162,7 +163,7 @@ export default function MyPage() {
               placeholder="新PWを入力" 
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="flex-1 px-4 py-2 rounded-xl bg-white border border-gray-200 font-bold text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-gray-100"
+              className="flex-1 px-4 py-2 rounded-xl bg-white border border-gray-200 font-bold text-gray-700 text-sm focus:outline-none"
             />
             <button 
               onClick={handlePasswordChange}
