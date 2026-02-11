@@ -37,7 +37,6 @@ export default function DashboardContent() {
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  // 📍 Vercelエラー対策：dataをanyとして扱い、同期時間を安全に抽出
   const lastSyncTime = (data as any)?.last_sync_at || (data as any)?.syncAt || null;
 
   const achievementData: any = useAchievement(
@@ -76,7 +75,6 @@ export default function DashboardContent() {
         />
       </div>
       
-      {/* 📍 パネルの位置を -mt-6 に調整 */}
       <main className="px-4 -mt-6 relative z-10 space-y-5">
         <MonthlySummary 
           month={displayMonth} 
