@@ -37,7 +37,7 @@ export default function DashboardContent() {
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  // 📍 12店舗の判別ロジック
+  // 📍 12店舗の正確なマッピング
   const shopName = useMemo(() => {
     const loginId = safeProfile.username || safeProfile.login_id || "";
     const prefix = loginId.substring(0, 3);
@@ -88,8 +88,8 @@ export default function DashboardContent() {
   if (!mounted || loading) return null;
 
   return (
-    <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
-      <div className="relative">
+    <div className=\"min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800\">
+      <div className=\"relative\">
         <CastHeader 
           displayName={safeProfile.display_name} 
           shopName={shopName} 
@@ -98,7 +98,7 @@ export default function DashboardContent() {
         />
       </div>
       
-      <main className="px-4 -mt-6 relative z-10 space-y-5">
+      <main className=\"px-4 -mt-6 relative z-10 space-y-5\">
         <MonthlySummary month={displayMonth} totals={monthlyTotals} targetAmount={safeProfile.monthly_target_amount || 0} theme={themeKey} />
 
         <section className={`p-4 rounded-[40px] border-2 shadow-xl shadow-pink-100/20 text-center transition-all duration-500 ${currentTheme.calendar}`}>
@@ -114,7 +114,7 @@ export default function DashboardContent() {
             theme={themeKey}
             supabase={supabase}
             onRefresh={() => fetchInitialData(router)}
-            /* 📍 自分自身の login_id を渡す */
+            /* 📍 個人履歴表示のためにキャスト本人の login_id を渡す */
             myLoginId={safeProfile.username || safeProfile.login_id}
           />
         )}
