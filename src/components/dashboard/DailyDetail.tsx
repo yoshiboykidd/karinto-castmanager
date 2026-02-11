@@ -1,18 +1,15 @@
 'use client';
 
-
 import { format, startOfDay, isAfter } from 'date-fns';
 import { ja } from 'date-fns/locale';
-
 
 type DailyDetailProps = {
   date: Date;
   dayNum: number;
   shift: any; 
-  reservations?: any[]; // 予約データ
-  theme?: string; // カラー設定連動用
+  reservations?: any[]; 
+  theme?: string; 
 };
-
 
 export default function DailyDetail({
   date,
@@ -23,21 +20,15 @@ export default function DailyDetail({
 }: DailyDetailProps) {
   if (!date) return null;
 
-
   const today = startOfDay(new Date());
   const targetDate = startOfDay(date);
   const isFuture = isAfter(targetDate, today);
 
-
-  // 1. ステータス判定（確定シフトのみを扱う）
   const isOfficial = shift?.status === 'official';
   
-  // 特定日判定
   const isKarin = dayNum === 10;
   const isSoine = dayNum === 11 || dayNum === 22;
 
-
-  // テーマカラー設定
   const themeColors: any = {
     pink: 'text-pink-500',
     blue: 'text-cyan-600',
@@ -48,16 +39,12 @@ export default function DailyDetail({
   };
   const accentColor = themeColors[theme] || themeColors.pink;
 
-
-  // 表示時間（HP確定時間を優先）
   const displayOfficialS = shift?.start_time || 'OFF';
   const displayOfficialE = shift?.end_time || '';
-
 
   return (
     <section className={`relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-4 pt-6 flex flex-col space-y-2 transition-all duration-300`}>
       
-      {/* 特定日バッジ（当時のまま） */}
       {(isKarin || isSoine) && (
         <div className={`absolute top-0 left-0 right-0 py-0.5 text-center font-black text-[10px] tracking-[0.2em] shadow-sm z-20
           ${isKarin ? 'bg-gradient-to-r from-orange-400 to-orange-500 text-white' : 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white'}`}>
@@ -65,8 +52,6 @@ export default function DailyDetail({
         </div>
       )}
 
-
-      {/* 1行目：日付（当時のデザインを維持） */}
       <div className="flex items-center justify-between px-1 h-7 mt-0.5">
         <h3 className="text-xl font-black text-gray-800 tracking-tight leading-none flex items-baseline shrink-0">
           {format(date, 'M/d')}
@@ -74,8 +59,6 @@ export default function DailyDetail({
         </h3>
       </div>
 
-
-      {/* 2行目：メイン時間（当時のデザインを維持） */}
       <div className="flex items-center justify-between px-1 h-10 gap-1">
         {isOfficial && displayOfficialS !== 'OFF' ? (
           <>
@@ -84,8 +67,6 @@ export default function DailyDetail({
                 確定シフト
               </span>
             </div>
-
-
             <div className="flex-1 text-right overflow-hidden">
               <span className={`text-[31px] font-black leading-none tracking-tighter whitespace-nowrap inline-block align-middle ${accentColor}`}>
                 {displayOfficialS}〜{displayOfficialE}
@@ -100,24 +81,27 @@ export default function DailyDetail({
         )}
       </div>
 
-
-      {/* 予約・実績セクション（手動入力から自動表示へ） */}
       {isOfficial && displayOfficialS !== 'OFF' && (
         <div className="pt-2 border-t border-gray-100/50 space-y-3">
-          
-          {/* 予約詳細リスト */}
           <div className="space-y-1.5">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Reservation Details</p>
             {reservations.length > 0 ? (
               reservations.map((res: any, idx: number) => (
                 <div key={idx} className="bg-gray-50/50 rounded-2xl p-3 border border-gray-100 flex justify-between items-center shadow-sm">
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-gray-400 leading-none mb-1">{res.startTime}〜{res.endTime}</span>
-                    <span className="text-sm font-black text-gray-700 leading-none">{res.course || 'コース未定'}</span>
+                    {/* 📍 修正: 元のデザインサイズ(text-[10px])に戻し、キー名を修正 */}
+                    <span className="text-[10px] font-bold text-gray-400 leading-none mb-1">
+                      {res.start_time?.substring(0, 5)}〜{res.end_time?.substring(0, 5)}
+                    </span>
+                    {/* 📍 修正: キー名を course_info に修正 */}
+                    <span className="text-sm font-black text-gray-700 leading-none">
+                      {res.course_info || 'コース未定'}
+                    </span>
                   </div>
                   <div className="text-right">
+                    {/* 📍 修正: キー名を nomination_type に修正 */}
                     <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg bg-white border border-pink-100 ${accentColor}`}>
-                      {res.type || 'フリー'}
+                      {res.nomination_type || 'フリー'}
                     </span>
                   </div>
                 </div>
@@ -129,8 +113,6 @@ export default function DailyDetail({
             )}
           </div>
 
-
-          {/* 自動計算された実績表示（当時のデザインパーツを再利用） */}
           {!isFuture && (
             <div className="bg-white/80 p-3 rounded-[24px] border border-pink-100 shadow-inner space-y-2">
               <div className="flex items-center justify-between border-b border-pink-50 pb-2">
