@@ -17,21 +17,21 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   if (!date) return null;
 
-  // 📍 執念の特定日（イベント）抽出ロジック
+  // 📍 特定日（イベント名）の判定ロジック
   const eventName = useMemo(() => {
-    if (!allShifts || allShifts.length === 0) return null;
-    
-    // 比較用に日付を文字列化（複数の形式に対応）
-    const targetDate = format(date, 'yyyy-MM-dd');
-    
-    // 全シフトデータの中から、日付が一致し、かつイベント名が入っているものを探す
-    const foundShift = allShifts.find((s: any) => {
-      const sDate = s.shift_date || s.date || "";
-      // 文字列の部分一致（2026-02-11が含まれているか）で判定
-      return sDate.includes(targetDate) && (s.event_name || s.event || s.event_title);
-    });
+    // 1. まずデータベース（全シフトデータ）の中に文字が入っているか探す
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const dbFound = allShifts.find((s: any) => 
+      (s.shift_date === dateStr || s.date === dateStr) && (s.event_name || s.event)
+    );
+    if (dbFound?.event_name || dbFound?.event) return dbFound.event_name || dbFound.event;
 
-    return foundShift?.event_name || foundShift?.event || foundShift?.event_title || null;
+    // 2. データベースが空の場合、カレンダーと同じ「数値ルール」で判定
+    const d = date.getDate();
+    if (d === 10) return 'かりんとの日';
+    if (d === 11 || d === 22) return '添い寝の日';
+
+    return null;
   }, [date, allShifts]);
 
   const isOfficial = shift?.status === 'official';
@@ -55,7 +55,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   const hasValue = (val: string) => val && val !== 'なし' && val !== '延長なし' && val !== 'なし ' && val !== '';
 
-  // 個人履歴取得
+  // 自分（当人）との履歴取得
   useEffect(() => {
     if (selectedRes && supabase && myLoginId) {
       const fetchHistory = async () => {
@@ -103,11 +103,11 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   return (
     <>
+      {/* 予約一覧セクション */}
       <section className="relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-3 pt-8 flex flex-col space-y-1 subpixel-antialiased text-gray-800">
-        
-        {/* 日付・特定日バッジ・確定バッジ・シフト時間 */}
         <div className="flex items-center justify-center w-full mt-1 mb-2">
           <div className="flex items-center gap-2 whitespace-nowrap">
+            {/* 日付表示 */}
             <div className="flex items-baseline font-black tracking-tighter">
               <span className="text-[28px] leading-none">{format(date, 'M')}</span>
               <span className="text-[14px] opacity-30 mx-0.5 font-bold">/</span>
@@ -122,6 +122,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
               </span>
             )}
 
+            {/* 確定 ＆ 時間 */}
             {isOfficial ? (
               <div className="flex items-center gap-1.5">
                 <span className="w-11 h-7 flex items-center justify-center rounded-lg bg-blue-500 text-white text-[13px] font-black shrink-0 tracking-tighter shadow-sm">確定</span>
@@ -158,10 +159,12 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
         </div>
       </section>
 
+      {/* 詳細モーダル */}
       {selectedRes && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-3 overflow-y-auto bg-black/90 backdrop-blur-sm pt-6 pb-32">
           <div className="absolute inset-0" onClick={() => setSelectedRes(null)} />
           <div className="relative bg-white w-full max-w-[340px] rounded-[38px] overflow-hidden shadow-2xl animate-in zoom-in duration-150 flex flex-col text-gray-800">
+            
             <div className={`p-4 pb-5 ${accentBg} flex items-center justify-center gap-3 relative border-b border-gray-100`}>
               <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300 active:text-gray-500"><X size={24} /></button>
               <div className="flex gap-1 shrink-0">
@@ -180,6 +183,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 <h3 className="text-[22px] font-black text-gray-800 leading-tight italic">{selectedRes.course_info}</h3>
               </div>
 
+              {/* 金額（38px） ＆ ホテル */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100 flex flex-col justify-center">
                   <p className="text-[9px] font-black text-gray-400 mb-0.5 uppercase tracking-widest text-center">合計金額</p>
@@ -194,7 +198,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 </div>
               </div>
 
-              {/* 顧客情報カード */}
+              {/* 顧客情報カード：様、回数、前回日付 */}
               <div className="bg-gray-900 rounded-[24px] p-3 text-white flex items-center justify-between gap-2 shadow-lg relative">
                 <div className="flex flex-col shrink-0 pl-1 text-left">
                   <div className="flex items-baseline gap-1">
@@ -218,7 +222,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 </div>
               </div>
 
-              {/* メモ ＆ フォーム（ズーム対策 16px） */}
+              {/* メモ ＆ フォーム（顧客カードの下） */}
               <div className="space-y-2">
                 {hasValue(selectedRes.memo) && (
                   <div className="bg-yellow-50/50 p-2.5 rounded-xl border border-yellow-100 flex gap-2">
@@ -234,6 +238,11 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 )}
                 {isEditingMemo && (
                   <div className="bg-gray-50 p-3 rounded-2xl border-2 border-pink-200 space-y-2 animate-in slide-in-from-top-2 duration-200">
+                    <div className="flex justify-between items-center px-1">
+                      <span className="text-[10px] font-black text-pink-400 uppercase tracking-widest">Cast Memo Form</span>
+                      <button onClick={() => setIsEditingMemo(false)}><X size={16} className="text-gray-300"/></button>
+                    </div>
+                    {/* 📍 ズーム対策 16px */}
                     <textarea value={memoDraft} onChange={(e) => setMemoDraft(e.target.value)} placeholder="メモを入力..." className="w-full h-24 bg-white rounded-xl p-3 text-[16px] font-bold border border-gray-100 focus:outline-none focus:ring-2 focus:ring-pink-400 shadow-inner" autoFocus />
                     <button onClick={handleSaveMemo} className="w-full h-11 bg-pink-500 text-white rounded-xl flex items-center justify-center gap-2 font-black text-[14px] shadow-md active:scale-95 transition-all"><Save size={18} /> 保存する</button>
                   </div>
