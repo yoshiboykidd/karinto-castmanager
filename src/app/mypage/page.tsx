@@ -110,7 +110,13 @@ export default function MyPage() {
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800 overflow-x-hidden">
-      <CastHeader shopName="マイページ" displayName={profile?.display_name} bgColor={currentTheme.bg} />
+      {/* 📍 syncTime={profile?.last_sync_at} を追加しました */}
+      <CastHeader 
+        shopName="マイページ" 
+        displayName={profile?.display_name} 
+        syncTime={profile?.last_sync_at} 
+        bgColor={currentTheme.bg} 
+      />
       
       <main className="px-5 mt-4 space-y-3">
         <section className="bg-white border border-pink-50 rounded-[32px] p-5 shadow-lg shadow-pink-100/10">
@@ -119,7 +125,6 @@ export default function MyPage() {
             <h3 className="text-sm tracking-tight">目標金額</h3>
           </div>
           <div className="relative">
-            {/* 📍 text-xl (20px) なのでズームしません */}
             <input type="text" inputMode="numeric" value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} className="w-full px-5 py-3 pl-10 rounded-2xl bg-gray-50 border-none font-black text-xl text-gray-700 focus:ring-2 focus:ring-pink-100" />
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-300 font-black text-lg">¥</span>
           </div>
@@ -147,7 +152,6 @@ export default function MyPage() {
             <h3 className="text-sm uppercase tracking-tight">{isDanger ? 'Security Alert' : 'Password'}</h3>
           </div>
           <div className="flex gap-2">
-            {/* 📍 text-sm を text-[16px] に変更（これでズームを防げます） */}
             <input 
               type="text" 
               placeholder="6文字以上で入力" 
