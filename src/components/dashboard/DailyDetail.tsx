@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { X, MapPin, Calculator, Trash2, User, Copy } from 'lucide-react';
+import { X, MapPin, Calculator, Trash2, Copy, UserCheck } from 'lucide-react';
 
 export default function DailyDetail({ date, dayNum, shift, reservations = [], theme = 'pink' }: any) {
   const [selectedRes, setSelectedRes] = useState<any>(null);
@@ -90,45 +90,48 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
         </div>
       </section>
 
-      {/* 📍 刷新版モーダル */}
+      {/* 📍 詳細モーダル（フッター被り対策版） */}
       {selectedRes && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/85 backdrop-blur-sm" onClick={() => setSelectedRes(null)} />
-          <div className="relative bg-white w-full max-w-[340px] rounded-[38px] overflow-hidden shadow-2xl animate-in zoom-in duration-150">
+        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 overflow-y-auto bg-black/85 backdrop-blur-sm pt-10 pb-28">
+          <div className="absolute inset-0" onClick={() => setSelectedRes(null)} />
+          
+          <div className="relative bg-white w-full max-w-[340px] rounded-[38px] overflow-hidden shadow-2xl animate-in zoom-in duration-150 flex flex-col">
             
-            {/* 1. 最上部：バッジと時間を特大・中央表示 */}
-            <div className={`pt-6 pb-4 ${accentBg} flex flex-col items-center justify-center relative`}>
-              <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300"><X size={24} /></button>
+            {/* 1. 最上部：バッジと時間を「横並び」中央特大表示 */}
+            <div className={`p-5 pb-6 ${accentBg} flex flex-col items-center justify-center relative border-b border-gray-100`}>
+              <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300 active:text-gray-500"><X size={24} /></button>
               
-              <div className="flex items-center gap-1.5 mb-2">
-                <span className={`text-[13px] font-black px-3 py-1 rounded-md ${getBadgeStyle(selectedRes.service_type)}`}>{selectedRes.service_type || 'か'}</span>
-                <span className={`text-[13px] font-black px-3 py-1 rounded-md ${getBadgeStyle(selectedRes.nomination_category)}`}>{selectedRes.nomination_category || 'FREE'}</span>
-              </div>
-              
-              <div className="flex items-baseline gap-1.5 text-gray-900 font-black">
-                <span className="text-[36px] tracking-tighter leading-none">{selectedRes.start_time?.substring(0, 5)}</span>
-                <span className="text-[20px] opacity-20 font-bold">/</span>
-                <span className="text-[36px] tracking-tighter leading-none">{selectedRes.end_time?.substring(0, 5)}</span>
+              <div className="flex items-center justify-center gap-3">
+                <div className="flex flex-col gap-1">
+                  <span className={`text-[12px] font-black px-2 py-0.5 rounded-md ${getBadgeStyle(selectedRes.service_type)}`}>{selectedRes.service_type || 'か'}</span>
+                  <span className={`text-[12px] font-black px-2 py-0.5 rounded-md ${getBadgeStyle(selectedRes.nomination_category)}`}>{selectedRes.nomination_category || 'FREE'}</span>
+                </div>
+                
+                <div className="flex items-baseline gap-1 text-gray-900 font-black">
+                  <span className="text-[36px] tracking-tighter leading-none">{selectedRes.start_time?.substring(0, 5)}</span>
+                  <span className="text-[20px] opacity-20 font-bold mx-0.5">/</span>
+                  <span className="text-[36px] tracking-tighter leading-none">{selectedRes.end_time?.substring(0, 5)}</span>
+                </div>
               </div>
             </div>
 
             {/* 2. ボディ：項目を詰め、文字を大きく */}
-            <div className="px-5 py-4 bg-white space-y-2.5">
+            <div className="px-5 py-4 bg-white space-y-3">
               
               {/* コース名：大きく強調 */}
               <div className="text-center border-b border-gray-50 pb-2">
-                <h3 className="text-[24px] font-black text-gray-800 leading-tight tracking-tight">
+                <h3 className="text-[24px] font-black text-gray-800 leading-tight tracking-tight italic">
                   {selectedRes.course_info}
                 </h3>
               </div>
 
-              {/* 合計金額（特大）＆ ホテル（並び） */}
+              {/* 料金（合計金額：巨大化） ＆ ホテル */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100 flex flex-col justify-center">
                   <p className="text-[9px] font-black text-gray-400 mb-0.5 uppercase tracking-widest">合計金額</p>
                   <div className="flex items-baseline font-black text-gray-900">
                     <span className="text-sm mr-0.5">¥</span>
-                    <span className="text-[32px] tracking-tighter leading-none">{(selectedRes.total_price || 0).toLocaleString()}</span>
+                    <span className="text-[34px] tracking-tighter leading-none">{(selectedRes.total_price || 0).toLocaleString()}</span>
                   </div>
                 </div>
                 <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100 flex flex-col justify-center">
@@ -139,42 +142,38 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
                 </div>
               </div>
 
-              {/* 延長・割引・オプション（ある時だけ） */}
+              {/* 変動項目 */}
               {(hasValue(selectedRes.extension) || hasValue(selectedRes.discount) || hasValue(selectedRes.options)) && (
-                <div className="bg-gray-50/50 rounded-xl p-2.5 space-y-1.5 border border-dashed border-gray-200">
-                  {hasValue(selectedRes.extension) && <div className="flex justify-between items-center text-[13px] font-bold"><span className="text-gray-400">延長</span><span className="text-orange-600 font-black">{selectedRes.extension}</span></div>}
-                  {hasValue(selectedRes.discount) && <div className="flex justify-between items-center text-[13px] font-bold"><span className="text-gray-400">割引</span><span className="text-red-500 font-black">{selectedRes.discount}</span></div>}
-                  {hasValue(selectedRes.options) && <div className="flex flex-col pt-0.5 border-t border-gray-100"><span className="text-[10px] text-gray-300 font-bold uppercase">Options</span><span className="text-[12px] font-black text-blue-600 leading-tight">{selectedRes.options}</span></div>}
+                <div className="bg-gray-50/50 rounded-xl p-2.5 space-y-1 border border-dashed border-gray-200">
+                  {hasValue(selectedRes.extension) && <div className="flex justify-between items-center text-[12px] font-bold"><span className="text-gray-400">延長</span><span className="text-orange-600 font-black">{selectedRes.extension}</span></div>}
+                  {hasValue(selectedRes.discount) && <div className="flex justify-between items-center text-[12px] font-bold"><span className="text-gray-400">割引</span><span className="text-red-500 font-black">{selectedRes.discount}</span></div>}
+                  {hasValue(selectedRes.options) && <div className="flex flex-col pt-0.5 border-t border-gray-100"><span className="text-[11px] text-gray-400 font-bold uppercase">Options</span><span className="text-[12px] font-black text-blue-600 leading-tight">{selectedRes.options}</span></div>}
                 </div>
               )}
 
-              {/* 📍 顧客情報：名前・回数を大きく */}
-              <div className="bg-gray-900 rounded-[28px] p-4 text-white space-y-3">
-                <div className="flex items-center justify-between px-1">
-                  <h4 className="text-[24px] font-black tracking-tighter leading-none">{selectedRes.customer_name} 様</h4>
-                  <div className="flex items-baseline gap-0.5">
-                    <span className="text-[20px] font-black text-pink-400 leading-none">{selectedRes.visit_count || '0'}</span>
-                    <span className="text-[11px] font-bold text-gray-500">回</span>
-                  </div>
+              {/* 📍 顧客情報：1行にスリム化しつつ、名前と回数を大きく */}
+              <div className="bg-gray-900 rounded-[24px] p-3 text-white flex items-center justify-between gap-2 shadow-lg">
+                <div className="flex items-baseline gap-1.5 shrink-0 pl-1">
+                  <span className="text-[20px] font-black tracking-tighter">{selectedRes.customer_name}</span>
+                  <span className="text-[16px] font-black text-pink-400">{selectedRes.visit_count || '0'}回</span>
                 </div>
-
-                {/* コピー用Noエリア */}
-                <div className="bg-white/10 rounded-xl py-2 px-4 border border-white/5 text-center active:bg-white/20 transition-all flex items-center justify-between">
-                  <span className="text-[10px] font-black text-gray-500 tracking-widest uppercase">No.</span>
-                  <span className="text-[22px] font-black tracking-[0.1em] leading-none select-all text-white">
+                {/* コピー用No */}
+                <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-xl border border-white/5 active:bg-white/20 transition-all">
+                  <span className="text-[18px] font-black tracking-widest leading-none select-all text-white">
                     {selectedRes.customer_no || '---'}
                   </span>
-                  <Copy size={16} className="text-gray-600" />
+                  <Copy size={14} className="text-gray-500" />
                 </div>
               </div>
 
               {/* スタッフ */}
-              <p className="text-center text-[11px] font-bold text-gray-300">
+              <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-gray-300">
+                <UserCheck size={12} className="opacity-50" />
                 Staff: <span className="text-gray-400">{selectedRes.staff_name || '---'}</span>
-              </p>
+              </div>
             </div>
 
-            {/* フッター：ボタン2連 */}
+            {/* 3. フッターボタン：2連 */}
             <div className="p-4 bg-gray-50 border-t border-gray-100 space-y-2">
               <button onClick={() => alert("OP計算君起動")} className="w-full h-14 rounded-2xl bg-blue-500 text-white flex items-center justify-center gap-2 font-black text-[16px] shadow-lg shadow-blue-100 active:scale-95 transition-all">
                 <Calculator size={20} /> OP計算君
