@@ -37,6 +37,7 @@ export default function DashboardContent() {
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
+  // 📍 001-012の店舗判別（確定版）
   const shopName = useMemo(() => {
     const loginId = String(safeProfile.username || safeProfile.login_id || "");
     const prefix = loginId.substring(0, 3);
@@ -48,11 +49,12 @@ export default function DashboardContent() {
     return shopMap[prefix] ? `${shopMap[prefix]}店` : (safeProfile.shop_name || '店舗未設定');
   }, [safeProfile]);
 
-  // 同期時刻を複数の階層から探す
+  // 📍 HP同期（--:--）を解消するための全方位サーチ
   const lastSyncTime = useMemo(() => {
     const d = data as any;
-    return d?.last_sync_at || d?.syncAt || safeProfile?.last_sync_at || safeProfile?.sync_at || null;
-  }, [data, safeProfile]);
+    // 優先順位をつけて取得（data直下 -> profile内 -> shiftデータ内）
+    return d?.last_sync_at || d?.syncAt || safeProfile?.last_sync_at || safeShifts[0]?.last_sync_at || null;
+  }, [data, safeProfile, safeShifts]);
 
   const achievementData: any = useAchievement(
     supabase, safeProfile, safeShifts, nav.selected?.single, () => fetchInitialData(router)
@@ -102,7 +104,7 @@ export default function DashboardContent() {
             date={nav.selected.single}
             dayNum={nav.selected.single.getDate()}
             shift={selectedShift}
-            allShifts={safeShifts}
+            allShifts={safeShifts} // 📍 特定日取得のために全シフトを渡す
             reservations={currentReservations} 
             theme={themeKey}
             supabase={supabase}

@@ -17,11 +17,21 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   if (!date) return null;
 
-  // 全キャストのデータからその日のイベント名を抽出
+  // 📍 執念の特定日（イベント）抽出ロジック
   const eventName = useMemo(() => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const target = allShifts.find((s: any) => (s.shift_date || s.date) === dateStr && (s.event_name || s.event));
-    return target?.event_name || target?.event || null;
+    if (!allShifts || allShifts.length === 0) return null;
+    
+    // 比較用に日付を文字列化（複数の形式に対応）
+    const targetDate = format(date, 'yyyy-MM-dd');
+    
+    // 全シフトデータの中から、日付が一致し、かつイベント名が入っているものを探す
+    const foundShift = allShifts.find((s: any) => {
+      const sDate = s.shift_date || s.date || "";
+      // 文字列の部分一致（2026-02-11が含まれているか）で判定
+      return sDate.includes(targetDate) && (s.event_name || s.event || s.event_title);
+    });
+
+    return foundShift?.event_name || foundShift?.event || foundShift?.event_title || null;
   }, [date, allShifts]);
 
   const isOfficial = shift?.status === 'official';
@@ -45,6 +55,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   const hasValue = (val: string) => val && val !== 'なし' && val !== '延長なし' && val !== 'なし ' && val !== '';
 
+  // 個人履歴取得
   useEffect(() => {
     if (selectedRes && supabase && myLoginId) {
       const fetchHistory = async () => {
@@ -93,6 +104,8 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
   return (
     <>
       <section className="relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-3 pt-8 flex flex-col space-y-1 subpixel-antialiased text-gray-800">
+        
+        {/* 日付・特定日バッジ・確定バッジ・シフト時間 */}
         <div className="flex items-center justify-center w-full mt-1 mb-2">
           <div className="flex items-center gap-2 whitespace-nowrap">
             <div className="flex items-baseline font-black tracking-tighter">
@@ -102,6 +115,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
               <span className="text-[12px] opacity-30 ml-0.5 font-bold">({format(date, 'E', { locale: ja })})</span>
             </div>
 
+            {/* 📍 特定日バッジ */}
             {eventName && (
               <span className="bg-red-500 text-white text-[10px] px-2 py-1 rounded-lg font-black shrink-0 shadow-sm animate-pulse">
                 {eventName}
@@ -125,7 +139,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
         <div className="pt-2 border-t border-gray-100/50 space-y-1">
           {reservations.length > 0 ? [...reservations].sort((a, b) => (a.start_time || "").localeCompare(b.start_time || "")).map((res: any, idx: number) => (
-            <button key={idx} onClick={() => { setSelectedRes(res); setMemoDraft(res.cast_memo || ''); setIsEditingMemo(false); }} className="w-full bg-gray-50/50 rounded-xl p-1.5 px-2 border border-gray-100 flex items-center gap-1 shadow-sm active:bg-gray-100 transition-all overflow-hidden text-gray-800 text-left">
+            <button key={idx} onClick={() => { setSelectedRes(res); setMemoDraft(res.cast_memo || ''); setIsEditingMemo(false); }} className="w-full bg-gray-50/50 rounded-xl p-1.5 px-2 border border-gray-100 flex items-center gap-1 shadow-sm active:bg-gray-100 transition-all overflow-hidden text-gray-800">
               <span className={`text-[13px] font-black w-7 h-7 flex items-center justify-center rounded-lg shrink-0 ${getBadgeStyle(res.service_type)}`}>{res.service_type || 'か'}</span>
               <span className={`text-[13px] font-black w-11 h-7 flex items-center justify-center rounded-lg shrink-0 tracking-tighter ${getBadgeStyle(res.nomination_category)}`}>{res.nomination_category || 'FREE'}</span>
               <div className="flex items-center tracking-tighter shrink-0 font-black text-gray-700 ml-1">
@@ -180,6 +194,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 </div>
               </div>
 
+              {/* 顧客情報カード */}
               <div className="bg-gray-900 rounded-[24px] p-3 text-white flex items-center justify-between gap-2 shadow-lg relative">
                 <div className="flex flex-col shrink-0 pl-1 text-left">
                   <div className="flex items-baseline gap-1">
@@ -203,6 +218,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
                 </div>
               </div>
 
+              {/* メモ ＆ フォーム（ズーム対策 16px） */}
               <div className="space-y-2">
                 {hasValue(selectedRes.memo) && (
                   <div className="bg-yellow-50/50 p-2.5 rounded-xl border border-yellow-100 flex gap-2">
