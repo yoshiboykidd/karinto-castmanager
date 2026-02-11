@@ -20,7 +20,8 @@ const THEME_CONFIG: any = {
   blue:   { header: 'bg-cyan-300',   calendar: 'bg-cyan-50 border-cyan-100',   accent: 'blue' },
   yellow: { header: 'bg-yellow-300', calendar: 'bg-yellow-50 border-yellow-100', accent: 'yellow' },
   white:  { header: 'bg-gray-400',   calendar: 'bg-white border-gray-100',     accent: 'gray' },
-  black:  { header: 'bg-gray-800',   calendar: 'bg-gray-900 border-gray-700',   accent: 'black' },
+  // 📍 実績枠と同じ薄いグレー（bg-gray-100）に修正
+  black:  { header: 'bg-gray-800',   calendar: 'bg-gray-100 border-gray-200',   accent: 'black' },
   red:    { header: 'bg-red-400',    calendar: 'bg-red-50 border-red-100',     accent: 'red' },
 };
 
@@ -32,12 +33,13 @@ export default function DashboardContent() {
   const { data, loading, fetchInitialData, getMonthlyTotals, supabase } = useShiftData();
   const nav = useNavigation() as any;
 
+  // プロフィールデータの安全な取得
   const safeProfile = useMemo(() => data?.profile || {}, [data]);
   const themeKey = safeProfile.theme_color || 'pink';
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
-  // 📍 12店舗の正確な判別ロジック
+  // 📍 12店舗の正確な判別（001〜012）
   const shopName = useMemo(() => {
     const loginId = String(safeProfile.username || safeProfile.login_id || "");
     const prefix = loginId.substring(0, 3);
@@ -49,29 +51,37 @@ export default function DashboardContent() {
     return shopMap[prefix] ? `${shopMap[prefix]}店` : (safeProfile.shop_name || '店舗未設定');
   }, [safeProfile]);
 
-  // 📍 HP同期時刻（--:--）を解消するための全方位サーチ
+  // 📍 HP同期時刻の取得強化
   const lastSyncTime = useMemo(() => {
     const d = data as any;
     return d?.last_sync_at || d?.syncAt || safeProfile?.last_sync_at || safeProfile?.sync_at || null;
   }, [data, safeProfile]);
 
+  // 実績データの取得
   const achievementData: any = useAchievement(
-    supabase, safeProfile, safeShifts, nav.selected?.single, () => fetchInitialData(router)
+    supabase, 
+    safeProfile, 
+    safeShifts, 
+    nav.selected?.single, 
+    () => fetchInitialData(router)
   );
   
   const { selectedShift = null } = achievementData || {};
 
+  // 選択された日の予約データフィルタリング
   const currentReservations = useMemo(() => {
     if (!(nav.selected?.single instanceof Date) || !data?.reservations) return [];
     const selectedDateStr = format(nav.selected.single, 'yyyy-MM-dd');
     return (data.reservations as any[]).filter((res) => res.reservation_date === selectedDateStr);
   }, [data?.reservations, nav.selected?.single]);
 
+  // 初回データフェッチ
   useEffect(() => { 
     setMounted(true);
     fetchInitialData(router); 
   }, [fetchInitialData, router]);
 
+  // 月間集計
   const monthlyTotals = useMemo(() => {
     return getMonthlyTotals(nav.viewDate || new Date());
   }, [getMonthlyTotals, nav.viewDate]);
@@ -82,6 +92,7 @@ export default function DashboardContent() {
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
+      {/* ヘッダーエリア */}
       <div className="relative">
         <CastHeader 
           displayName={safeProfile.display_name} 
@@ -92,9 +103,15 @@ export default function DashboardContent() {
       </div>
       
       <main className="px-4 -mt-6 relative z-10 space-y-5">
-        <MonthlySummary month={displayMonth} totals={monthlyTotals} targetAmount={safeProfile.monthly_target_amount || 0} theme={themeKey} />
+        {/* 月間実績サマリー */}
+        <MonthlySummary 
+          month={displayMonth} 
+          totals={monthlyTotals} 
+          targetAmount={safeProfile.monthly_target_amount || 0} 
+          theme={themeKey} 
+        />
 
-        {/* 📍 カレンダーセクション */}
+        {/* カレンダー：背景はcurrentTheme.calendarで実績枠と同じ薄いグレーになります */}
         <section className={`p-4 rounded-[40px] border-2 shadow-xl shadow-pink-100/20 text-center transition-all duration-500 ${currentTheme.calendar}`}>
           <DashboardCalendar 
             shifts={safeShifts as any} 
@@ -103,11 +120,11 @@ export default function DashboardContent() {
             month={nav.viewDate || new Date()} 
             onMonthChange={nav.setViewDate} 
             isRequestMode={false}
-            theme={themeKey} // 👈 これにより黒背景時に文字が白くなります
+            theme={themeKey} // 📍 カレンダー側にもテーマを渡す
           />
         </section>
 
-        {/* 📍 日別詳細セクション */}
+        {/* 日別詳細エリア */}
         {(nav.selected?.single instanceof Date && isValid(nav.selected.single)) && (
           <DailyDetail 
             date={nav.selected.single}
@@ -122,10 +139,15 @@ export default function DashboardContent() {
           />
         )}
         
+        {/* お知らせセクション */}
         <NewsSection newsList={data?.news || []} />
       </main>
 
-      <FixedFooter pathname={pathname} onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} />
+      {/* 固定フッター */}
+      <FixedFooter 
+        pathname={pathname} 
+        onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} 
+      />
     </div>
   );
 }

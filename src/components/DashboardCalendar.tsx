@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay, isValid, isAfter, startOfDay, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay, isValid, isAfter, startOfDay } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -12,12 +12,11 @@ interface DashboardCalendarProps {
   month: Date;
   onMonthChange: (date: Date) => void;
   isRequestMode: boolean;
-  theme?: string; // 📍 追加
+  theme?: string;
 }
 
 export default function DashboardCalendar({ shifts, selectedDates, onSelect, month, onMonthChange, isRequestMode, theme = 'pink' }: DashboardCalendarProps) {
   const [holidays, setHolidays] = useState<string[]>([]);
-  const isBlackTheme = theme === 'black'; // 📍 黒テーマ判定
 
   useEffect(() => {
     if (!month || !isValid(month)) return;
@@ -34,22 +33,21 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
 
   return (
     <div className="w-full">
-      <div className={`flex items-center justify-between mb-4 px-4 font-black ${isBlackTheme ? 'text-white' : 'text-slate-700'}`}>
+      {/* 📍 文字色は常に slate-700（濃いグレー）で見やすく */}
+      <div className="flex items-center justify-between mb-4 px-4 font-black text-slate-700">
         <button onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>
-          <ChevronLeft className={isBlackTheme ? 'text-gray-400' : 'text-pink-400'} />
+          <ChevronLeft className="text-gray-400" />
         </button>
         <span className="text-[20px] tracking-tighter">{format(month, 'yyyy / M月')}</span>
         <button onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>
-          <ChevronRight className={isBlackTheme ? 'text-gray-400' : 'text-pink-400'} />
+          <ChevronRight className="text-gray-400" />
         </button>
       </div>
 
       <div className="grid grid-cols-7 gap-1 px-1">
         {['日', '月', '火', '水', '木', '金', '土'].map((d, idx) => (
           <div key={d} className={`text-[13px] font-black pb-2 text-center tracking-widest
-            ${idx === 0 ? (isBlackTheme ? 'text-red-400' : 'text-red-500') : 
-              idx === 6 ? (isBlackTheme ? 'text-blue-400' : 'text-blue-500') : 
-              (isBlackTheme ? 'text-gray-400' : 'text-gray-900')}`}>
+            ${idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-gray-500'}`}>
             {d}
           </div>
         ))}
@@ -79,17 +77,17 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const dayOfWeek = getDay(day);
           const isHoliday = holidays.includes(dateStr);
           
-          // 📍 文字色ロジック修正
-          let textColor = isBlackTheme ? 'text-white' : 'text-gray-900';
+          // 📍 文字色は基本「黒（gray-900）」に固定
+          let textColor = 'text-gray-900';
           
           if (isSelected) {
-            textColor = 'text-pink-500'; // 白背景になるのでピンク文字
+            textColor = 'text-pink-500';
           } else if (hasOfficialBase) {
-            textColor = 'text-white'; // ピンク丸の中なので白
+            textColor = 'text-white'; // ピンク丸の中だけは白
           } else if (isHoliday || dayOfWeek === 0) {
-            textColor = isBlackTheme ? 'text-red-400' : 'text-red-500';
+            textColor = 'text-red-500';
           } else if (dayOfWeek === 6) {
-            textColor = isBlackTheme ? 'text-blue-400' : 'text-blue-500';
+            textColor = 'text-blue-500';
           }
 
           return (
@@ -98,8 +96,8 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
               onClick={() => { if (canSelect) onSelect(day); }} 
               className={`relative h-12 w-full flex flex-col items-center justify-center rounded-2xl transition-all active:scale-95 cursor-pointer
               ${isSelected ? 'bg-white shadow-lg ring-2 ring-pink-400 z-10' : ''}
-              ${!isSelected && isKarin ? (isBlackTheme ? 'bg-orange-900/50 border border-orange-700' : 'bg-orange-200 border border-orange-300') : ''} 
-              ${!isSelected && isSoine ? (isBlackTheme ? 'bg-yellow-900/50 border border-yellow-700' : 'bg-yellow-200 border border-yellow-300') : ''}
+              ${!isSelected && isKarin ? 'bg-orange-100 border border-orange-200' : ''} 
+              ${!isSelected && isSoine ? 'bg-yellow-100 border border-yellow-200' : ''}
               ${isRequestMode && !isFuture ? 'opacity-40 grayscale-[0.5] cursor-not-allowed' : ''}`}
             >
               <span className={`z-20 text-[16px] font-black ${textColor}`}>{dNum}</span>
