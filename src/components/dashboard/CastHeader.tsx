@@ -58,14 +58,13 @@ export default function CastHeader({
         </div>
       )}
 
-      {/* 📍 修正箇所: pt-7 pb-9 に変更して下側の余白を確保し、全体の重心を上げました */}
-      <header className={`px-5 pt-7 pb-9 rounded-b-[40px] shadow-sm relative transition-colors duration-500
+      {/* 📍 pt-5 pb-12 に調整してヘッダー内の重心を上へ、背景の余裕を確保 */}
+      <header className={`px-5 pt-5 pb-12 rounded-b-[40px] shadow-sm relative transition-colors duration-500
         ${isThemed 
           ? `${bgColor} text-white border-b border-white/10` 
           : 'bg-white text-gray-800 border-b border-pink-50' 
         }
       `}>
-        {/* 📍 修正箇所: items-end から items-center に変更して上下中央揃えに */}
         <div className="flex justify-between items-center">
           
           <div 
@@ -99,7 +98,6 @@ export default function CastHeader({
             </div>
           </div>
 
-          {/* 📍 修正箇所: ボタンエリアの上下間隔を少し詰めました */}
           <div className="flex flex-col items-end space-y-1.5">
             <div className={`w-[128px] h-[42px] rounded-xl border flex items-center justify-center gap-2 shadow-sm transition-colors
               ${isThemed 
