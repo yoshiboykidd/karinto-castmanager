@@ -5,18 +5,24 @@ import { format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { X, Calculator, Trash2, Copy, MessageSquare, Edit3, StickyNote, Save, Calendar, UserCheck } from 'lucide-react';
 
-export default function DailyDetail({ date, dayNum, shift, reservations = [], theme = 'pink', supabase, onRefresh, myLoginId }: any) {
+export default function DailyDetail({ date, dayNum, shift, allShifts = [], reservations = [], theme = 'pink', supabase, onRefresh, myLoginId }: any) {
   const [selectedRes, setSelectedRes] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditingMemo, setIsEditingMemo] = useState(false);
   const [memoDraft, setMemoDraft] = useState('');
   
   const [visitInfo, setVisitInfo] = useState<{count: string | number, lastDate: string | null}>({
-    count: '--',
-    lastDate: null
+    count: '--', lastDate: null
   });
 
   if (!date) return null;
+
+  // 📍 修正：特定日（イベント名）を確実に取得するロジック
+  const eventName = useMemo(() => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const targetShift = allShifts.find((s: any) => (s.shift_date || s.date) === dateStr);
+    return targetShift?.event_name || targetShift?.event || null;
+  }, [date, allShifts]);
 
   const isOfficial = shift?.status === 'official';
   const themeColors: any = {
@@ -39,6 +45,7 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
 
   const hasValue = (val: string) => val && val !== 'なし' && val !== '延長なし' && val !== 'なし ' && val !== '';
 
+  // 個人履歴取得
   useEffect(() => {
     if (selectedRes && supabase && myLoginId) {
       const fetchHistory = async () => {
@@ -87,9 +94,10 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
   return (
     <>
       <section className="relative overflow-hidden rounded-[32px] border bg-white border-pink-100 shadow-xl p-3 pt-8 flex flex-col space-y-1 subpixel-antialiased text-gray-800">
+        
+        {/* 📍 復活：日付・特定日・確定バッジ・シフト時間 */}
         <div className="flex items-center justify-center w-full mt-1 mb-2">
           <div className="flex items-center gap-2 whitespace-nowrap">
-            {/* 日付 */}
             <div className="flex items-baseline font-black tracking-tighter">
               <span className="text-[28px] leading-none">{format(date, 'M')}</span>
               <span className="text-[14px] opacity-30 mx-0.5 font-bold">/</span>
@@ -97,14 +105,14 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
               <span className="text-[12px] opacity-30 ml-0.5 font-bold">({format(date, 'E', { locale: ja })})</span>
             </div>
 
-            {/* 📍 復活：特定日バッジ */}
-            {shift?.event_name && (
+            {/* 📍 特定日バッジ */}
+            {eventName && (
               <span className="bg-red-500 text-white text-[10px] px-2 py-1 rounded-lg font-black shrink-0 shadow-sm animate-pulse">
-                {shift.event_name}
+                {eventName}
               </span>
             )}
 
-            {/* 確定 ＆ 時間 */}
+            {/* 確定 ＆ シフト時間 */}
             {isOfficial ? (
               <div className="flex items-center gap-1.5">
                 <span className="w-11 h-7 flex items-center justify-center rounded-lg bg-blue-500 text-white text-[13px] font-black shrink-0 tracking-tighter shadow-sm">確定</span>
@@ -115,7 +123,7 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
                 </div>
               </div>
             ) : (
-              <span className="text-[14px] font-black text-gray-200 italic uppercase tracking-[0.2em] leading-none">Day Off</span>
+              <span className="text-[14px] font-black text-gray-200 italic uppercase tracking-[0.2em] leading-none ml-1">Day Off</span>
             )}
           </div>
         </div>
@@ -141,10 +149,10 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
         </div>
       </section>
 
+      {/* 詳細モーダル（UI最適化版） */}
       {selectedRes && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center p-3 overflow-y-auto bg-black/90 backdrop-blur-sm pt-6 pb-32">
           <div className="absolute inset-0" onClick={() => setSelectedRes(null)} />
-          
           <div className="relative bg-white w-full max-w-[340px] rounded-[38px] overflow-hidden shadow-2xl animate-in zoom-in duration-150 flex flex-col text-gray-800">
             <div className={`p-4 pb-5 ${accentBg} flex items-center justify-center gap-3 relative border-b border-gray-100`}>
               <button onClick={() => setSelectedRes(null)} className="absolute top-4 right-4 text-gray-300 active:text-gray-500"><X size={24} /></button>
@@ -159,7 +167,7 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
               </div>
             </div>
 
-            <div className="px-5 py-3 bg-white space-y-2">
+            <div className="px-5 py-3 bg-white space-y-2 text-left">
               <div className="text-center pt-1 border-b border-gray-50 pb-2">
                 <h3 className="text-[22px] font-black text-gray-800 leading-tight italic">{selectedRes.course_info}</h3>
               </div>
@@ -178,22 +186,9 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
                 </div>
               </div>
 
-              {hasValue(selectedRes.memo) && (
-                <div className="bg-yellow-50/50 p-2.5 rounded-xl border border-yellow-100 flex gap-2">
-                  <MessageSquare size={14} className="text-yellow-400 shrink-0 mt-0.5" />
-                  <p className="text-[12px] font-bold text-yellow-700 leading-tight italic">{selectedRes.memo}</p>
-                </div>
-              )}
-
-              {hasValue(selectedRes.cast_memo) && !isEditingMemo && (
-                <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-100 flex gap-2 shadow-inner">
-                  <StickyNote size={14} className="text-blue-400 shrink-0 mt-0.5" />
-                  <p className="text-[12px] font-bold text-blue-700 leading-tight whitespace-pre-wrap">{selectedRes.cast_memo}</p>
-                </div>
-              )}
-
+              {/* 顧客情報カード */}
               <div className="bg-gray-900 rounded-[24px] p-3 text-white flex items-center justify-between gap-2 shadow-lg relative">
-                <div className="flex flex-col shrink-0 pl-1">
+                <div className="flex flex-col shrink-0 pl-1 text-left">
                   <div className="flex items-baseline gap-1">
                     <span className="text-[18px] font-black tracking-tighter">{selectedRes.customer_name}</span>
                     <span className="text-[12px] font-bold text-gray-500">様</span>
@@ -215,16 +210,27 @@ export default function DailyDetail({ date, dayNum, shift, reservations = [], th
                 </div>
               </div>
 
-              {isEditingMemo && (
-                <div className="bg-gray-50 p-3 rounded-2xl border-2 border-pink-200 space-y-2 animate-in slide-in-from-top-2 duration-200">
-                  <div className="flex justify-between items-center px-1">
-                    <span className="text-[10px] font-black text-pink-400 uppercase tracking-widest">Cast Memo Form</span>
-                    <button onClick={() => setIsEditingMemo(false)}><X size={16} className="text-gray-300"/></button>
+              {/* メモ ＆ フォーム（配置修正版） */}
+              <div className="space-y-2">
+                {hasValue(selectedRes.memo) && (
+                  <div className="bg-yellow-50/50 p-2.5 rounded-xl border border-yellow-100 flex gap-2">
+                    <MessageSquare size={14} className="text-yellow-400 shrink-0 mt-0.5" />
+                    <p className="text-[12px] font-bold text-yellow-700 leading-tight italic">{selectedRes.memo}</p>
                   </div>
-                  <textarea value={memoDraft} onChange={(e) => setMemoDraft(e.target.value)} placeholder="メモを入力..." className="w-full h-24 bg-white rounded-xl p-3 text-[16px] font-bold border border-gray-100 focus:outline-none focus:ring-2 focus:ring-pink-400 shadow-inner" autoFocus />
-                  <button onClick={handleSaveMemo} className="w-full h-11 bg-pink-500 text-white rounded-xl flex items-center justify-center gap-2 font-black text-[14px] shadow-md active:scale-95 transition-all"><Save size={18} /> 保存する</button>
-                </div>
-              )}
+                )}
+                {hasValue(selectedRes.cast_memo) && !isEditingMemo && (
+                  <div className="bg-blue-50/50 p-2.5 rounded-xl border border-blue-100 flex gap-2 shadow-inner">
+                    <StickyNote size={14} className="text-blue-400 shrink-0 mt-0.5" />
+                    <p className="text-[12px] font-bold text-blue-700 leading-tight whitespace-pre-wrap">{selectedRes.cast_memo}</p>
+                  </div>
+                )}
+                {isEditingMemo && (
+                  <div className="bg-gray-50 p-3 rounded-2xl border-2 border-pink-200 space-y-2 animate-in slide-in-from-top-2 duration-200">
+                    <textarea value={memoDraft} onChange={(e) => setMemoDraft(e.target.value)} placeholder="メモを入力..." className="w-full h-24 bg-white rounded-xl p-3 text-[16px] font-bold border border-gray-100 focus:outline-none focus:ring-2 focus:ring-pink-400 shadow-inner" autoFocus />
+                    <button onClick={handleSaveMemo} className="w-full h-11 bg-pink-500 text-white rounded-xl flex items-center justify-center gap-2 font-black text-[14px] shadow-md active:scale-95 transition-all"><Save size={18} /> 保存する</button>
+                  </div>
+                )}
+              </div>
 
               <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-gray-300 pt-1">
                 <UserCheck size={12} className="opacity-40" />Staff: <span className="text-gray-400">{selectedRes.staff_name || '---'}</span>

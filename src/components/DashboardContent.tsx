@@ -49,7 +49,11 @@ export default function DashboardContent() {
     return shopMap[prefix] ? `${shopMap[prefix]}店` : (safeProfile.shop_name || '店舗未設定');
   }, [safeProfile]);
 
-  const lastSyncTime = (data as any)?.last_sync_at || (data as any)?.syncAt || null;
+  // 📍 HPsync (--:--) を解消するための同期時間取得ロジック強化
+  const lastSyncTime = useMemo(() => {
+    const d = data as any;
+    return d?.last_sync_at || d?.syncAt || safeProfile?.last_sync_at || null;
+  }, [data, safeProfile]);
 
   const achievementData: any = useAchievement(
     supabase, safeProfile, safeShifts, nav.selected?.single, () => fetchInitialData(router)
@@ -79,7 +83,12 @@ export default function DashboardContent() {
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
       <div className="relative">
-        <CastHeader displayName={safeProfile.display_name} shopName={shopName} syncTime={lastSyncTime} bgColor={currentTheme.header} />
+        <CastHeader 
+          displayName={safeProfile.display_name} 
+          shopName={shopName} 
+          syncTime={lastSyncTime} 
+          bgColor={currentTheme.header} 
+        />
       </div>
       
       <main className="px-4 -mt-6 relative z-10 space-y-5">
@@ -94,6 +103,7 @@ export default function DashboardContent() {
             date={nav.selected.single}
             dayNum={nav.selected.single.getDate()}
             shift={selectedShift}
+            allShifts={safeShifts} // 📍 特定日表示のために渡す
             reservations={currentReservations} 
             theme={themeKey}
             supabase={supabase}
