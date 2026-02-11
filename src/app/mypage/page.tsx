@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter, usePathname } from 'next/navigation';
 import CastHeader from '@/components/dashboard/CastHeader';
@@ -19,10 +19,12 @@ const THEMES = [
 export default function MyPage() {
   const router = useRouter();
   const pathname = usePathname();
-  const supabase = createBrowserClient(
+  
+  // 📍 無限ループ防止：supabaseクライアントをuseStateで固定
+  const [supabase] = useState(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  ));
 
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
@@ -39,21 +41,24 @@ export default function MyPage() {
           router.push('/login');
           return;
         }
+        
         const rawLoginId = user.email?.split('@')[0] || '';         
         const strippedLoginId = String(Number(rawLoginId));  
         
-        // 📍 select('*') で全カラムを取得していることを再確認
         const { data: members } = await supabase
           .from('cast_members')
           .select('*')
           .in('login_id', [rawLoginId, strippedLoginId]);
-
+          
         const member = members?.[0];
+        
         if (member) {
           setProfile(member);
           setTargetAmount(String(member.monthly_target_amount || '')); 
           setTheme(member.theme_color || 'pink');
         }
+      } catch (e) {
+        console.error(e);
       } finally {
         setLoading(false);
       }
@@ -70,6 +75,7 @@ export default function MyPage() {
         .from('cast_members')
         .update({ monthly_target_amount: cleanAmount, theme_color: theme })
         .eq('login_id', profile.login_id);
+      
       alert('設定を保存しました♪');
       window.location.reload();
     } finally {
@@ -87,11 +93,14 @@ export default function MyPage() {
     try {
       const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
       if (authError) throw authError;
+
       const { error: dbError } = await supabase
         .from('cast_members')
         .update({ password: newPassword })
         .eq('login_id', profile.login_id);
+        
       if (dbError) throw dbError;
+
       alert('パスワードを更新しました！');
       setNewPassword('');
       window.location.reload();
@@ -104,15 +113,16 @@ export default function MyPage() {
 
   const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
   
-  // 📍 TOPページのDashboardContentと100%同じ優先順位で同期時間を判定
-  const lastSyncTime = 
-    profile?.last_sync_at || 
-    profile?.sync_at || 
-    profile?.syncAt || 
-    profile?.updated_at || // 念のためのバックアップ
-    null;
+  // 📍 HPsync表示ロジック（TOPページと完全に同期）
+  const lastSyncTime = useMemo(() => {
+    return profile?.last_sync_at || profile?.sync_at || profile?.syncAt || null;
+  }, [profile]);
 
-  const isDanger = profile && (!profile.password || String(profile.password) === '0000' || String(profile.password) === 'managed_by_supabase');
+  const isDanger = profile && (
+    !profile.password || 
+    String(profile.password) === '0000' || 
+    String(profile.password) === 'managed_by_supabase'
+  );
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#FFFDFE]">
@@ -120,17 +130,20 @@ export default function MyPage() {
     </div>
   );
 
+  // 📍 データが取得できなかった場合のガード
+  if (!profile) return null;
+
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans text-gray-800 overflow-x-hidden">
       <CastHeader 
         shopName="マイページ" 
-        displayName={profile?.display_name} 
-        syncTime={lastSyncTime} // 📍 ここで確実に渡す
+        displayName={profile.display_name} 
+        syncTime={lastSyncTime} 
         bgColor={currentTheme.bg} 
       />
       
-      <main className="px-5 mt-4 space-y-3">
-        {/* 目標金額 */}
+      <main className="px-5 mt-4 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        
         <section className="bg-white border border-pink-50 rounded-[32px] p-5 shadow-lg shadow-pink-100/10">
           <div className="flex items-center gap-2 mb-3 font-black text-gray-700">
             <span className="text-lg">💰</span>
@@ -142,13 +155,12 @@ export default function MyPage() {
               inputMode="numeric" 
               value={targetAmount} 
               onChange={(e) => setTargetAmount(e.target.value)} 
-              className="w-full px-5 py-3 pl-10 rounded-2xl bg-gray-50 border-none font-black text-xl text-gray-700 focus:ring-2 focus:ring-pink-100" 
+              className="w-full px-5 py-3 pl-10 rounded-2xl bg-gray-50 border-none font-black text-xl text-gray-700 focus:ring-2 focus:ring-pink-100 transition-all" 
             />
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-pink-300 font-black text-lg">¥</span>
           </div>
         </section>
 
-        {/* テーマカラー */}
         <section className="bg-white border border-pink-50 rounded-[32px] p-5 shadow-lg shadow-pink-100/10">
           <div className="flex items-center gap-2 mb-3 font-black text-gray-700">
             <span className="text-lg">🎨</span>
@@ -156,23 +168,38 @@ export default function MyPage() {
           </div>
           <div className="grid grid-cols-6 gap-2">
             {THEMES.map((t) => (
-              <button key={t.id} onClick={() => setTheme(t.id)} className={`w-9 h-9 rounded-full mx-auto transition-all ${t.bg} ${theme === t.id ? `scale-110 ring-4 ring-white shadow-md` : 'opacity-40'}`} />
+              <button 
+                key={t.id} 
+                onClick={() => setTheme(t.id)} 
+                className={`w-9 h-9 rounded-full mx-auto shadow-sm transition-all ${t.bg} ${
+                  theme === t.id ? `scale-110 ring-4 ring-white shadow-md` : 'opacity-40'
+                }`} 
+              />
             ))}
           </div>
         </section>
 
-        {/* 保存ボタン */}
-        <button onClick={handleSaveSettings} disabled={isSaving} className={`w-full py-4 rounded-2xl shadow-md font-black text-white text-md active:scale-95 transition-all flex items-center justify-center gap-2 ${isSaving ? 'bg-gray-300' : 'bg-gradient-to-r from-pink-400 to-rose-400'}`}>
+        <button 
+          onClick={handleSaveSettings} 
+          disabled={isSaving} 
+          className={`w-full py-4 rounded-2xl shadow-md font-black text-white text-md active:scale-95 transition-all flex items-center justify-center gap-2 ${
+            isSaving ? 'bg-gray-300' : 'bg-gradient-to-r from-pink-400 to-rose-400'
+          }`}
+        >
           {isSaving ? 'Saving...' : '設定を保存する ✨'}
         </button>
 
-        {/* パスワード変更 */}
-        <section className={`border-2 rounded-[32px] p-5 shadow-sm transition-all duration-500 ${isDanger ? 'bg-rose-50 border-rose-100 animate-pulse' : 'bg-gray-50 border-gray-100'}`}>
+        <section className={`border-2 rounded-[32px] p-5 shadow-sm transition-all duration-500 ${
+          isDanger ? 'bg-rose-50 border-rose-100 animate-pulse' : 'bg-gray-50 border-gray-100'
+        }`}>
           <div className={`flex items-center gap-2 mb-3 font-black ${isDanger ? 'text-rose-500' : 'text-gray-500'}`}>
             <span className="text-lg">{isDanger ? '⚠️' : '🔒'}</span>
-            <h3 className="text-sm uppercase tracking-tight">{isDanger ? 'Security Alert' : 'Password'}</h3>
+            <h3 className="text-sm uppercase tracking-tight">
+              {isDanger ? 'Security Alert' : 'Password'}
+            </h3>
           </div>
           <div className="flex gap-2">
+            {/* 📍 text-[16px] でズームを防止 */}
             <input 
               type="text" 
               placeholder="6文字以上で入力" 
@@ -180,15 +207,26 @@ export default function MyPage() {
               onChange={(e) => setNewPassword(e.target.value)}
               className="flex-1 px-4 py-2 rounded-xl bg-white border border-gray-200 font-bold text-gray-700 text-[16px] focus:outline-none focus:ring-2 focus:ring-gray-100"
             />
-            <button onClick={handlePasswordChange} disabled={isSaving} className={`px-4 py-2 font-black rounded-xl text-white text-xs shadow-sm active:scale-95 whitespace-nowrap ${isSaving ? 'bg-gray-300' : (isDanger ? 'bg-rose-400' : 'bg-gray-400')}`}>
+            <button 
+              onClick={handlePasswordChange}
+              disabled={isSaving}
+              className={`px-4 py-2 font-black rounded-xl text-white text-xs shadow-sm active:scale-95 whitespace-nowrap ${
+                isSaving ? 'bg-gray-300' : (isDanger ? 'bg-rose-400' : 'bg-gray-400')
+              }`}
+            >
               更新
             </button>
           </div>
         </section>
       </main>
 
-      {/* @ts-ignore */}
-      <FixedFooter pathname={pathname || ''} onLogout={async () => { await supabase.auth.signOut(); router.push('/login'); }} />
+      <FixedFooter 
+        pathname={pathname || ''} 
+        onLogout={async () => { 
+          await supabase.auth.signOut(); 
+          router.push('/login'); 
+        }} 
+      />
     </div>
   );
 }
