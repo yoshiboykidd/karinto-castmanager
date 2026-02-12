@@ -19,7 +19,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    // 1. メールアドレス形式に変換
+    // 1. メールアドレス形式に変換 (@karinto-internal.com を使用)
     const email = castId.includes('@') ? castId : `${castId}@karinto-internal.com`;
 
     // 2. Supabaseで認証 (Auth)
@@ -35,29 +35,32 @@ export default function LoginPage() {
     }
 
     // 3. 役職チェック (Database)
+    // ここで失敗すると管理画面に行けないため、慎重に判定します
     const { data: member, error: dbError } = await supabase
       .from('cast_members')
       .select('role')
       .eq('login_id', castId) 
       .single();
 
-    if (dbError) {
-      console.error('Role check failed:', dbError);
-      router.push('/');
-    } else {
-      // 4. 振り分けロジック & パスワード警告判定
-      const role = member?.role;
-      const isAdmin = role === 'developer' || role === 'admin';
-      
-      // 行き先決定
-      const destination = isAdmin ? '/admin' : '/';
+    const role = member?.role;
+    const isAdmin = role === 'developer' || role === 'admin';
 
-      // ★追加: パスワードが「0000」なら、URLに目印(?alert_password=true)をつける
+    // 4. 振り分けロジックの修正
+    if (isAdmin) {
+      // 👑 管理者はアラートなしで管理画面トップへ直行
+      router.push('/admin');
+    } else if (role === 'cast') {
+      // 👗 キャストの場合のみパスワードチェック
       if (password === '0000') {
-        router.push(`${destination}?alert_password=true`);
+        router.push('/?alert_password=true');
       } else {
-        router.push(destination);
+        router.push('/');
       }
+    } else {
+      // ⚠️ 役職が取得できなかった場合（RLSエラーなど）
+      console.error('Role check failed or role not found:', dbError);
+      // ログイン自体は成功しているので、一旦トップへ
+      router.push('/');
     }
     
     router.refresh();
