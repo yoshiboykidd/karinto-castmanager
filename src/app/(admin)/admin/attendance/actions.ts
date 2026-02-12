@@ -4,7 +4,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 /**
- * 権限に基づいたシフト一覧の取得
+ * 権限と店舗に基づいたシフト一覧の取得
  */
 export async function getFilteredAttendance(selectedDate: string, selectedShopId: string = 'all') {
   const cookieStore = await cookies()
@@ -32,11 +32,12 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
   if (!currentUser) return { shifts: [], myProfile: null }
 
   // 2. シフトデータのクエリ構築
+  // cast_members!inner を使うことで、リレーション先の店舗IDでの絞り込みを有効にします
   let query = supabase
     .from('shifts')
     .select(`
       *,
-      cast_members (
+      cast_members!inner (
         login_id,
         display_name,
         home_shop_id
@@ -46,16 +47,20 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
 
   if (currentUser.role === 'developer') {
     if (selectedShopId !== 'all') {
+      // 開発者の場合は選択した店舗IDで絞り込み
       query = query.eq('cast_members.home_shop_id', selectedShopId)
     }
   } else {
-    // 店長（admin）は自店のみ
+    // 店長（admin）は自分の店舗IDで固定
     query = query.eq('cast_members.home_shop_id', currentUser.home_shop_id)
   }
 
   const { data: shifts, error } = await query.order('start_time', { ascending: true })
 
-  if (error) console.error(error)
+  if (error) {
+    console.error('Fetch error:', error)
+    return { shifts: [], myProfile: null }
+  }
 
   return {
     shifts: shifts || [],
@@ -67,7 +72,7 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
 }
 
 /**
- * 出勤ステータスの更新（当欠・復旧）
+ * 当欠ステータスの切り替え
  */
 export async function updateShiftStatus(shiftId: string, currentStatus: string) {
   const cookieStore = await cookies()
