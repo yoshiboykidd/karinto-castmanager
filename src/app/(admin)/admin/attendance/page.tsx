@@ -26,7 +26,13 @@ export default function AttendancePage() {
 
   useEffect(() => { loadData(); }, [selectedDate, targetShopId]);
 
-  const handleToggle = async (shiftId: string, type: 'absent' | 'late', current: any) => {
+  const handleToggle = async (shiftId: string, type: 'absent' | 'late', current: any, name: string) => {
+    // 📍 2段構えの確認
+    const actionName = type === 'late' ? '遅刻' : '当欠';
+    const confirmMsg = `${name}さんの状態を「${actionName}」に変更します。本当によろしいですか？`;
+    
+    if (!window.confirm(confirmMsg)) return;
+
     const res = await updateShiftAction(shiftId, type, current);
     if (res.success) {
       setShifts(shifts.map(s => s.id === shiftId ? { ...s, [type === 'absent' ? 'status' : 'is_late']: res.newValue } : s));
@@ -35,92 +41,66 @@ export default function AttendancePage() {
 
   return (
     <div className="min-h-screen bg-slate-100 pb-10 text-slate-900">
-      <div className="bg-white px-6 pt-10 pb-4 shadow-md border-b border-slate-200">
+      <div className="bg-white px-4 pt-10 pb-4 shadow-sm border-b">
         <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <button onClick={() => router.push('/admin')} className="p-2 bg-slate-100 rounded-full text-slate-500">
-              <ChevronLeft size={20} />
-            </button>
-            <h1 className="text-2xl font-black tracking-tighter">ATTENDANCE</h1>
-          </div>
-          <input 
-            type="date" 
-            value={selectedDate} 
-            onChange={(e) => setSelectedDate(e.target.value)} 
-            className="bg-slate-900 text-white font-black p-3 rounded-2xl text-base outline-none shadow-lg" 
-          />
+          <button onClick={() => router.push('/admin')} className="p-2 bg-slate-100 rounded-full"><ChevronLeft size={20} /></button>
+          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="bg-slate-900 text-white font-black p-2 rounded-xl text-sm outline-none" />
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-2 mt-4 space-y-2">
         {loading ? (
-          <div className="flex justify-center py-20"><RefreshCw className="animate-spin text-slate-400" size={40} /></div>
+          <div className="flex justify-center py-20"><RefreshCw className="animate-spin text-slate-400" size={30} /></div>
         ) : (
           shifts.map((shift) => (
-            <div 
-              key={shift.id} 
-              className={`flex items-center justify-between p-3 pl-5 rounded-[24px] border-2 transition-all ${
-                shift.status === 'absent' 
-                ? 'bg-slate-200 border-slate-300 opacity-60' 
-                : 'bg-white border-white shadow-sm'
-              }`}
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[11px] font-black font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md">ID:{shift.login_id}</span>
-                  {shift.is_late && (
-                    <span className="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-lg font-black italic animate-pulse">LATE</span>
-                  )}
+            <div key={shift.id} className={`flex flex-col p-3 rounded-[20px] border-2 transition-all bg-white ${shift.status === 'absent' ? 'bg-slate-200 opacity-60' : 'border-white shadow-sm'}`}>
+              
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-2">
+                   <span className="text-[10px] font-bold text-slate-400 font-mono">ID:{shift.login_id}</span>
+                   {shift.is_late && <span className="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded font-black animate-pulse tracking-tighter">LATE</span>}
                 </div>
-                
-                <div className="flex flex-col">
-                  <h3 className="text-xl font-black text-slate-900 truncate tracking-tighter leading-none mb-2">
-                    {shift.hp_display_name}
-                  </h3>
-                  <div className={`flex items-center gap-2 ${shift.status === 'absent' ? 'text-slate-400' : 'text-blue-600'}`}>
-                    <Clock size={20} strokeWidth={3} />
-                    <span className="text-3xl font-black font-mono tracking-tighter">
-                      {shift.start_time} <span className="text-lg opacity-50">-</span> {shift.end_time}
-                    </span>
-                  </div>
+                <div className={`flex items-center gap-1 font-black font-mono ${shift.status === 'absent' ? 'text-slate-400' : 'text-blue-600'}`}>
+                  <Clock size={16} strokeWidth={3} />
+                  <span className="text-2xl tracking-tighter">{shift.start_time}-{shift.end_time}</span>
                 </div>
               </div>
 
-              <div className="flex gap-2 ml-4">
-                {/* 📍 遅刻ボタン: デカくてオレンジ */}
-                <button 
-                  onClick={() => handleToggle(shift.id, 'late', shift.is_late)}
-                  className={`flex flex-col items-center justify-center w-20 h-20 rounded-[20px] border-4 transition-all shadow-lg active:scale-95 ${
-                    shift.is_late 
-                    ? 'bg-amber-500 border-amber-600 text-white' 
-                    : 'bg-white border-slate-100 text-slate-200 hover:border-amber-200 hover:text-amber-300'
-                  }`}
-                >
-                  <AlertCircle size={32} strokeWidth={3} />
-                  <span className="text-[11px] font-black mt-1">遅刻</span>
-                </button>
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-xl font-black text-slate-900 truncate flex-1 tracking-tighter">
+                  {shift.hp_display_name}
+                </h3>
 
-                {/* 📍 当欠ボタン: デカくて赤 */}
-                <button 
-                  onClick={() => handleToggle(shift.id, 'absent', shift.status)}
-                  className={`flex flex-col items-center justify-center w-20 h-20 rounded-[20px] border-4 transition-all shadow-lg active:scale-95 ${
-                    shift.status === 'absent' 
-                    ? 'bg-rose-600 border-rose-700 text-white' 
-                    : 'bg-white border-slate-100 text-slate-200 hover:border-rose-200 hover:text-rose-300'
-                  }`}
-                >
-                  {shift.status === 'absent' ? <RotateCcw size={32} strokeWidth={3} /> : <Ban size={32} strokeWidth={3} />}
-                  <span className="text-[11px] font-black mt-1">{shift.status === 'absent' ? '復旧' : '当欠'}</span>
-                </button>
+                <div className="flex gap-2">
+                  {/* 📍 遅刻ボタン: 常時色がつくように背景を設定 */}
+                  <button 
+                    onClick={() => handleToggle(shift.id, 'late', shift.is_late, shift.hp_display_name)}
+                    className={`flex items-center gap-1 px-3 py-3 rounded-xl font-black text-xs transition-all shadow-md active:scale-95 ${
+                      shift.is_late 
+                      ? 'bg-amber-500 text-white' 
+                      : 'bg-amber-50 text-amber-600 border border-amber-200'
+                    }`}
+                  >
+                    <AlertCircle size={16} strokeWidth={3} />
+                    <span>遅刻</span>
+                  </button>
+
+                  {/* 📍 当欠ボタン: 常時色がつくように背景を設定 */}
+                  <button 
+                    onClick={() => handleToggle(shift.id, 'absent', shift.status, shift.hp_display_name)}
+                    className={`flex items-center gap-1 px-3 py-3 rounded-xl font-black text-xs transition-all shadow-md active:scale-95 ${
+                      shift.status === 'absent' 
+                      ? 'bg-rose-600 text-white' 
+                      : 'bg-rose-50 text-rose-600 border border-rose-200'
+                    }`}
+                  >
+                    {shift.status === 'absent' ? <RotateCcw size={16} strokeWidth={3} /> : <Ban size={16} strokeWidth={3} />}
+                    <span>{shift.status === 'absent' ? '復旧' : '当欠'}</span>
+                  </button>
+                </div>
               </div>
             </div>
           ))
-        )}
-
-        {!loading && shifts.length === 0 && (
-          <div className="py-20 text-center text-slate-400 font-black uppercase tracking-widest bg-white rounded-[40px] border-4 border-dashed border-slate-200">
-            No Shifts Today
-          </div>
         )}
       </div>
     </div>
