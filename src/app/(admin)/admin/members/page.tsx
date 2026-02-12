@@ -75,8 +75,8 @@ export default function MembersPage() {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
               <input 
                 type="text"
-                placeholder="Search..."
-                className="w-full bg-slate-50 border-none rounded-2xl py-3 pl-11 pr-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/10"
+                placeholder="Search by name or ID..."
+                className="w-full bg-slate-50 border-none rounded-2xl py-3 pl-11 pr-4 text-sm font-bold focus:ring-2 focus:ring-blue-500/10 transition-all"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -94,7 +94,7 @@ export default function MembersPage() {
                       : 'bg-white text-slate-400 border border-slate-100 hover:bg-slate-50'
                     }`}
                   >
-                    {id === 'all' ? 'ALL' : id}
+                    {id === 'all' ? 'ALL SHOPS' : id}
                   </button>
                 ))}
               </div>
@@ -103,15 +103,15 @@ export default function MembersPage() {
         </div>
       </div>
 
-      {/* リスト部分：一人一人の「帯」を強調 */}
+      {/* リスト：視認性重視の「帯」デザイン */}
       <div className="max-w-4xl mx-auto px-4 mt-6">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-300">
             <RefreshCw className="animate-spin mb-2" size={24} />
-            <span className="text-[10px] font-black tracking-widest">LOADING</span>
+            <span className="text-[10px] font-black tracking-widest uppercase">Synchronizing</span>
           </div>
         ) : (
-          <div className="flex flex-col gap-2"> {/* 📍 gapで帯同士に隙間を作る */}
+          <div className="flex flex-col gap-2">
             {filteredMembers.length > 0 ? (
               filteredMembers.map((m) => (
                 <div 
@@ -119,15 +119,17 @@ export default function MembersPage() {
                   className="flex items-center justify-between p-4 bg-white rounded-2xl border border-white shadow-sm hover:shadow-md hover:border-blue-100 transition-all group"
                 >
                   <div className="flex items-center gap-6">
-                    {/* 📍 ID：フォントを大きく、太く、色を濃く */}
+                    {/* ID：大きく太く */}
                     <div className="flex flex-col leading-none">
                       <span className="text-[9px] font-black text-slate-300 uppercase tracking-tighter mb-1">Login ID</span>
-                      <span className="text-lg font-mono font-black text-slate-900 tracking-tighter">
+                      <span className="text-xl font-mono font-black text-slate-900 tracking-tighter">
                         {m.login_id}
                       </span>
                     </div>
-                    {/* 名前部分 */}
-                    <div className="h-8 w-[2px] bg-slate-100 mx-1" /> {/* 仕切り線 */}
+                    
+                    <div className="h-8 w-[2px] bg-slate-100 mx-1" /> {/* セパレーター */}
+                    
+                    {/* 名前 */}
                     <span className="font-black text-slate-800 text-base group-hover:text-blue-600 transition-colors">
                       {m.display_name}
                     </span>
@@ -137,6 +139,7 @@ export default function MembersPage() {
                     <button 
                       onClick={() => handleDelete(m.login_id, m.display_name)}
                       className="p-2.5 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                      title="Delete Member"
                     >
                       <Trash2 size={18} />
                     </button>
@@ -146,7 +149,7 @@ export default function MembersPage() {
               ))
             ) : (
               <div className="py-20 text-center text-[10px] font-black text-slate-300 uppercase tracking-widest bg-white rounded-[30px] border border-dashed border-slate-200">
-                No Data Found
+                No Members Found
               </div>
             )}
           </div>
