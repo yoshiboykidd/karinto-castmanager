@@ -3,9 +3,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-/**
- * 📍 必ず「export」がついている必要があります
- */
+// 📍 export を確実に付ける
 export async function getFilteredAttendance(selectedDate: string, selectedShopId: string = 'all') {
   const cookieStore = await cookies()
   const supabase = createServerClient(
@@ -18,13 +16,13 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
     }
   )
 
-  // 📍 デバッグ：まずは条件を極限まで絞らずに取得を試みる
+  // デバッグ：条件なしで20件取る
   const { data: shifts, error } = await supabase
     .from('shifts')
     .select('*')
     .limit(20)
 
-  if (error) console.error('DB Fetch Error:', error)
+  if (error) console.error('Error:', error)
 
   const { data: { user } } = await supabase.auth.getUser()
   const { data: currentUser } = await supabase
@@ -39,6 +37,7 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
   }
 }
 
+// 📍 export を確実に付ける
 export async function updateShiftStatus(shiftId: string, currentStatus: string) {
   const cookieStore = await cookies()
   const supabase = createServerClient(
