@@ -3,139 +3,153 @@
 import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
-import CastRegister from '@/components/admin/CastRegister';
-import NewsManager from '@/components/admin/NewsManager';
+import { 
+  Users, 
+  Megaphone, 
+  CalendarCheck, 
+  Settings, 
+  ChevronRight, 
+  LogOut,
+  ShieldCheck
+} from 'lucide-react';
 
-const SHOP_LIST = [
-  { id: 'all', name: '📢 全店舗' },
-  { id: '001', name: '📍 神田' }, { id: '002', name: '📍 赤坂' },
-  { id: '003', name: '📍 秋葉原' }, { id: '004', name: '📍 上野' },
-  { id: '005', name: '📍 渋谷' }, { id: '006', name: '📍 池西' },
-  { id: '007', name: '📍 五反田' }, { id: '008', name: '📍 大宮' },
-  { id: '009', name: '📍 吉祥寺' }, { id: '010', name: '📍 大久保' },
-  { id: '011', name: '📍 池東' }, { id: '012', name: '📍 小岩' },
-];
-
-export default function AdminPage() {
+export default function AdminDashboard() {
+  const router = useRouter();
   const [supabase] = useState(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ));
   
-  const [targetShopId, setTargetShopId] = useState('all');
-  const [activeTab, setActiveTab] = useState<'cast' | 'news'>('cast');
   const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState<string | null>(null);
-  const [myShopId, setMyShopId] = useState<string | null>(null);
-  
-  const router = useRouter();
+  const [adminProfile, setAdminProfile] = useState<any>(null);
+
+  // 📍 ログアウト処理
+  const handleLogout = async () => {
+    if (!window.confirm('ログアウトしてログイン画面に戻りますか？')) return;
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
 
   useEffect(() => {
-    async function initAdmin() {
+    async function checkAuth() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session || !session.user.email) {
+      if (!session) {
         router.push('/login');
         return;
       }
-
-      const loginId = session.user.email.split('@')[0];
-      const { data: member, error } = await supabase
+      
+      const loginId = session.user.email?.split('@')[0];
+      const { data } = await supabase
         .from('cast_members')
-        .select('role, home_shop_id')
+        .select('*')
         .eq('login_id', loginId)
         .single();
 
-      if (error || !member || (member.role !== 'developer' && member.role !== 'admin')) {
-        alert('権限がありません');
+      if (data?.role !== 'admin' && data?.role !== 'developer') {
+        alert('管理者権限がありません');
         router.push('/');
         return;
       }
-
-      setRole(member.role);
-      setMyShopId(member.home_shop_id);
-      if (member.role === 'admin' && member.home_shop_id) {
-        setTargetShopId(member.home_shop_id);
-      }
+      setAdminProfile(data);
       setLoading(false);
     }
-    initAdmin();
+    checkAuth();
   }, [supabase, router]);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#FFFDFE]">
-      <div className="font-black text-pink-300 animate-pulse text-4xl italic tracking-tighter">MANAGER...</div>
+      <div className="font-black text-gray-300 animate-pulse text-4xl italic tracking-tighter">ADMIN...</div>
     </div>
   );
 
+  const MENUS = [
+    { 
+      title: 'キャスト管理', 
+      desc: 'キャストの登録・編集・PWリセット', 
+      path: '/admin/members', 
+      icon: <Users className="text-blue-500" />, 
+      color: 'border-blue-100 bg-blue-50/30' 
+    },
+    { 
+      title: '勤怠・シフト管理', 
+      desc: '本日の出勤確認・当欠処理', 
+      path: '/admin/attendance', 
+      icon: <CalendarCheck className="text-green-500" />, 
+      color: 'border-green-100 bg-green-50/30' 
+    },
+    { 
+      title: 'ニュース配信', 
+      desc: 'キャスト向けお知らせの編集', 
+      path: '/admin/news', 
+      icon: <Megaphone className="text-pink-500" />, 
+      color: 'border-pink-100 bg-pink-50/30' 
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-[#FFFDFE] pb-20 font-sans text-gray-800">
-      {/* 📍 ヘッダーを可愛く修正 */}
-      <div className="bg-gradient-to-r from-gray-800 to-gray-700 pt-8 pb-12 px-6 rounded-b-[40px] shadow-lg mb-[-24px]">
-        <div className="flex justify-between items-center max-w-md mx-auto">
+    <div className="min-h-screen bg-[#FFFDFE] pb-10 font-sans text-gray-800">
+      {/* 📍 KCM ADMIN ヘッダー */}
+      <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-black pt-12 pb-16 px-6 rounded-b-[50px] shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+        
+        <div className="relative z-10 flex justify-between items-start max-w-2xl mx-auto">
           <div>
-            <h1 className="text-white text-2xl font-black italic tracking-tighter">MANAGER CENTER</h1>
-            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-1">Control Panel v2.0</p>
+            <h1 className="text-white text-3xl font-black italic tracking-tighter">KCM ADMIN</h1>
+            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-[0.2em] mt-1.5 opacity-60">Management Console</p>
           </div>
-          <span className={`text-[10px] font-black px-4 py-1.5 rounded-full shadow-inner ${
-            role === 'developer' ? 'bg-purple-500 text-white' : 'bg-pink-500 text-white'
-          }`}>
-            {role === 'developer' ? 'DEVELOPER' : `SHOP:${myShopId}`}
-          </span>
+          
+          {/* 📍 ログアウトボタン */}
+          <button 
+            onClick={handleLogout}
+            className="flex flex-col items-center gap-1 group transition-all"
+          >
+            <div className="bg-white/10 group-active:bg-white/20 p-3 rounded-2xl border border-white/10 backdrop-blur-md shadow-lg">
+              <LogOut className="text-pink-400" size={20} />
+            </div>
+            <span className="text-[9px] font-black text-white/40 uppercase tracking-tighter">Logout</span>
+          </button>
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-4 space-y-4">
-        {/* 開発者用: 店舗切替 */}
-        {role === 'developer' && (
-          <section className="bg-white p-4 rounded-[32px] shadow-xl shadow-gray-200/50 border border-gray-50">
-             <label className="text-[10px] font-black text-gray-300 ml-2 uppercase tracking-widest block mb-3">Target Shop Selection</label>
-             <div className="grid grid-cols-3 gap-1.5">
-                {SHOP_LIST.map((shop) => (
-                  <button
-                    key={shop.id}
-                    onClick={() => setTargetShopId(shop.id)}
-                    className={`text-[10px] py-2.5 rounded-xl font-black transition-all border ${
-                      targetShopId === shop.id 
-                      ? 'bg-gray-800 text-white border-gray-800 shadow-md' 
-                      : 'bg-gray-50 text-gray-400 border-transparent hover:bg-gray-100'
-                    }`}
-                  >
-                    {shop.name.replace('📍 ', '')}
-                  </button>
-                ))}
-             </div>
-          </section>
-        )}
-
-        {/* タブ切り替え */}
-        <div className="flex bg-white/50 backdrop-blur-md p-1.5 rounded-[24px] border border-gray-100 shadow-sm mx-2">
-          <button
-            onClick={() => setActiveTab('cast')}
-            className={`flex-1 py-3.5 rounded-xl text-xs font-black transition-all ${
-              activeTab === 'cast' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-400'
-            }`}
-          >
-            👩🏻‍💼 キャスト登録
-          </button>
-          <button
-            onClick={() => setActiveTab('news')}
-            className={`flex-1 py-3.5 rounded-xl text-xs font-black transition-all ${
-              activeTab === 'news' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-400'
-            }`}
-          >
-            📢 ニュース配信
-          </button>
+      <main className="px-5 -mt-8 relative z-20 space-y-4 max-w-2xl mx-auto">
+        {/* ステータスバッジ */}
+        <div className="bg-white/80 backdrop-blur-sm px-4 py-2 rounded-2xl border border-white/20 inline-flex items-center gap-2 mb-2 shadow-sm">
+           <ShieldCheck size={14} className="text-green-500" />
+           <span className="text-[10px] font-black text-gray-500 uppercase">
+             {adminProfile?.role} : {adminProfile?.display_name}
+           </span>
         </div>
 
-        {/* メインエリア */}
-        <div className="animate-in fade-in slide-in-from-bottom-2 duration-500 px-1">
-          {activeTab === 'cast' ? (
-            <CastRegister targetShopId={targetShopId} />
-          ) : (
-            <NewsManager targetShopId={targetShopId} role={role || ''} myShopId={myShopId} />
-          )}
+        {/* メニューリスト */}
+        <div className="grid gap-3">
+          {MENUS.map((menu, idx) => (
+            <button
+              key={idx}
+              onClick={() => router.push(menu.path)}
+              className={`w-full flex items-center p-5 rounded-[32px] border-2 transition-all active:scale-[0.97] bg-white shadow-xl shadow-gray-200/40 ${menu.color}`}
+            >
+              <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center shrink-0">
+                {menu.icon}
+              </div>
+              <div className="ml-4 text-left flex-1">
+                <h3 className="font-black text-gray-800 text-[16px] tracking-tight">{menu.title}</h3>
+                <p className="text-gray-400 text-[11px] font-bold">{menu.desc}</p>
+              </div>
+              <ChevronRight className="text-gray-300" size={20} />
+            </button>
+          ))}
         </div>
-      </div>
+
+        {/* 下部アクション */}
+        <div className="pt-4">
+          <button 
+            onClick={() => router.push('/')}
+            className="w-full py-4 rounded-2xl bg-gray-100 text-gray-500 font-black text-sm flex items-center justify-center gap-2 active:bg-gray-200 transition-colors shadow-inner"
+          >
+            <Settings size={16} /> キャスト画面を表示する
+          </button>
+        </div>
+      </main>
     </div>
   );
 }
