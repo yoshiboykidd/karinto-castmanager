@@ -24,24 +24,23 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
 
-  // 1. 未ログイン時の処理
+  // 1. ログインしていない場合、ログイン画面以外はすべてリダイレクト
   if (!user && !path.startsWith("/login") && !path.startsWith("/auth") && !path.match(/\.(png|jpg|jpeg|gif|webp|svg|ico)$/)) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // 2. ログイン済みで /login に来た時の「役割別」振り分け
+  // 2. ログイン済みで /login にアクセスした時の振り分け
   if (user && path.startsWith("/login")) {
     const loginId = user.email?.split('@')[0] || '';
-    
-    // DBからロールを確認
     const { data: member } = await supabase
       .from('cast_members')
       .select('role')
       .eq('login_id', loginId)
       .single();
 
-    const redirectPath = (member?.role === 'admin' || member?.role === 'developer') ? '/admin' : '/';
-    return NextResponse.redirect(new URL(redirectPath, request.url));
+    // 管理者は /admin へ、キャストは / へ
+    const dest = (member?.role === 'admin' || member?.role === 'developer') ? '/admin' : '/';
+    return NextResponse.redirect(new URL(dest, request.url));
   }
 
   return response;

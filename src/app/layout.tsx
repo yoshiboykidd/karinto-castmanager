@@ -17,7 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     const checkUser = async () => {
-      // 👑 管理画面（/admin...）にいる時は何もしない
+      // 1. 管理画面内ならアラートを出さない
       if (pathname.startsWith('/admin')) {
         setIsAlertOpen(false);
         return;
@@ -28,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
       const loginId = user.email?.split('@')[0] || '';
       
+      // 2. プロフィール情報を取得（roleも含める）
       const { data: profile } = await supabase
         .from('cast_members')
         .select('password, role, display_name')
@@ -36,13 +37,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
       if (!profile) return;
 
-      // 👑 管理者・開発者ならアラートを出さない
+      // 👑 管理者ならアラートを出さない
       if (profile.role === 'admin' || profile.role === 'developer') {
         setIsAlertOpen(false);
         return;
       }
 
-      // 👗 キャストの場合のみパスワードチェック
+      // 👗 キャストかつ初期パスワードならアラート
       if (profile.password === '0000' || profile.password === 'managed_by_supabase') {
         setIsAlertOpen(true);
       } else {
@@ -55,17 +56,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <html lang="ja">
-      <body className="antialiased">
+      <body className="antialiased text-slate-900">
         {children}
         {isAlertOpen && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
-            <div className="bg-white rounded-[40px] p-8 w-full max-w-[340px] text-center shadow-2xl animate-in zoom-in duration-300">
+            <div className="bg-white rounded-[40px] p-8 w-full max-w-[340px] text-center shadow-2xl">
               <div className="text-5xl mb-4">⚠️</div>
-              <h2 className="text-xl font-black mb-2 text-gray-800 tracking-tighter">Security Alert</h2>
-              <p className="text-xs font-bold text-gray-400 mb-8 leading-relaxed">初期パスワードを変更してください。</p>
+              <h2 className="text-xl font-black mb-2 tracking-tighter text-slate-800">Security Alert</h2>
+              <p className="text-xs font-bold text-slate-400 mb-8 leading-relaxed">初期パスワードを変更してください。</p>
               <div className="space-y-3">
-                <button onClick={() => { setIsAlertOpen(false); router.push('/mypage'); }} className="w-full py-4 bg-rose-500 text-white font-black rounded-2xl shadow-lg">今すぐ変更する</button>
-                <button onClick={() => setIsAlertOpen(false)} className="w-full py-3 text-gray-400 font-black text-xs uppercase tracking-widest">後で設定する</button>
+                <button onClick={() => { setIsAlertOpen(false); router.push('/mypage'); }} className="w-full py-4 bg-rose-500 text-white font-black rounded-2xl">今すぐ変更</button>
+                <button onClick={() => setIsAlertOpen(false)} className="w-full py-3 text-slate-400 font-bold text-xs uppercase tracking-widest">後で設定</button>
               </div>
             </div>
           </div>
