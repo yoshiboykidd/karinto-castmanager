@@ -8,6 +8,8 @@ export default function HomePage() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ));
+  
+  // 初期値を「読み込み中」にして、取得に失敗した場合はIDそのものを出すようにします
   const [displayName, setDisplayName] = useState<string>('読み込み中...');
 
   useEffect(() => {
@@ -15,38 +17,37 @@ export default function HomePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const loginId = user.email?.split('@')[0] || '';
+      const rawId = user.email?.split('@')[0] || '';
       
-      // ★ ここで「名前」を取ってきます
-      const { data } = await supabase
+      // ★ 8桁のID(00600001)と、数値化したID(600001)の両方で検索をかける
+      const { data, error } = await supabase
         .from('cast_members')
         .select('display_name')
-        .eq('login_id', loginId)
+        .in('login_id', [rawId, String(Number(rawId))])
         .single();
 
       if (data?.display_name) {
         setDisplayName(data.display_name);
       } else {
-        setDisplayName('名前未設定');
+        // 名前が見つからない場合は、原因を特定するためにIDを表示させる
+        setDisplayName(`ID:${rawId} (名前未登録)`);
       }
     };
     fetchProfile();
   }, [supabase]);
 
   return (
-    <div className="min-h-screen bg-[#FFF5F7] p-6 text-slate-800">
-      {/* ★ ここが「名前」を表示する場所です */}
-      <div className="max-w-md mx-auto bg-white rounded-[32px] p-8 shadow-sm border border-pink-50 text-center">
-        <p className="text-[10px] font-bold text-pink-400 uppercase tracking-widest mb-1">Welcome back</p>
-        <h1 className="text-2xl font-black text-slate-800">
-          {displayName} <span className="text-sm font-medium">さん</span>
+    <div className="min-h-screen bg-[#FFF5F7] p-6 flex flex-col items-center justify-center font-sans text-slate-800">
+      <div className="w-full max-w-md bg-white rounded-[40px] p-10 shadow-xl border border-pink-50 text-center">
+        <p className="text-[10px] font-black text-pink-300 uppercase tracking-[0.2em] mb-2">Welcome Back</p>
+        
+        <h1 className="text-3xl font-black text-slate-800 tracking-tighter">
+          {displayName} <span className="text-base font-bold text-slate-400">さん</span>
         </h1>
-        <p className="mt-4 text-xs text-gray-400 font-bold">今日も一日お疲れ様です🌸</p>
-      </div>
-
-      {/* 以下に、あなたの元の「キャストメニュー」などのボタンが続きます */}
-      <div className="mt-8 space-y-4">
-        {/* 元々のボタン類をここに置いてください */}
+        
+        <div className="mt-8 pt-8 border-t border-pink-50">
+          <p className="text-xs font-bold text-slate-400">今日も一日お疲れ様です 🌸</p>
+        </div>
       </div>
     </div>
   );
