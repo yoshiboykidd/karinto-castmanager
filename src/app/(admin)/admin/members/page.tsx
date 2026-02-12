@@ -1,166 +1,174 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
-import { UserPlus, RefreshCw, Store, ShieldCheck, Search } from 'lucide-react';
+import { UserPlus, RefreshCw, Store, ShieldCheck, Search, ChevronRight } from 'lucide-react';
 import CastRegister from '@/components/admin/CastRegister';
+// 📍 actions.ts からロジックをインポート
+import { getFilteredMembers } from './actions';
 
 export default function MembersPage() {
   const router = useRouter();
-  const [supabase] = useState(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ));
-
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showRegister, setShowRegister] = useState(false);
-  const [myProfile, setMyProfile] = useState<{role: string, shop_id: string | null} | null>(null);
+  const [myProfile, setMyProfile] = useState<{role: string, home_shop_id: string | null} | null>(null);
   const [targetShopId, setTargetShopId] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // 📍 キャスト一覧を取得する関数
-  const fetchMembers = async (role: string, shopId: string | null, selectedShop: string) => {
+  // 📍 データを取得する関数
+  const loadData = async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('cast_members')
-        .select('*')
-        .order('login_id', { ascending: true });
-
-      // 🔐 権限によるフィルタリング
-      if (role === 'developer') {
-        // 開発者（神）: 選択された店舗があれば絞り込み。なければ全表示。
-        if (selectedShop !== 'all') {
-          query = query.eq('home_shop_id', selectedShop);
-        }
-      } else {
-        // 店長: 自分の店舗IDのキャストのみ。
-        // もし shopId が null なら、何も表示されないようにする（セキュリティ）
-        if (shopId) {
-          query = query.eq('home_shop_id', shopId);
-        } else {
-          setMembers([]);
-          return;
-        }
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      setMembers(data || []);
-    } catch (err) {
-      console.error('Fetch error:', err);
+      // actions.ts の getFilteredMembers を呼び出し
+      const result = await getFilteredMembers(targetShopId);
+      setMembers(result.members);
+      setMyProfile(result.myProfile);
+    } catch (error) {
+      console.error('Failed to load members:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // 📍 初期化：自分のプロフィールを確認して初回フェッチ
   useEffect(() => {
-    async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push('/login');
-        return;
-      }
+    loadData();
+  }, [targetShopId]);
 
-      const loginId = session.user.email?.split('@')[0];
-      const { data: profile } = await supabase
-        .from('cast_members')
-        .select('role, home_shop_id')
-        .eq('login_id', loginId)
-        .single();
-
-      if (profile) {
-        setMyProfile({ role: profile.role, shop_id: profile.home_shop_id });
-        // 開発者なら 'all'、店長なら自分の店舗を初期値に
-        const initialShop = profile.role === 'developer' ? 'all' : (profile.home_shop_id || '');
-        setTargetShopId(initialShop);
-        fetchMembers(profile.role, profile.home_shop_id, initialShop);
-      }
-    }
-    init();
-  }, [supabase]);
-
-  if (!myProfile) return <div className="p-10 text-center animate-pulse font-black text-gray-300">AUTHENTICATING...</div>;
+  // 🔍 検索フィルタリング（表示用）
+  const filteredMembers = members.filter(m => 
+    m.display_name?.includes(searchQuery) || 
+    m.login_id?.includes(searchQuery)
+  );
 
   return (
-    <div className="min-h-screen bg-[#FFFDFE] pb-24">
-      {/* ヘッダー */}
-      <div className="bg-slate-900 pt-12 pb-16 px-6 rounded-b-[40px] shadow-2xl relative">
-        <h1 className="text-white text-3xl font-black italic tracking-tighter">CAST MEMBERS</h1>
-        <div className="flex items-center gap-2 mt-2">
-          <span className={`text-[10px] font-black px-3 py-1 rounded-full ${myProfile.role === 'developer' ? 'bg-purple-500' : 'bg-blue-500'} text-white uppercase`}>
-            {myProfile.role === 'developer' ? 'GOD MODE' : `MANAGER: ${myProfile.shop_id}`}
-          </span>
+    <div className="min-h-screen bg-[#F8FAFC] pb-20">
+      {/* ヘッダーエリア */}
+      <div className="bg-white px-8 pt-16 pb-10 rounded-b-[50px] shadow-sm border-b border-slate-100">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex justify-between items-start mb-8">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                {myProfile?.role === 'developer' ? (
+                  <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full tracking-tighter animate-pulse">
+                    GOD MODE / ALL SHOPS
+                  </span>
+                ) : (
+                  <span className="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full tracking-tighter uppercase">
+                    Manager / Shop {myProfile?.home_shop_id}
+                  </span>
+                )}
+              </div>
+              <h1 className="text-3xl font-black text-slate-800 tracking-tighter flex items-center gap-3">
+                Member List
+                <span className="text-sm font-bold text-slate-300 bg-slate-50 px-3 py-1 rounded-xl">
+                  {members.length}
+                </span>
+              </h1>
+            </div>
+            <button 
+              onClick={() => setShowRegister(true)}
+              className="bg-slate-900 text-white p-4 rounded-3xl shadow-lg shadow-slate-200 active:scale-95 transition-all flex items-center gap-2"
+            >
+              <UserPlus size={20} />
+              <span className="text-xs font-black uppercase tracking-widest hidden md:block">Add Cast</span>
+            </button>
+          </div>
+
+          {/* 検索 & 店舗フィルター */}
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1 group">
+              <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" size={18} />
+              <input 
+                type="text"
+                placeholder="Search by name or ID..."
+                className="w-full bg-slate-50 border-none rounded-[25px] py-4 pl-14 pr-6 text-sm font-bold focus:ring-2 focus:ring-blue-500/20 transition-all"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            {/* 開発者のみ店舗切り替えボタンを表示 */}
+            {myProfile?.role === 'developer' && (
+              <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
+                {['all', '001', '002', '003', '004'].map((id) => (
+                  <button
+                    key={id}
+                    onClick={() => setTargetShopId(id)}
+                    className={`px-6 py-4 rounded-[25px] text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                      targetShopId === id 
+                      ? 'bg-slate-900 text-white shadow-md' 
+                      : 'bg-white text-slate-400 border border-slate-100 hover:bg-slate-50'
+                    }`}
+                  >
+                    {id === 'all' ? 'All Shops' : `Shop ${id}`}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <main className="max-w-2xl mx-auto px-5 -mt-8 relative z-20 space-y-4">
-        {/* 開発者専用：店舗フィルター */}
-        {myProfile.role === 'developer' && (
-          <div className="bg-white p-2 rounded-2xl shadow-lg flex gap-1 overflow-x-auto border border-gray-100">
-            {['all', '001', '006', '002'].map((shop) => (
-              <button
-                key={shop}
-                onClick={() => { setTargetShopId(shop); fetchMembers(myProfile.role, myProfile.shop_id, shop); }}
-                className={`px-5 py-2 rounded-xl text-[10px] font-black transition-all shrink-0 ${targetShopId === shop ? 'bg-slate-800 text-white' : 'bg-gray-50 text-gray-400'}`}
-              >
-                {shop === 'all' ? 'ALL' : `SHOP:${shop}`}
-              </button>
-            ))}
+      {/* メインリスト */}
+      <div className="max-w-4xl mx-auto px-6 mt-10">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <RefreshCw className="text-blue-500 animate-spin mb-4" size={32} />
+            <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em]">Synchronizing...</p>
           </div>
-        )}
-
-        {/* 登録ボタンの切り替え */}
-        <button 
-          onClick={() => setShowRegister(!showRegister)}
-          className={`w-full h-16 rounded-[24px] shadow-xl flex items-center justify-center gap-2 font-black text-sm transition-all active:scale-95 ${showRegister ? 'bg-slate-800 text-white' : 'bg-pink-500 text-white'}`}
-        >
-          {showRegister ? '一覧を表示する' : '新規キャスト登録を開く'}
-        </button>
-
-        {showRegister ? (
-          <CastRegister 
-            role={myProfile.role} 
-            myShopId={myProfile.shop_id} 
-            targetShopId={targetShopId === 'all' ? (myProfile.shop_id || '001') : targetShopId}
-            onSuccess={() => {
-              setShowRegister(false);
-              fetchMembers(myProfile.role, myProfile.shop_id, targetShopId);
-            }} 
-          />
         ) : (
-          <div className="space-y-2">
-            {loading ? (
-              <div className="py-12 text-center text-gray-300 font-black italic">LOADING MEMBERS...</div>
-            ) : members.length > 0 ? (
-              members.map((m) => (
-                <div key={m.id} className="bg-white p-5 rounded-[30px] shadow-sm border border-gray-100 flex items-center justify-between animate-in fade-in slide-in-from-bottom-2">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-slate-50 flex flex-col items-center justify-center border border-gray-50">
-                      <span className="text-[8px] font-black text-gray-300 uppercase">ID</span>
+          <div className="grid gap-4">
+            {filteredMembers.length > 0 ? (
+              filteredMembers.map((m) => (
+                <div 
+                  key={m.login_id} 
+                  className="bg-white p-5 rounded-[35px] border border-slate-100 shadow-sm flex items-center justify-between hover:border-blue-200 transition-all group active:scale-[0.99]"
+                >
+                  <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 rounded-[22px] bg-slate-50 flex flex-col items-center justify-center border border-slate-100 group-hover:bg-blue-50 transition-colors">
+                      <span className="text-[8px] font-black text-slate-300 uppercase">ID</span>
                       <span className="text-[13px] font-black text-slate-800 font-mono">{m.login_id}</span>
                     </div>
                     <div>
-                      <h3 className="font-black text-slate-800 text-lg">{m.display_name}</h3>
-                      <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                        <Store size={10} /> {m.home_shop_id}
+                      <h3 className="font-black text-slate-800 text-lg group-hover:text-blue-600 transition-colors">{m.display_name}</h3>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          <Store size={10} /> {m.home_shop_id}
+                        </div>
+                        {m.role === 'admin' && (
+                          <span className="text-[8px] font-black bg-blue-50 text-blue-500 px-2 py-0.5 rounded-md uppercase">Manager</span>
+                        )}
                       </div>
                     </div>
                   </div>
-                  <ShieldCheck size={20} className={m.role === 'cast' ? 'text-gray-100' : 'text-blue-500'} />
+                  <div className="flex items-center gap-3">
+                    <button className="p-3 bg-slate-50 rounded-2xl text-slate-300 group-hover:text-blue-500 group-hover:bg-blue-50 transition-all">
+                      <ChevronRight size={20} />
+                    </button>
+                  </div>
                 </div>
               ))
             ) : (
-              <div className="py-20 text-center bg-gray-50 rounded-[40px] border-2 border-dashed border-gray-100">
-                <p className="font-black text-gray-300 italic">NO CAST MEMBERS FOUND</p>
-                <p className="text-[10px] text-gray-400 mt-2 uppercase tracking-[0.2em]">Check shop filter or RLS settings</p>
+              <div className="py-24 text-center bg-white rounded-[50px] border-2 border-dashed border-slate-100">
+                <p className="font-black text-slate-200 text-xl italic tracking-tighter mb-2">NO CAST MEMBERS FOUND</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Try adjusting your search or filters</p>
               </div>
             )}
           </div>
         )}
-      </main>
+      </div>
+
+      {/* 登録用モーダル（既存コンポーネント） */}
+      {showRegister && (
+        <CastRegister 
+          onClose={() => setShowRegister(false)} 
+          onSuccess={() => {
+            setShowRegister(false);
+            loadData();
+          }} 
+        />
+      )}
     </div>
   );
 }
