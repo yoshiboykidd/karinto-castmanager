@@ -3,15 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserPlus, RefreshCw, Store, ShieldCheck, Search, ChevronRight } from 'lucide-react';
-// 📍 ここで登録コンポーネントをインポートしています
 import CastRegister from '@/components/admin/CastRegister';
 import { getFilteredMembers } from './actions';
 
 export default function MembersPage() {
   const router = useRouter();
-  const [members, setMembers] = useState<any[]>([]);
+  const [members, setMembers] = useState<any[]>([]); // 初期値は空配列
   const [loading, setLoading] = useState(true);
-  // 📍 登録画面の表示管理
   const [showRegister, setShowRegister] = useState(false);
   const [myProfile, setMyProfile] = useState<{role: string, home_shop_id: string | null} | null>(null);
   const [targetShopId, setTargetShopId] = useState('all');
@@ -21,8 +19,11 @@ export default function MembersPage() {
     setLoading(true);
     try {
       const result = await getFilteredMembers(targetShopId);
-      setMembers(result.members);
-      setMyProfile(result.myProfile);
+      // 📍 result が null や undefined の場合のガード
+      if (result) {
+        setMembers(result.members || []);
+        setMyProfile(result.myProfile || null);
+      }
     } catch (error) {
       console.error('Failed to load members:', error);
     } finally {
@@ -34,9 +35,10 @@ export default function MembersPage() {
     loadData();
   }, [targetShopId]);
 
-  const filteredMembers = members.filter(m => 
-    m.display_name?.includes(searchQuery) || 
-    m.login_id?.includes(searchQuery)
+  // 📍 配列でない場合に備えてガード
+  const filteredMembers = (members || []).filter(m => 
+    m?.display_name?.includes(searchQuery) || 
+    m?.login_id?.includes(searchQuery)
   );
 
   return (
@@ -53,21 +55,23 @@ export default function MembersPage() {
                   </span>
                 ) : (
                   <span className="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full tracking-tighter uppercase">
-                    Manager / Shop {myProfile?.home_shop_id}
+                    Manager / Shop {myProfile?.home_shop_id || '---'}
                   </span>
                 )}
               </div>
               <h1 className="text-3xl font-black text-slate-800 tracking-tighter flex items-center gap-3">
                 Member List
                 <span className="text-sm font-bold text-slate-300 bg-slate-50 px-3 py-1 rounded-xl">
-                  {members.length}
+                  {members?.length || 0}
                 </span>
               </h1>
             </div>
             
-            {/* 📍 新規登録ボタン（ここをクリックするとモーダルが開きます） */}
             <button 
-              onClick={() => setShowRegister(true)}
+              onClick={() => {
+                console.log("Add Cast clicked"); // 📍 ログが出るか確認
+                setShowRegister(true);
+              }}
               className="bg-slate-900 text-white p-4 rounded-3xl shadow-lg shadow-slate-200 active:scale-95 transition-all flex items-center gap-2"
             >
               <UserPlus size={20} />
@@ -75,7 +79,6 @@ export default function MembersPage() {
             </button>
           </div>
 
-          {/* 検索 & 店舗フィルター */}
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1 group">
               <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" size={18} />
@@ -118,7 +121,8 @@ export default function MembersPage() {
           </div>
         ) : (
           <div className="grid gap-4">
-            {filteredMembers.map((m) => (
+            {/* 📍 オプショナルチェイニング ?. で安全にループ */}
+            {filteredMembers?.map((m) => (
               <div 
                 key={m.login_id} 
                 className="bg-white p-5 rounded-[35px] border border-slate-100 shadow-sm flex items-center justify-between hover:border-blue-200 transition-all group active:scale-[0.99]"
@@ -143,17 +147,19 @@ export default function MembersPage() {
                 </div>
               </div>
             ))}
+            {filteredMembers.length === 0 && (
+              <div className="text-center py-10 text-slate-400 font-bold">No members found.</div>
+            )}
           </div>
         )}
       </div>
 
-      {/* 📍 これが新規登録のポップアップ本体です */}
       {showRegister && (
         <CastRegister 
           onClose={() => setShowRegister(false)} 
           onSuccess={() => {
             setShowRegister(false);
-            loadData(); // 登録後にリストを再読み込み
+            loadData();
           }} 
         />
       )}
