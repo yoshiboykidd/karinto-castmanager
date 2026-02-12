@@ -3,9 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
+    request: { headers: request.headers },
   });
 
   const supabase = createServerClient(
@@ -13,59 +11,41 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
+        getAll() { return request.cookies.getAll(); },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({
-            request,
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          response = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
         },
       },
     }
   );
 
-  // 重要: getUser() を呼ぶことでセッションをリフレッシュする
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // 現在のパス
+  const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
 
-  // ▼▼▼ 交通整理ルール ▼▼▼
-
-  // 1. ログインしていないのに、保護されたページに行こうとしたら弾く
-  // (login, auth, 画像ファイル 以外はすべて保護)
+  // 1. 未ログイン時の保護
   if (!user && !path.startsWith("/login") && !path.startsWith("/auth") && !path.match(/\.(png|jpg|jpeg|gif|webp|svg|ico)$/)) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // 2. すでにログインしているのに、ログイン画面に来たらホームへ返す
+  // 2. ログイン済みでログイン画面に来た時のリダイレクト先を修正
   if (user && path.startsWith("/login")) {
-    return NextResponse.redirect(new URL("/", request.url));
+    const rawId = user.email?.split('@')[0] || '';
+    // DBから権限をチェック
+    const { data: member } = await supabase
+      .from('cast_members')
+      .select('role')
+      .eq('login_id', rawId)
+      .single();
+
+    const redirectPath = (member?.role === 'admin' || member?.role === 'developer') ? '/admin' : '/';
+    return NextResponse.redirect(new URL(redirectPath, request.url));
   }
 
   return response;
 }
 
 export const config = {
-  matcher: [
-    /*
-     * すべてのリクエストパスにマッチさせますが、以下は除外します:
-     * - api (APIルート)  <-- ★これを追加したことになります
-     * - _next/static (静的ファイル)
-     * - _next/image (画像最適化ファイル)
-     * - favicon.ico (ファビコン)
-     * - 画像ファイル
-     */
-    // ▼▼▼ 修正箇所: 先頭に「api|」を追加 ▼▼▼
-    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };
