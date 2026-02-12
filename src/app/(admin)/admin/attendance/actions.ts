@@ -3,6 +3,9 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
+/**
+ * 勤怠データ取得：3段構えのフィルタリングで漏れを防止
+ */
 export async function getFilteredAttendance(selectedDate: string, selectedShopId: string = 'all') {
   const cookieStore = await cookies()
   const supabase = createServerClient(
@@ -15,7 +18,7 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
     }
   )
 
-  // 1. ユーザー権限の確認
+  // 1. ユーザー情報の取得
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { shifts: [], myProfile: null }
 
@@ -28,7 +31,7 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
 
   if (!currentUser) return { shifts: [], myProfile: null }
 
-  // 2. クエリ構築（!innerを外して、リレーションがなくても shifts は取得する）
+  // 2. クエリ構築（!innerを外し、リレーションなしでも shifts 自体は取る）
   let query = supabase
     .from('shifts')
     .select(`
@@ -41,14 +44,14 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
     `)
     .eq('shift_date', selectedDate)
 
-  // 3. フィルタリング：店長なら自店固定、開発者なら選択店舗
+  // 3. 店舗フィルタリングの適用
   const filterId = currentUser.role === 'developer' ? selectedShopId : currentUser.home_shop_id;
 
   if (filterId !== 'all' && filterId) {
-    // 📍 修正のキモ：
+    // 📍 修正のキモ：or条件
     // ① store_codeが一致
-    // ② login_idの先頭3文字が一致（APIでstore_codeを入れる前のデータ救済）
-    // ③ リレーション先の home_shop_id が一致
+    // ② login_idの先頭3文字が一致 ( ilike `${filterId}%` )
+    // ③ 紐づくキャストの所属店舗が一致
     query = query.or(`store_code.eq.${filterId}, login_id.ilike.${filterId}%, cast_members.home_shop_id.eq.${filterId}`)
   }
 
@@ -62,6 +65,9 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
   }
 }
 
+/**
+ * 出勤ステータスの更新
+ */
 export async function updateShiftStatus(shiftId: string, currentStatus: string) {
   const cookieStore = await cookies()
   const supabase = createServerClient(
