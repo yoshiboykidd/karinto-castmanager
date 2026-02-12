@@ -27,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
     const rawId = user.email?.split('@')[0] || '';
     
-    // 【最重要】名前(display_name)と役職(role)も取得するように修正
+    // 【修正箇所】password だけでなく display_name と role も取得する
     const { data } = await supabase
       .from('cast_members')
       .select('password, display_name, role')
@@ -60,11 +60,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         {isAlertOpen && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
-            <div className="bg-white rounded-[40px] p-8 w-full max-w-[340px] text-center shadow-2xl">
-              <h2 className="text-xl font-black mb-4">初期パスワード変更</h2>
+            <div className="relative bg-white rounded-[40px] p-8 w-full max-w-[340px] text-center shadow-2xl border border-gray-100 animate-in zoom-in duration-300">
+              <div className="text-5xl mb-4">⚠️</div>
+              <h2 className="text-xl font-black mb-2 text-gray-800 tracking-tighter">Security Alert</h2>
+              <p className="text-xs font-bold text-gray-400 mb-8 leading-relaxed">
+                初期パスワードのままです。<br />安全のため変更してください。
+              </p>
               <div className="space-y-3">
-                <button onClick={() => { setIsAlertOpen(false); router.push('/mypage'); }} className="w-full py-4 bg-pink-500 text-white font-black rounded-2xl">変更する</button>
-                <button onClick={() => setIsAlertOpen(false)} className="w-full py-3 text-gray-400 font-bold text-xs">後で設定</button>
+                <button onClick={() => { setIsAlertOpen(false); router.push('/mypage'); }} className="w-full py-4 bg-rose-500 text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all">今すぐ変更する</button>
+                <button onClick={() => setIsAlertOpen(false)} className="w-full py-3 text-gray-400 font-black text-xs active:scale-95 transition-all">後で設定する</button>
               </div>
             </div>
           </div>
