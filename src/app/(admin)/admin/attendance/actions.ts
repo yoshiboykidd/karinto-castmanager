@@ -3,9 +3,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-/**
- * 勤怠データ取得：店長・開発者の権限に応じてフィルタリング
- */
 export async function getFilteredAttendance(selectedDate: string, selectedShopId: string = 'all') {
   const cookieStore = await cookies()
   const supabase = createServerClient(
@@ -18,7 +15,7 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
     }
   )
 
-  // 1. 操作ユーザーの権限と所属店舗を確認
+  // 1. ユーザー権限の確認
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { shifts: [], myProfile: null }
 
@@ -31,7 +28,7 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
 
   if (!currentUser) return { shifts: [], myProfile: null }
 
-  // 2. クエリ構築：リレーションがなくても shifts 自体は取得する
+  // 2. クエリ構築（!innerを外して、リレーションがなくても shifts は取得する）
   let query = supabase
     .from('shifts')
     .select(`
@@ -44,22 +41,20 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
     `)
     .eq('shift_date', selectedDate)
 
-  // 3. 店舗フィルタリングの適用
+  // 3. フィルタリング：店長なら自店固定、開発者なら選択店舗
   const filterId = currentUser.role === 'developer' ? selectedShopId : currentUser.home_shop_id;
 
   if (filterId !== 'all' && filterId) {
-    // 📍 漏れを防ぐ最強のOR条件
+    // 📍 修正のキモ：
     // ① store_codeが一致
-    // ② login_idの先頭3文字が一致 (例: 006...)
-    // ③ 紐づくキャストの所属店舗が一致
+    // ② login_idの先頭3文字が一致（APIでstore_codeを入れる前のデータ救済）
+    // ③ リレーション先の home_shop_id が一致
     query = query.or(`store_code.eq.${filterId}, login_id.ilike.${filterId}%, cast_members.home_shop_id.eq.${filterId}`)
   }
 
   const { data: shifts, error } = await query.order('start_time', { ascending: true })
 
-  if (error) {
-    console.error('Fetch error:', error)
-  }
+  if (error) console.error('Fetch error:', error)
 
   return {
     shifts: shifts || [],
@@ -67,9 +62,6 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
   }
 }
 
-/**
- * 当欠ステータスの更新
- */
 export async function updateShiftStatus(shiftId: string, currentStatus: string) {
   const cookieStore = await cookies()
   const supabase = createServerClient(
