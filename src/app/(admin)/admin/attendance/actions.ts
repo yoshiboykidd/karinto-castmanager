@@ -3,9 +3,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-/**
- * 権限と店舗に基づいたシフト一覧の取得
- */
 export async function getFilteredAttendance(selectedDate: string, selectedShopId: string = 'all') {
   const cookieStore = await cookies()
   const supabase = createServerClient(
@@ -18,7 +15,6 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
     }
   )
 
-  // 1. 操作ユーザーの権限取得
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { shifts: [], myProfile: null }
 
@@ -31,13 +27,13 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
 
   if (!currentUser) return { shifts: [], myProfile: null }
 
-  // 2. シフトデータのクエリ構築
-  // cast_members!inner を使うことで、リレーション先の店舗IDでの絞り込みを有効にします
+  // 📍 クエリの構築
+  // 一旦 !inner を外して、確実にデータが取れるかテストします
   let query = supabase
     .from('shifts')
     .select(`
       *,
-      cast_members!inner (
+      cast_members (
         login_id,
         display_name,
         home_shop_id
@@ -45,22 +41,25 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
     `)
     .eq('shift_date', selectedDate)
 
+  // 📍 フィルター条件の適用
   if (currentUser.role === 'developer') {
     if (selectedShopId !== 'all') {
-      // 開発者の場合は選択した店舗IDで絞り込み
-      query = query.eq('cast_members.home_shop_id', selectedShopId)
+      // 開発者の場合：home_shop_id が一致するものを探す
+      query = query.filter('cast_members.home_shop_id', 'eq', selectedShopId)
     }
   } else {
-    // 店長（admin）は自分の店舗IDで固定
-    query = query.eq('cast_members.home_shop_id', currentUser.home_shop_id)
+    // 店長の場合：自店舗のみ
+    query = query.filter('cast_members.home_shop_id', 'eq', currentUser.home_shop_id)
   }
 
   const { data: shifts, error } = await query.order('start_time', { ascending: true })
 
   if (error) {
-    console.error('Fetch error:', error)
-    return { shifts: [], myProfile: null }
+    console.error('Fetch Error:', error)
   }
+
+  // 📍 デバッグ用：取得した生データをログに出す（Vercelのログで確認可能）
+  console.log(`Date: ${selectedDate}, Shop: ${selectedShopId}, Count: ${shifts?.length || 0}`)
 
   return {
     shifts: shifts || [],
@@ -71,9 +70,6 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
   }
 }
 
-/**
- * 当欠ステータスの切り替え
- */
 export async function updateShiftStatus(shiftId: string, currentStatus: string) {
   const cookieStore = await cookies()
   const supabase = createServerClient(
@@ -85,12 +81,7 @@ export async function updateShiftStatus(shiftId: string, currentStatus: string) 
       },
     }
   )
-
   const newStatus = currentStatus === 'absent' ? 'official' : 'absent'
-  const { error } = await supabase
-    .from('shifts')
-    .update({ status: newStatus })
-    .eq('id', shiftId)
-
+  const { error } = await supabase.from('shifts').update({ status: newStatus }).eq('id', shiftId)
   return { success: !error, newStatus }
 }
