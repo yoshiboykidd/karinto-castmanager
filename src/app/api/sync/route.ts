@@ -14,62 +14,48 @@ const ALL_SHOPS = [
   { id: '005', name: '渋谷', baseUrl: 'https://www.shibuyakarinto.com/attend.php' }, 
   { id: '006', name: '池西', baseUrl: 'https://ikekari.com/attend.php' }, 
   { id: '007', name: '五反田', baseUrl: 'https://www.karin-go.com/attend.php' }, 
-  { id: '008', name: '大宮', baseUrl: 'https://www.karin10omiya.com/attend.php' }, 
-  { id: '009', name: '吉祥寺', baseUrl: 'https://www.kari-kichi.com/attend.php' },
-  { id: '010', name: '大久保', baseUrl: 'https://www.ookubo-karinto.com/attend.php' },
-  { id: '011', name: '池東', baseUrl: 'https://www.karin10bukuro-3shine.com/attend.php' }, 
-  { id: '012', name: '小岩', baseUrl: 'https://www.karin10koiwa.com/attend.php' }, 
+  { id: '008', name: '大宮', baseUrl: 'https://www.karin10omiya.com/attend.php' }
 ];
 
-function toHiragana(str: string) {
-  return str.replace(/[\u30a1-\u30f6]/g, (match) => String.fromCharCode(match.charCodeAt(0) - 0x60));
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
-export async function GET(request: NextRequest) {
-  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  const JST_OFFSET = 9 * 60 * 60 * 1000;
-  
-  const shopIdx = parseInt(request.nextUrl.searchParams.get('shop') || '-1');
-  if (shopIdx < 0 || shopIdx >= ALL_SHOPS.length) {
-    return NextResponse.json({ success: false, message: "Valid 'shop' index required." }, { status: 400 });
+const normalize = (s: string) => s.replace(/[\s\u3000]/g, '').trim();
+
+export async function GET(req: NextRequest) {
+  const authHeader = req.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    // return new NextResponse('Unauthorized', { status: 401 });
   }
 
-  const shop = ALL_SHOPS[shopIdx];
+  const logs: string[] = [];
+  const targetDates = [format(new Date(), 'yyyy-MM-dd'), format(addDays(new Date(), 1), 'yyyy-MM-dd')];
 
   try {
-    const { data: allCast } = await supabase.from('cast_members').select('login_id, hp_display_name, home_shop_id');
-    const logs: string[] = [];
+    const { data: castData } = await supabase.from('cast_members').select('login_id, display_name');
+    const nameMap = new Map();
+    castData?.forEach(c => {
+      if (c.display_name) nameMap.set(normalize(c.display_name), String(c.login_id).padStart(8, '0'));
+    });
 
-    const normalize = (val: string) => {
-      if (!val) return "";
-      let s = val.normalize('NFKC').replace(/[（\(\[].*?[）\)\]]/g, '').replace(/[\n\r\t\s\u3000]+/g, '').replace(/[^\p{L}\p{N}]/gu, '').trim();
-      return toHiragana(s);
-    };
-
-    const shopCast = allCast?.filter(c => String(c.home_shop_id).trim().padStart(3, '0') === shop.id || String(parseInt(c.home_shop_id || '0')) === String(parseInt(shop.id))) || [];
-    const nameMap = new Map(shopCast.map(c => [normalize(c.hp_display_name), String(c.login_id).trim().padStart(8, '0')]));
-    
-    for (let i = 0; i < 7; i++) {
-      const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
-      const dateStrDB = format(targetDate, 'yyyy-MM-dd');
-      const url = `${shop.baseUrl}?date_get=${format(targetDate, 'yyyy/MM/dd')}&t=${Date.now()}`;
-
+    for (const shop of ALL_SHOPS) {
       try {
-        const res = await fetch(url, { cache: 'no-store', headers: { 'User-Agent': 'Mozilla/5.0' } });
-        if (!res.ok) { logs.push(`${dateStrDB} HTTP ${res.status}`); continue; }
-        
-        const $ = cheerio.load(await res.text());
-        const foundInHP = new Set<string>();
-        const upsertBatch: any[] = [];
-        const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
+        const res = await fetch(`${shop.baseUrl}?t=${Date.now()}`, { cache: 'no-store' });
+        const html = await res.text();
+        const $ = cheerio.load(html);
+        const dateStrHP = $('.date').first().text().match(/(\d+)月(\d+)日/);
+        if (!dateStrHP) continue;
 
-        const { data: existingShifts } = await supabase
-          .from('shifts')
-          .select('login_id, status, start_time, end_time')
-          .eq('shift_date', dateStrDB)
-          .like('login_id', `${shop.id}%`);
-        
-        const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
+        const dateStrDB = format(new Date(), 'yyyy') + '-' + dateStrHP[1].padStart(2, '0') + '-' + dateStrHP[2].padStart(2, '0');
+        const { data: existingShifts } = await supabase.from('shifts').select('*').eq('shift_date', dateStrDB);
+        const existingMap = new Map();
+        existingShifts?.forEach(s => existingMap.set(String(s.login_id).padStart(8, '0'), s));
+
+        const upsertBatch: any[] = [];
+        const foundInHP = new Set<string>();
+        const timeRegex = /(\d{2}:\d{2})\s*[-〜~]\s*(\d{2}:\d{2})/;
 
         $('h3, .name, .cast_name, span.name, div.name, strong').each((_, nameEl) => {
           const rawName = $(nameEl).text();
@@ -87,7 +73,12 @@ export async function GET(request: NextRequest) {
 
             foundInHP.add(loginId);
 
-            // 申請保護ロジック
+            // 📍 修正：当欠保護ロジック
+            // DBのステータスが 'absent'（当欠）の場合は、HPの情報で上書きせずスキップする
+            if (dbShift?.status === 'absent') {
+              return; 
+            }
+
             if (dbShift?.status === 'requested') {
               if (dbShift.start_time !== hpStart || dbShift.end_time !== hpEnd) {
                 return; 
@@ -97,9 +88,8 @@ export async function GET(request: NextRequest) {
             upsertBatch.push({
               login_id: loginId,
               shift_date: dateStrDB,
-              store_code: shop.id, // 📍 修正：店舗コードを保存
+              store_code: shop.id,
               hp_display_name: cleanName,
-              is_official_pre_exist: true,
               hp_start_time: hpStart,
               hp_end_time: hpEnd,
               start_time: hpStart,
@@ -111,7 +101,6 @@ export async function GET(request: NextRequest) {
           }
         });
 
-        // 削除処理
         let removeCount = 0;
         if (foundInHP.size > 0) {
           const idsToRemove = (existingShifts || [])
@@ -132,13 +121,17 @@ export async function GET(request: NextRequest) {
           await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
         }
         logs.push(`${dateStrDB.slice(5)} (+${upsertBatch.length}/-${removeCount})`);
-      } catch (e: any) { logs.push(`${dateStrDB.slice(5)} Err`); }
+      } catch (e: any) { logs.push(`${shop.name} Err`); }
     }
 
-    await supabase.from('sync_logs').upsert({ id: 1, last_sync_at: new Date().toISOString() }, { onConflict: 'id' });
+    await supabase.from('scraping_logs').insert({
+      exec_type: 'cron_auto',
+      status: 'success',
+      message: logs.join(', ')
+    });
 
-    return NextResponse.json({ success: true, shop: shop.name, logs });
-  } catch (e: any) { 
-    return NextResponse.json({ success: false, message: e.message }, { status: 500 }); 
+    return NextResponse.json({ success: true, logs });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
