@@ -11,18 +11,14 @@ export default function CastRegister({ targetShopId }: { targetShopId: string })
   ));
 
   const [newCastName, setNewCastName] = useState('');
-  const [newCastNumber, setNewCastNumber] = useState('');
-  const [suggestedNumber, setSuggestedNumber] = useState('');
+  const [newCastNumber, setNewCastNumber] = useState(''); // ここを自動で5桁にする
   const [registerStatus, setRegisterStatus] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // 次の番号を計算するロジック
+  // 📍 自動で「次の5桁番号」を計算してセットするロジック
   useEffect(() => {
     async function calculateNextNumber() {
-      if (!targetShopId || targetShopId === 'all') {
-        setSuggestedNumber('');
-        return;
-      }
+      if (!targetShopId || targetShopId === 'all') return;
 
       const { data } = await supabase
         .from('cast_members')
@@ -33,9 +29,10 @@ export default function CastRegister({ targetShopId }: { targetShopId: string })
       if (data && data.length > 0) {
         const numbers = data.map(c => parseInt(c.login_id.slice(-5))).filter(n => !isNaN(n));
         const maxNum = Math.max(0, ...numbers);
-        setSuggestedNumber(String(maxNum + 1));
+        // 📍 5桁の文字列（00001形式）に変換してセット
+        setNewCastNumber(String(maxNum + 1).padStart(5, '0'));
       } else {
-        setSuggestedNumber('1');
+        setNewCastNumber('00001'); // 最初の1人目
       }
     }
     calculateNextNumber();
@@ -48,17 +45,17 @@ export default function CastRegister({ targetShopId }: { targetShopId: string })
 
     const formData = new FormData();
     formData.append('display_name', newCastName);
-    formData.append('personal_number', newCastNumber);
+    formData.append('personal_number', newCastNumber); // 5桁の文字列として送信
     formData.append('home_shop_id', targetShopId);
 
-    const result = await createCast(formData); // Server Action呼び出し
+    const result = await createCast(formData);
 
     if (result.error) {
       setRegisterStatus({ msg: result.error, type: 'error' });
     } else if (result.success) {
-      setRegisterStatus({ msg: result.message || '登録完了', type: 'success' });
+      setRegisterStatus({ msg: `${newCastName}さんを登録しました！\nID: ${targetShopId}${newCastNumber}\nPW: 0000`, type: 'success' });
       setNewCastName('');
-      setNewCastNumber('');
+      // 番号は useEffect で次の番号が自動セットされる
     }
     setIsProcessing(false);
   };
@@ -73,22 +70,15 @@ export default function CastRegister({ targetShopId }: { targetShopId: string })
       <form onSubmit={handleRegisterCast} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-[10px] font-bold text-gray-400 block mb-1">個人番号</label>
-            <div className="relative">
-              <input
-                type="number"
-                value={newCastNumber}
-                onChange={(e) => setNewCastNumber(e.target.value)}
-                placeholder={suggestedNumber ? `次: ${suggestedNumber}` : "番号"}
-                className="w-full bg-pink-50 border border-pink-100 rounded-xl px-3 py-3 text-sm font-black text-gray-700 focus:outline-none focus:ring-2 focus:ring-pink-300"
-                required
-              />
-              {suggestedNumber && !newCastNumber && (
-                <div className="absolute right-2 top-3 text-[10px] text-pink-400 font-bold opacity-50 pointer-events-none">
-                   next: {suggestedNumber}
-                </div>
-              )}
-            </div>
+            <label className="text-[10px] font-bold text-gray-400 block mb-1">個人番号 (5桁)</label>
+            <input
+              type="text"
+              value={newCastNumber}
+              onChange={(e) => setNewCastNumber(e.target.value)}
+              placeholder="00001"
+              className="w-full bg-pink-50 border border-pink-100 rounded-xl px-3 py-3 text-sm font-black text-pink-600 focus:outline-none focus:ring-2 focus:ring-pink-300 font-mono"
+              required
+            />
           </div>
           <div>
             <label className="text-[10px] font-bold text-gray-400 block mb-1">表示名 (源氏名)</label>
@@ -103,16 +93,24 @@ export default function CastRegister({ targetShopId }: { targetShopId: string })
           </div>
         </div>
 
+        {/* 📍 登録される8桁IDを視覚的に見せる */}
+        <div className="bg-gray-50 rounded-xl p-3 text-center border border-dashed border-gray-200">
+          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Login ID Preview</p>
+          <p className="text-lg font-black text-gray-800 tracking-tighter">
+            {targetShopId}<span className="text-pink-500">{newCastNumber}</span>
+          </p>
+        </div>
+
         <button
           type="submit"
           disabled={isProcessing || targetShopId === 'all'}
-          className="w-full bg-gray-800 text-white font-black py-3 rounded-xl shadow-md active:scale-95 transition-all disabled:opacity-50 text-xs flex justify-center items-center"
+          className="w-full bg-gray-800 text-white font-black py-4 rounded-xl shadow-md active:scale-95 transition-all disabled:opacity-50 text-xs"
         >
-          {isProcessing ? '処理中...' : targetShopId === 'all' ? '店舗を選択してください' : 'この内容で登録する ⚡️'}
+          {isProcessing ? '通信中...' : 'この内容で登録を確定 ⚡️'}
         </button>
 
         {registerStatus && (
-          <div className={`text-xs font-bold p-3 rounded-xl mt-2 whitespace-pre-line leading-relaxed ${registerStatus.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+          <div className={`text-xs font-bold p-3 rounded-xl mt-2 whitespace-pre-line leading-relaxed ${registerStatus.type === 'success' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
             {registerStatus.msg}
           </div>
         )}
