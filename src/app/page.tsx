@@ -8,46 +8,39 @@ export default function HomePage() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ));
-  
-  // 初期値を「読み込み中」にして、取得に失敗した場合はIDそのものを出すようにします
-  const [displayName, setDisplayName] = useState<string>('読み込み中...');
+  const [displayName, setDisplayName] = useState<string>('取得中...');
 
   useEffect(() => {
     const fetchProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const rawId = user.email?.split('@')[0] || '';
-      
-      // ★ 8桁のID(00600001)と、数値化したID(600001)の両方で検索をかける
+      const rawId = user.email?.split('@')[0] || ''; // '00600037'
+      const trimmedId = rawId.replace(/^0+/, '');    // '600037' (ゼロを除去)
+
+      // ★ '00600037' か '600037' のどちらかにある方を拾う
       const { data, error } = await supabase
         .from('cast_members')
         .select('display_name')
-        .in('login_id', [rawId, String(Number(rawId))])
-        .single();
+        .or(`login_id.eq.${rawId},login_id.eq.${trimmedId}`)
+        .maybeSingle();
 
       if (data?.display_name) {
         setDisplayName(data.display_name);
       } else {
-        // 名前が見つからない場合は、原因を特定するためにIDを表示させる
-        setDisplayName(`ID:${rawId} (名前未登録)`);
+        setDisplayName(`未登録(ID:${rawId})`);
       }
     };
     fetchProfile();
   }, [supabase]);
 
   return (
-    <div className="min-h-screen bg-[#FFF5F7] p-6 flex flex-col items-center justify-center font-sans text-slate-800">
+    <div className="min-h-screen bg-[#FFF5F7] p-6 flex items-center justify-center font-sans">
       <div className="w-full max-w-md bg-white rounded-[40px] p-10 shadow-xl border border-pink-50 text-center">
-        <p className="text-[10px] font-black text-pink-300 uppercase tracking-[0.2em] mb-2">Welcome Back</p>
-        
-        <h1 className="text-3xl font-black text-slate-800 tracking-tighter">
-          {displayName} <span className="text-base font-bold text-slate-400">さん</span>
+        <h1 className="text-3xl font-black text-slate-800 tracking-tighter mb-2">
+          {displayName} <span className="text-lg font-bold text-slate-400">さん</span>
         </h1>
-        
-        <div className="mt-8 pt-8 border-t border-pink-50">
-          <p className="text-xs font-bold text-slate-400">今日も一日お疲れ様です 🌸</p>
-        </div>
+        <p className="mt-4 text-xs text-pink-300 font-bold uppercase tracking-widest">Karinto System Grounded</p>
       </div>
     </div>
   );
