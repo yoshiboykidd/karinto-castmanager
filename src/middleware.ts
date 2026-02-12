@@ -31,41 +31,33 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // 重要: getUser() を呼ぶことでセッションをリフレッシュする
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // 現在のパス
   const path = request.nextUrl.pathname;
 
-  // ▼▼▼ 交通整理ルール ▼▼▼
-
-  // 1. ログインしていないのに、保護されたページに行こうとしたら弾く
-  // (login, auth, 画像ファイル 以外はすべて保護)
+  // 1. 未ログイン時のガード
   if (!user && !path.startsWith("/login") && !path.startsWith("/auth") && !path.match(/\.(png|jpg|jpeg|gif|webp|svg|ico)$/)) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // 2. すでにログインしているのに、ログイン画面に来たらホームへ返す
+  // 2. ログイン済みでログイン画面に来た時の振り分け
   if (user && path.startsWith("/login")) {
-    return NextResponse.redirect(new URL("/", request.url));
+    const rawId = user.email?.split('@')[0] || '';
+    const { data: member } = await supabase
+      .from('cast_members')
+      .select('role')
+      .eq('login_id', rawId)
+      .single();
+
+    const dest = (member?.role === 'admin' || member?.role === 'developer') ? '/admin' : '/';
+    return NextResponse.redirect(new URL(dest, request.url));
   }
 
   return response;
 }
 
 export const config = {
-  matcher: [
-    /*
-     * すべてのリクエストパスにマッチさせますが、以下は除外します:
-     * - api (APIルート)  <-- ★これを追加したことになります
-     * - _next/static (静的ファイル)
-     * - _next/image (画像最適化ファイル)
-     * - favicon.ico (ファビコン)
-     * - 画像ファイル
-     */
-    // ▼▼▼ 修正箇所: 先頭に「api|」を追加 ▼▼▼
-    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };
