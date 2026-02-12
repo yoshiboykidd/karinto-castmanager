@@ -48,8 +48,7 @@ export async function GET(request: NextRequest) {
 
     const shopCast = allCast?.filter(c => String(c.home_shop_id).trim().padStart(3, '0') === shop.id || String(parseInt(c.home_shop_id || '0')) === String(parseInt(shop.id))) || [];
     const nameMap = new Map(shopCast.map(c => [normalize(c.hp_display_name), String(c.login_id).trim().padStart(8, '0')]));
-    const targetShopCastIds = shopCast.map(c => String(c.login_id).trim().padStart(8, '0'));
-
+    
     for (let i = 0; i < 7; i++) {
       const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
       const dateStrDB = format(targetDate, 'yyyy-MM-dd');
@@ -68,7 +67,7 @@ export async function GET(request: NextRequest) {
           .from('shifts')
           .select('login_id, status, start_time, end_time')
           .eq('shift_date', dateStrDB)
-          .like('login_id', `${shop.id}%`); // 当該店舗のIDで絞り込み
+          .like('login_id', `${shop.id}%`);
         
         const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
 
@@ -88,17 +87,17 @@ export async function GET(request: NextRequest) {
 
             foundInHP.add(loginId);
 
+            // 申請保護ロジック
             if (dbShift?.status === 'requested') {
-              if (dbShift.start_time === hpStart && dbShift.end_time === hpEnd) {
-                // 自動承認へ
-              } else {
-                return; // 申請保護
+              if (dbShift.start_time !== hpStart || dbShift.end_time !== hpEnd) {
+                return; 
               }
             }
 
             upsertBatch.push({
               login_id: loginId,
               shift_date: dateStrDB,
+              store_code: shop.id, // 📍 修正：店舗コードを保存
               hp_display_name: cleanName,
               is_official_pre_exist: true,
               hp_start_time: hpStart,
@@ -112,8 +111,7 @@ export async function GET(request: NextRequest) {
           }
         });
 
-        // 【HP完全連動ロジック：削除】
-        // HPに1人以上見つかった場合のみ、削除処理を実行（空振り全消し防止）
+        // 削除処理
         let removeCount = 0;
         if (foundInHP.size > 0) {
           const idsToRemove = (existingShifts || [])
