@@ -14,8 +14,8 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
   const { data: currentUser } = await supabase.from('cast_members').select('role, home_shop_id').eq('login_id', loginId).single()
   if (!currentUser) return { shifts: [], myProfile: null }
 
-  // 📍 !innerを削除し、結合がなくてもデータを拾えるように修正
-  let query = supabase.from('shifts').select(`*, cast_members(display_name, home_shop_id)`).eq('shift_date', selectedDate)
+  // 📍 結合を解除して shifts テーブル単体から取得（データ漏れ防止）
+  let query = supabase.from('shifts').select('*').eq('shift_date', selectedDate)
   
   const filterId = currentUser.role === 'developer' ? selectedShopId : currentUser.home_shop_id
   if (filterId !== 'all' && filterId) {
@@ -26,7 +26,6 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
   return { shifts: shifts || [], myProfile: currentUser }
 }
 
-// 📍 遅刻(late)と当欠(absent)の両方に対応する2段階対応アクション
 export async function updateShiftAction(shiftId: string, type: 'absent' | 'late', current: any) {
   const cookieStore = await cookies()
   const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
