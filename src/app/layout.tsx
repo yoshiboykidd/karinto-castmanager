@@ -17,7 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     const checkUser = async () => {
-      // 管理画面内ではアラートを表示しない
+      // 👑 管理画面（/admin...）にいる時は何もしない
       if (pathname.startsWith('/admin')) {
         setIsAlertOpen(false);
         return;
@@ -26,21 +26,24 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const rawId = user.email?.split('@')[0] || '';
-      const { data } = await supabase
+      const loginId = user.email?.split('@')[0] || '';
+      
+      const { data: profile } = await supabase
         .from('cast_members')
-        .select('password, role')
-        .eq('login_id', rawId)
+        .select('password, role, display_name')
+        .eq('login_id', loginId)
         .single();
 
-      // 管理者・開発者はアラート対象外
-      if (data?.role === 'admin' || data?.role === 'developer') {
+      if (!profile) return;
+
+      // 👑 管理者・開発者ならアラートを出さない
+      if (profile.role === 'admin' || profile.role === 'developer') {
         setIsAlertOpen(false);
         return;
       }
 
-      // キャストで初期PWの場合のみ表示
-      if (data?.password === '0000' || data?.password === 'managed_by_supabase') {
+      // 👗 キャストの場合のみパスワードチェック
+      if (profile.password === '0000' || profile.password === 'managed_by_supabase') {
         setIsAlertOpen(true);
       } else {
         setIsAlertOpen(false);
@@ -56,13 +59,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         {isAlertOpen && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
-            <div className="bg-white rounded-[40px] p-8 w-full max-w-[340px] text-center shadow-2xl border border-gray-100 animate-in zoom-in duration-300">
+            <div className="bg-white rounded-[40px] p-8 w-full max-w-[340px] text-center shadow-2xl animate-in zoom-in duration-300">
               <div className="text-5xl mb-4">⚠️</div>
               <h2 className="text-xl font-black mb-2 text-gray-800 tracking-tighter">Security Alert</h2>
               <p className="text-xs font-bold text-gray-400 mb-8 leading-relaxed">初期パスワードを変更してください。</p>
               <div className="space-y-3">
-                <button onClick={() => { setIsAlertOpen(false); router.push('/mypage'); }} className="w-full py-4 bg-rose-500 text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all">今すぐ変更する</button>
-                <button onClick={() => setIsAlertOpen(false)} className="w-full py-3 text-gray-400 font-black text-xs active:scale-95 transition-all uppercase tracking-widest">後で設定する</button>
+                <button onClick={() => { setIsAlertOpen(false); router.push('/mypage'); }} className="w-full py-4 bg-rose-500 text-white font-black rounded-2xl shadow-lg">今すぐ変更する</button>
+                <button onClick={() => setIsAlertOpen(false)} className="w-full py-3 text-gray-400 font-black text-xs uppercase tracking-widest">後で設定する</button>
               </div>
             </div>
           </div>
