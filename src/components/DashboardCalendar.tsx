@@ -78,19 +78,18 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const dNum = day.getDate();
           const isSelected = selectedDates && (isSameDay(day, selectedDates) || (Array.isArray(selectedDates) && selectedDates.some(d => isSameDay(day, d))));
           const isToday = isSameDay(day, today);
-          const isFuture = isAfter(day, today);
           const isHoliday = holidays.includes(dateStr);
           const dayOfWeek = getDay(day);
 
-          // シフトデータの検索
           const s = Array.isArray(shifts) ? shifts.find((x: any) => x.shift_date && x.shift_date.startsWith(dateStr)) : null;
 
           // 📍 状態判定
-          const isAbsent = s?.status === 'absent'; // 当欠
-          const isLate = s?.is_late === true;      // 遅刻
+          const isAbsent = s?.status === 'absent';
+          const isLate = s?.is_late === true;
           const isOfficial = s?.status === 'official' && !isAbsent;
           const isRequested = s?.status === 'requested';
           const isModified = isRequested && s?.is_official_pre_exist;
+          const isSpecialDay = s?.is_special_day === true; // 特定日フラグ（DBに合わせて調整してください）
 
           const refStart = isModified ? s?.hp_start_time : s?.start_time;
           const hasOfficialBase = (isOfficial || isModified) && refStart && refStart !== 'OFF';
@@ -105,30 +104,30 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
               onClick={() => onSelect(day)} 
               className={`relative h-12 w-full flex flex-col items-center justify-center rounded-2xl transition-all active:scale-95 cursor-pointer
               ${isSelected ? 'bg-white shadow-lg ring-2 ' + currentTheme.selected + ' z-10' : ''}
-              ${isToday && !isSelected ? currentTheme.today : ''}`}
+              ${isToday && !isSelected ? currentTheme.today : ''}
+              ${isSpecialDay ? 'bg-blue-50' : ''} // 📍 特定日は背景が薄い青
+              `}
             >
-              <span className={`z-20 text-[16px] font-black ${textColor} ${isAbsent ? 'opacity-40' : ''}`}>{dNum}</span>
+              <span className={`z-20 text-[16px] font-black ${textColor}`}>{dNum}</span>
 
-              {/* 📍 通常の出勤確定：ピンク丸 */}
-              {hasOfficialBase && !isAbsent && (
-                <div className="absolute inset-1.5 rounded-full bg-gradient-to-br from-pink-400 to-rose-400 shadow-sm z-10" />
+              {/* 📍 当欠：赤丸 */}
+              {isAbsent && (
+                <div className="absolute inset-1.5 rounded-full bg-rose-500 opacity-80 z-10 shadow-sm" />
               )}
 
-              {/* 📍 当欠表示：ピンク丸の代わりにグレーの枠 ＋ 「欠」の文字 */}
-              {isAbsent && (
-                <div className="absolute inset-1.5 rounded-full border-2 border-slate-200 bg-slate-50/50 flex items-center justify-center z-10">
-                   <span className="text-[10px] font-black text-slate-300 mt-4 leading-none">欠</span>
-                </div>
+              {/* 📍 遅刻：薄いオレンジ○ */}
+              {!isAbsent && isLate && hasOfficialBase && (
+                <div className="absolute inset-1.5 rounded-full bg-orange-200 border-2 border-orange-300 z-10 shadow-sm" />
+              )}
+
+              {/* 📍 シフトあり：薄いピンク〇（通常時） */}
+              {!isAbsent && !isLate && hasOfficialBase && (
+                <div className="absolute inset-1.5 rounded-full bg-pink-100 border border-pink-200 z-10" />
               )}
 
               {/* 申請中（点線丸） */}
               {isRequested && !isModified && !isAbsent && (
                 <div className="absolute inset-1 rounded-full border-2 border-slate-200 border-dashed z-10" />
-              )}
-
-              {/* 📍 遅刻ドット（ピンク丸が出ている時のみ表示） */}
-              {isLate && hasOfficialBase && !isAbsent && (
-                <div className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-amber-400 z-30 shadow-sm border border-white" />
               )}
             </div>
           );
