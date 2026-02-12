@@ -23,7 +23,7 @@ export default function AttendancePage() {
         setMyProfile(result.myProfile);
       }
     } catch (error) {
-      console.error('Attendance Load Error:', error);
+      console.error('Load error:', error);
     } finally {
       setLoading(false);
     }
@@ -42,7 +42,6 @@ export default function AttendancePage() {
 
   return (
     <div className="min-h-screen bg-[#F1F5F9] pb-20">
-      {/* HEADER */}
       <div className="bg-white px-6 pt-12 pb-6 rounded-b-[40px] shadow-md border-b border-slate-100">
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-between items-start mb-6">
@@ -57,6 +56,7 @@ export default function AttendancePage() {
                 </span>
               </h1>
             </div>
+            {/* カレンダー入力欄 */}
             <div className="bg-slate-900 text-white px-4 py-2 rounded-2xl shadow-lg border border-slate-800">
               <input 
                 type="date" 
@@ -67,7 +67,7 @@ export default function AttendancePage() {
             </div>
           </div>
 
-          {/* DEVELOPER FILTER */}
+          {/* 開発者用：店舗切替 */}
           {myProfile?.role === 'developer' && (
             <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide">
               {['all', '001', '002', '003', '004', '005', '006', '007', '008', '009', '010', '011', '012'].map((id) => (
@@ -75,7 +75,7 @@ export default function AttendancePage() {
                   key={id}
                   onClick={() => setTargetShopId(id)}
                   className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap shadow-sm border ${
-                    targetShopId === id ? 'bg-blue-600 text-white border-blue-500' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'
+                    targetShopId === id ? 'bg-blue-600 text-white border-blue-500' : 'bg-white text-slate-400 border-slate-100'
                   }`}
                 >
                   {id === 'all' ? 'ALL' : id}
@@ -84,16 +84,15 @@ export default function AttendancePage() {
             </div>
           )}
 
-          {/* ADMIN SHOP INDICATOR */}
+          {/* 店長用：自店舗固定表示 */}
           {myProfile?.role === 'admin' && (
             <div className="inline-block px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              SHOP: {myProfile.home_shop_id || 'NOT ASSIGNED'}
+              SHOP: {myProfile.home_shop_id || '---'}
             </div>
           )}
         </div>
       </div>
 
-      {/* LIST AREA */}
       <div className="max-w-4xl mx-auto px-4 mt-6">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-300">
@@ -107,14 +106,14 @@ export default function AttendancePage() {
                 <div 
                   key={shift.id} 
                   className={`flex items-center justify-between p-4 rounded-2xl border transition-all bg-white shadow-sm border-white ${
-                    shift.status === 'absent' ? 'opacity-50 grayscale bg-slate-50' : 'hover:border-blue-100'
+                    shift.status === 'absent' ? 'opacity-50 grayscale' : 'hover:border-blue-100'
                   }`}
                 >
                   <div className="flex items-center gap-6">
                     <div className="flex flex-col leading-none">
                       <span className="text-[9px] font-black text-slate-300 uppercase mb-1">ID</span>
                       <span className="text-xl font-mono font-black text-slate-900 tracking-tighter">
-                        {shift.login_id || '--------'}
+                        {shift.login_id || shift.cast_members?.login_id || '--------'}
                       </span>
                     </div>
 
@@ -140,7 +139,7 @@ export default function AttendancePage() {
                     className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm ${
                       shift.status === 'absent' 
                       ? 'bg-slate-900 text-white' 
-                      : 'bg-rose-50 text-rose-500 border border-rose-100 hover:bg-rose-100'
+                      : 'bg-rose-50 text-rose-500 border border-rose-100'
                     }`}
                   >
                     {shift.status === 'absent' ? (
@@ -154,7 +153,7 @@ export default function AttendancePage() {
             ) : (
               <div className="py-20 text-center bg-white rounded-[30px] border-2 border-dashed border-slate-200">
                 <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">No Shifts Found</p>
-                <p className="text-[9px] text-slate-400 mt-2 tracking-tighter italic">Please check if the date is correct.</p>
+                <p className="text-[9px] text-slate-400 mt-2">日付をデータのある日に切り替えてください</p>
               </div>
             )}
           </div>

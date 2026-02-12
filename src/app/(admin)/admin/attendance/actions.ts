@@ -4,7 +4,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 /**
- * 勤怠データ取得：3段構えのフィルタリングで漏れを防止
+ * 勤怠データ取得：!innerを排除し、OR条件で漏れなく取得
  */
 export async function getFilteredAttendance(selectedDate: string, selectedShopId: string = 'all') {
   const cookieStore = await cookies()
@@ -18,7 +18,7 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
     }
   )
 
-  // 1. ユーザー情報の取得
+  // 1. ユーザープロフィールの取得
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { shifts: [], myProfile: null }
 
@@ -31,7 +31,8 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
 
   if (!currentUser) return { shifts: [], myProfile: null }
 
-  // 2. クエリ構築（!innerを外し、リレーションなしでも shifts 自体は取る）
+  // 2. クエリ構築
+  // 📍 !inner を削除。キャスト情報がなくても shifts 自体は必ず取るように変更
   let query = supabase
     .from('shifts')
     .select(`
@@ -48,10 +49,10 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
   const filterId = currentUser.role === 'developer' ? selectedShopId : currentUser.home_shop_id;
 
   if (filterId !== 'all' && filterId) {
-    // 📍 修正のキモ：or条件
-    // ① store_codeが一致
-    // ② login_idの先頭3文字が一致 ( ilike `${filterId}%` )
-    // ③ 紐づくキャストの所属店舗が一致
+    // 📍 漏れを防ぐ3段構えのOR条件
+    // ① store_code が一致
+    // ② login_id の先頭3文字が一致（API修正前のデータ救済）
+    // ③ キャストテーブル側の所属店舗が一致
     query = query.or(`store_code.eq.${filterId}, login_id.ilike.${filterId}%, cast_members.home_shop_id.eq.${filterId}`)
   }
 
@@ -66,7 +67,7 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
 }
 
 /**
- * 出勤ステータスの更新
+ * ステータス更新
  */
 export async function updateShiftStatus(shiftId: string, currentStatus: string) {
   const cookieStore = await cookies()
