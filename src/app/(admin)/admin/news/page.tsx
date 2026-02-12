@@ -1,51 +1,85 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Megaphone, Plus, Trash2, LogOut, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ChevronLeft, LogOut, ShieldAlert } from 'lucide-react';
 import NewsManager from '@/components/admin/NewsManager';
 
-export default function NewsAdminPage() {
+export default function NewsPage() {
   const router = useRouter();
   const [supabase] = useState(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   ));
+  
+  const [myProfile, setMyProfile] = useState<{role: string, shop_id: string | null}>({
+    role: 'admin',
+    shop_id: null
+  });
+  const [loading, setLoading] = useState(true);
 
-  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    async function getProfile() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        router.push('/login');
+        return;
+      }
+
+      // ログインユーザーの権限と所属店舗を取得
+      const { data } = await supabase
+        .from('cast_members')
+        .select('role, home_shop_id')
+        .eq('login_id', session.user.email?.split('@')[0])
+        .single();
+
+      if (data) {
+        setMyProfile({
+          role: data.role, // 'developer' か 'admin' (店長)
+          shop_id: data.home_shop_id
+        });
+      }
+      setLoading(false);
+    }
+    getProfile();
+  }, [supabase, router]);
 
   const handleLogout = async () => {
-    if (window.confirm('ログアウトしますか？')) {
-      await supabase.auth.signOut();
-      router.push('/login');
-    }
+    if (!window.confirm('ログアウトしますか？')) return;
+    await supabase.auth.signOut();
+    router.push('/login');
   };
+
+  if (loading) return null;
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-24 font-sans text-gray-800">
       <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-black pt-10 pb-16 px-6 rounded-b-[40px] shadow-2xl relative">
         <div className="relative z-10 max-w-2xl mx-auto flex justify-between items-start">
-          <div className="flex-1">
-            <button onClick={() => router.push('/admin')} className="flex items-center gap-1 text-gray-400 mb-4 text-xs font-black uppercase tracking-widest">
-              <ChevronLeft size={16} /> Back
+          <div>
+            <button onClick={() => router.push('/admin')} className="text-gray-400 mb-4 text-xs font-black uppercase tracking-widest">
+              <ChevronLeft size={16} className="inline" /> Dashboard
             </button>
-            <h1 className="text-white text-3xl font-black italic tracking-tighter">NEWS</h1>
-            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-[0.2em] mt-1 opacity-60">Broadcast Management</p>
-          </div>
-          <button onClick={handleLogout} className="flex flex-col items-center gap-1">
-            <div className="bg-white/10 p-3 rounded-2xl border border-white/10 backdrop-blur-md">
-              <LogOut className="text-pink-400" size={18} />
+            <h1 className="text-white text-3xl font-black italic tracking-tighter">NEWS FEED</h1>
+            <div className="flex items-center gap-2 mt-2">
+              <span className={`text-[10px] font-black px-3 py-1 rounded-full ${myProfile.role === 'developer' ? 'bg-purple-500' : 'bg-blue-500'} text-white uppercase`}>
+                {myProfile.role === 'developer' ? 'GOD MODE' : `MANAGER: ${myProfile.shop_id}`}
+              </span>
             </div>
+          </div>
+          <button onClick={handleLogout} className="bg-white/10 p-3 rounded-2xl border border-white/10 text-pink-400">
+            <LogOut size={18} />
           </button>
         </div>
       </div>
 
       <main className="max-w-2xl mx-auto px-5 -mt-8 relative z-20">
-        <div className="bg-white rounded-[32px] p-2 shadow-xl border border-gray-50">
-          {/* 既存の NewsManager コンポーネントを再利用 */}
-          <NewsManager targetShopId="all" role="admin" />
-        </div>
+        {/* 📍 権限情報をコンポーネントに渡す */}
+        <NewsManager 
+          role={myProfile.role} 
+          myShopId={myProfile.shop_id} 
+        />
       </main>
     </div>
   );
