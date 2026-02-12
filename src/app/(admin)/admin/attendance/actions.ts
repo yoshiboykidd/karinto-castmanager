@@ -16,22 +16,40 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
   )
 
   const { data: { user } } = await supabase.auth.getUser()
-  const loginId = user?.email?.split('@')[0] || ''
+  if (!user) return { shifts: [], myProfile: null }
+
+  const loginId = user.email?.split('@')[0] || ''
   const { data: currentUser } = await supabase
     .from('cast_members')
     .select('role, home_shop_id')
     .eq('login_id', loginId)
     .single()
 
-  // 📍 フィルタリングの構築
-  let query = supabase.from('shifts').select('*').eq('shift_date', selectedDate)
+  if (!currentUser) return { shifts: [], myProfile: null }
 
-  if (currentUser?.role === 'developer') {
-    if (selectedShopId !== 'all') {
-      query = query.eq('store_code', selectedShopId)
-    }
-  } else {
-    query = query.eq('store_code', currentUser?.home_shop_id)
+  // 1. シフトとキャスト情報を結合して取得
+  // store_code が null の場合に備え、リレーション先の home_shop_id も取得対象にします
+  let query = supabase
+    .from('shifts')
+    .select(`
+      *,
+      cast_members!inner (
+        login_id,
+        display_name,
+        home_shop_id
+      )
+    `)
+    .eq('shift_date', selectedDate)
+
+  // 2. 店舗フィルタリングの適用
+  // 店長（admin）の場合は、選択肢に関わらず「自分の home_shop_id」で強制フィルター
+  const filterId = currentUser.role === 'developer' ? selectedShopId : currentUser.home_shop_id;
+
+  if (filterId !== 'all') {
+    // 📍 修正のキモ：
+    // シフト側の store_code もしくは キャスト側の home_shop_id のいずれかが一致するものを抽出
+    // これにより、store_code が null のデータも home_shop_id が合っていれば表示されます
+    query = query.or(`store_code.eq.${filterId}, cast_members.home_shop_id.eq.${filterId}`)
   }
 
   const { data: shifts, error } = await query.order('start_time', { ascending: true })
@@ -40,7 +58,7 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
 
   return {
     shifts: shifts || [],
-    myProfile: currentUser || null
+    myProfile: currentUser
   }
 }
 
