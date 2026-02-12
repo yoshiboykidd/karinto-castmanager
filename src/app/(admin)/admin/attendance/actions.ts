@@ -3,9 +3,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-/**
- * 勤怠データ取得：!innerを排除し、OR条件で漏れなく取得
- */
 export async function getFilteredAttendance(selectedDate: string, selectedShopId: string = 'all') {
   const cookieStore = await cookies()
   const supabase = createServerClient(
@@ -18,7 +15,6 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
     }
   )
 
-  // 1. ユーザープロフィールの取得
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { shifts: [], myProfile: null }
 
@@ -31,8 +27,7 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
 
   if (!currentUser) return { shifts: [], myProfile: null }
 
-  // 2. クエリ構築
-  // 📍 !inner を削除。キャスト情報がなくても shifts 自体は必ず取るように変更
+  // 1. 📍 !innerを削除。キャスト情報がなくても shifts 自体は必ず取るように変更
   let query = supabase
     .from('shifts')
     .select(`
@@ -45,14 +40,15 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
     `)
     .eq('shift_date', selectedDate)
 
-  // 3. 店舗フィルタリングの適用
+  // 2. 店舗フィルタリングの適用
   const filterId = currentUser.role === 'developer' ? selectedShopId : currentUser.home_shop_id;
 
   if (filterId !== 'all' && filterId) {
-    // 📍 漏れを防ぐ3段構えのOR条件
-    // ① store_code が一致
-    // ② login_id の先頭3文字が一致（API修正前のデータ救済）
-    // ③ キャストテーブル側の所属店舗が一致
+    // 📍 3重の網（OR条件）: 
+    // ① 直接の店舗コード 
+    // ② IDの頭3文字 
+    // ③ キャストの所属店舗
+    // のどれか1つでも合致すれば表示
     query = query.or(`store_code.eq.${filterId}, login_id.ilike.${filterId}%, cast_members.home_shop_id.eq.${filterId}`)
   }
 
@@ -66,26 +62,12 @@ export async function getFilteredAttendance(selectedDate: string, selectedShopId
   }
 }
 
-/**
- * ステータス更新
- */
 export async function updateShiftStatus(shiftId: string, currentStatus: string) {
   const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) { return cookieStore.get(name)?.value },
-      },
-    }
-  )
-
+  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+      cookies: { get(name: string) { return cookieStore.get(name)?.value }, },
+  })
   const newStatus = currentStatus === 'absent' ? 'official' : 'absent'
-  const { error } = await supabase
-    .from('shifts')
-    .update({ status: newStatus })
-    .eq('id', shiftId)
-
+  const { error } = await supabase.from('shifts').update({ status: newStatus }).eq('id', shiftId)
   return { success: !error, newStatus }
 }

@@ -23,7 +23,7 @@ export default function AttendancePage() {
         setMyProfile(result.myProfile);
       }
     } catch (error) {
-      console.error('Load error:', error);
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -56,7 +56,6 @@ export default function AttendancePage() {
                 </span>
               </h1>
             </div>
-            {/* カレンダー入力欄 */}
             <div className="bg-slate-900 text-white px-4 py-2 rounded-2xl shadow-lg border border-slate-800">
               <input 
                 type="date" 
@@ -67,7 +66,6 @@ export default function AttendancePage() {
             </div>
           </div>
 
-          {/* 開発者用：店舗切替 */}
           {myProfile?.role === 'developer' && (
             <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide">
               {['all', '001', '002', '003', '004', '005', '006', '007', '008', '009', '010', '011', '012'].map((id) => (
@@ -83,8 +81,7 @@ export default function AttendancePage() {
               ))}
             </div>
           )}
-
-          {/* 店長用：自店舗固定表示 */}
+          
           {myProfile?.role === 'admin' && (
             <div className="inline-block px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest">
               SHOP: {myProfile.home_shop_id || '---'}
@@ -101,59 +98,45 @@ export default function AttendancePage() {
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {shifts.length > 0 ? (
-              shifts.map((shift) => (
-                <div 
-                  key={shift.id} 
-                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all bg-white shadow-sm border-white ${
-                    shift.status === 'absent' ? 'opacity-50 grayscale' : 'hover:border-blue-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-6">
-                    <div className="flex flex-col leading-none">
-                      <span className="text-[9px] font-black text-slate-300 uppercase mb-1">ID</span>
-                      <span className="text-xl font-mono font-black text-slate-900 tracking-tighter">
-                        {shift.login_id || shift.cast_members?.login_id || '--------'}
+            {shifts.map((shift) => (
+              <div key={shift.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all bg-white shadow-sm border-white ${shift.status === 'absent' ? 'opacity-50 grayscale' : ''}`}>
+                <div className="flex items-center gap-6">
+                  <div className="flex flex-col leading-none">
+                    <span className="text-[9px] font-black text-slate-300 uppercase mb-1">ID</span>
+                    <span className="text-xl font-mono font-black text-slate-900 tracking-tighter">
+                      {shift.login_id || shift.cast_members?.login_id || '--------'}
+                    </span>
+                  </div>
+                  <div className="h-8 w-[2px] bg-slate-100" />
+                  <div>
+                    <h3 className="font-black text-slate-800 text-base">
+                      {shift.hp_display_name || shift.cast_members?.display_name || 'Unknown'}
+                    </h3>
+                    <div className={`flex items-center gap-1.5 mt-0.5 font-bold ${shift.status === 'absent' ? 'text-slate-400' : 'text-blue-500'}`}>
+                      <Clock size={12} />
+                      <span className="text-[11px] font-mono tracking-tighter">
+                        {shift.start_time} — {shift.end_time}
                       </span>
                     </div>
-
-                    <div className="h-8 w-[2px] bg-slate-50" />
-
-                    <div>
-                      <h3 className="font-black text-slate-800 text-base">
-                        {shift.hp_display_name || shift.cast_members?.display_name || 'Unknown'}
-                      </h3>
-                      <div className={`flex items-center gap-1.5 mt-0.5 font-bold ${
-                        shift.status === 'absent' ? 'text-slate-400' : 'text-blue-500'
-                      }`}>
-                        <Clock size={12} />
-                        <span className="text-[11px] font-mono tracking-tighter">
-                          {shift.start_time} — {shift.end_time}
-                        </span>
-                      </div>
-                    </div>
                   </div>
-
-                  <button 
-                    onClick={() => handleStatusToggle(shift.id, shift.status)}
-                    className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm ${
-                      shift.status === 'absent' 
-                      ? 'bg-slate-900 text-white' 
-                      : 'bg-rose-50 text-rose-500 border border-rose-100'
-                    }`}
-                  >
-                    {shift.status === 'absent' ? (
-                      <span className="flex items-center gap-1.5"><RotateCcw size={12}/> 復旧</span>
-                    ) : (
-                      <span className="flex items-center gap-1.5"><AlertTriangle size={12}/> 当欠</span>
-                    )}
-                  </button>
                 </div>
-              ))
-            ) : (
-              <div className="py-20 text-center bg-white rounded-[30px] border-2 border-dashed border-slate-200">
-                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">No Shifts Found</p>
-                <p className="text-[9px] text-slate-400 mt-2">日付をデータのある日に切り替えてください</p>
+                <button 
+                  onClick={() => handleStatusToggle(shift.id, shift.status)}
+                  className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm ${
+                    shift.status === 'absent' ? 'bg-slate-900 text-white' : 'bg-rose-50 text-rose-500 border border-rose-100'
+                  }`}
+                >
+                  {shift.status === 'absent' ? (
+                      <span className="flex items-center gap-1.5"><RotateCcw size={12}/> 復旧</span>
+                  ) : (
+                      <span className="flex items-center gap-1.5"><AlertTriangle size={12}/> 当欠</span>
+                  )}
+                </button>
+              </div>
+            ))}
+            {shifts.length === 0 && (
+              <div className="py-20 text-center bg-white rounded-[30px] border-2 border-dashed border-slate-200 text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                No Shifts Found
               </div>
             )}
           </div>
