@@ -31,6 +31,7 @@ export default function LoginPage() {
       return;
     }
 
+    // 役職をチェック
     const { data: member } = await supabase
       .from('cast_members')
       .select('role')
@@ -53,8 +54,8 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-5">
           <input type="text" placeholder="ID" value={castId} onChange={(e) => setCastId(e.target.value)} className="w-full px-6 py-4 bg-gray-50 border rounded-2xl font-bold" required />
           <input type="password" placeholder="PASSWORD" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-6 py-4 bg-gray-50 border rounded-2xl font-bold" required />
-          <button type="submit" disabled={loading} className="w-full bg-pink-500 text-white font-black py-4 rounded-2xl shadow-lg">
-            {loading ? 'WAIT...' : 'GO 🌸'}
+          <button type="submit" disabled={loading} className="w-full bg-pink-500 text-white font-black py-4 rounded-2xl">
+            {loading ? 'WAIT...' : 'GO 🚀'}
           </button>
         </form>
       </div>

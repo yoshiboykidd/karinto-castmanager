@@ -17,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     const checkUserStatus = async () => {
+      // 👑 管理画面内ならアラートを出さない
       if (pathname.startsWith('/admin')) {
         setIsAlertOpen(false);
         return;
@@ -27,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
       const loginId = user.email?.split('@')[0] || '';
       
-      // 名前(display_name)と役職(role)をセットで取得
+      // 名前(display_name)と役職(role)を確実に取得
       const { data: profile } = await supabase
         .from('cast_members')
         .select('password, display_name, role')
@@ -36,12 +37,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
       if (!profile) return;
 
-      // 管理者はアラート対象外
+      // 👑 管理者ならアラートを出さない
       if (profile.role === 'admin' || profile.role === 'developer') {
         setIsAlertOpen(false);
         return;
       }
 
+      // キャストかつ初期パスワードなら表示
       if (profile.password === '0000' || profile.password === 'managed_by_supabase') {
         setIsAlertOpen(true);
       } else {
@@ -59,10 +61,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {isAlertOpen && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
             <div className="bg-white rounded-[40px] p-8 w-full max-w-[340px] text-center shadow-2xl">
-              <h2 className="text-xl font-black mb-4">初期パスワード変更</h2>
+              <h2 className="text-xl font-black mb-4 text-slate-800">パスワードを変更してください</h2>
               <div className="space-y-3">
-                <button onClick={() => { setIsAlertOpen(false); router.push('/mypage'); }} className="w-full py-4 bg-pink-500 text-white font-black rounded-2xl">変更する</button>
-                <button onClick={() => setIsAlertOpen(false)} className="w-full py-3 text-gray-400 font-bold text-xs">後で設定</button>
+                <button onClick={() => { setIsAlertOpen(false); router.push('/mypage'); }} className="w-full py-4 bg-rose-500 text-white font-black rounded-2xl shadow-lg">変更する</button>
+                <button onClick={() => setIsAlertOpen(false)} className="w-full py-3 text-gray-400 font-bold text-xs uppercase">後で設定</button>
               </div>
             </div>
           </div>
