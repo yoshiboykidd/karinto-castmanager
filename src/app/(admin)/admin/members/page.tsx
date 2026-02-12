@@ -3,24 +3,23 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserPlus, RefreshCw, Store, ShieldCheck, Search, ChevronRight } from 'lucide-react';
+// 📍 ここで登録コンポーネントをインポートしています
 import CastRegister from '@/components/admin/CastRegister';
-// 📍 actions.ts からロジックをインポート
 import { getFilteredMembers } from './actions';
 
 export default function MembersPage() {
   const router = useRouter();
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  // 📍 登録画面の表示管理
   const [showRegister, setShowRegister] = useState(false);
   const [myProfile, setMyProfile] = useState<{role: string, home_shop_id: string | null} | null>(null);
   const [targetShopId, setTargetShopId] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // 📍 データを取得する関数
   const loadData = async () => {
     setLoading(true);
     try {
-      // actions.ts の getFilteredMembers を呼び出し
       const result = await getFilteredMembers(targetShopId);
       setMembers(result.members);
       setMyProfile(result.myProfile);
@@ -35,7 +34,6 @@ export default function MembersPage() {
     loadData();
   }, [targetShopId]);
 
-  // 🔍 検索フィルタリング（表示用）
   const filteredMembers = members.filter(m => 
     m.display_name?.includes(searchQuery) || 
     m.login_id?.includes(searchQuery)
@@ -66,6 +64,8 @@ export default function MembersPage() {
                 </span>
               </h1>
             </div>
+            
+            {/* 📍 新規登録ボタン（ここをクリックするとモーダルが開きます） */}
             <button 
               onClick={() => setShowRegister(true)}
               className="bg-slate-900 text-white p-4 rounded-3xl shadow-lg shadow-slate-200 active:scale-95 transition-all flex items-center gap-2"
@@ -88,10 +88,9 @@ export default function MembersPage() {
               />
             </div>
 
-            {/* 開発者のみ店舗切り替えボタンを表示 */}
             {myProfile?.role === 'developer' && (
               <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
-                {['all', '001', '002', '003', '004'].map((id) => (
+                {['all', '001', '002', '003', '004', '005', '006', '007', '008', '009', '010', '011', '012'].map((id) => (
                   <button
                     key={id}
                     onClick={() => setTargetShopId(id)}
@@ -110,7 +109,7 @@ export default function MembersPage() {
         </div>
       </div>
 
-      {/* メインリスト */}
+      {/* リスト表示部分 */}
       <div className="max-w-4xl mx-auto px-6 mt-10">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
@@ -119,53 +118,42 @@ export default function MembersPage() {
           </div>
         ) : (
           <div className="grid gap-4">
-            {filteredMembers.length > 0 ? (
-              filteredMembers.map((m) => (
-                <div 
-                  key={m.login_id} 
-                  className="bg-white p-5 rounded-[35px] border border-slate-100 shadow-sm flex items-center justify-between hover:border-blue-200 transition-all group active:scale-[0.99]"
-                >
-                  <div className="flex items-center gap-5">
-                    <div className="w-14 h-14 rounded-[22px] bg-slate-50 flex flex-col items-center justify-center border border-slate-100 group-hover:bg-blue-50 transition-colors">
-                      <span className="text-[8px] font-black text-slate-300 uppercase">ID</span>
-                      <span className="text-[13px] font-black text-slate-800 font-mono">{m.login_id}</span>
-                    </div>
-                    <div>
-                      <h3 className="font-black text-slate-800 text-lg group-hover:text-blue-600 transition-colors">{m.display_name}</h3>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                          <Store size={10} /> {m.home_shop_id}
-                        </div>
-                        {m.role === 'admin' && (
-                          <span className="text-[8px] font-black bg-blue-50 text-blue-500 px-2 py-0.5 rounded-md uppercase">Manager</span>
-                        )}
-                      </div>
-                    </div>
+            {filteredMembers.map((m) => (
+              <div 
+                key={m.login_id} 
+                className="bg-white p-5 rounded-[35px] border border-slate-100 shadow-sm flex items-center justify-between hover:border-blue-200 transition-all group active:scale-[0.99]"
+              >
+                <div className="flex items-center gap-5">
+                  <div className="w-14 h-14 rounded-[22px] bg-slate-50 flex flex-col items-center justify-center border border-slate-100 group-hover:bg-blue-50 transition-colors">
+                    <span className="text-[8px] font-black text-slate-300 uppercase">ID</span>
+                    <span className="text-[13px] font-black text-slate-800 font-mono">{m.login_id}</span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <button className="p-3 bg-slate-50 rounded-2xl text-slate-300 group-hover:text-blue-500 group-hover:bg-blue-50 transition-all">
-                      <ChevronRight size={20} />
-                    </button>
+                  <div>
+                    <h3 className="font-black text-slate-800 text-lg group-hover:text-blue-600 transition-colors">{m.display_name}</h3>
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                      <Store size={10} /> {m.home_shop_id}
+                    </div>
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className="py-24 text-center bg-white rounded-[50px] border-2 border-dashed border-slate-100">
-                <p className="font-black text-slate-200 text-xl italic tracking-tighter mb-2">NO CAST MEMBERS FOUND</p>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Try adjusting your search or filters</p>
+                <div className="flex items-center gap-3">
+                  <ShieldCheck size={20} className={m.role === 'cast' ? 'text-slate-100' : 'text-blue-500'} />
+                  <button className="p-3 bg-slate-50 rounded-2xl text-slate-300 group-hover:text-blue-500 group-hover:bg-blue-50 transition-all">
+                    <ChevronRight size={20} />
+                  </button>
+                </div>
               </div>
-            )}
+            ))}
           </div>
         )}
       </div>
 
-      {/* 登録用モーダル（既存コンポーネント） */}
+      {/* 📍 これが新規登録のポップアップ本体です */}
       {showRegister && (
         <CastRegister 
           onClose={() => setShowRegister(false)} 
           onSuccess={() => {
             setShowRegister(false);
-            loadData();
+            loadData(); // 登録後にリストを再読み込み
           }} 
         />
       )}
