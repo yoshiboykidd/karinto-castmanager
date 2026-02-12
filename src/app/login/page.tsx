@@ -19,11 +19,10 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    const email = castId.includes('@') ? castId : `${castId}@karinto-internal.com`;
+    const email = `${castId}@karinto-internal.com`;
 
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password,
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email, password,
     });
 
     if (authError) {
@@ -32,36 +31,30 @@ export default function LoginPage() {
       return;
     }
 
-    // 役職をチェックして行き先を分岐
     const { data: member } = await supabase
       .from('cast_members')
       .select('role')
       .eq('login_id', castId) 
       .single();
 
-    const role = member?.role;
-
-    if (role === 'admin' || role === 'developer') {
+    if (member?.role === 'admin' || member?.role === 'developer') {
       router.push('/admin');
     } else {
-      const dest = (password === '0000') ? '/?alert_password=true' : '/';
-      router.push(dest);
+      router.push(password === '0000' ? '/?alert_password=true' : '/');
     }
     
     router.refresh();
   };
 
   return (
-    <div className="min-h-screen bg-[#FFF5F7] flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-[#FFF5F7] flex flex-col items-center justify-center p-6 text-slate-800">
       <div className="w-full max-w-sm bg-white rounded-[40px] p-10 shadow-xl border border-pink-50">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-black italic tracking-tighter uppercase mb-2 text-slate-800">Login</h1>
-        </div>
+        <h1 className="text-2xl font-black italic text-center mb-8 uppercase">Login</h1>
         <form onSubmit={handleLogin} className="space-y-5">
-          <input type="text" placeholder="ID" value={castId} onChange={(e) => setCastId(e.target.value)} className="w-full px-6 py-4 bg-gray-50 border rounded-2xl font-bold text-slate-800" required />
-          <input type="password" placeholder="PASSWORD" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-6 py-4 bg-gray-50 border rounded-2xl font-bold text-slate-800" required />
+          <input type="text" placeholder="ID" value={castId} onChange={(e) => setCastId(e.target.value)} className="w-full px-6 py-4 bg-gray-50 border rounded-2xl font-bold" required />
+          <input type="password" placeholder="PASSWORD" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-6 py-4 bg-gray-50 border rounded-2xl font-bold" required />
           <button type="submit" disabled={loading} className="w-full bg-pink-500 text-white font-black py-4 rounded-2xl shadow-lg">
-            {loading ? 'WAIT...' : 'LOGIN 🌸'}
+            {loading ? 'WAIT...' : 'GO 🌸'}
           </button>
         </form>
       </div>
