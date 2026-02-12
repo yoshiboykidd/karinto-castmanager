@@ -2,7 +2,9 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request: { headers: request.headers } });
+  let response = NextResponse.next({
+    request: { headers: request.headers },
+  });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,26 +29,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // 2. ログイン済みの振り分け
-  if (user) {
-    const loginId = user.email?.split('@')[0] || '';
+  // 2. ログイン済みで /login に来た時の振り分け（管理者対応）
+  if (user && path.startsWith("/login")) {
+    const rawId = user.email?.split('@')[0] || '';
     const { data: member } = await supabase
       .from('cast_members')
       .select('role')
-      .eq('login_id', loginId)
+      .eq('login_id', rawId)
       .single();
 
-    const role = member?.role;
-    const isAdmin = role === 'admin' || role === 'developer';
-
-    // 管理者がキャストページやログイン画面にいたら、管理画面へ強制移動
-    if (isAdmin && (path === "/" || path === "/login")) {
-      return NextResponse.redirect(new URL("/admin", request.url));
-    }
-    // ログイン済みでログイン画面にいたら、適切なトップへ移動
-    if (path === "/login") {
-      return NextResponse.redirect(new URL(isAdmin ? "/admin" : "/", request.url));
-    }
+    const dest = (member?.role === 'admin' || member?.role === 'developer') ? '/admin' : '/';
+    return NextResponse.redirect(new URL(dest, request.url));
   }
 
   return response;

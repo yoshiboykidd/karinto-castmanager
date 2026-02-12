@@ -19,10 +19,11 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    const email = `${castId}@karinto-internal.com`;
+    const email = castId.includes('@') ? castId : `${castId}@karinto-internal.com`;
 
     const { error: authError } = await supabase.auth.signInWithPassword({
-      email, password,
+      email: email,
+      password: password,
     });
 
     if (authError) {
@@ -31,7 +32,7 @@ export default function LoginPage() {
       return;
     }
 
-    // 役職をチェック
+    // 役職（role）を取得して移動先を決定
     const { data: member } = await supabase
       .from('cast_members')
       .select('role')
@@ -50,11 +51,11 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#FFF5F7] flex flex-col items-center justify-center p-6 text-slate-800">
       <div className="w-full max-w-sm bg-white rounded-[40px] p-10 shadow-xl border border-pink-50">
-        <h1 className="text-2xl font-black italic text-center mb-8 uppercase">Login</h1>
+        <h1 className="text-2xl font-black italic text-center mb-8 uppercase tracking-tighter">Login</h1>
         <form onSubmit={handleLogin} className="space-y-5">
           <input type="text" placeholder="ID" value={castId} onChange={(e) => setCastId(e.target.value)} className="w-full px-6 py-4 bg-gray-50 border rounded-2xl font-bold" required />
           <input type="password" placeholder="PASSWORD" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-6 py-4 bg-gray-50 border rounded-2xl font-bold" required />
-          <button type="submit" disabled={loading} className="w-full bg-pink-500 text-white font-black py-4 rounded-2xl">
+          <button type="submit" disabled={loading} className="w-full bg-pink-500 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all">
             {loading ? 'WAIT...' : 'GO 🚀'}
           </button>
         </form>

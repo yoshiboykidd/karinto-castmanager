@@ -15,56 +15,57 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   
   const [isAlertOpen, setIsAlertOpen] = useState(false);
 
+  const checkUser = async () => {
+    // 👑 管理画面（/admin）にいる時はチェックしない
+    if (pathname.startsWith('/admin')) {
+      setIsAlertOpen(false);
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const rawId = user.email?.split('@')[0] || '';
+    
+    // 修正：名前(display_name)と役職(role)も取得するように変更
+    const { data } = await supabase
+      .from('cast_members')
+      .select('password, display_name, role')
+      .in('login_id', [rawId, String(Number(rawId))])
+      .limit(1);
+
+    const profile = data?.[0];
+
+    // 👑 管理者ならアラートを出さない
+    if (profile?.role === 'admin' || profile?.role === 'developer') {
+      setIsAlertOpen(false);
+      return;
+    }
+
+    const pw = profile?.password;
+    if (!pw || String(pw) === '0000' || String(pw) === 'managed_by_supabase') {
+      setIsAlertOpen(true);
+    } else {
+      setIsAlertOpen(false);
+    }
+  };
+
   useEffect(() => {
-    const checkUserStatus = async () => {
-      // 👑 管理画面内ならアラートを出さない
-      if (pathname.startsWith('/admin')) {
-        setIsAlertOpen(false);
-        return;
-      }
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const loginId = user.email?.split('@')[0] || '';
-      
-      // 名前(display_name)と役職(role)を確実に取得
-      const { data: profile } = await supabase
-        .from('cast_members')
-        .select('password, display_name, role')
-        .eq('login_id', loginId)
-        .single();
-
-      if (!profile) return;
-
-      // 👑 管理者ならアラートを出さない
-      if (profile.role === 'admin' || profile.role === 'developer') {
-        setIsAlertOpen(false);
-        return;
-      }
-
-      // キャストかつ初期パスワードなら表示
-      if (profile.password === '0000' || profile.password === 'managed_by_supabase') {
-        setIsAlertOpen(true);
-      } else {
-        setIsAlertOpen(false);
-      }
-    };
-
-    checkUserStatus();
-  }, [pathname, supabase]);
+    checkUser();
+  }, [pathname]);
 
   return (
     <html lang="ja">
-      <body className="antialiased">
+      <body className="antialiased text-slate-900">
         {children}
         {isAlertOpen && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
             <div className="bg-white rounded-[40px] p-8 w-full max-w-[340px] text-center shadow-2xl">
-              <h2 className="text-xl font-black mb-4 text-slate-800">パスワードを変更してください</h2>
+              <h2 className="text-xl font-black mb-4">セキュリティ警告</h2>
+              <p className="text-xs font-bold text-gray-400 mb-8 leading-relaxed">初期パスワードを変更してください。</p>
               <div className="space-y-3">
                 <button onClick={() => { setIsAlertOpen(false); router.push('/mypage'); }} className="w-full py-4 bg-rose-500 text-white font-black rounded-2xl shadow-lg">変更する</button>
-                <button onClick={() => setIsAlertOpen(false)} className="w-full py-3 text-gray-400 font-bold text-xs uppercase">後で設定</button>
+                <button onClick={() => setIsAlertOpen(false)} className="w-full py-3 text-gray-400 font-bold text-xs uppercase tracking-widest">後で設定</button>
               </div>
             </div>
           </div>
