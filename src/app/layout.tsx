@@ -15,8 +15,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   
   const [isAlertOpen, setIsAlertOpen] = useState(false);
 
-  const checkUser = async () => {
-    // 👑 管理画面（/admin）にいる時はチェックしない
+  const checkUserStatus = async () => {
+    // 管理画面内ならアラートを出さない
     if (pathname.startsWith('/admin')) {
       setIsAlertOpen(false);
       return;
@@ -27,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
     const rawId = user.email?.split('@')[0] || '';
     
-    // 修正：名前(display_name)と役職(role)も取得するように変更
+    // 【最重要】名前(display_name)と役職(role)も取得するように修正
     const { data } = await supabase
       .from('cast_members')
       .select('password, display_name, role')
@@ -36,7 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
     const profile = data?.[0];
 
-    // 👑 管理者ならアラートを出さない
+    // 管理者の場合はアラートを強制停止
     if (profile?.role === 'admin' || profile?.role === 'developer') {
       setIsAlertOpen(false);
       return;
@@ -51,21 +51,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   };
 
   useEffect(() => {
-    checkUser();
+    checkUserStatus();
   }, [pathname]);
 
   return (
     <html lang="ja">
-      <body className="antialiased text-slate-900">
+      <body className="antialiased">
         {children}
         {isAlertOpen && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
             <div className="bg-white rounded-[40px] p-8 w-full max-w-[340px] text-center shadow-2xl">
-              <h2 className="text-xl font-black mb-4">セキュリティ警告</h2>
-              <p className="text-xs font-bold text-gray-400 mb-8 leading-relaxed">初期パスワードを変更してください。</p>
+              <h2 className="text-xl font-black mb-4">初期パスワード変更</h2>
               <div className="space-y-3">
-                <button onClick={() => { setIsAlertOpen(false); router.push('/mypage'); }} className="w-full py-4 bg-rose-500 text-white font-black rounded-2xl shadow-lg">変更する</button>
-                <button onClick={() => setIsAlertOpen(false)} className="w-full py-3 text-gray-400 font-bold text-xs uppercase tracking-widest">後で設定</button>
+                <button onClick={() => { setIsAlertOpen(false); router.push('/mypage'); }} className="w-full py-4 bg-pink-500 text-white font-black rounded-2xl">変更する</button>
+                <button onClick={() => setIsAlertOpen(false)} className="w-full py-3 text-gray-400 font-bold text-xs">後で設定</button>
               </div>
             </div>
           </div>

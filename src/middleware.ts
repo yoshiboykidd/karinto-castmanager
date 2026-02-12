@@ -2,9 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: { headers: request.headers },
-  });
+  let response = NextResponse.next({ request: { headers: request.headers } });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,20 +22,14 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
 
-  // 1. 未ログイン時のガード
   if (!user && !path.startsWith("/login") && !path.startsWith("/auth") && !path.match(/\.(png|jpg|jpeg|gif|webp|svg|ico)$/)) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // 2. ログイン済みで /login に来た時の振り分け（管理者対応）
   if (user && path.startsWith("/login")) {
     const rawId = user.email?.split('@')[0] || '';
-    const { data: member } = await supabase
-      .from('cast_members')
-      .select('role')
-      .eq('login_id', rawId)
-      .single();
-
+    const { data: member } = await supabase.from('cast_members').select('role').eq('login_id', rawId).single();
+    
     const dest = (member?.role === 'admin' || member?.role === 'developer') ? '/admin' : '/';
     return NextResponse.redirect(new URL(dest, request.url));
   }

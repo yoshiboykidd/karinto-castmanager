@@ -22,8 +22,7 @@ export default function LoginPage() {
     const email = castId.includes('@') ? castId : `${castId}@karinto-internal.com`;
 
     const { error: authError } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password,
+      email, password,
     });
 
     if (authError) {
@@ -32,10 +31,10 @@ export default function LoginPage() {
       return;
     }
 
-    // 役職（role）を取得して移動先を決定
+    // 役職と名前をチェック
     const { data: member } = await supabase
       .from('cast_members')
-      .select('role')
+      .select('role, display_name')
       .eq('login_id', castId) 
       .single();
 
@@ -55,7 +54,7 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-5">
           <input type="text" placeholder="ID" value={castId} onChange={(e) => setCastId(e.target.value)} className="w-full px-6 py-4 bg-gray-50 border rounded-2xl font-bold" required />
           <input type="password" placeholder="PASSWORD" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-6 py-4 bg-gray-50 border rounded-2xl font-bold" required />
-          <button type="submit" disabled={loading} className="w-full bg-pink-500 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all">
+          <button type="submit" disabled={loading} className="w-full bg-pink-500 text-white font-black py-4 rounded-2xl shadow-lg transition-all">
             {loading ? 'WAIT...' : 'GO 🚀'}
           </button>
         </form>
