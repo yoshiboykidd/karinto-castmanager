@@ -154,15 +154,31 @@ export default function MembersPage() {
         )}
       </div>
 
-      {showRegister && (
-        <CastRegister 
-          onClose={() => setShowRegister(false)} 
-          onSuccess={() => {
-            setShowRegister(false);
-            loadData();
-          }} 
-        />
-      )}
+      {/* 📍 修正後の呼び出し部分 */}
+{showRegister && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm">
+    <div className="relative w-full max-w-md">
+      {/* 閉じるボタン（外側に配置） */}
+      <button 
+        onClick={() => setShowRegister(false)}
+        className="absolute -top-12 right-0 text-white/50 hover:text-white font-black text-sm uppercase tracking-widest"
+      >
+        Close [×]
+      </button>
+
+      <CastRegister 
+        role={myProfile?.role} 
+        myShopId={myProfile?.home_shop_id} 
+        targetShopId={targetShopId}
+        onClose={() => setShowRegister(false)} 
+        onSuccess={() => {
+          setShowRegister(false);
+          loadData();
+        }} 
+      />
+    </div>
+  </div>
+)}
     </div>
   );
 }
