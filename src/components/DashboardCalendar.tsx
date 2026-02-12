@@ -21,7 +21,7 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
   useEffect(() => {
     if (!month || !isValid(month)) return;
     fetch(`https://holidays-jp.github.io/api/v1/${month.getFullYear()}/date.json`)
-      .then(res => res.ok ? res.json() : { Cairo: {} })
+      .then(res => res.ok ? res.json() : {})
       .then(data => setHolidays(Object.keys(data)))
       .catch(() => {});
   }, [month?.getFullYear()]);
@@ -43,7 +43,6 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
 
   return (
     <div className="w-full select-none">
-      {/* カレンダーヘッダー */}
       <div className="flex items-center justify-between mb-6 px-2">
         <button onClick={() => onMonthChange(new Date(month.getFullYear(), month.getMonth() - 1))} className="p-2 hover:bg-black/5 rounded-full transition-colors">
           <ChevronLeft className="text-slate-400" size={24} />
@@ -61,7 +60,6 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
         </button>
       </div>
 
-      {/* 曜日 */}
       <div className="grid grid-cols-7 mb-2">
         {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((w, i) => (
           <span key={w} className={`text-[9px] font-black text-center tracking-widest ${i === 0 ? 'text-rose-400' : i === 6 ? 'text-blue-400' : 'text-slate-300'}`}>
@@ -70,7 +68,6 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
         ))}
       </div>
 
-      {/* 日付グリッド */}
       <div className="grid grid-cols-7 gap-y-1">
         {blanks.map((_, i) => <div key={`b-${i}`} />)}
         {days.map(day => {
@@ -81,6 +78,7 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const isHoliday = holidays.includes(dateStr);
           const dayOfWeek = getDay(day);
 
+          // シフトデータの検索
           const s = Array.isArray(shifts) ? shifts.find((x: any) => x.shift_date && x.shift_date.startsWith(dateStr)) : null;
 
           // 📍 状態判定
@@ -89,7 +87,8 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const isOfficial = s?.status === 'official' && !isAbsent;
           const isRequested = s?.status === 'requested';
           const isModified = isRequested && s?.is_official_pre_exist;
-          const isSpecialDay = s?.is_special_day === true; // 特定日フラグ（DBに合わせて調整してください）
+          // 特定日の判定
+          const isSpecialDay = s?.is_special_day === true; 
 
           const refStart = isModified ? s?.hp_start_time : s?.start_time;
           const hasOfficialBase = (isOfficial || isModified) && refStart && refStart !== 'OFF';
@@ -105,22 +104,22 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
               className={`relative h-12 w-full flex flex-col items-center justify-center rounded-2xl transition-all active:scale-95 cursor-pointer
               ${isSelected ? 'bg-white shadow-lg ring-2 ' + currentTheme.selected + ' z-10' : ''}
               ${isToday && !isSelected ? currentTheme.today : ''}
-              ${isSpecialDay ? 'bg-blue-50' : ''} // 📍 特定日は背景が薄い青
+              ${isSpecialDay && !isSelected ? 'bg-blue-100' : ''} // 📍 特定日は背景を薄い青に
               `}
             >
               <span className={`z-20 text-[16px] font-black ${textColor}`}>{dNum}</span>
 
               {/* 📍 当欠：赤丸 */}
               {isAbsent && (
-                <div className="absolute inset-1.5 rounded-full bg-rose-500 opacity-80 z-10 shadow-sm" />
+                <div className="absolute inset-1.5 rounded-full bg-rose-500 opacity-90 z-10 shadow-sm flex items-center justify-center" />
               )}
 
               {/* 📍 遅刻：薄いオレンジ○ */}
               {!isAbsent && isLate && hasOfficialBase && (
-                <div className="absolute inset-1.5 rounded-full bg-orange-200 border-2 border-orange-300 z-10 shadow-sm" />
+                <div className="absolute inset-1.5 rounded-full bg-orange-100 border-2 border-orange-300 z-10 shadow-sm" />
               )}
 
-              {/* 📍 シフトあり：薄いピンク〇（通常時） */}
+              {/* 📍 シフトあり：薄いピンク〇 */}
               {!isAbsent && !isLate && hasOfficialBase && (
                 <div className="absolute inset-1.5 rounded-full bg-pink-100 border border-pink-200 z-10" />
               )}
