@@ -3,17 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { 
-  RefreshCw, 
-  ChevronLeft, 
-  Clock, 
-  AlertTriangle,
-  RotateCcw
-} from 'lucide-react';
+import { RefreshCw, ChevronLeft, Clock, AlertTriangle, RotateCcw } from 'lucide-react';
 import { getFilteredAttendance, updateShiftStatus } from './actions';
 
 export default function AttendancePage() {
   const router = useRouter();
+  // 📍 初期表示を今日に設定
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [targetShopId, setTargetShopId] = useState('all');
   const [shifts, setShifts] = useState<any[]>([]);
@@ -29,7 +24,7 @@ export default function AttendancePage() {
         setMyProfile(result.myProfile);
       }
     } catch (error) {
-      console.error('Failed to load attendance:', error);
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -55,19 +50,14 @@ export default function AttendancePage() {
               <button onClick={() => router.push('/admin')} className="flex items-center gap-1 text-slate-400 mb-2 text-[10px] font-black uppercase tracking-[0.2em]">
                 <ChevronLeft size={14} /> Back
               </button>
-              <h1 className="text-2xl font-black text-slate-800 tracking-tighter flex items-center gap-2">
-                ATTENDANCE
-                <span className="text-xs font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-lg">
-                  {shifts.length}
-                </span>
-              </h1>
+              <h1 className="text-2xl font-black text-slate-800 tracking-tighter">ATTENDANCE</h1>
             </div>
-            <div className="bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100 flex items-center gap-2">
+            <div className="bg-slate-900 text-white px-4 py-2 rounded-2xl shadow-lg flex items-center gap-2">
               <input 
                 type="date" 
                 value={selectedDate} 
                 onChange={(e) => setSelectedDate(e.target.value)} 
-                className="bg-transparent font-black text-slate-700 outline-none text-sm" 
+                className="bg-transparent font-mono font-black outline-none text-sm cursor-pointer" 
               />
             </div>
           </div>
@@ -78,11 +68,11 @@ export default function AttendancePage() {
                 <button
                   key={id}
                   onClick={() => setTargetShopId(id)}
-                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all whitespace-nowrap ${
-                    targetShopId === id ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-400 border border-slate-100 hover:bg-slate-50'
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all whitespace-nowrap ${
+                    targetShopId === id ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-400 border border-slate-100'
                   }`}
                 >
-                  {id === 'all' ? 'ALL SHOPS' : id}
+                  {id === 'all' ? 'ALL' : id}
                 </button>
               ))}
             </div>
@@ -100,53 +90,35 @@ export default function AttendancePage() {
           <div className="flex flex-col gap-2">
             {shifts.length > 0 ? (
               shifts.map((shift) => (
-                <div 
-                  key={shift.id} 
-                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
-                    shift.status === 'absent' 
-                    ? 'bg-slate-100 border-slate-200 opacity-60' 
-                    : 'bg-white border-white shadow-sm hover:shadow-md'
-                  }`}
-                >
+                <div key={shift.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all bg-white shadow-sm ${shift.status === 'absent' ? 'opacity-50' : ''}`}>
                   <div className="flex items-center gap-6">
                     <div className="flex flex-col leading-none">
-                      <span className="text-[9px] font-black text-slate-300 uppercase tracking-tighter mb-1">Cast ID</span>
-                      <span className="text-xl font-mono font-black text-slate-900 tracking-tighter">
-                        {shift.login_id}
-                      </span>
+                      <span className="text-[9px] font-black text-slate-300 uppercase mb-1">ID</span>
+                      <span className="text-xl font-mono font-black text-slate-900">{shift.login_id}</span>
                     </div>
-                    <div className="h-8 w-[2px] bg-slate-100 mx-1" />
+                    <div className="h-8 w-[2px] bg-slate-100" />
                     <div>
-                      <h3 className="font-black text-slate-800 text-base">
-                        {shift.hp_display_name || 'Unknown'}
-                      </h3>
-                      <div className={`flex items-center gap-1.5 mt-0.5 font-bold ${shift.status === 'absent' ? 'text-slate-400' : 'text-blue-500'}`}>
+                      <h3 className="font-black text-slate-800 text-base">{shift.hp_display_name}</h3>
+                      <div className="flex items-center gap-1.5 text-blue-500 font-bold">
                         <Clock size={12} />
-                        <span className="text-[11px] font-mono tracking-tight">
-                          {shift.start_time} — {shift.end_time}
-                        </span>
+                        <span className="text-[11px] font-mono">{shift.start_time} — {shift.end_time}</span>
                       </div>
                     </div>
                   </div>
                   <button 
                     onClick={() => handleStatusToggle(shift.id, shift.status)}
-                    className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${
-                      shift.status === 'absent' 
-                      ? 'bg-slate-900 text-white' 
-                      : 'bg-rose-50 text-rose-500 border border-rose-100 hover:bg-rose-100'
+                    className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all ${
+                      shift.status === 'absent' ? 'bg-slate-900 text-white' : 'bg-rose-50 text-rose-500 border border-rose-100'
                     }`}
                   >
-                    {shift.status === 'absent' ? (
-                      <span className="flex items-center gap-1.5"><RotateCcw size={12}/> 復旧</span>
-                    ) : (
-                      <span className="flex items-center gap-1.5"><AlertTriangle size={12}/> 当欠</span>
-                    )}
+                    {shift.status === 'absent' ? '復旧' : '当欠'}
                   </button>
                 </div>
               ))
             ) : (
               <div className="py-20 text-center bg-white rounded-[30px] border-2 border-dashed border-slate-200">
-                <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em]">No Shifts Found</p>
+                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-2">No Shifts Found</p>
+                <p className="text-[9px] text-slate-400">日付を 2026-02-05 等に切り替えてみてください</p>
               </div>
             )}
           </div>
