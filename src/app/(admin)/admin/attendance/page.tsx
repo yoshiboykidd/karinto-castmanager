@@ -23,7 +23,7 @@ export default function AttendancePage() {
         setMyProfile(result.myProfile);
       }
     } catch (error) {
-      console.error(error);
+      console.error('Data load error:', error);
     } finally {
       setLoading(false);
     }
@@ -42,6 +42,7 @@ export default function AttendancePage() {
 
   return (
     <div className="min-h-screen bg-[#F1F5F9] pb-20">
+      {/* ヘッダー */}
       <div className="bg-white px-6 pt-12 pb-6 rounded-b-[40px] shadow-md border-b border-slate-100">
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-between items-start mb-6">
@@ -56,7 +57,7 @@ export default function AttendancePage() {
                 </span>
               </h1>
             </div>
-            <div className="bg-slate-900 text-white px-4 py-2 rounded-2xl shadow-lg flex items-center gap-2 border border-slate-800">
+            <div className="bg-slate-900 text-white px-4 py-2 rounded-2xl shadow-lg border border-slate-800">
               <input 
                 type="date" 
                 value={selectedDate} 
@@ -66,6 +67,7 @@ export default function AttendancePage() {
             </div>
           </div>
 
+          {/* 開発者用店舗フィルター */}
           {myProfile?.role === 'developer' && (
             <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide">
               {['all', '001', '002', '003', '004', '005', '006', '007', '008', '009', '010', '011', '012'].map((id) => (
@@ -81,58 +83,81 @@ export default function AttendancePage() {
               ))}
             </div>
           )}
-          
+
+          {/* 店長用店舗固定表示 */}
           {myProfile?.role === 'admin' && (
             <div className="inline-block px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              SHOP: {myProfile.home_shop_id}
+              SHOP: {myProfile.home_shop_id || 'NOT ASSIGNED'}
             </div>
           )}
         </div>
       </div>
 
+      {/* リストエリア */}
       <div className="max-w-4xl mx-auto px-4 mt-6">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-300">
             <RefreshCw className="animate-spin mb-2" size={24} />
-            <span className="text-[10px] font-black tracking-widest uppercase">Syncing...</span>
+            <span className="text-[10px] font-black tracking-widest uppercase">Syncing</span>
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {shifts.map((shift) => (
-              <div key={shift.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all bg-white shadow-sm border-white ${shift.status === 'absent' ? 'opacity-50 grayscale' : ''}`}>
-                <div className="flex items-center gap-6">
-                  <div className="flex flex-col leading-none">
-                    <span className="text-[9px] font-black text-slate-300 uppercase mb-1">ID</span>
-                    <span className="text-xl font-mono font-black text-slate-900 tracking-tighter">
-                      {shift.login_id || shift.cast_members?.login_id}
-                    </span>
-                  </div>
-                  <div className="h-8 w-[2px] bg-slate-50" />
-                  <div>
-                    <h3 className="font-black text-slate-800 text-base">
-                      {shift.cast_members?.display_name || shift.hp_display_name}
-                    </h3>
-                    <div className={`flex items-center gap-1.5 mt-0.5 font-bold ${shift.status === 'absent' ? 'text-slate-400' : 'text-blue-500'}`}>
-                      <Clock size={12} />
-                      <span className="text-[11px] font-mono tracking-tighter">
-                        {shift.start_time} — {shift.end_time}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => handleStatusToggle(shift.id, shift.status)}
-                  className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm ${
-                    shift.status === 'absent' ? 'bg-slate-900 text-white' : 'bg-rose-50 text-rose-500 border border-rose-100'
+            {shifts.length > 0 ? (
+              shifts.map((shift) => (
+                <div 
+                  key={shift.id} 
+                  className={`flex items-center justify-between p-4 rounded-2xl border transition-all bg-white shadow-sm border-white ${
+                    shift.status === 'absent' ? 'opacity-50 grayscale bg-slate-50' : 'hover:border-blue-100'
                   }`}
                 >
-                  {shift.status === 'absent' ? '復旧' : '当欠'}
-                </button>
-              </div>
-            ))}
-            {shifts.length === 0 && !loading && (
-              <div className="py-20 text-center bg-white rounded-[30px] border-2 border-dashed border-slate-200 text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                No Shifts Found
+                  <div className="flex items-center gap-6">
+                    {/* ID表示：シフトテーブルの値を優先 */}
+                    <div className="flex flex-col leading-none">
+                      <span className="text-[9px] font-black text-slate-300 uppercase mb-1">ID</span>
+                      <span className="text-xl font-mono font-black text-slate-900 tracking-tighter">
+                        {shift.login_id || '--------'}
+                      </span>
+                    </div>
+
+                    <div className="h-8 w-[2px] bg-slate-50" />
+
+                    {/* 名前と時間 */}
+                    <div>
+                      <h3 className="font-black text-slate-800 text-base">
+                        {shift.hp_display_name || shift.cast_members?.display_name || 'Unknown'}
+                      </h3>
+                      <div className={`flex items-center gap-1.5 mt-0.5 font-bold ${
+                        shift.status === 'absent' ? 'text-slate-400' : 'text-blue-500'
+                      }`}>
+                        <Clock size={12} />
+                        <span className="text-[11px] font-mono tracking-tighter">
+                          {shift.start_time} — {shift.end_time}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* アクション */}
+                  <button 
+                    onClick={() => handleStatusToggle(shift.id, shift.status)}
+                    className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm ${
+                      shift.status === 'absent' 
+                      ? 'bg-slate-900 text-white' 
+                      : 'bg-rose-50 text-rose-500 border border-rose-100 hover:bg-rose-100'
+                    }`}
+                  >
+                    {shift.status === 'absent' ? (
+                      <span className="flex items-center gap-1.5"><RotateCcw size={12}/> 復旧</span>
+                    ) : (
+                      <span className="flex items-center gap-1.5"><AlertTriangle size={12}/> 当欠</span>
+                    )}
+                  </button>
+                </div>
+              ))
+            ) : (
+              <div className="py-20 text-center bg-white rounded-[30px] border-2 border-dashed border-slate-200">
+                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">No Shifts Found</p>
+                <p className="text-[9px] text-slate-400 mt-2">Check another date or shop code</p>
               </div>
             )}
           </div>
