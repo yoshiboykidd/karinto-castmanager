@@ -16,7 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const [isAlertOpen, setIsAlertOpen] = useState(false);
 
   const checkPassword = async () => {
-    // 1. 管理画面（/admin...）にいる場合はチェック自体をしない
+    // 👑 管理画面（/admin）にいる時はチェック自体をスキップ
     if (pathname.startsWith('/admin')) {
       setIsAlertOpen(false);
       return;
@@ -27,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
     const rawId = user.email?.split('@')[0] || '';
     
-    // 2. パスワードだけでなく「role（役職）」も一緒に取得する
+    // パスワードと役割（role）を両方取得
     const { data } = await supabase
       .from('cast_members')
       .select('password, role')
@@ -36,13 +36,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
     const profile = data?.[0];
 
-    // 3. 管理者・開発者なら、パスワードが何であれアラートを出さない
+    // 👑 管理者・開発者なら、パスワードに関わらずアラートを出さない
     if (profile?.role === 'admin' || profile?.role === 'developer') {
       setIsAlertOpen(false);
       return;
     }
 
-    // 4. キャストの場合のみ、初期パスワードチェックを行う
+    // 👗 キャストの場合のみ、初期パスワードチェック
     const pw = profile?.password;
     if (!pw || String(pw) === '0000' || String(pw) === 'managed_by_supabase') {
       setIsAlertOpen(true);
@@ -53,14 +53,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     checkPassword();
-  }, [pathname]); // ページが変わるたびに実行される
+  }, [pathname]);
 
   return (
     <html lang="ja">
       <body className="antialiased">
         {children}
 
-        {/* アラートを表示するのは「isAlertOpen」がtrueの時だけ */}
         {isAlertOpen && (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6">
             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
@@ -83,7 +82,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   今すぐ変更する
                 </button>
 
-                {/* 「後で設定する」を押しても管理者は飛ばされない */}
                 <button
                   onClick={() => setIsAlertOpen(false)}
                   className="w-full py-3 text-gray-400 font-black text-xs active:scale-95 transition-all uppercase tracking-widest"

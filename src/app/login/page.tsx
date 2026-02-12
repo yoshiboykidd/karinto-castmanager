@@ -19,10 +19,10 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    // 1. メールアドレス形式に変換 (@karinto-internal.com を使用)
+    // 1. メールアドレス形式に変換 (@karinto-internal.com)
     const email = castId.includes('@') ? castId : `${castId}@karinto-internal.com`;
 
-    // 2. Supabaseで認証 (Auth)
+    // 2. Supabaseで認証
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email: email,
       password: password,
@@ -34,32 +34,31 @@ export default function LoginPage() {
       return;
     }
 
-    // 3. 役職チェック (Database)
-    // ここで失敗すると管理画面に行けないため、慎重に判定します
-    const { data: member, error: dbError } = await supabase
-      .from('cast_members')
-      .select('role')
-      .eq('login_id', castId) 
-      .single();
+    // 3. 役職(role)をチェックして、行き先を振り分ける
+    try {
+      const { data: member } = await supabase
+        .from('cast_members')
+        .select('role')
+        .eq('login_id', castId) 
+        .single();
 
-    const role = member?.role;
-    const isAdmin = role === 'developer' || role === 'admin';
+      const role = member?.role;
 
-    // 4. 振り分けロジックの修正
-    if (isAdmin) {
-      // 👑 管理者はアラートなしで管理画面トップへ直行
-      router.push('/admin');
-    } else if (role === 'cast') {
-      // 👗 キャストの場合のみパスワードチェック
-      if (password === '0000') {
-        router.push('/?alert_password=true');
+      if (role === 'developer' || role === 'admin') {
+        // 👑 管理者・開発者は管理画面へ直行（アラートなし）
+        router.push('/admin');
+      } else if (role === 'cast') {
+        // 👗 キャストで初期パスワードならアラート用パラメータ付きでトップへ
+        if (password === '0000') {
+          router.push('/?alert_password=true');
+        } else {
+          router.push('/');
+        }
       } else {
         router.push('/');
       }
-    } else {
-      // ⚠️ 役職が取得できなかった場合（RLSエラーなど）
-      console.error('Role check failed or role not found:', dbError);
-      // ログイン自体は成功しているので、一旦トップへ
+    } catch (err) {
+      console.error(err);
       router.push('/');
     }
     
@@ -107,7 +106,3 @@ export default function LoginPage() {
             {loading ? '認証中...' : 'ログインする 🌸'}
           </button>
         </form>
-      </div>
-    </div>
-  );
-}
