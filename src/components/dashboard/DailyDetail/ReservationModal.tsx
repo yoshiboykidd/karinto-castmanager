@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { X, Calculator, Trash2, Edit3, Save, Loader2, StickyNote } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { X, Calculator, Trash2, Edit3, Save, Loader2, StickyNote, History, Star } from 'lucide-react';
 
 export default function ReservationModal({ 
   selectedRes, 
@@ -13,9 +13,31 @@ export default function ReservationModal({
   memoDraft, 
   setMemoDraft, 
   onSaveMemo, 
-  getBadgeStyle 
+  getBadgeStyle,
+  allPastReservations = [] // 📍 自分の過去の全予約データ
 }: any) {
   if (!selectedRes) return null;
+
+  // 📍 あなた（キャスト）とこのお客様の接触履歴を計算
+  const castVisitHistory = useMemo(() => {
+    if (!selectedRes.customer_no) return { count: 1, lastDate: null };
+
+    // 1. 自分(allPastReservations)のデータの中から、同じcustomer_noを抽出
+    // 2. 日付順（新しい順）に並び替え
+    const history = allPastReservations
+      .filter((r: any) => r.customer_no === selectedRes.customer_no)
+      .sort((a: any, b: any) => b.reservation_date.localeCompare(a.reservation_date));
+
+    const count = history.length;
+    
+    // 3. 「直近で会った日」を取得（今回の予約IDを除いた中での最新）
+    const lastMet = history.find((r: any) => r.id !== selectedRes.id);
+    
+    return {
+      count,
+      lastDate: lastMet ? lastMet.reservation_date : null
+    };
+  }, [selectedRes, allPastReservations]);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center p-2 overflow-y-auto bg-black/90 backdrop-blur-sm pt-4 pb-24">
@@ -44,40 +66,41 @@ export default function ReservationModal({
         </div>
         
         <div className="px-4 py-2 space-y-3">
+          {/* お客様情報 & あなたとの履歴 */}
+          <div className="bg-gray-50/80 rounded-2xl p-3 border border-gray-100">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-[20px] font-black text-gray-800 truncate">
+                {selectedRes.customer_name}<span className="text-[12px] ml-1 font-bold text-gray-400">様</span>
+              </h3>
+              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-full border border-gray-100 shadow-sm">
+                <History size={12} className="text-pink-400" />
+                <span className="text-[11px] font-black text-gray-600">
+                  {castVisitHistory.count === 1 ? '初対面' : `${castVisitHistory.count}回目`}
+                </span>
+              </div>
+            </div>
+            {castVisitHistory.lastDate ? (
+              <div className="flex items-center gap-1 text-[10px] font-bold text-gray-400">
+                <Star size={10} className="text-yellow-500 fill-yellow-500" />
+                <span>直近で会った日: {castVisitHistory.lastDate.replace(/-/g, '/')}</span>
+              </div>
+            ) : (
+              <div className="text-[10px] font-bold text-gray-300 italic">あなたとの履歴はありません</div>
+            )}
+          </div>
+
           {/* コース情報 */}
           <div className="text-center border-b border-gray-50 pb-1">
-            <h3 className="text-[24px] font-black text-gray-800 leading-tight italic break-words">
+            <h3 className="text-[22px] font-black text-gray-700 leading-tight italic break-words">
               {selectedRes.course_info}
             </h3>
           </div>
 
-          {/* 金額・ホテル */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-gray-50 p-2 rounded-xl border border-gray-100 flex flex-col justify-center text-center">
-              <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">合計金額</p>
-              <div className="flex items-baseline justify-center font-black text-gray-900 leading-none">
-                <span className="text-xs mr-0.5">¥</span>
-                <span className="text-[32px] tracking-tighter">{(selectedRes.total_price || 0).toLocaleString()}</span>
-              </div>
-            </div>
-            <div className="bg-gray-50 p-2 rounded-xl border border-gray-100 flex flex-col justify-center text-center">
-              <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Hotel</p>
-              <p className="text-[16px] font-black text-gray-800 truncate">{selectedRes.hotel_name || 'MR'}</p>
-            </div>
-          </div>
-
-          {/* 📍 キャストメモエリア (修正：タップで編集モード切り替え & ズーム防止) */}
+          {/* 📍 キャストメモ：デフォルトは閉じており、タップで16pxフォームが開く */}
           <div className="bg-pink-50/50 rounded-2xl p-3 border border-pink-100/50">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5 text-pink-400">
-                <StickyNote size={14} />
-                <span className="text-[10px] font-black uppercase tracking-widest">Cast Memo</span>
-              </div>
-              {isEditingMemo && (
-                <button onClick={() => setIsEditingMemo(false)} className="text-gray-400">
-                   <X size={16} />
-                </button>
-              )}
+            <div className="flex items-center gap-1.5 mb-2 text-pink-400">
+              <StickyNote size={14} />
+              <span className="text-[10px] font-black uppercase tracking-widest">Cast Memo</span>
             </div>
 
             {isEditingMemo ? (
@@ -99,14 +122,12 @@ export default function ReservationModal({
             ) : (
               <div 
                 onClick={() => setIsEditingMemo(true)} 
-                className="min-h-[60px] cursor-pointer group relative bg-white/50 rounded-xl p-2 border border-dashed border-pink-200/50 hover:bg-white transition-colors"
+                className="min-h-[50px] cursor-pointer group bg-white/40 rounded-xl p-3 border border-dashed border-pink-200 hover:bg-white transition-colors flex items-center justify-between"
               >
-                <p className="text-[14px] font-bold text-gray-600 leading-relaxed whitespace-pre-wrap">
-                  {selectedRes.cast_memo || <span className="text-gray-300 italic text-[12px]">タップしてメモを入力...</span>}
+                <p className="text-[14px] font-bold text-gray-600 leading-relaxed truncate pr-4">
+                  {selectedRes.cast_memo || <span className="text-gray-300 italic text-[12px]">タップして入力...</span>}
                 </p>
-                <div className="absolute top-1 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                   <Edit3 size={12} className="text-pink-300" />
-                </div>
+                <Edit3 size={14} className="text-pink-300 shrink-0" />
               </div>
             )}
           </div>

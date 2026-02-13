@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
-// 📍 分割したパーツをすべてインポート
+// 分割したパーツをインポート
 import DailyStats from './DailyDetail/DailyStats';
 import ReservationModal from './DailyDetail/ReservationModal';
 import ReservationList from './DailyDetail/ReservationList';
@@ -14,8 +14,11 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditingMemo, setIsEditingMemo] = useState(false);
   const [memoDraft, setMemoDraft] = useState('');
+  
+  // 📍 履歴計算用に自分の過去の全予約を保持するステート
+  const [allPastReservations, setAllPastReservations] = useState<any[]>([]);
 
-  // 1. 予約の本数を集計（DailyStatsに渡す用）
+  // 1. 予約の本数を集計
   const dayTotals = useMemo(() => {
     return reservations.reduce((acc: any, res: any) => {
       const isSoe = res.service_type === '添';
@@ -34,7 +37,23 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
   const isAbsent = shift?.status === 'absent';
   const isLate = shift?.is_late === true;
 
-  // 2. 当欠時の予約自動削除ロジック
+  // 2. 自分の全予約データを取得（履歴表示用）
+  useEffect(() => {
+    const fetchMyHistory = async () => {
+      if (!myLoginId || !supabase) return;
+      const { data, error } = await supabase
+        .from('reservations')
+        .select('*')
+        .eq('login_id', myLoginId);
+      
+      if (!error && data) {
+        setAllPastReservations(data);
+      }
+    };
+    fetchMyHistory();
+  }, [myLoginId, supabase, date]); // 日付が変わるタイミング等でも再取得
+
+  // 3. 当欠時の予約自動削除ロジック
   useEffect(() => {
     const autoDelete = async () => {
       if (isAbsent && reservations.length > 0 && supabase && myLoginId) {
@@ -50,9 +69,11 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
   // メモの下書き同期
   useEffect(() => {
     setMemoDraft(selectedRes?.cast_memo || '');
+    // モーダルを開くたびに編集モードはオフにする（デフォルトで閉じるため）
+    setIsEditingMemo(false);
   }, [selectedRes]);
 
-  // 3. 共通のハンドラー
+  // 4. ハンドラー
   const handleDelete = async () => {
     if (!selectedRes?.id || !supabase) return;
     if (!window.confirm("この予約を完全に削除しますか？")) return;
@@ -87,7 +108,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
     }
   };
 
-  // 4. イベント・デザイン情報の計算
   const eventInfo = useMemo(() => {
     const d = date.getDate();
     if (d === 10) return { label: 'かりんとの日', color: 'bg-[#FF9900]', text: 'text-white' };
@@ -105,10 +125,8 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
   return (
     <>
       <section className="relative overflow-hidden rounded-[32px] border border-gray-100 bg-white shadow-xl flex flex-col">
-        {/* イベントラベル */}
         {eventInfo && <div className={`w-full py-1 ${eventInfo.color} ${eventInfo.text} text-center text-[12px] font-black tracking-widest uppercase`}>{eventInfo.label}</div>}
         
-        {/* 日付・シフト時間ヘッダー */}
         <div className="flex items-center justify-center w-full p-2">
           <div className="flex items-center gap-2">
             <div className="flex items-baseline font-black tracking-tighter text-gray-800 leading-none">
@@ -132,7 +150,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
           </div>
         </div>
 
-        {/* 5. 分割されたパーツの配置 */}
         <DailyStats dayTotals={dayTotals} rewardAmount={shift?.reward_amount} theme={theme} />
         
         <ReservationList 
@@ -143,6 +160,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
         />
       </section>
 
+      {/* 📍 修正：全予約履歴(allPastReservations)をPropsとして渡す */}
       <ReservationModal 
         selectedRes={selectedRes}
         onClose={() => setSelectedRes(null)}
@@ -154,6 +172,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
         setMemoDraft={setMemoDraft}
         onSaveMemo={handleSaveMemo}
         getBadgeStyle={getBadgeStyle}
+        allPastReservations={allPastReservations}
       />
     </>
   );
