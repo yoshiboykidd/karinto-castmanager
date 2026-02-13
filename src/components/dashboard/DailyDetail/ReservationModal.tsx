@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X, Calculator, Trash2, Edit3, Save, Loader2 } from 'lucide-react';
+import { X, Calculator, Trash2, Edit3, Save, Loader2, StickyNote } from 'lucide-react';
 
 export default function ReservationModal({ 
   selectedRes, 
@@ -19,12 +19,11 @@ export default function ReservationModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-start justify-center p-2 overflow-y-auto bg-black/90 backdrop-blur-sm pt-4 pb-24">
-      {/* 背景クリックで閉じる */}
       <div className="absolute inset-0" onClick={onClose} />
       
       <div className="relative bg-white w-full max-w-[340px] rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in duration-150 flex flex-col text-gray-800">
         
-        {/* ヘッダー：時間とバッジ */}
+        {/* ヘッダー */}
         <div className="p-2 px-4 flex items-center justify-center gap-3 relative border-b border-gray-50">
           <button onClick={onClose} className="absolute top-2 right-3 text-gray-300">
             <X size={20} />
@@ -52,7 +51,7 @@ export default function ReservationModal({
             </h3>
           </div>
 
-          {/* 金額とホテル */}
+          {/* 金額・ホテル */}
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-gray-50 p-2 rounded-xl border border-gray-100 flex flex-col justify-center text-center">
               <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">合計金額</p>
@@ -67,41 +66,56 @@ export default function ReservationModal({
             </div>
           </div>
 
-          {/* キャストメモエリア */}
+          {/* 📍 キャストメモエリア (修正：タップで編集モード切り替え & ズーム防止) */}
           <div className="bg-pink-50/50 rounded-2xl p-3 border border-pink-100/50">
-            <div className="flex items-center gap-1.5 mb-2 text-pink-400">
-              <Edit3 size={14} />
-              <span className="text-[10px] font-black uppercase tracking-widest">Cast Memo</span>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5 text-pink-400">
+                <StickyNote size={14} />
+                <span className="text-[10px] font-black uppercase tracking-widest">Cast Memo</span>
+              </div>
+              {isEditingMemo && (
+                <button onClick={() => setIsEditingMemo(false)} className="text-gray-400">
+                   <X size={16} />
+                </button>
+              )}
             </div>
+
             {isEditingMemo ? (
               <div className="space-y-2">
                 <textarea 
-                  className="w-full p-3 rounded-xl border-2 border-pink-100 text-[14px] font-bold focus:outline-none focus:border-pink-300 min-h-[100px]"
+                  className="w-full p-3 rounded-xl border-2 border-pink-200 bg-white text-[16px] font-bold focus:outline-none focus:border-pink-400 min-h-[120px] shadow-inner"
                   value={memoDraft}
                   onChange={(e) => setMemoDraft(e.target.value)}
+                  placeholder="メモを入力..."
                   autoFocus
                 />
                 <button 
                   onClick={onSaveMemo}
-                  className="w-full h-10 bg-pink-500 text-white rounded-lg flex items-center justify-center gap-1 font-black text-[13px]"
+                  className="w-full h-12 bg-pink-500 text-white rounded-xl flex items-center justify-center gap-2 font-black text-[14px] shadow-lg shadow-pink-200"
                 >
-                  <Save size={16} /> 保存する
+                  <Save size={18} /> 保存する
                 </button>
               </div>
             ) : (
-              <div onClick={() => setIsEditingMemo(true)} className="min-h-[60px] cursor-pointer">
-                <p className="text-[14px] font-bold text-gray-600 leading-relaxed">
+              <div 
+                onClick={() => setIsEditingMemo(true)} 
+                className="min-h-[60px] cursor-pointer group relative bg-white/50 rounded-xl p-2 border border-dashed border-pink-200/50 hover:bg-white transition-colors"
+              >
+                <p className="text-[14px] font-bold text-gray-600 leading-relaxed whitespace-pre-wrap">
                   {selectedRes.cast_memo || <span className="text-gray-300 italic text-[12px]">タップしてメモを入力...</span>}
                 </p>
+                <div className="absolute top-1 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                   <Edit3 size={12} className="text-pink-300" />
+                </div>
               </div>
             )}
           </div>
 
-          {/* 各種アクションボタン */}
+          {/* ボタン類 */}
           <div className="space-y-1.5 pt-1">
             <button 
               onClick={() => alert("OP計算君起動")} 
-              className="w-full h-14 rounded-2xl bg-blue-500 text-white flex items-center justify-center gap-2 font-black text-[16px] shadow-lg shadow-blue-100"
+              className="w-full h-14 rounded-2xl bg-blue-500 text-white flex items-center justify-center gap-2 font-black text-[16px] shadow-lg shadow-blue-100 active:scale-95 transition-transform"
             >
               <Calculator size={20} /> OP計算君
             </button>
