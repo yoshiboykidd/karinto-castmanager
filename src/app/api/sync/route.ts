@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { addDays, format } from 'date-fns';
 
-export const maxDuration = 60; // 1店舗あたり60秒あれば十分間に合います
+export const maxDuration = 60; 
 export const dynamic = 'force-dynamic';
 
 const ALL_SHOPS = [
@@ -22,17 +22,14 @@ const ALL_SHOPS = [
 ];
 
 export async function GET(req: NextRequest) {
-  // 1. 認証チェック
   const authHeader = req.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && process.env.NODE_ENV === 'production') {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 
-  // 2. クエリパラメータから対象店舗を取得 (?shop=0 ~ 11)
   const { searchParams } = new URL(req.url);
   const shopIndexParam = searchParams.get('shop');
   
-  // パラメータがない場合はエラーまたは全店舗(安全のため1店舗指定を推奨)
   if (shopIndexParam === null) {
     return NextResponse.json({ error: "No shop index provided" }, { status: 400 });
   }
@@ -46,7 +43,11 @@ export async function GET(req: NextRequest) {
 
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const logs: string[] = [];
-  const targetDates = [format(new Date(), 'yyyy-MM-dd'), format(addDays(new Date(), 1), 'yyyy-MM-dd')];
+
+  // 📍 今日から8日間（今日 + 7日間）の日付リストを生成
+  const targetDates = Array.from({ length: 8 }, (_, i) => 
+    format(addDays(new Date(), i), 'yyyy-MM-dd')
+  );
 
   const normalize = (s: string) => s.replace(/[\s　\n\t]/g, '').toLowerCase();
 
@@ -55,7 +56,6 @@ export async function GET(req: NextRequest) {
     const html = await res.text();
     const $ = cheerio.load(html);
 
-    // キャスト一覧取得
     const { data: castMembers } = await supabase
       .from('cast_members')
       .select('login_id, display_name, hp_display_name')
@@ -63,13 +63,13 @@ export async function GET(req: NextRequest) {
 
     if (!castMembers) throw new Error("Cast members not found");
 
+    // 各日付についてループ処理
     for (const dateStrDB of targetDates) {
       const dateObj = new Date(dateStrDB);
       const dayOfMonth = dateObj.getDate();
       const foundInHP = new Set<string>();
       const upsertBatch: any[] = [];
 
-      // 当欠ガード用の既存シフト取得
       const { data: existingShifts } = await supabase
         .from('shifts')
         .select('login_id, status')
@@ -77,7 +77,6 @@ export async function GET(req: NextRequest) {
       
       const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
 
-      // HP解析
       $('table tr').each((_, tr) => {
         const cells = $(tr).find('td');
         if (cells.length < 31) return;
@@ -90,7 +89,6 @@ export async function GET(req: NextRequest) {
         if (!targetMember) return;
         const lid = String(targetMember.login_id).trim().padStart(8, '0');
         
-        // 当欠(absent)はHPがどうあれ上書きしない
         if (existingMap.get(lid)?.status === 'absent') {
           foundInHP.add(lid);
           return;
@@ -114,7 +112,6 @@ export async function GET(req: NextRequest) {
         }
       });
 
-      // HPから消えたofficialキャストを削除
       let removeCount = 0;
       const idsToRemove = (existingShifts || [])
         .map(s => String(s.login_id).trim().padStart(8, '0'))
@@ -132,20 +129,18 @@ export async function GET(req: NextRequest) {
       if (upsertBatch.length > 0) {
         await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
       }
-      logs.push(`${shop.name}:${dateStrDB.slice(5)} (+${upsertBatch.length}/-${removeCount})`);
+      logs.push(`${dateStrDB.slice(8)}日(+${upsertBatch.length}/-${removeCount})`);
     }
 
-    // ログ記録
     await supabase.from('scraping_logs').insert({
       executed_at: new Date().toISOString(),
       status: 'success',
-      details: logs.join(', ')
+      details: `${shop.name}: ${logs.join(', ')}`
     });
 
     return NextResponse.json({ success: true, shop: shop.name, logs });
 
   } catch (e: any) {
-    console.error(e);
     return NextResponse.json({ success: false, error: e.message }, { status: 500 });
   }
 }
