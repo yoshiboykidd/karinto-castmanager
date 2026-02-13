@@ -6,6 +6,7 @@ import { addDays, format } from 'date-fns';
 export const maxDuration = 60; 
 export const dynamic = 'force-dynamic';
 
+// 📍 12店舗すべてのリストを復元
 const ALL_SHOPS = [
   { id: '001', name: '神田', baseUrl: 'https://www.kakarinto.com/attend.php' }, 
   { id: '002', name: '赤坂', baseUrl: 'https://www.akakari10.com/attend.php' }, 
@@ -14,82 +15,82 @@ const ALL_SHOPS = [
   { id: '005', name: '渋谷', baseUrl: 'https://www.shibuyakarinto.com/attend.php' }, 
   { id: '006', name: '池西', baseUrl: 'https://ikekari.com/attend.php' }, 
   { id: '007', name: '五反田', baseUrl: 'https://www.karin-go.com/attend.php' }, 
-  { id: '008', name: '大宮', baseUrl: 'https://www.karin10omiya.com/attend.php' }
+  { id: '008', name: '大宮', baseUrl: 'https://www.karin10omiya.com/attend.php' },
+  { id: '009', name: '吉祥寺', baseUrl: 'https://www.kari-kichi.com/attend.php' }, 
+  { id: '010', name: '大久保', baseUrl: 'https://www.ookubo-karinto.com/attend.php' }, 
+  { id: '011', name: '池東', baseUrl: 'https://www.karin10bukuro-3shine.com/attend.php' }, 
+  { id: '012', name: '小岩', baseUrl: 'https://www.karin10koiwa.com/attend.php' }
 ];
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-const normalize = (s: string) => s.replace(/[\s\u3000]/g, '').trim();
 
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    // return new NextResponse('Unauthorized', { status: 401 });
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && process.env.NODE_ENV === 'production') {
+    return new NextResponse('Unauthorized', { status: 401 });
   }
 
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const logs: string[] = [];
   const targetDates = [format(new Date(), 'yyyy-MM-dd'), format(addDays(new Date(), 1), 'yyyy-MM-dd')];
 
-  try {
-    const { data: castData } = await supabase.from('cast_members').select('login_id, display_name');
-    const nameMap = new Map();
-    castData?.forEach(c => {
-      if (c.display_name) nameMap.set(normalize(c.display_name), String(c.login_id).padStart(8, '0'));
-    });
+  // 名前のゆらぎを吸収する関数
+  const normalize = (s: string) => s.replace(/[\s　\n\t]/g, '').toLowerCase();
 
-    for (const shop of ALL_SHOPS) {
-      try {
-        const res = await fetch(`${shop.baseUrl}?t=${Date.now()}`, { cache: 'no-store' });
-        const html = await res.text();
-        const $ = cheerio.load(html);
-        const dateStrHP = $('.date').first().text().match(/(\d+)月(\d+)日/);
-        if (!dateStrHP) continue;
+  for (const shop of ALL_SHOPS) {
+    try {
+      const res = await fetch(`${shop.baseUrl}?t=${Date.now()}`, { cache: 'no-store' });
+      const html = await res.text();
+      const $ = cheerio.load(html);
 
-        const dateStrDB = format(new Date(), 'yyyy') + '-' + dateStrHP[1].padStart(2, '0') + '-' + dateStrHP[2].padStart(2, '0');
-        const { data: existingShifts } = await supabase.from('shifts').select('*').eq('shift_date', dateStrDB);
-        const existingMap = new Map();
-        existingShifts?.forEach(s => existingMap.set(String(s.login_id).padStart(8, '0'), s));
+      // DBからキャスト一覧を取得
+      const { data: castMembers } = await supabase
+        .from('cast_members')
+        .select('login_id, display_name, hp_display_name')
+        .eq('home_shop_id', shop.id);
 
-        const upsertBatch: any[] = [];
+      if (!castMembers) continue;
+
+      for (const dateStrDB of targetDates) {
+        const dateObj = new Date(dateStrDB);
+        const dayOfMonth = dateObj.getDate();
         const foundInHP = new Set<string>();
-        const timeRegex = /(\d{2}:\d{2})\s*[-〜~]\s*(\d{2}:\d{2})/;
+        const upsertBatch: any[] = [];
 
-        $('h3, .name, .cast_name, span.name, div.name, strong').each((_, nameEl) => {
-          const rawName = $(nameEl).text();
-          const cleanName = normalize(rawName);
-          const loginId = nameMap.get(cleanName);
-          if (!loginId) return;
+        // 既存のシフトを取得（当欠ガードのため）
+        const { data: existingShifts } = await supabase
+          .from('shifts')
+          .select('login_id, status')
+          .eq('shift_date', dateStrDB);
+        
+        const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
 
-          const context = $(nameEl).text() + " " + $(nameEl).parent().text() + " " + $(nameEl).parent().parent().text();
-          const timeMatch = context.match(timeRegex);
+        // HPのテーブルを解析
+        $('table tr').each((_, tr) => {
+          const cells = $(tr).find('td');
+          if (cells.length < 31) return;
 
-          if (timeMatch) {
-            const hpStart = timeMatch[1].padStart(5, '0');
-            const hpEnd = timeMatch[2].padStart(5, '0');
-            const dbShift = existingMap.get(loginId);
+          const rawName = $(cells[0]).text().trim();
+          if (!rawName) return;
 
-            foundInHP.add(loginId);
+          const targetMember = castMembers.find(m => 
+            normalize(m.hp_display_name || m.display_name) === normalize(rawName)
+          );
 
-            // 📍 修正：当欠保護ロジック
-            // DBのステータスが 'absent'（当欠）の場合は、HPの情報で上書きせずスキップする
-            if (dbShift?.status === 'absent') {
-              return; 
-            }
+          if (!targetMember) return;
+          const lid = String(targetMember.login_id).trim().padStart(8, '0');
+          
+          // 当欠ステータスの場合は同期をスキップして保護
+          if (existingMap.get(lid)?.status === 'absent') {
+            foundInHP.add(lid);
+            return;
+          }
 
-            if (dbShift?.status === 'requested') {
-              if (dbShift.start_time !== hpStart || dbShift.end_time !== hpEnd) {
-                return; 
-              }
-            }
-
+          const timeStr = $(cells[dayOfMonth]).text().trim();
+          if (timeStr && timeStr.includes('~')) {
+            const [hpStart, hpEnd] = timeStr.split('~').map(t => t.trim().padStart(5, '0') + ':00');
+            foundInHP.add(lid);
             upsertBatch.push({
-              login_id: loginId,
+              login_id: lid,
               shift_date: dateStrDB,
-              store_code: shop.id,
-              hp_display_name: cleanName,
               hp_start_time: hpStart,
               hp_end_time: hpEnd,
               start_time: hpStart,
@@ -101,6 +102,7 @@ export async function GET(req: NextRequest) {
           }
         });
 
+        // HPから消えたキャストのクリーンアップ（officialのみ対象）
         let removeCount = 0;
         if (foundInHP.size > 0) {
           const idsToRemove = (existingShifts || [])
@@ -120,18 +122,19 @@ export async function GET(req: NextRequest) {
         if (upsertBatch.length > 0) {
           await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
         }
-        logs.push(`${dateStrDB.slice(5)} (+${upsertBatch.length}/-${removeCount})`);
-      } catch (e: any) { logs.push(`${shop.name} Err`); }
+        logs.push(`${shop.name}${dateStrDB.slice(5)} (+${upsertBatch.length}/-${removeCount})`);
+      }
+    } catch (e: any) {
+      logs.push(`${shop.name} Error`);
     }
-
-    await supabase.from('scraping_logs').insert({
-      exec_type: 'cron_auto',
-      status: 'success',
-      message: logs.join(', ')
-    });
-
-    return NextResponse.json({ success: true, logs });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
+
+  // スクレイピング完了ログを保存
+  await supabase.from('scraping_logs').insert({
+    executed_at: new Date().toISOString(),
+    status: 'success',
+    details: logs.join(', ')
+  });
+
+  return NextResponse.json({ success: true, logs });
 }
