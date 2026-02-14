@@ -39,13 +39,13 @@ export default function MonthlySummary({ month, totals, targetAmount = 0, theme 
         </div>
       )}
 
-      {/* 1行目：表題（指示通り中央配置に変更） */}
-      <div className="text-center relative z-10">
+      {/* 1行目：表題（中央配置） */}
+      <div className="text-center relative z-10 mb-1">
         <h2 className={`text-[20px] font-black ${c.textSub} tracking-tighter leading-none`}>{month}の実績</h2>
       </div>
 
-      {/* 2行目：出勤・稼働バッジ（元のデザインを維持） */}
-      <div className="flex justify-center gap-1.5 relative z-10">
+      {/* 2行目：実績バッジ（出勤・稼働・当欠・遅刻を同じ構成・デザインで配置） */}
+      <div className="flex flex-wrap justify-center gap-1.5 relative z-10">
         <div className={`bg-white/90 px-3 py-1.5 rounded-xl border ${c.subBorder} shadow-sm flex items-baseline justify-center min-w-[70px]`}>
           <span className="text-[11px] font-bold text-gray-400 mr-1">出勤</span>
           <span className={`text-[24px] font-black ${c.textSub} leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>{totals.count}</span>
@@ -56,9 +56,21 @@ export default function MonthlySummary({ month, totals, targetAmount = 0, theme 
           <span className={`text-[24px] font-black ${c.textSub} leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>{Math.round(totals.hours * 10) / 10}</span>
           <span className="text-[11px] font-bold text-gray-400 ml-0.5">h</span>
         </div>
+        {/* 追加：当欠（赤） */}
+        <div className={`bg-white/90 px-3 py-1.5 rounded-xl border ${c.subBorder} shadow-sm flex items-baseline justify-center min-w-[70px]`}>
+          <span className="text-[11px] font-bold text-gray-400 mr-1">当欠</span>
+          <span className={`text-[24px] font-black text-red-500 leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>{totals.absent || 0}</span>
+          <span className="text-[11px] font-bold text-gray-400 ml-0.5">日</span>
+        </div>
+        {/* 追加：遅刻（オレンジ） */}
+        <div className={`bg-white/90 px-3 py-1.5 rounded-xl border ${c.subBorder} shadow-sm flex items-baseline justify-center min-w-[70px]`}>
+          <span className="text-[11px] font-bold text-gray-400 mr-1">遅刻</span>
+          <span className={`text-[24px] font-black text-orange-500 leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>{totals.late || 0}</span>
+          <span className="text-[11px] font-bold text-gray-400 ml-0.5">回</span>
+        </div>
       </div>
       
-      {/* 3行目：金額（元のデザインを維持） */}
+      {/* 3行目：金額 */}
       <div className="text-center flex flex-col items-center justify-center relative z-10 -my-1">
         <p className={`text-[56px] font-black ${c.textMain} leading-none tracking-tighter filter drop-shadow-sm [text-shadow:_0.8px_0_0_currentColor]`}>
           <span className="text-3xl mr-1 opacity-40 translate-y-[-6px] inline-block">¥</span>
@@ -66,7 +78,7 @@ export default function MonthlySummary({ month, totals, targetAmount = 0, theme 
         </p>
       </div>
 
-      {/* 4行目：目標ゲージ（元のデザインを維持） */}
+      {/* 4行目：目標ゲージ */}
       {targetAmount > 0 && (
         <div className="bg-white/40 rounded-xl p-2.5 border border-white/50 shadow-sm mx-1 relative z-10">
           <div className="flex justify-between items-end mb-1.5 px-1">
@@ -87,7 +99,7 @@ export default function MonthlySummary({ month, totals, targetAmount = 0, theme 
         </div>
       )}
 
-      {/* 5行目：指名数グリッド（元のデザインを維持） */}
+      {/* 5行目：指名数グリッド */}
       <div className={`grid grid-cols-3 bg-white/80 backdrop-blur-sm rounded-2xl border ${c.subBorder} shadow-sm divide-x divide-gray-100 py-2 relative z-10`}>
         <div className="flex flex-col items-center justify-center space-y-0.5">
           <p className={`text-[11px] ${c.textLabel} font-black leading-none tracking-widest scale-y-90`}>フリー</p>
