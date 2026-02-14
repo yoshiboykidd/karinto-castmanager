@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
       return toHiragana(s);
     };
 
-    // 店舗所属キャストを数値比較で確実に抽出
+    // 店舗IDを数値として比較し、所属キャストを抽出
     const shopCast = allCast?.filter(c => Number(c.home_shop_id) === Number(shop.id)) || [];
     const nameMap = new Map();
     shopCast.forEach(c => {
@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
               hp_end_time: hpEnd,
               start_time: hpStart,
               end_time: hpEnd,
-              reward_amount: 0, // 📍 修正：ここが抜けていたため23502エラーが出ていました
+              // 📍 reward_amount は送信しない（DB側の設定でNULLまたは既存値を維持）
               updated_at: new Date().toISOString()
             });
           }
