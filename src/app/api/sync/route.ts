@@ -26,9 +26,15 @@ function toHiragana(str: string) {
 }
 
 export async function GET(req: NextRequest) {
+  // 📍 修正1：認証チェックのログを強化（cron-job.org対策）
   const authHeader = req.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && process.env.NODE_ENV === 'production') {
-    return new NextResponse('Unauthorized', { status: 401 });
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (process.env.NODE_ENV === 'production') {
+    if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
+      console.error("Auth Fail: Header is " + authHeader);
+      return NextResponse.json({ success: false, message: "Unauthorized: Secret mismatch" }, { status: 401 });
+    }
   }
 
   const { searchParams } = new URL(req.url);
@@ -78,7 +84,7 @@ export async function GET(req: NextRequest) {
 
         const { data: existingShifts } = await supabase
           .from('shifts')
-          .select('*') // 📍 デバッグ用に全カラム取得
+          .select('login_id, status, start_time, end_time, reward_amount')
           .eq('shift_date', dateStrDB);
         
         const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
@@ -100,9 +106,8 @@ export async function GET(req: NextRequest) {
             foundInHP.add(loginId);
             if (dbShift?.status === 'absent') return;
 
-            // 📍 解決策：reward_amount を含めるが、既存の値があればそれを使い、なければ NULL (送らない) 
-            // ただし、DB制約が厳しい場合を想定して ?? 0 も残せるように。
-            const data: any = {
+            // 📍 修正2：reward_amount の制約エラーを回避（既存値があれば維持、なければ0）
+            upsertBatch.push({
               login_id: loginId,
               shift_date: dateStrDB,
               status: 'official',
@@ -111,13 +116,9 @@ export async function GET(req: NextRequest) {
               hp_end_time: hpEnd,
               start_time: hpStart,
               end_time: hpEnd,
+              reward_amount: dbShift?.reward_amount ?? 0,
               updated_at: new Date().toISOString()
-            };
-
-            // 📍 reward_amount が必須と言われるなら 0 を入れる、そうでなければ既存値を維持
-            data.reward_amount = dbShift?.reward_amount ?? 0;
-
-            upsertBatch.push(data);
+            });
           }
         });
 
@@ -127,8 +128,6 @@ export async function GET(req: NextRequest) {
             .upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
           
           if (upsertError) {
-            // 📍 ログにどのカラムが原因か詳しく出すようにコンソール出力
-            console.error("UPSERT FAILURE DETAIL:", upsertError);
             logs.push(`${dateStrDB.slice(8)}日 ERR:${upsertError.code}`);
           } else {
             logs.push(`${dateStrDB.slice(8)}日(HP:${foundInHP.size}/更:${upsertBatch.length})`);
