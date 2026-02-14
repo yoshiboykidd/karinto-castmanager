@@ -125,9 +125,15 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
   return (
     <>
       <section className="relative overflow-hidden rounded-[32px] border border-gray-100 bg-white shadow-xl flex flex-col">
-        {eventInfo && <div className={`w-full py-1 ${eventInfo.color} ${eventInfo.text} text-center text-[12px] font-black tracking-widest uppercase`}>{eventInfo.label}</div>}
+        {/* イベント情報 */}
+        {eventInfo && (
+          <div className={`w-full py-1 ${eventInfo.color} ${eventInfo.text} text-center text-[12px] font-black tracking-widest uppercase`}>
+            {eventInfo.label}
+          </div>
+        )}
         
-        <div className="flex items-center justify-center w-full p-2">
+        {/* 日付・シフト時間ヘッダー */}
+        <div className="flex items-center justify-center w-full p-2 border-b border-gray-50">
           <div className="flex items-center gap-2">
             <div className="flex items-baseline font-black tracking-tighter text-gray-800 leading-none">
               <span className="text-[24px]">{format(date, 'M')}</span>
@@ -137,30 +143,44 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
             </div>
             {shift?.status === 'official' || isAbsent ? (
               <div className="flex items-center gap-1">
-                {isAbsent ? <span className="w-10 h-6 flex items-center justify-center rounded bg-rose-600 text-white text-[10px] font-black">当欠</span>
-                : isLate ? <span className="w-10 h-6 flex items-center justify-center rounded bg-amber-500 text-white text-[10px] font-black animate-pulse">遅刻</span>
-                : <span className="w-10 h-6 flex items-center justify-center rounded bg-pink-500 text-white text-[10px] font-black">確定</span>}
+                {isAbsent ? (
+                  <span className="w-10 h-6 flex items-center justify-center rounded bg-rose-600 text-white text-[10px] font-black">当欠</span>
+                ) : isLate ? (
+                  <span className="w-10 h-6 flex items-center justify-center rounded bg-amber-500 text-white text-[10px] font-black animate-pulse">遅刻</span>
+                ) : (
+                  <span className="w-10 h-6 flex items-center justify-center rounded bg-pink-500 text-white text-[10px] font-black">確定</span>
+                )}
                 <div className={`flex items-baseline font-black tracking-tighter leading-none ${isAbsent ? 'text-gray-300 line-through' : accentColor}`}>
                   <span className="text-[20px]">{shift?.start_time}</span>
                   <span className="text-[10px] mx-0.5 opacity-20">〜</span>
                   <span className="text-[20px]">{shift?.end_time}</span>
                 </div>
               </div>
-            ) : <span className="text-[11px] font-black text-gray-200 uppercase tracking-widest ml-1">Day Off</span>}
+            ) : (
+              <span className="text-[11px] font-black text-gray-200 uppercase tracking-widest ml-1">Day Off</span>
+            )}
           </div>
         </div>
 
-        <DailyStats dayTotals={dayTotals} rewardAmount={shift?.reward_amount} theme={theme} />
-        
-        <ReservationList 
-          reservations={reservations} 
-          onSelect={setSelectedRes} 
-          getBadgeStyle={getBadgeStyle} 
-          isAbsent={isAbsent}
+        {/* 📍 1. 予約一覧を上に配置 */}
+        <div className="flex-1 min-h-[100px]">
+          <ReservationList 
+            reservations={reservations} 
+            onSelect={setSelectedRes} 
+            getBadgeStyle={getBadgeStyle} 
+            isAbsent={isAbsent}
+          />
+        </div>
+
+        {/* 📍 2. 統計情報を下（予約一覧の後）に配置 */}
+        <DailyStats 
+          dayTotals={dayTotals} 
+          rewardAmount={shift?.reward_amount} 
+          theme={theme} 
         />
       </section>
 
-      {/* 📍 修正：全予約履歴(allPastReservations)をPropsとして渡す */}
+      {/* 予約詳細モーダル */}
       <ReservationModal 
         selectedRes={selectedRes}
         onClose={() => setSelectedRes(null)}
