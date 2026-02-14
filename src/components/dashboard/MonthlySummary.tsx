@@ -1,11 +1,16 @@
 'use client';
 
+
 import { useState } from 'react';
 
-export default function MonthlySummary({ month, totals, targetAmount = 0, theme = 'pink' }: any) {
-  const [isCovered, setIsCovered] = useState(true);
 
+export default function MonthlySummary({ month, totals, targetAmount = 0, theme = 'pink' }: any) {
+  const [isCovered, setIsCovered] = useState(true); // 初期状態は蓋（KCM画像）を表示
+
+
+  // 📍 提供されたSupabaseのURLを設定
   const imageURL = "https://gstsgybukinlkzdqotyv.supabase.co/storage/v1/object/public/assets/KCMlogo.png";
+
 
   const THEME_STYLES: any = {
     pink:   { bgFrom: 'from-[#FFE9ED]', bgTo: 'to-[#FFF5F7]', border: 'border-pink-200',  textMain: 'text-pink-600', textSub: 'text-pink-500',  textLabel: 'text-pink-400',  subBorder: 'border-pink-50',  bar: 'bg-pink-400' },
@@ -19,81 +24,86 @@ export default function MonthlySummary({ month, totals, targetAmount = 0, theme 
   const c = THEME_STYLES[theme] || THEME_STYLES.pink;
   const progressPercent = targetAmount > 0 ? Math.min(100, Math.floor((totals.amount / targetAmount) * 100)) : 0;
 
+
   return (
     <section 
-      onClick={() => setIsCovered(!isCovered)}
-      className={`relative bg-gradient-to-br ${c.bgFrom} ${c.bgTo} rounded-[32px] p-5 border ${c.border} overflow-hidden shadow-sm flex flex-col space-y-4 subpixel-antialiased cursor-pointer select-none`}
+      onClick={() => setIsCovered(!isCovered)} // 枠全体タップで開閉
+      className={`relative bg-gradient-to-br ${c.bgFrom} ${c.bgTo} rounded-[32px] p-5 border ${c.border} overflow-hidden shadow-sm flex flex-col space-y-2 subpixel-antialiased cursor-pointer select-none`}
     >
-      {/* 📍 KCM画像の蓋（オリジナル維持） */}
+      {/* 📍 KCM画像の蓋（isCoveredがtrueの時のみ最前面に表示） */}
       {isCovered && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/40 backdrop-blur-md transition-all duration-300">
-          <img src={imageURL} alt="KCM Cover" className="w-full h-full object-cover opacity-90" />
+          <img 
+            src={imageURL} 
+            alt="KCM Cover" 
+            className="w-full h-full object-cover opacity-90"
+          />
+          {/* 下部に薄く案内を表示 */}
           <div className="absolute bottom-3 px-3 py-1 bg-black/20 backdrop-blur-sm rounded-full">
             <p className="text-[10px] font-black text-white uppercase tracking-widest">Tap to reveal</p>
           </div>
         </div>
       )}
 
-      {/* 1行目：月表示 */}
-      <div className="relative z-10 px-1">
-        <h2 className={`text-[20px] font-black ${c.textSub} tracking-tighter leading-none`}>{month}の実績</h2>
-      </div>
 
-      {/* 2行目：出勤・稼働・当欠・遅刻（オリジナルと同等の太字・質感） */}
-      <div className={`relative z-10 flex justify-between items-center bg-white/90 px-4 py-2.5 rounded-2xl border ${c.subBorder} shadow-sm font-black tracking-tighter`}>
-        <div className="flex flex-col items-center">
-          <span className="text-[10px] text-gray-400 mb-0.5">出勤</span>
-          <span className={`text-[18px] ${c.textSub}`}>{totals.days || 0}日</span>
-        </div>
-        <div className="w-[1px] h-6 bg-gray-100" />
-        <div className="flex flex-col items-center">
-          <span className="text-[10px] text-gray-400 mb-0.5">稼働</span>
-          <span className={`text-[18px] ${c.textSub}`}>{Math.round(totals.hours * 10) / 10}h</span>
-        </div>
-        <div className="w-[1px] h-6 bg-gray-100" />
-        <div className="flex flex-col items-center">
-          <span className="text-[10px] text-red-300 mb-0.5">当欠</span>
-          <span className="text-[18px] text-red-500">{totals.absent || 0}日</span>
-        </div>
-        <div className="w-[1px] h-6 bg-gray-100" />
-        <div className="flex flex-col items-center">
-          <span className="text-[10px] text-orange-300 mb-0.5">遅刻</span>
-          <span className="text-[18px] text-orange-500">{totals.late || 0}回</span>
+      {/* 以下、元の実績表示コンテンツ（蓋が開いた時に見える） */}
+      <div className="flex items-center justify-between mb-1 relative z-10">
+        <h2 className={`text-[20px] font-black ${c.textSub} tracking-tighter leading-none shrink-0`}>{month}の実績</h2>
+        <div className="flex gap-1.5">
+          <div className={`bg-white/90 px-3 py-1.5 rounded-xl border ${c.subBorder} shadow-sm flex items-baseline justify-center min-w-[70px]`}>
+            <span className="text-[11px] font-bold text-gray-400 mr-1">出勤</span>
+            <span className={`text-[24px] font-black ${c.textSub} leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>{totals.count}</span>
+            <span className="text-[11px] font-bold text-gray-400 ml-0.5">日</span>
+          </div>
+          <div className={`bg-white/90 px-3 py-1.5 rounded-xl border ${c.subBorder} shadow-sm flex items-baseline justify-center min-w-[70px]`}>
+            <span className="text-[11px] font-bold text-gray-400 mr-1">稼働</span>
+            <span className={`text-[24px] font-black ${c.textSub} leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>{Math.round(totals.hours * 10) / 10}</span>
+            <span className="text-[11px] font-bold text-gray-400 ml-0.5">h</span>
+          </div>
         </div>
       </div>
       
-      {/* 3行目：報酬合計金額（オリジナルのインパクトを維持） */}
-      <div className="text-center relative z-10">
+      <div className="text-center flex flex-col items-center justify-center relative z-10 -my-1">
         <p className={`text-[56px] font-black ${c.textMain} leading-none tracking-tighter filter drop-shadow-sm [text-shadow:_0.8px_0_0_currentColor]`}>
-          <span className="text-3xl mr-1 opacity-40 translate-y-[-6px] inline-block font-black">¥</span>
+          <span className="text-3xl mr-1 opacity-40 translate-y-[-6px] inline-block">¥</span>
           {totals.amount.toLocaleString()}
         </p>
       </div>
 
-      {/* 4〜6行目：集計グリッド（数字サイズ text-[26px] を死守） */}
-      <div className={`bg-white/80 backdrop-blur-sm rounded-3xl border ${c.subBorder} shadow-sm overflow-hidden relative z-10 divide-y divide-gray-100`}>
-        {/* 4行目：ラベル */}
-        <div className="grid grid-cols-4 py-2 text-center items-center">
-          <div />
-          <p className={`text-[11px] ${c.textLabel} font-black tracking-widest scale-y-95`}>フリー</p>
-          <p className={`text-[11px] ${c.textLabel} font-black tracking-widest scale-y-95`}>初指名</p>
-          <p className={`text-[11px] ${c.textLabel} font-black tracking-widest scale-y-95`}>本指名</p>
-        </div>
 
-        {/* 5行目：〈か〉内訳 */}
-        <div className="grid grid-cols-4 py-3 text-center items-center">
-          <p className={`text-[12px] font-black ${c.textSub} opacity-60 tracking-tighter`}>〈か〉</p>
-          <p className={`text-[26px] font-black ${c.textMain} leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>{totals.ka_f || 0}</p>
-          <p className={`text-[26px] font-black ${c.textMain} leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>{totals.ka_first || 0}</p>
-          <p className={`text-[26px] font-black ${c.textMain} leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>{totals.ka_main || 0}</p>
+      {targetAmount > 0 && (
+        <div className="bg-white/40 rounded-xl p-2.5 border border-white/50 shadow-sm mx-1 relative z-10">
+          <div className="flex justify-between items-end mb-1.5 px-1">
+             <div className="flex items-center gap-2">
+                <span className="text-[9px] font-bold text-gray-400 tracking-widest bg-white/60 px-1.5 py-0.5 rounded">GOAL</span>
+                <span className={`text-[16px] font-black ${c.textSub} tracking-tight leading-none`}>¥{targetAmount.toLocaleString()}</span>
+             </div>
+             <div className="flex items-baseline">
+                <span className={`text-[20px] font-black ${c.textMain} leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>{progressPercent}</span>
+                <span className={`text-[10px] font-bold ${c.textLabel} ml-0.5`}>%</span>
+             </div>
+          </div>
+          <div className="w-full h-3.5 bg-gray-100 rounded-full overflow-hidden border border-white/60 shadow-inner relative">
+            <div className={`h-full ${c.bar} transition-all duration-1000 ease-out shadow-sm relative`} style={{ width: `${progressPercent}%` }}>
+               <div className="absolute inset-0 w-full h-full opacity-30 bg-[repeating-linear-gradient(45deg,transparent,transparent_6px,#fff_6px,#fff_12px)]"></div>
+            </div>
+          </div>
         </div>
+      )}
 
-        {/* 6行目：〈添〉内訳 */}
-        <div className="grid grid-cols-4 py-3 text-center items-center bg-white/30">
-          <p className={`text-[12px] font-black ${c.textSub} opacity-60 tracking-tighter`}>〈添〉</p>
-          <p className={`text-[26px] font-black ${c.textMain} leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>{totals.soe_f || 0}</p>
-          <p className={`text-[26px] font-black ${c.textMain} leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>{totals.soe_first || 0}</p>
-          <p className={`text-[26px] font-black ${c.textMain} leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>{totals.soe_main || 0}</p>
+
+      <div className={`grid grid-cols-3 bg-white/80 backdrop-blur-sm rounded-2xl border ${c.subBorder} shadow-sm divide-x divide-gray-100 py-2 relative z-10`}>
+        <div className="flex flex-col items-center justify-center space-y-0.5">
+          <p className={`text-[11px] ${c.textLabel} font-black leading-none tracking-widest scale-y-90`}>フリー</p>
+          <p className={`text-[26px] font-black ${c.textMain} leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>{totals.f || 0}</p>
+        </div>
+        <div className="flex flex-col items-center justify-center space-y-0.5">
+          <p className={`text-[11px] ${c.textLabel} font-black leading-none tracking-widest scale-y-90`}>初指名</p>
+          <p className={`text-[26px] font-black ${c.textMain} leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>{totals.first || 0}</p>
+        </div>
+        <div className="flex flex-col items-center justify-center space-y-0.5">
+          <p className={`text-[11px] ${c.textLabel} font-black leading-none tracking-widest scale-y-90`}>本指名</p>
+          <p className={`text-[26px] font-black ${c.textMain} leading-none tracking-tighter [text-shadow:_0.4px_0_0_currentColor]`}>{totals.main || 0}</p>
         </div>
       </div>
     </section>
