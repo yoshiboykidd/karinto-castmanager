@@ -33,25 +33,12 @@ export default function MonthlySummary({ month, totals, targetAmount = 0, theme 
         </div>
       )}
 
-      {/* 📍 ヘッダー：出勤内訳と稼働時間 */}
-      <div className="flex items-center justify-between mb-1 relative z-10">
-        <h2 className={`text-[18px] font-black ${c.textSub} tracking-tighter leading-none shrink-0`}>{month}</h2>
-        <div className="flex gap-1">
-          {/* か */}
-          <div className={`bg-white/90 px-2 py-1.5 rounded-xl border ${c.subBorder} shadow-sm flex items-baseline min-w-[45px] justify-center`}>
-            <span className="text-[9px] font-bold text-gray-400 mr-0.5">か</span>
-            <span className={`text-[18px] font-black ${c.textSub} leading-none tracking-tighter`}>{totals.ka || 0}</span>
-          </div>
-          {/* 添 */}
-          <div className={`bg-white/90 px-2 py-1.5 rounded-xl border ${c.subBorder} shadow-sm flex items-baseline min-w-[45px] justify-center`}>
-            <span className="text-[9px] font-bold text-gray-400 mr-0.5">添</span>
-            <span className={`text-[18px] font-black ${c.textSub} leading-none tracking-tighter`}>{totals.soe || 0}</span>
-          </div>
-          {/* 稼働h */}
-          <div className={`bg-white/90 px-2 py-1.5 rounded-xl border ${c.subBorder} shadow-sm flex items-baseline min-w-[55px] justify-center`}>
-            <span className={`text-[18px] font-black ${c.textSub} leading-none tracking-tighter`}>{Math.round(totals.hours * 10) / 10}</span>
-            <span className="text-[9px] font-bold text-gray-400 ml-0.5">h</span>
-          </div>
+      {/* 📍 ヘッダー：元のデザインに復帰 */}
+      <div className="flex items-center justify-between mb-1 relative z-10 px-1">
+        <h2 className={`text-[18px] font-black ${c.textSub} tracking-tighter`}>{month}</h2>
+        <div className="flex gap-3">
+          <span className={`text-[13px] font-black ${c.textLabel}`}>出勤 {totals.days || 0}日</span>
+          <span className={`text-[13px] font-black ${c.textLabel}`}>{Math.round(totals.hours * 10) / 10}h</span>
         </div>
       </div>
       
@@ -84,9 +71,9 @@ export default function MonthlySummary({ month, totals, targetAmount = 0, theme 
         </div>
       )}
 
-      {/* 📍 詳細グリッド：2段構成に変更 */}
+      {/* 📍 グリッド：元のスタイルを維持しつつ2段構成 */}
       <div className={`bg-white/80 backdrop-blur-sm rounded-2xl border ${c.subBorder} shadow-sm overflow-hidden relative z-10`}>
-        {/* 指名数（上段） */}
+        {/* 上段：フリー・初指名・本指名（元のまま） */}
         <div className="grid grid-cols-3 divide-x divide-gray-100 py-2 border-b border-gray-50">
           <div className="flex flex-col items-center justify-center">
             <p className={`text-[10px] ${c.textLabel} font-black leading-none tracking-widest scale-y-90`}>フリー</p>
@@ -102,15 +89,25 @@ export default function MonthlySummary({ month, totals, targetAmount = 0, theme 
           </div>
         </div>
         
-        {/* 当欠・遅刻（下段） */}
-        <div className="grid grid-cols-2 divide-x divide-gray-100 py-2 bg-gray-50/30">
-          <div className="flex items-center justify-center gap-2">
-            <p className={`text-[10px] font-black text-red-400 tracking-widest`}>当欠</p>
-            <p className={`text-[18px] font-black text-red-500 leading-none`}>{totals.absent || 0}</p>
+        {/* 下段：指名数内訳（か・添）と当欠・遅刻 */}
+        <div className="grid grid-cols-3 divide-x divide-gray-100 py-2 bg-gray-50/20">
+          <div className="flex flex-col items-center justify-center">
+            <p className={`text-[10px] font-black text-gray-400 leading-none tracking-widest scale-y-90`}>〈か〉指名</p>
+            <p className={`text-[18px] font-black ${c.textSub} leading-none mt-1`}>{totals.ka || 0}</p>
+          </div>
+          <div className="flex flex-col items-center justify-center">
+            <p className={`text-[10px] font-black text-gray-400 leading-none tracking-widest scale-y-90`}>〈添〉指名</p>
+            <p className={`text-[18px] font-black ${c.textSub} leading-none mt-1`}>{totals.soe || 0}</p>
           </div>
           <div className="flex items-center justify-center gap-2">
-            <p className={`text-[10px] font-black text-orange-400 tracking-widest`}>遅刻</p>
-            <p className={`text-[18px] font-black text-orange-500 leading-none`}>{totals.late || 0}</p>
+            <div className="text-center">
+              <p className="text-[8px] font-black text-red-400 leading-none">当欠</p>
+              <p className="text-[14px] font-black text-red-500 mt-0.5">{totals.absent || 0}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[8px] font-black text-orange-400 leading-none">遅刻</p>
+              <p className="text-[14px] font-black text-orange-500 mt-0.5">{totals.late || 0}</p>
+            </div>
           </div>
         </div>
       </div>
