@@ -3,7 +3,7 @@
 import React, { useMemo, useEffect } from 'react';
 import { 
   X, Calculator, Trash2, Edit3, Save, Loader2, 
-  StickyNote, History, Star, CreditCard, Layers, Quote 
+  StickyNote, History, Star, CreditCard, Layers, MessageSquare 
 } from 'lucide-react';
 
 export default function ReservationModal({ 
@@ -21,30 +21,27 @@ export default function ReservationModal({
 }: any) {
   if (!selectedRes) return null;
 
-  // 1. お客様の履歴と最新メモの特定
+  // 1. 最新メモの特定
   const customerInfo = useMemo(() => {
     if (!selectedRes.customer_no) return { count: 1, lastDate: null, latestMemo: "" };
 
-    const history = allPastReservations
+    const history = [...allPastReservations]
       .filter((r: any) => r.customer_no === selectedRes.customer_no)
       .sort((a: any, b: any) => (b.reservation_date || "").localeCompare(a.reservation_date || ""));
 
     const count = history.length;
     const lastMet = history.find((r: any) => r.id !== selectedRes.id);
-    
-    // 過去の予約から中身がある最新メモを検索
     const latestMemo = history.find((r: any) => r.cast_memo && r.cast_memo.trim() !== "")?.cast_memo || "";
     
     return { count, lastDate: lastMet ? lastMet.reservation_date : null, latestMemo };
   }, [selectedRes, allPastReservations]);
 
-  // 2. 編集開始時の自動セット（依存関係を整理）
+  // 2. 編集開始時の自動セット
   useEffect(() => {
     if (isEditingMemo && !memoDraft && customerInfo.latestMemo && !selectedRes.cast_memo) {
       setMemoDraft(customerInfo.latestMemo);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditingMemo]);
+  }, [isEditingMemo, memoDraft, customerInfo.latestMemo, selectedRes.cast_memo, setMemoDraft]);
 
   const handleSaveMemo = async () => {
     await onSaveMemo();
@@ -108,9 +105,7 @@ export default function ReservationModal({
                 <Layers size={12} className="text-gray-600" />
                 <span className="text-[11px] font-black text-gray-600">コース</span>
               </div>
-              <p className={`font-black text-gray-700 leading-[1.2] break-all ${
-                (selectedRes.course_info?.length || 0) > 15 ? 'text-[15px]' : 'text-[18px]'
-              }`}>
+              <p className={`font-black text-gray-700 leading-[1.2] break-all ${(selectedRes.course_info?.length || 0) > 15 ? 'text-[15px]' : 'text-[18px]'}`}>
                 {selectedRes.course_info}
               </p>
             </div>
@@ -122,7 +117,7 @@ export default function ReservationModal({
               <div className="flex items-baseline gap-0.5 text-blue-600 font-black">
                 <span className="text-[14px]">¥</span>
                 <span className="text-[24px] tracking-tighter">
-                  {selectedRes.total_price?.toLocaleString() || '0'}
+                  {(selectedRes.total_price || 0).toLocaleString()}
                 </span>
               </div>
             </div>
@@ -137,14 +132,14 @@ export default function ReservationModal({
                     <Edit3 size={14} />
                     <span className="text-[11px] font-black">メモを入力・確認</span>
                   </div>
-                  <button onClick={() => setIsEditingMemo(false)} className="p-1 text-pink-300 hover:text-pink-500">
+                  <button onClick={() => setIsEditingMemo(false)} className="p-1 text-pink-300 hover:text-pink-500 transition-colors">
                     <X size={20} />
                   </button>
                 </div>
                 
                 {!selectedRes.cast_memo && customerInfo.latestMemo && (
                   <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/60 rounded-xl border border-pink-100 text-[10px] font-black text-pink-400 italic">
-                    <Quote size={12} /> 前回のメモを引き継いでいます
+                    <MessageSquare size={12} /> 前回のメモを引き継いでいます
                   </div>
                 )}
 
@@ -164,6 +159,7 @@ export default function ReservationModal({
               </div>
             ) : (
               <button 
+                type="button"
                 onClick={() => setIsEditingMemo(true)} 
                 className="w-full py-5 flex flex-col items-center justify-center gap-1.5 hover:bg-white transition-all group"
               >
