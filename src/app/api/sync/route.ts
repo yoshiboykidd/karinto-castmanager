@@ -47,15 +47,10 @@ export async function GET(req: NextRequest) {
 
     const normalize = (val: string) => {
       if (!val) return "";
-      let s = val.normalize('NFKC')
-        .replace(/[（\(\[].*?[）\)\]]/g, '')
-        .replace(/[\n\r\t\s\u3000]+/g, '')
-        .replace(/[^\p{L}\p{N}]/gu, '')
-        .trim();
+      let s = val.normalize('NFKC').replace(/[（\(\[].*?[）\)\]]/g, '').replace(/[\n\r\t\s\u3000]+/g, '').replace(/[^\p{L}\p{N}]/gu, '').trim();
       return toHiragana(s);
     };
 
-    // 店舗IDを数値として比較し、所属キャストを抽出
     const shopCast = allCast?.filter(c => Number(c.home_shop_id) === Number(shop.id)) || [];
     const nameMap = new Map();
     shopCast.forEach(c => {
@@ -77,11 +72,7 @@ export async function GET(req: NextRequest) {
         const upsertBatch: any[] = [];
         const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
 
-        const { data: existingShifts } = await supabase
-          .from('shifts')
-          .select('login_id, status, start_time, end_time, reward_amount')
-          .eq('shift_date', dateStrDB);
-        
+        const { data: existingShifts } = await supabase.from('shifts').select('login_id, status, reward_amount').eq('shift_date', dateStrDB);
         const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
 
         $('h3, .name, .cast_name, span.name, div.name, strong, td, a').each((_, nameEl) => {
@@ -97,12 +88,9 @@ export async function GET(req: NextRequest) {
             const hpStart = timeMatch[1].padStart(5, '0');
             const hpEnd = timeMatch[2].padStart(5, '0');
             const dbShift = existingMap.get(loginId);
-
             foundInHP.add(loginId);
             if (dbShift?.status === 'absent') return;
 
-            // 📍 修正：既に報酬額が入っていればそれを維持、なければ0として送る
-            // これで DB側の NOT NULL 制約エラー (23502) を物理的に回避します
             upsertBatch.push({
               login_id: loginId,
               shift_date: dateStrDB,
@@ -118,40 +106,27 @@ export async function GET(req: NextRequest) {
           }
         });
 
-        let removeCount = 0;
-        if (foundInHP.size > 0) {
-          const idsToRemove = (existingShifts || [])
-            .map(s => String(s.login_id).trim().padStart(8, '0'))
-            .filter(id => !foundInHP.has(id) && nameMap.has(id) && existingMap.get(id)?.status === 'official');
-
-          if (idsToRemove.length > 0) {
-            await supabase.from('shifts').delete().eq('shift_date', dateStrDB).in('login_id', idsToRemove);
-            removeCount = idsToRemove.length;
-          }
-        }
-
         if (upsertBatch.length > 0) {
-          const { error: upsertError } = await supabase
-            .from('shifts')
-            .upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
+          const { error: upsertError } = await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
           
           if (upsertError) {
+            // 📍 修正のキモ：サーバーのコンソールにエラーの詳細を書き出す
+            console.error(`--- DB ERROR DETAILS (${dateStrDB}) ---`);
+            console.error("Message:", upsertError.message);
+            console.error("Hint:", upsertError.hint);
+            console.error("Details:", upsertError.details);
+            console.error("Code:", upsertError.code);
+            console.error(`--------------------------------------`);
+            
             logs.push(`${dateStrDB.slice(8)}日 ERR:${upsertError.code}`);
           } else {
-            logs.push(`${dateStrDB.slice(8)}日(HP:${foundInHP.size}/更:${upsertBatch.length})`);
+            logs.push(`${dateStrDB.slice(8)}日(更:${upsertBatch.length})`);
           }
         } else {
           logs.push(`${dateStrDB.slice(8)}日(HP:0)`);
         }
       } catch (e: any) { logs.push(`${dateStrDB.slice(8)}日 Error`); }
     }
-
-    await supabase.from('scraping_logs').insert({
-      executed_at: new Date().toISOString(),
-      status: 'success',
-      details: `${shop.name}: ${logs.join(', ')}`
-    });
-
     return NextResponse.json({ success: true, shop: shop.name, logs });
   } catch (e: any) { 
     return NextResponse.json({ success: false, message: e.message }, { status: 500 }); 
