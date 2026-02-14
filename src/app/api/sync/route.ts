@@ -21,13 +21,11 @@ const ALL_SHOPS = [
   { id: '012', name: '小岩', baseUrl: 'https://www.karin10koiwa.com/attend.php' }, 
 ];
 
-// カタカナをひらがなに変換して照合精度を上げる
 function toHiragana(str: string) {
   return str.replace(/[\u30a1-\u30f6]/g, (match) => String.fromCharCode(match.charCodeAt(0) - 0x60));
 }
 
 export async function GET(req: NextRequest) {
-  // 1. セキュリティチェック
   const authHeader = req.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && process.env.NODE_ENV === 'production') {
     return new NextResponse('Unauthorized', { status: 401 });
@@ -50,25 +48,23 @@ export async function GET(req: NextRequest) {
     const normalize = (val: string) => {
       if (!val) return "";
       let s = val.normalize('NFKC')
-        .replace(/[（\(\[].*?[）\)\]]/g, '') // カッコ内を除去
-        .replace(/[\n\r\t\s\u3000]+/g, '')   // 空白除去
-        .replace(/[^\p{L}\p{N}]/gu, '')      // 記号除去
+        .replace(/[（\(\[].*?[）\)\]]/g, '')
+        .replace(/[\n\r\t\s\u3000]+/g, '')
+        .replace(/[^\p{L}\p{N}]/gu, '')
         .trim();
       return toHiragana(s);
     };
 
-    // 店舗所属キャストの絞り込みと名前マップ作成
     const shopCast = allCast?.filter(c => String(c.home_shop_id).trim().padStart(3, '0') === shop.id) || [];
     const nameMap = new Map();
     shopCast.forEach(c => {
-      nameMap.set(normalize(c.hp_display_name || c.display_name), String(c.login_id).trim().padStart(8, '0'));
+      // 📍 修正：login_idの0埋め(padStart)を削除。DBの値をそのまま使用。
+      nameMap.set(normalize(c.hp_display_name || c.display_name), String(c.login_id).trim());
     });
 
-    // 8日間ループ
     for (let i = 0; i < 8; i++) {
       const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
       const dateStrDB = format(targetDate, 'yyyy-MM-dd');
-      // 日付指定URL（大久保店等の個別ページ対応）
       const url = `${shop.baseUrl}?date_get=${format(targetDate, 'yyyy/MM/dd')}&t=${Date.now()}`;
 
       try {
@@ -80,22 +76,20 @@ export async function GET(req: NextRequest) {
         const upsertBatch: any[] = [];
         const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
 
-        // 既存シフト取得
         const { data: existingShifts } = await supabase
           .from('shifts')
           .select('login_id, status, start_time, end_time')
           .eq('shift_date', dateStrDB);
         
-        const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
+        // 📍 修正：既存シフトの比較用IDも0埋めなしで扱う
+        const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim(), s]));
 
-        // 名前タグを全スキャン（h3, .name, 強いタグ等）
         $('h3, .name, .cast_name, span.name, div.name, strong, td').each((_, nameEl) => {
           const rawName = $(nameEl).text();
           const cleanName = normalize(rawName);
           const loginId = nameMap.get(cleanName);
           if (!loginId) return;
 
-          // 名前の周辺（親要素や自分）から時間を探す
           const context = $(nameEl).text() + " " + $(nameEl).parent().text() + " " + $(nameEl).parent().parent().text();
           const timeMatch = context.match(timeRegex);
 
@@ -106,14 +100,13 @@ export async function GET(req: NextRequest) {
 
             foundInHP.add(loginId);
 
-            // 当欠・申請中の保護
             if (dbShift?.status === 'absent') return;
             if (dbShift?.status === 'requested') {
               if (dbShift.start_time !== hpStart || dbShift.end_time !== hpEnd) return;
             }
 
             upsertBatch.push({
-              login_id: loginId,
+              login_id: loginId, // 📍 修正：0埋めなしのIDで保存
               shift_date: dateStrDB,
               status: 'official',
               is_official: true,
@@ -126,12 +119,11 @@ export async function GET(req: NextRequest) {
           }
         });
 
-        // 削除処理
         let removeCount = 0;
         if (foundInHP.size > 0) {
           const idsToRemove = (existingShifts || [])
-            .map(s => String(s.login_id).trim().padStart(8, '0'))
-            .filter(id => !foundInHP.has(id) && existingMap.get(id)?.status === 'official' && id.startsWith(shop.id.substring(0,2))); // 簡易的な自店舗判定
+            .map(s => String(s.login_id).trim()) // 📍 修正：0埋めなしで比較
+            .filter(id => !foundInHP.has(id) && existingMap.get(id)?.status === 'official');
 
           if (idsToRemove.length > 0) {
             await supabase.from('shifts').delete().eq('shift_date', dateStrDB).in('login_id', idsToRemove);
@@ -139,14 +131,24 @@ export async function GET(req: NextRequest) {
           }
         }
 
+        // 📍 修正：upsertの結果をチェックし、エラーがあれば詳細を出す
         if (upsertBatch.length > 0) {
-          await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
+          const { error: upsertError } = await supabase
+            .from('shifts')
+            .upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
+          
+          if (upsertError) {
+            console.error(`Upsert Error (${dateStrDB}):`, upsertError);
+            logs.push(`${dateStrDB.slice(8)}日 ERR:${upsertError.code}`);
+          } else {
+            logs.push(`${dateStrDB.slice(8)}日(HP:${foundInHP.size}/更新:${upsertBatch.length}/消:${removeCount})`);
+          }
+        } else {
+          logs.push(`${dateStrDB.slice(8)}日(HP:0)`);
         }
-        logs.push(`${dateStrDB.slice(8)}日(HP:${foundInHP.size}/更新:${upsertBatch.length}/消:${removeCount})`);
       } catch (e: any) { logs.push(`${dateStrDB.slice(8)}日 Error`); }
     }
 
-    // ログ記録
     await supabase.from('scraping_logs').insert({
       executed_at: new Date().toISOString(),
       status: 'success',
