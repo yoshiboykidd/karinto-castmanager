@@ -1,7 +1,10 @@
 'use client';
 
 import React, { useMemo, useEffect } from 'react';
-import { X, Calculator, Trash2, Edit3, Save, Loader2, StickyNote, History, Star, CreditCard, Layers, Quote } from 'lucide-react';
+import { 
+  X, Calculator, Trash2, Edit3, Save, Loader2, 
+  StickyNote, History, Star, CreditCard, Layers, Quote 
+} from 'lucide-react';
 
 export default function ReservationModal({ 
   selectedRes, 
@@ -18,29 +21,30 @@ export default function ReservationModal({
 }: any) {
   if (!selectedRes) return null;
 
-  // 📍 最新のメモを特定する
+  // 1. お客様の履歴と最新メモの特定
   const customerInfo = useMemo(() => {
     if (!selectedRes.customer_no) return { count: 1, lastDate: null, latestMemo: "" };
 
     const history = allPastReservations
       .filter((r: any) => r.customer_no === selectedRes.customer_no)
-      .sort((a: any, b: any) => b.reservation_date.localeCompare(a.reservation_date));
+      .sort((a: any, b: any) => (b.reservation_date || "").localeCompare(a.reservation_date || ""));
 
     const count = history.length;
     const lastMet = history.find((r: any) => r.id !== selectedRes.id);
     
-    // 📍 過去の予約の中から、中身がある最新のメモを検索
+    // 過去の予約から中身がある最新メモを検索
     const latestMemo = history.find((r: any) => r.cast_memo && r.cast_memo.trim() !== "")?.cast_memo || "";
     
     return { count, lastDate: lastMet ? lastMet.reservation_date : null, latestMemo };
   }, [selectedRes, allPastReservations]);
 
-  // 📍 編集画面を開いたとき、今回のメモがまだ空なら自動で前回の内容をセット
+  // 2. 編集開始時の自動セット（依存関係を整理）
   useEffect(() => {
     if (isEditingMemo && !memoDraft && customerInfo.latestMemo && !selectedRes.cast_memo) {
       setMemoDraft(customerInfo.latestMemo);
     }
-  }, [isEditingMemo, memoDraft, customerInfo.latestMemo, selectedRes.cast_memo, setMemoDraft]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditingMemo]);
 
   const handleSaveMemo = async () => {
     await onSaveMemo();
@@ -105,7 +109,7 @@ export default function ReservationModal({
                 <span className="text-[11px] font-black text-gray-600">コース</span>
               </div>
               <p className={`font-black text-gray-700 leading-[1.2] break-all ${
-                (selectedRes.course_info?.length || 0) > 20 ? 'text-[15px]' : 'text-[18px]'
+                (selectedRes.course_info?.length || 0) > 15 ? 'text-[15px]' : 'text-[18px]'
               }`}>
                 {selectedRes.course_info}
               </p>
@@ -124,21 +128,20 @@ export default function ReservationModal({
             </div>
           </div>
 
-          {/* キャストメモ：引き継ぎ対応 */}
+          {/* キャストメモ */}
           <div className="bg-pink-50/50 rounded-2xl border border-pink-100/50 overflow-hidden">
             {isEditingMemo ? (
               <div className="p-3 space-y-2 animate-in slide-in-from-top-2 duration-200">
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-1.5 text-pink-500">
                     <Edit3 size={14} />
-                    <span className="text-[11px] font-black text-pink-500">メモを編集中</span>
+                    <span className="text-[11px] font-black">メモを入力・確認</span>
                   </div>
-                  <button onClick={() => setIsEditingMemo(false)} className="p-1 text-pink-300 hover:text-pink-500 transition-colors">
+                  <button onClick={() => setIsEditingMemo(false)} className="p-1 text-pink-300 hover:text-pink-500">
                     <X size={20} />
                   </button>
                 </div>
                 
-                {/* 過去メモを自動セットした場合の通知 */}
                 {!selectedRes.cast_memo && customerInfo.latestMemo && (
                   <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/60 rounded-xl border border-pink-100 text-[10px] font-black text-pink-400 italic">
                     <Quote size={12} /> 前回のメモを引き継いでいます
@@ -168,7 +171,6 @@ export default function ReservationModal({
                   <StickyNote size={18} />
                   <span className="text-[14px] font-black tracking-[0.2em]">【 キャストメモ 】</span>
                 </div>
-                {/* 過去分含めメモがある場合はインジケーターを表示 */}
                 {(selectedRes.cast_memo || customerInfo.latestMemo) && (
                   <div className="flex gap-1 mt-1">
                     <div className="w-1.5 h-1.5 bg-pink-300 rounded-full animate-pulse" />
@@ -179,7 +181,7 @@ export default function ReservationModal({
             )}
           </div>
 
-          {/* 下部ボタン */}
+          {/* 下部アクション */}
           <div className="space-y-2 pt-2">
             <button 
               onClick={() => alert("OP計算君起動")} 
