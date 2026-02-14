@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
         const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
 
         $('h3, .name, .cast_name, span.name, div.name, strong, td, a').each((_, nameEl) => {
-          const rawName = $(nameEl).text();
+          const rawName = $(nameEl).text().trim(); // HP上の名前
           const cleanName = normalize(rawName);
           const loginId = nameMap.get(cleanName);
           if (!loginId) return;
@@ -91,9 +91,11 @@ export async function GET(req: NextRequest) {
             foundInHP.add(loginId);
             if (dbShift?.status === 'absent') return;
 
+            // 📍 修正のポイント：hp_display_name を追加
             upsertBatch.push({
               login_id: loginId,
               shift_date: dateStrDB,
+              hp_display_name: rawName, // 👈 これが欠けていたためエラーになっていました
               status: 'official',
               is_official: true,
               hp_start_time: hpStart,
@@ -108,16 +110,8 @@ export async function GET(req: NextRequest) {
 
         if (upsertBatch.length > 0) {
           const { error: upsertError } = await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
-          
           if (upsertError) {
-            // 📍 修正のキモ：サーバーのコンソールにエラーの詳細を書き出す
-            console.error(`--- DB ERROR DETAILS (${dateStrDB}) ---`);
-            console.error("Message:", upsertError.message);
-            console.error("Hint:", upsertError.hint);
-            console.error("Details:", upsertError.details);
-            console.error("Code:", upsertError.code);
-            console.error(`--------------------------------------`);
-            
+            console.error("UPSERT ERROR:", upsertError);
             logs.push(`${dateStrDB.slice(8)}日 ERR:${upsertError.code}`);
           } else {
             logs.push(`${dateStrDB.slice(8)}日(更:${upsertBatch.length})`);
