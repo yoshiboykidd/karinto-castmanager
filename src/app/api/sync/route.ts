@@ -55,7 +55,6 @@ export async function GET(req: NextRequest) {
       return toHiragana(s);
     };
 
-    // 📍 DBのキャスト情報をマップ化（8桁揃え）
     const shopCast = allCast?.filter(c => String(c.home_shop_id).trim().padStart(3, '0') === shop.id) || [];
     const nameMap = new Map();
     shopCast.forEach(c => {
@@ -105,7 +104,7 @@ export async function GET(req: NextRequest) {
             }
 
             upsertBatch.push({
-              login_id: loginId, // 📍 ここはnameMapから取得した8桁ID
+              login_id: loginId,
               shift_date: dateStrDB,
               status: 'official',
               is_official: true,
@@ -113,6 +112,7 @@ export async function GET(req: NextRequest) {
               hp_end_time: hpEnd,
               start_time: hpStart,
               end_time: hpEnd,
+              reward_amount: 0, // 📍 必須項目
               updated_at: new Date().toISOString()
             });
           }
@@ -136,8 +136,7 @@ export async function GET(req: NextRequest) {
             .upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
           
           if (upsertError) {
-            console.error("Upsert Error:", upsertError);
-            logs.push(`${dateStrDB.slice(8)}日 ERR`);
+            logs.push(`${dateStrDB.slice(8)}日 ERR:${upsertError.code}`);
           } else {
             logs.push(`${dateStrDB.slice(8)}日(HP:${foundInHP.size}/更新:${upsertBatch.length}/消:${removeCount})`);
           }
