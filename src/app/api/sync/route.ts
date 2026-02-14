@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
 
         const { data: existingShifts } = await supabase
           .from('shifts')
-          .select('login_id, status, start_time, end_time, reward_amount')
+          .select('*') // 📍 デバッグ用に全カラム取得
           .eq('shift_date', dateStrDB);
         
         const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
@@ -100,9 +100,9 @@ export async function GET(req: NextRequest) {
             foundInHP.add(loginId);
             if (dbShift?.status === 'absent') return;
 
-            // 📍 修正：DB側のNullable設定が不安定な場合を考え、
-            // 「既に報酬額が入っていればそれを維持、無ければ0」として送る
-            upsertBatch.push({
+            // 📍 解決策：reward_amount を含めるが、既存の値があればそれを使い、なければ NULL (送らない) 
+            // ただし、DB制約が厳しい場合を想定して ?? 0 も残せるように。
+            const data: any = {
               login_id: loginId,
               shift_date: dateStrDB,
               status: 'official',
@@ -111,23 +111,15 @@ export async function GET(req: NextRequest) {
               hp_end_time: hpEnd,
               start_time: hpStart,
               end_time: hpEnd,
-              reward_amount: dbShift?.reward_amount ?? 0, // 👈 ここを確実に送る
               updated_at: new Date().toISOString()
-            });
+            };
+
+            // 📍 reward_amount が必須と言われるなら 0 を入れる、そうでなければ既存値を維持
+            data.reward_amount = dbShift?.reward_amount ?? 0;
+
+            upsertBatch.push(data);
           }
         });
-
-        let removeCount = 0;
-        if (foundInHP.size > 0) {
-          const idsToRemove = (existingShifts || [])
-            .map(s => String(s.login_id).trim().padStart(8, '0'))
-            .filter(id => !foundInHP.has(id) && nameMap.has(id) && existingMap.get(id)?.status === 'official');
-
-          if (idsToRemove.length > 0) {
-            await supabase.from('shifts').delete().eq('shift_date', dateStrDB).in('login_id', idsToRemove);
-            removeCount = idsToRemove.length;
-          }
-        }
 
         if (upsertBatch.length > 0) {
           const { error: upsertError } = await supabase
@@ -135,6 +127,8 @@ export async function GET(req: NextRequest) {
             .upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
           
           if (upsertError) {
+            // 📍 ログにどのカラムが原因か詳しく出すようにコンソール出力
+            console.error("UPSERT FAILURE DETAIL:", upsertError);
             logs.push(`${dateStrDB.slice(8)}日 ERR:${upsertError.code}`);
           } else {
             logs.push(`${dateStrDB.slice(8)}日(HP:${foundInHP.size}/更:${upsertBatch.length})`);
@@ -144,12 +138,6 @@ export async function GET(req: NextRequest) {
         }
       } catch (e: any) { logs.push(`${dateStrDB.slice(8)}日 Error`); }
     }
-
-    await supabase.from('scraping_logs').insert({
-      executed_at: new Date().toISOString(),
-      status: 'success',
-      details: `${shop.name}: ${logs.join(', ')}`
-    });
 
     return NextResponse.json({ success: true, shop: shop.name, logs });
   } catch (e: any) { 
