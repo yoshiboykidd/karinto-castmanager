@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
               if (dbShift.start_time !== hpStart || dbShift.end_time !== hpEnd) return;
             }
 
-            upsertBatch.push({
+           upsertBatch.push({
               login_id: loginId,
               shift_date: dateStrDB,
               status: 'official',
@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
               hp_end_time: hpEnd,
               start_time: hpStart,
               end_time: hpEnd,
-              reward_amount: 0, // 📍 必須項目
+              reward_amount: 0, // 📍 ここを追加：ERR:23502を回避
               updated_at: new Date().toISOString()
             });
           }
