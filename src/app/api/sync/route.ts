@@ -55,7 +55,6 @@ export async function GET(req: NextRequest) {
       return toHiragana(s);
     };
 
-    // 店舗IDを数値として比較し、所属キャストを抽出
     const shopCast = allCast?.filter(c => Number(c.home_shop_id) === Number(shop.id)) || [];
     const nameMap = new Map();
     shopCast.forEach(c => {
@@ -79,7 +78,7 @@ export async function GET(req: NextRequest) {
 
         const { data: existingShifts } = await supabase
           .from('shifts')
-          .select('login_id, status, start_time, end_time')
+          .select('login_id, status, start_time, end_time, reward_amount')
           .eq('shift_date', dateStrDB);
         
         const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
@@ -101,6 +100,8 @@ export async function GET(req: NextRequest) {
             foundInHP.add(loginId);
             if (dbShift?.status === 'absent') return;
 
+            // 📍 修正：DB側のNullable設定が不安定な場合を考え、
+            // 「既に報酬額が入っていればそれを維持、無ければ0」として送る
             upsertBatch.push({
               login_id: loginId,
               shift_date: dateStrDB,
@@ -110,7 +111,7 @@ export async function GET(req: NextRequest) {
               hp_end_time: hpEnd,
               start_time: hpStart,
               end_time: hpEnd,
-              // 📍 reward_amount は送信しない（DB側の設定でNULLまたは既存値を維持）
+              reward_amount: dbShift?.reward_amount ?? 0, // 👈 ここを確実に送る
               updated_at: new Date().toISOString()
             });
           }
@@ -136,7 +137,7 @@ export async function GET(req: NextRequest) {
           if (upsertError) {
             logs.push(`${dateStrDB.slice(8)}日 ERR:${upsertError.code}`);
           } else {
-            logs.push(`${dateStrDB.slice(8)}日(HP:${foundInHP.size}/更:${upsertBatch.length}/消:${removeCount})`);
+            logs.push(`${dateStrDB.slice(8)}日(HP:${foundInHP.size}/更:${upsertBatch.length})`);
           }
         } else {
           logs.push(`${dateStrDB.slice(8)}日(HP:0)`);
