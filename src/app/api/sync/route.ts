@@ -26,15 +26,9 @@ function toHiragana(str: string) {
 }
 
 export async function GET(req: NextRequest) {
-  // 📍 修正1：認証チェックのログを強化（cron-job.org対策）
   const authHeader = req.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (process.env.NODE_ENV === 'production') {
-    if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
-      console.error("Auth Fail: Header is " + authHeader);
-      return NextResponse.json({ success: false, message: "Unauthorized: Secret mismatch" }, { status: 401 });
-    }
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && process.env.NODE_ENV === 'production') {
+    return new NextResponse('Unauthorized', { status: 401 });
   }
 
   const { searchParams } = new URL(req.url);
@@ -61,6 +55,7 @@ export async function GET(req: NextRequest) {
       return toHiragana(s);
     };
 
+    // 店舗IDを数値として比較し、所属キャストを抽出
     const shopCast = allCast?.filter(c => Number(c.home_shop_id) === Number(shop.id)) || [];
     const nameMap = new Map();
     shopCast.forEach(c => {
@@ -106,7 +101,8 @@ export async function GET(req: NextRequest) {
             foundInHP.add(loginId);
             if (dbShift?.status === 'absent') return;
 
-            // 📍 修正2：reward_amount の制約エラーを回避（既存値があれば維持、なければ0）
+            // 📍 修正：既に報酬額が入っていればそれを維持、なければ0として送る
+            // これで DB側の NOT NULL 制約エラー (23502) を物理的に回避します
             upsertBatch.push({
               login_id: loginId,
               shift_date: dateStrDB,
@@ -116,11 +112,23 @@ export async function GET(req: NextRequest) {
               hp_end_time: hpEnd,
               start_time: hpStart,
               end_time: hpEnd,
-              reward_amount: dbShift?.reward_amount ?? 0,
+              reward_amount: dbShift?.reward_amount ?? 0, 
               updated_at: new Date().toISOString()
             });
           }
         });
+
+        let removeCount = 0;
+        if (foundInHP.size > 0) {
+          const idsToRemove = (existingShifts || [])
+            .map(s => String(s.login_id).trim().padStart(8, '0'))
+            .filter(id => !foundInHP.has(id) && nameMap.has(id) && existingMap.get(id)?.status === 'official');
+
+          if (idsToRemove.length > 0) {
+            await supabase.from('shifts').delete().eq('shift_date', dateStrDB).in('login_id', idsToRemove);
+            removeCount = idsToRemove.length;
+          }
+        }
 
         if (upsertBatch.length > 0) {
           const { error: upsertError } = await supabase
@@ -137,6 +145,12 @@ export async function GET(req: NextRequest) {
         }
       } catch (e: any) { logs.push(`${dateStrDB.slice(8)}日 Error`); }
     }
+
+    await supabase.from('scraping_logs').insert({
+      executed_at: new Date().toISOString(),
+      status: 'success',
+      details: `${shop.name}: ${logs.join(', ')}`
+    });
 
     return NextResponse.json({ success: true, shop: shop.name, logs });
   } catch (e: any) { 
