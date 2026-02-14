@@ -55,11 +55,11 @@ export async function GET(req: NextRequest) {
       return toHiragana(s);
     };
 
+    // 📍 DBのキャスト情報をマップ化（8桁揃え）
     const shopCast = allCast?.filter(c => String(c.home_shop_id).trim().padStart(3, '0') === shop.id) || [];
     const nameMap = new Map();
     shopCast.forEach(c => {
-      // 📍 修正：login_idの0埋め(padStart)を削除。DBの値をそのまま使用。
-      nameMap.set(normalize(c.hp_display_name || c.display_name), String(c.login_id).trim());
+      nameMap.set(normalize(c.hp_display_name || c.display_name), String(c.login_id).trim().padStart(8, '0'));
     });
 
     for (let i = 0; i < 8; i++) {
@@ -81,8 +81,7 @@ export async function GET(req: NextRequest) {
           .select('login_id, status, start_time, end_time')
           .eq('shift_date', dateStrDB);
         
-        // 📍 修正：既存シフトの比較用IDも0埋めなしで扱う
-        const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim(), s]));
+        const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
 
         $('h3, .name, .cast_name, span.name, div.name, strong, td').each((_, nameEl) => {
           const rawName = $(nameEl).text();
@@ -106,7 +105,7 @@ export async function GET(req: NextRequest) {
             }
 
             upsertBatch.push({
-              login_id: loginId, // 📍 修正：0埋めなしのIDで保存
+              login_id: loginId, // 📍 ここはnameMapから取得した8桁ID
               shift_date: dateStrDB,
               status: 'official',
               is_official: true,
@@ -122,7 +121,7 @@ export async function GET(req: NextRequest) {
         let removeCount = 0;
         if (foundInHP.size > 0) {
           const idsToRemove = (existingShifts || [])
-            .map(s => String(s.login_id).trim()) // 📍 修正：0埋めなしで比較
+            .map(s => String(s.login_id).trim().padStart(8, '0'))
             .filter(id => !foundInHP.has(id) && existingMap.get(id)?.status === 'official');
 
           if (idsToRemove.length > 0) {
@@ -131,15 +130,14 @@ export async function GET(req: NextRequest) {
           }
         }
 
-        // 📍 修正：upsertの結果をチェックし、エラーがあれば詳細を出す
         if (upsertBatch.length > 0) {
           const { error: upsertError } = await supabase
             .from('shifts')
             .upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
           
           if (upsertError) {
-            console.error(`Upsert Error (${dateStrDB}):`, upsertError);
-            logs.push(`${dateStrDB.slice(8)}日 ERR:${upsertError.code}`);
+            console.error("Upsert Error:", upsertError);
+            logs.push(`${dateStrDB.slice(8)}日 ERR`);
           } else {
             logs.push(`${dateStrDB.slice(8)}日(HP:${foundInHP.size}/更新:${upsertBatch.length}/消:${removeCount})`);
           }
