@@ -30,24 +30,15 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const shopIndexParam = searchParams.get('shop');
   
-  if (shopIndexParam === null) {
-    return NextResponse.json({ error: "No shop index provided" }, { status: 400 });
-  }
+  if (shopIndexParam === null) return NextResponse.json({ error: "No shop index" }, { status: 400 });
 
   const shopIndex = parseInt(shopIndexParam);
   const shop = ALL_SHOPS[shopIndex];
-
-  if (!shop) {
-    return NextResponse.json({ error: "Invalid shop index" }, { status: 400 });
-  }
+  if (!shop) return NextResponse.json({ error: "Invalid shop index" }, { status: 400 });
 
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const logs: string[] = [];
-
-  // 📍 今日から8日間（今日 + 7日間）の日付リストを生成
-  const targetDates = Array.from({ length: 8 }, (_, i) => 
-    format(addDays(new Date(), i), 'yyyy-MM-dd')
-  );
+  const targetDates = Array.from({ length: 8 }, (_, i) => format(addDays(new Date(), i), 'yyyy-MM-dd'));
 
   const normalize = (s: string) => s.replace(/[\s　\n\t]/g, '').toLowerCase();
 
@@ -63,11 +54,10 @@ export async function GET(req: NextRequest) {
 
     if (!castMembers) throw new Error("Cast members not found");
 
-    // 各日付についてループ処理
     for (const dateStrDB of targetDates) {
-      const dateObj = new Date(dateStrDB);
-      const dayOfMonth = dateObj.getDate();
-      const foundInHP = new Set<string>();
+      const dayOfMonth = new Date(dateStrDB).getDate();
+      const hpDetectedNames = new Set<string>(); // HPで見つけた生の名前
+      const matchedLids = new Set<string>();     // DBと一致したキャストのID
       const upsertBatch: any[] = [];
 
       const { data: existingShifts } = await supabase
@@ -79,25 +69,27 @@ export async function GET(req: NextRequest) {
 
       $('table tr').each((_, tr) => {
         const cells = $(tr).find('td');
+        // かりんとの出勤表構造に基づき、セルが31個以上ある行を対象とする
         if (cells.length < 31) return;
 
         const rawName = $(cells[0]).text().trim();
+        if (!rawName) return;
+        hpDetectedNames.add(rawName); // 📍 デバッグ：HP上で名前を検知
+
         const targetMember = castMembers.find(m => 
           normalize(m.hp_display_name || m.display_name) === normalize(rawName)
         );
 
         if (!targetMember) return;
         const lid = String(targetMember.login_id).trim().padStart(8, '0');
-        
-        if (existingMap.get(lid)?.status === 'absent') {
-          foundInHP.add(lid);
-          return;
-        }
+        matchedLids.add(lid); // 📍 デバッグ：DBと一致
+
+        // 当欠ガード
+        if (existingMap.get(lid)?.status === 'absent') return;
 
         const timeStr = $(cells[dayOfMonth]).text().trim();
         if (timeStr && timeStr.includes('~')) {
           const [hpStart, hpEnd] = timeStr.split('~').map(t => t.trim().padStart(5, '0') + ':00');
-          foundInHP.add(lid);
           upsertBatch.push({
             login_id: lid,
             shift_date: dateStrDB,
@@ -112,24 +104,26 @@ export async function GET(req: NextRequest) {
         }
       });
 
+      // 削除処理
       let removeCount = 0;
       const idsToRemove = (existingShifts || [])
         .map(s => String(s.login_id).trim().padStart(8, '0'))
-        .filter(id => !foundInHP.has(id) && existingMap.get(id)?.status === 'official');
+        .filter(id => !matchedLids.has(id) && existingMap.get(id)?.status === 'official');
 
       if (idsToRemove.length > 0) {
-        await supabase
-          .from('shifts')
-          .delete()
-          .eq('shift_date', dateStrDB)
-          .in('login_id', idsToRemove);
+        await supabase.from('shifts').delete().eq('shift_date', dateStrDB).in('login_id', idsToRemove);
         removeCount = idsToRemove.length;
       }
 
       if (upsertBatch.length > 0) {
         await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
       }
-      logs.push(`${dateStrDB.slice(8)}日(+${upsertBatch.length}/-${removeCount})`);
+
+      // 📍 ログを詳細化
+      // HP: HPで見つかった名前の総数
+      // 一致: DBのキャスト名と合致した人数
+      // 更新: 実際にDBに書き込んだ(時間が以前と違う)人数
+      logs.push(`${dateStrDB.slice(8)}日(HP:${hpDetectedNames.size}/一致:${matchedLids.size}/更新:${upsertBatch.length})`);
     }
 
     await supabase.from('scraping_logs').insert({
