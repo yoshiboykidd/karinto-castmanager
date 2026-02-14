@@ -16,7 +16,7 @@ export function useShiftData() {
     shop: any, 
     news: any[], 
     reservations: any[],
-    achievements: any[], // 📍 新設した集計テーブル用
+    achievements: any[],
     syncAt: string
   }>({
     shifts: [], profile: null, shop: null, news: [], reservations: [], achievements: [], syncAt: ''
@@ -53,40 +53,55 @@ export function useShiftData() {
       if (profile) {
         const myShopId = profile.home_shop_id || 'main';
         
+        // 📍 Promise.all 内のクエリ。orderの書き方とカンマに注意
         const [shopRes, shiftsRes, newsRes, resData, achiRes, syncRes] = await Promise.all([
           supabase.from('shop_master').select('*').eq('shop_id', myShopId).single(),
           supabase.from('shifts')
             .select('*')
             .in('login_id', uniqueIds)
             .order('shift_date', { ascending: true }),
-          supabase.from('news').select('*').or(`shop_id.eq.${myShopId},shop_id.eq.all`).order('created_at', { ascending: false }).limit(3),
+          supabase.from('news')
+            .select('*')
+            .or(`shop_id.eq.${myShopId},shop_id.eq.all`)
+            .order('created_at', { ascending: false })
+            .limit(3),
           supabase.from('reservations')
             .select('*')
             .in('login_id', uniqueIds)
             .order('created_at', { ascending: false }),
-          // 📍 集計専用テーブルから全データを取得（UUIDを使用）
           supabase.from('daily_achievements')
             .select('*')
             .eq('cast_id', profile.id),
           supabase.from('sync_logs').select('last_sync_at').eq('id', 1).single()
         ]);
         
-        const cleanReservations = (resData.data || []).reduce((acc: any[], current: any) => {
-          const key = current.external_res_id || `${current.reservation_date}_${current.customer_name}_${current.start_time}`;
-          const isExist = acc.find(item => 
-            (item.external_res_id || `${item.reservation_date}_${item.customer_name}_${item.start_time}`) === key
+        // 📍 取得した予約データに対して重複・最新判定を行う
+        const rawRes = resData.data || [];
+        const enhancedReservations = rawRes.map((res: any) => {
+          // 同じ日の同じ時間に自分以外の予約があるか
+          const duplicates = rawRes.filter((other: any) => 
+            other.reservation_date === res.reservation_date && 
+            other.start_time === res.start_time &&
+            other.id !== res.id
           );
-          if (!isExist) acc.push(current);
-          return acc;
-        }, []);
+
+          const isDuplicate = duplicates.length > 0;
+          
+          // 重複の中で、自分が最も新しい(created_atが最新)かどうか
+          const isLatest = isDuplicate 
+            ? !duplicates.some((other: any) => new Date(other.created_at) > new Date(res.created_at))
+            : true;
+
+          return { ...res, isDuplicate, isLatest };
+        });
 
         setData({
           shifts: shiftsRes.data || [], 
           profile, 
           shop: shopRes.data || null, 
           news: newsRes.data || [],
-          reservations: cleanReservations,
-          achievements: achiRes.data || [], // 📍 取得データをセット
+          reservations: enhancedReservations,
+          achievements: achiRes.data || [],
           syncAt: (syncRes.data && syncRes.data.last_sync_at) ? syncRes.data.last_sync_at : ''
         });
       }
@@ -97,7 +112,7 @@ export function useShiftData() {
     }
   }, [supabase]);
 
-  // 📍 修正後の月間集計ロジック
+  // 実績集計ロジック
   const getMonthlyTotals = useCallback((viewDate: Date) => {
     if (!mounted || !viewDate || !data.shifts) return { amount: 0, count: 0, hours: 0, absent: 0, late: 0, ka_f: 0, ka_first: 0, ka_main: 0, soe_f: 0, soe_first: 0, soe_main: 0 };
     
@@ -105,18 +120,16 @@ export function useShiftData() {
     const currentMonth = viewDate.getMonth();
     const currentYear = viewDate.getFullYear();
 
-    // 1. シフトテーブルから「出勤日数・金額・当欠・遅刻」を集計
     const shiftStats = (data.shifts || []).reduce((acc: any, s: any) => {
       const d = parseISO(s.shift_date);
       if (!isValid(d) || d.getMonth() !== currentMonth || d.getFullYear() !== currentYear) return acc;
-      if (isAfter(d, today)) return acc; // 未来のシフトは集計しない
+      if (isAfter(d, today)) return acc;
 
       if (s.status === 'official' || s.is_official_pre_exist === true) {
         acc.count++;
         acc.amount += (Number(s.reward_amount) || 0);
         if (s.is_late) acc.late++;
         
-        // 稼働時間の計算
         if (s.start_time && s.end_time && s.start_time !== 'OFF') {
           const [sH, sM] = s.start_time.split(':').map(Number);
           const [eH, eM] = s.end_time.split(':').map(Number);
@@ -131,7 +144,6 @@ export function useShiftData() {
       return acc;
     }, { amount: 0, count: 0, hours: 0, absent: 0, late: 0 });
 
-    // 2. 📍 集計テーブルから「指名内訳」をSUMする
     const achievementStats = (data.achievements || []).reduce((acc: any, cur: any) => {
       const d = parseISO(cur.date);
       if (!isValid(d) || d.getMonth() !== currentMonth || d.getFullYear() !== currentYear) return acc;
