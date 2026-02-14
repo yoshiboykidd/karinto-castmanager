@@ -55,10 +55,14 @@ export async function GET(req: NextRequest) {
       return toHiragana(s);
     };
 
-    const shopCast = allCast?.filter(c => String(c.home_shop_id).trim().padStart(3, '0') === shop.id) || [];
+    // 📍 修正1：店舗IDを数値として比較し、所属キャストを確実に抽出
+    const shopCast = allCast?.filter(c => Number(c.home_shop_id) === Number(shop.id)) || [];
+    
+    // 名前から8桁ログインIDを引くためのMap
     const nameMap = new Map();
     shopCast.forEach(c => {
-      nameMap.set(normalize(c.hp_display_name || c.display_name), String(c.login_id).trim().padStart(8, '0'));
+      const lid = String(c.login_id).trim().padStart(8, '0');
+      nameMap.set(normalize(c.hp_display_name || c.display_name), lid);
     });
 
     for (let i = 0; i < 8; i++) {
@@ -82,7 +86,8 @@ export async function GET(req: NextRequest) {
         
         const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
 
-        $('h3, .name, .cast_name, span.name, div.name, strong, td').each((_, nameEl) => {
+        // 📍 修正2：セレクタを強化。aタグ内の名前も拾えるように追加
+        $('h3, .name, .cast_name, span.name, div.name, strong, td, a').each((_, nameEl) => {
           const rawName = $(nameEl).text();
           const cleanName = normalize(rawName);
           const loginId = nameMap.get(cleanName);
@@ -98,12 +103,10 @@ export async function GET(req: NextRequest) {
 
             foundInHP.add(loginId);
 
+            // 欠勤は上書きしない
             if (dbShift?.status === 'absent') return;
-            if (dbShift?.status === 'requested') {
-              if (dbShift.start_time !== hpStart || dbShift.end_time !== hpEnd) return;
-            }
 
-           upsertBatch.push({
+            upsertBatch.push({
               login_id: loginId,
               shift_date: dateStrDB,
               status: 'official',
@@ -112,17 +115,22 @@ export async function GET(req: NextRequest) {
               hp_end_time: hpEnd,
               start_time: hpStart,
               end_time: hpEnd,
-              reward_amount: 0, // 📍 ここを追加：ERR:23502を回避
+              reward_amount: 0, // ERR:23502 対策
               updated_at: new Date().toISOString()
             });
           }
         });
 
+        // 📍 修正3：削除ロジック。今回HPにいなかった「その店舗の所属キャスト」のみ消す
         let removeCount = 0;
         if (foundInHP.size > 0) {
           const idsToRemove = (existingShifts || [])
             .map(s => String(s.login_id).trim().padStart(8, '0'))
-            .filter(id => !foundInHP.has(id) && existingMap.get(id)?.status === 'official');
+            .filter(id => 
+              !foundInHP.has(id) && 
+              nameMap.has(id) && // 📍 重要：この店舗のキャストであることが確定している場合のみ
+              existingMap.get(id)?.status === 'official'
+            );
 
           if (idsToRemove.length > 0) {
             await supabase.from('shifts').delete().eq('shift_date', dateStrDB).in('login_id', idsToRemove);
@@ -138,7 +146,7 @@ export async function GET(req: NextRequest) {
           if (upsertError) {
             logs.push(`${dateStrDB.slice(8)}日 ERR:${upsertError.code}`);
           } else {
-            logs.push(`${dateStrDB.slice(8)}日(HP:${foundInHP.size}/更新:${upsertBatch.length}/消:${removeCount})`);
+            logs.push(`${dateStrDB.slice(8)}日(HP:${foundInHP.size}/更:${upsertBatch.length}/消:${removeCount})`);
           }
         } else {
           logs.push(`${dateStrDB.slice(8)}日(HP:0)`);
