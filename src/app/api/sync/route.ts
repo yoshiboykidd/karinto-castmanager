@@ -29,7 +29,6 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const shopIndexParam = searchParams.get('shop');
-  
   if (shopIndexParam === null) return NextResponse.json({ error: "No shop index" }, { status: 400 });
 
   const shopIndex = parseInt(shopIndexParam);
@@ -56,8 +55,8 @@ export async function GET(req: NextRequest) {
 
     for (const dateStrDB of targetDates) {
       const dayOfMonth = new Date(dateStrDB).getDate();
-      const hpDetectedNames = new Set<string>(); // HPで見つけた生の名前
-      const matchedLids = new Set<string>();     // DBと一致したキャストのID
+      const hpDetectedNames = new Set<string>();
+      const matchedLids = new Set<string>();
       const upsertBatch: any[] = [];
 
       const { data: existingShifts } = await supabase
@@ -67,14 +66,20 @@ export async function GET(req: NextRequest) {
       
       const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
 
+      // 📍 修正：特定のクラス名や構造に依存せず、すべてのテーブル行をスキャン
       $('table tr').each((_, tr) => {
         const cells = $(tr).find('td');
-        // かりんとの出勤表構造に基づき、セルが31個以上ある行を対象とする
-        if (cells.length < 31) return;
+        
+        // 少なくとも名前列と日付列が存在することを確認
+        if (cells.length <= dayOfMonth) return;
 
+        // 1番目のセルから名前を取得
         const rawName = $(cells[0]).text().trim();
-        if (!rawName) return;
-        hpDetectedNames.add(rawName); // 📍 デバッグ：HP上で名前を検知
+        
+        // 名前が空、または「名前」というヘッダー文字列の場合はスキップ
+        if (!rawName || rawName === '名前' || rawName.includes('出勤')) return;
+
+        hpDetectedNames.add(rawName);
 
         const targetMember = castMembers.find(m => 
           normalize(m.hp_display_name || m.display_name) === normalize(rawName)
@@ -82,11 +87,11 @@ export async function GET(req: NextRequest) {
 
         if (!targetMember) return;
         const lid = String(targetMember.login_id).trim().padStart(8, '0');
-        matchedLids.add(lid); // 📍 デバッグ：DBと一致
+        matchedLids.add(lid);
 
-        // 当欠ガード
         if (existingMap.get(lid)?.status === 'absent') return;
 
+        // 指定した日のセルから時間を取得
         const timeStr = $(cells[dayOfMonth]).text().trim();
         if (timeStr && timeStr.includes('~')) {
           const [hpStart, hpEnd] = timeStr.split('~').map(t => t.trim().padStart(5, '0') + ':00');
@@ -104,7 +109,6 @@ export async function GET(req: NextRequest) {
         }
       });
 
-      // 削除処理
       let removeCount = 0;
       const idsToRemove = (existingShifts || [])
         .map(s => String(s.login_id).trim().padStart(8, '0'))
@@ -119,10 +123,6 @@ export async function GET(req: NextRequest) {
         await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
       }
 
-      // 📍 ログを詳細化
-      // HP: HPで見つかった名前の総数
-      // 一致: DBのキャスト名と合致した人数
-      // 更新: 実際にDBに書き込んだ(時間が以前と違う)人数
       logs.push(`${dateStrDB.slice(8)}日(HP:${hpDetectedNames.size}/一致:${matchedLids.size}/更新:${upsertBatch.length})`);
     }
 
