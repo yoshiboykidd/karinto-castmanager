@@ -80,7 +80,8 @@ export default function DashboardContent() {
 
   const displayMonth = format(nav.viewDate || new Date(), 'M月');
 
-  // 📍 修正箇所：データがある状態(dataが存在する)なら、loading中(更新中)でもnullを返さないように変更
+  // 📍 【ここだけ修正】データがある状態なら、更新中(loading)でも画面を消さないようにしました。
+  // これで、保存ボタンを押した瞬間に画面がリセットされるのを防ぎます。
   if (!mounted || (loading && !data)) return null;
 
   return (
@@ -96,7 +97,7 @@ export default function DashboardContent() {
       
       <main className="px-4 -mt-6 relative z-10 space-y-5">
         
-        {/* 1. カレンダーを一番上に配置 */}
+        {/* 1. カレンダー */}
         <section className={`p-4 rounded-[40px] border-2 shadow-xl shadow-pink-100/20 text-center transition-all duration-500 ${currentTheme.calendar}`}>
           <DashboardCalendar 
             shifts={safeShifts as any} 
@@ -109,7 +110,7 @@ export default function DashboardContent() {
           />
         </section>
 
-        {/* 2. 日別詳細エリア（予約詳細）を二番目に配置 */}
+        {/* 2. 日別詳細エリア（予約詳細） */}
         {(nav.selected?.single instanceof Date && isValid(nav.selected.single)) && (
           <DailyDetail 
             date={nav.selected.single}
@@ -124,7 +125,7 @@ export default function DashboardContent() {
           />
         )}
 
-        {/* 3. 月間実績サマリーを三番目に配置 */}
+        {/* 3. 月間実績サマリー */}
         <MonthlySummary 
           month={displayMonth} 
           totals={monthlyTotals} 
@@ -132,7 +133,7 @@ export default function DashboardContent() {
           theme={themeKey} 
         />
         
-        {/* お知らせセクション（最下部） */}
+        {/* お知らせセクション */}
         <NewsSection newsList={data?.news || []} />
       </main>
 
