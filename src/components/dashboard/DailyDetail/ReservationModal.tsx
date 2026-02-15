@@ -6,11 +6,10 @@ export default function ReservationModal({
   selectedRes, onClose, onDelete, isDeleting, isEditingMemo, setIsEditingMemo, 
   memoDraft, setMemoDraft, onSaveMemo, allPastReservations = [] 
 }: any) {
-  // 1. フックをすべて先に宣言（エラー回避の絶対ルール）
+  // 1. フックをすべて先に宣言
   const [showToast, setShowToast] = useState(false);
 
   const customerInfo = useMemo(() => {
-    // selectedResがない場合でもフックは実行されるため、安全な初期値を返す
     if (!selectedRes) return { count: 1, lastDate: null };
 
     try {
@@ -30,25 +29,24 @@ export default function ReservationModal({
     }
   }, [selectedRes, allPastReservations]);
 
-  // 2. フックの宣言が終わった後にガード（存在しない場合は何も描画しない）
+  // 2. フックの宣言が終わった後にガード
   if (!selectedRes) return null;
 
-  // 📍 保存処理：保存してもモーダルは閉じず、トーストを出してから入力欄だけを閉じる
+  // 📍 保存処理：保存しても閉じず、トーストを出してから入力欄だけを閉じる
   const handleSave = async () => {
     if (typeof onSaveMemo !== 'function') return;
 
     try {
-      // 親のDB更新処理（DailyDetail側の関数）を実行
       await onSaveMemo();
       
-      // ✅ 1. トーストを表示（ボクの実装で問題なく動く）
+      // ✅ トーストを表示
       setShowToast(true);
 
-      // ✅ 2. 1.5秒待ってからトーストを消し、入力フォーム（Editing）だけを閉じる
+      // ✅ 1.5秒待ってから入力欄だけを閉じる
       setTimeout(() => {
         setShowToast(false);
         if (typeof setIsEditingMemo === 'function') {
-          setIsEditingMemo(false); // これで「キャストメモを書く」ボタンの状態に戻る
+          setIsEditingMemo(false);
         }
       }, 1500);
 
@@ -63,10 +61,14 @@ export default function ReservationModal({
       {/* 背景 */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => onClose?.()} />
       
-      {/* 📍 トースト通知：モーダル内の「中」に配置 */}
+      {/* 📍 トースト通知：2行表示にアップデート */}
       {showToast && (
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[150] bg-pink-600 text-white px-6 py-3 rounded-full shadow-2xl font-black text-[13px] border border-pink-400">
-          ✅ 保存しました
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[150] bg-pink-600 text-white px-7 py-5 rounded-[24px] shadow-2xl font-black text-center border-2 border-pink-400 whitespace-nowrap animate-bounce flex flex-col items-center gap-1">
+          <div className="text-[16px]">✅ 保存されました</div>
+          <div className="text-[11px] opacity-90 leading-tight">
+            同じお客様の情報は<br />
+            1つのメモで更新されてます
+          </div>
         </div>
       )}
 
