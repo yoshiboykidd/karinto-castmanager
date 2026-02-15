@@ -51,7 +51,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
       }
     };
     fetchMyHistory();
-  }, [myLoginId, supabase, date]); // 日付が変わるタイミング等でも再取得
+  }, [myLoginId, supabase, date]);
 
   // 3. 当欠時の予約自動削除ロジック
   useEffect(() => {
@@ -66,12 +66,16 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
     autoDelete();
   }, [isAbsent, reservations.length, date, myLoginId, supabase, onRefresh]);
 
-  // メモの下書き同期
+  // 📍 メモの下書き同期（修正箇所）
   useEffect(() => {
-    setMemoDraft(selectedRes?.cast_memo || '');
-    // モーダルを開くたびに編集モードはオフにする（デフォルトで閉じるため）
-    setIsEditingMemo(false);
-  }, [selectedRes]);
+    if (!selectedRes) {
+      setMemoDraft('');
+      setIsEditingMemo(false);
+      return;
+    }
+    // メモ内容だけを同期し、isEditingMemoは勝手にいじらない
+    setMemoDraft(selectedRes.cast_memo || '');
+  }, [selectedRes?.id]); // IDが変わった時（別の予約を開いた時）だけ初期化
 
   // 4. ハンドラー
   const handleDelete = async () => {
@@ -87,14 +91,27 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
     } finally { setIsDeleting(false); }
   };
 
+  // 📍 メモ保存ロジック（修正箇所）
   const handleSaveMemo = async () => {
-    if (!selectedRes?.id) return;
+    if (!selectedRes?.id || !supabase) return;
     try {
-      await supabase.from('reservations').update({ cast_memo: memoDraft }).eq('id', selectedRes.id);
-      setIsEditingMemo(false);
+      const { error } = await supabase
+        .from('reservations')
+        .update({ cast_memo: memoDraft })
+        .eq('id', selectedRes.id);
+
+      if (error) throw error;
+
+      // ローカルステートを更新して表示に反映（モーダルは閉じない）
       setSelectedRes({ ...selectedRes, cast_memo: memoDraft });
+      
+      // バックグラウンドでデータをリフレッシュ（loadingにならないことを祈る）
       if (onRefresh) onRefresh();
-    } catch (err) { alert("保存に失敗しました。"); }
+
+    } catch (err) { 
+      console.error(err);
+      alert("保存に失敗しました。"); 
+    }
   };
 
   const getBadgeStyle = (label: string) => {
@@ -162,7 +179,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
           </div>
         </div>
 
-        {/* 📍 1. 予約一覧を上に配置 */}
+        {/* 1. 予約一覧 */}
         <div className="flex-1 min-h-[100px]">
           <ReservationList 
             reservations={reservations} 
@@ -172,7 +189,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
           />
         </div>
 
-        {/* 📍 2. 統計情報を下（予約一覧の後）に配置 */}
+        {/* 2. 統計情報 */}
         <DailyStats 
           dayTotals={dayTotals} 
           rewardAmount={shift?.reward_amount} 

@@ -6,12 +6,11 @@ export default function ReservationModal({
   selectedRes, onClose, onDelete, isDeleting, isEditingMemo, setIsEditingMemo, 
   memoDraft, setMemoDraft, onSaveMemo, allPastReservations = [] 
 }: any) {
-  // 1. フックをすべて先に宣言（順序を固定）
+  // 1. フックをすべて先に宣言（エラー回避の絶対ルール）
   const [showToast, setShowToast] = useState(false);
 
-  // 履歴計算（絶対に落ちない安全な書き方）
   const customerInfo = useMemo(() => {
-    // selectedResがない場合の初期値を返しておく（後続のガードで弾かれるが、フックの動作上必要）
+    // selectedResがない場合でもフックは実行されるため、安全な初期値を返す
     if (!selectedRes) return { count: 1, lastDate: null };
 
     try {
@@ -31,29 +30,30 @@ export default function ReservationModal({
     }
   }, [selectedRes, allPastReservations]);
 
-  // 2. フックの宣言が終わった後にガードを実行
+  // 2. フックの宣言が終わった後にガード（存在しない場合は何も描画しない）
   if (!selectedRes) return null;
 
-  // 📍 保存処理：保存しても閉じず、トーストを出してから入力欄だけを閉じる
+  // 📍 保存処理：保存してもモーダルは閉じず、トーストを出してから入力欄だけを閉じる
   const handleSave = async () => {
     if (typeof onSaveMemo !== 'function') return;
 
     try {
-      // 親の保存処理（DailyDetailのhandleSaveMemo）を実行
+      // 親のDB更新処理（DailyDetail側の関数）を実行
       await onSaveMemo();
       
-      // ✅ 画面を閉じさせないために、まずトーストを表示
+      // ✅ 1. トーストを表示（ボクの実装で問題なく動く）
       setShowToast(true);
 
-      // ✅ 1.5秒待ってから入力欄だけを閉じる
+      // ✅ 2. 1.5秒待ってからトーストを消し、入力フォーム（Editing）だけを閉じる
       setTimeout(() => {
         setShowToast(false);
         if (typeof setIsEditingMemo === 'function') {
-          setIsEditingMemo(false);
+          setIsEditingMemo(false); // これで「キャストメモを書く」ボタンの状態に戻る
         }
       }, 1500);
 
     } catch (e) {
+      console.error("Save error:", e);
       alert("保存エラー");
     }
   };
