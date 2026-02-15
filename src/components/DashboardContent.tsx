@@ -80,7 +80,9 @@ export default function DashboardContent() {
 
   const displayMonth = format(nav.viewDate || new Date(), 'M月');
 
-  if (!mounted || loading) return null;
+  // 📍 修正箇所: loading中であってもdataが存在すれば描画を継続する（アンロードを防ぐ）
+  if (!mounted) return null;
+  if (loading && !data) return null;
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
