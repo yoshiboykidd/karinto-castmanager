@@ -1,6 +1,5 @@
 'use client';
 
-
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation'; 
 import { format, isValid } from 'date-fns';
@@ -13,10 +12,8 @@ import DashboardCalendar from '@/components/DashboardCalendar';
 import DailyDetail from '@/components/dashboard/DailyDetail';
 import NewsSection from '@/components/dashboard/NewsSection';
 
-
 // @ts-ignore
 import FixedFooter from '@/components/dashboard/FixedFooter';
-
 
 const THEME_CONFIG: any = {
   pink:   { header: 'bg-[#FFB7C5]', calendar: 'bg-[#FFF9FA] border-pink-100', accent: 'pink' },
@@ -27,22 +24,18 @@ const THEME_CONFIG: any = {
   red:    { header: 'bg-red-400',    calendar: 'bg-red-50 border-red-100',     accent: 'red' },
 };
 
-
 export default function DashboardContent() {
   const router = useRouter();
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
 
-
   const { data, loading, fetchInitialData, getMonthlyTotals, supabase } = useShiftData();
   const nav = useNavigation() as any;
-
 
   const safeProfile = useMemo(() => data?.profile || {}, [data]);
   const themeKey = safeProfile.theme_color || 'pink';
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
-
 
   const shopName = useMemo(() => {
     const loginId = String(safeProfile.username || safeProfile.login_id || "");
@@ -55,12 +48,10 @@ export default function DashboardContent() {
     return shopMap[prefix] ? `${shopMap[prefix]}店` : (safeProfile.shop_name || '店舗未設定');
   }, [safeProfile]);
 
-
   const lastSyncTime = useMemo(() => {
     const d = data as any;
     return d?.last_sync_at || d?.syncAt || safeProfile?.last_sync_at || safeProfile?.sync_at || null;
   }, [data, safeProfile]);
-
 
   const achievementData: any = useAchievement(
     supabase, 
@@ -72,30 +63,25 @@ export default function DashboardContent() {
   
   const { selectedShift = null } = achievementData || {};
 
-
   const currentReservations = useMemo(() => {
     if (!(nav.selected?.single instanceof Date) || !data?.reservations) return [];
     const selectedDateStr = format(nav.selected.single, 'yyyy-MM-dd');
     return (data.reservations as any[]).filter((res) => res.reservation_date === selectedDateStr);
   }, [data?.reservations, nav.selected?.single]);
 
-
   useEffect(() => { 
     setMounted(true);
     fetchInitialData(router); 
   }, [fetchInitialData, router]);
 
-
   const monthlyTotals = useMemo(() => {
     return getMonthlyTotals(nav.viewDate || new Date());
   }, [getMonthlyTotals, nav.viewDate]);
 
-
   const displayMonth = format(nav.viewDate || new Date(), 'M月');
 
-
-  if (!mounted || loading) return null;
-
+  // 📍 修正箇所：データがある状態(dataが存在する)なら、loading中(更新中)でもnullを返さないように変更
+  if (!mounted || (loading && !data)) return null;
 
   return (
     <div className="min-h-screen bg-[#FFFDFE] pb-36 font-sans overflow-x-hidden text-gray-800">
@@ -110,7 +96,7 @@ export default function DashboardContent() {
       
       <main className="px-4 -mt-6 relative z-10 space-y-5">
         
-        {/* 📍 1. カレンダーを一番上に配置 */}
+        {/* 1. カレンダーを一番上に配置 */}
         <section className={`p-4 rounded-[40px] border-2 shadow-xl shadow-pink-100/20 text-center transition-all duration-500 ${currentTheme.calendar}`}>
           <DashboardCalendar 
             shifts={safeShifts as any} 
@@ -123,8 +109,7 @@ export default function DashboardContent() {
           />
         </section>
 
-
-        {/* 📍 2. 日別詳細エリア（予約詳細）を二番目に配置 */}
+        {/* 2. 日別詳細エリア（予約詳細）を二番目に配置 */}
         {(nav.selected?.single instanceof Date && isValid(nav.selected.single)) && (
           <DailyDetail 
             date={nav.selected.single}
@@ -139,8 +124,7 @@ export default function DashboardContent() {
           />
         )}
 
-
-        {/* 📍 3. 月間実績サマリーを三番目に配置 */}
+        {/* 3. 月間実績サマリーを三番目に配置 */}
         <MonthlySummary 
           month={displayMonth} 
           totals={monthlyTotals} 
@@ -151,7 +135,6 @@ export default function DashboardContent() {
         {/* お知らせセクション（最下部） */}
         <NewsSection newsList={data?.news || []} />
       </main>
-
 
       <FixedFooter 
         pathname={pathname} 
