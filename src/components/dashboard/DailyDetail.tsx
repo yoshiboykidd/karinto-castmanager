@@ -66,16 +66,15 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
     autoDelete();
   }, [isAbsent, reservations.length, date, myLoginId, supabase, onRefresh]);
 
-  // 📍 メモの下書き同期（修正箇所）
+  // 📍 メモの下書き同期
   useEffect(() => {
     if (!selectedRes) {
       setMemoDraft('');
       setIsEditingMemo(false);
       return;
     }
-    // メモ内容だけを同期し、isEditingMemoは勝手にいじらない
     setMemoDraft(selectedRes.cast_memo || '');
-  }, [selectedRes?.id]); // IDが変わった時（別の予約を開いた時）だけ初期化
+  }, [selectedRes?.id]);
 
   // 4. ハンドラー
   const handleDelete = async () => {
@@ -91,21 +90,30 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
     } finally { setIsDeleting(false); }
   };
 
-  // 📍 メモ保存ロジック（修正箇所）
+  // 📍 顧客メモ一括更新ロジック（修正箇所）
   const handleSaveMemo = async () => {
     if (!selectedRes?.id || !supabase) return;
-    try {
-      const { error } = await supabase
-        .from('reservations')
-        .update({ cast_memo: memoDraft })
-        .eq('id', selectedRes.id);
+    
+    const cNo = selectedRes.customer_no;
 
+    try {
+      let query = supabase.from('reservations').update({ cast_memo: memoDraft });
+
+      if (cNo) {
+        // ✅ 顧客番号がある場合：その顧客かつ自分のメモをすべて更新
+        query = query.eq('customer_no', cNo).eq('login_id', myLoginId);
+      } else {
+        // 顧客番号がない場合：この予約1件のみ更新
+        query = query.eq('id', selectedRes.id);
+      }
+
+      const { error } = await query;
       if (error) throw error;
 
-      // ローカルステートを更新して表示に反映（モーダルは閉じない）
+      // ローカル表示を更新
       setSelectedRes({ ...selectedRes, cast_memo: memoDraft });
       
-      // バックグラウンドでデータをリフレッシュ（loadingにならないことを祈る）
+      // 全データを再取得して、カレンダーや他の日のリストにも反映させる
       if (onRefresh) onRefresh();
 
     } catch (err) { 
