@@ -1,17 +1,41 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 
 export default function ReservationModal({ 
   selectedRes, onClose, onDelete, isDeleting, isEditingMemo, setIsEditingMemo, 
-  memoDraft, setMemoDraft, onSaveMemo
+  memoDraft, setMemoDraft, onSaveMemo, getBadgeStyle, allPastReservations = [] 
 }: any) {
   const [showToast, setShowToast] = useState(false);
 
-  // ガード：これがないと絶対に落ちる
+  // ガード：これがないと落ちる
   if (!selectedRes) return null;
 
-  // 保存ボタンの処理
+  // 1. 過去履歴の安全な計算
+  const customerInfo = useMemo(() => {
+    const historyData = Array.isArray(allPastReservations) ? allPastReservations : [];
+    const customerNo = selectedRes?.customer_no;
+    if (!customerNo) return { count: 1, lastDate: null, latestMemo: "" };
+
+    const history = historyData
+      .filter((r: any) => r && r.customer_no === customerNo)
+      .sort((a: any, b: any) => String(b?.reservation_date || "").localeCompare(String(a?.reservation_date || "")));
+    
+    const count = history.length;
+    const lastMet = history.find((r: any) => r && r.id !== selectedRes.id && r.reservation_date <= (selectedRes.reservation_date || ""));
+    const latestMemo = history.find((r: any) => r?.cast_memo && String(r.cast_memo).trim() !== "")?.cast_memo || "";
+    
+    return { count, lastDate: lastMet?.reservation_date || null, latestMemo };
+  }, [selectedRes, allPastReservations]);
+
+  // 2. メモの初期セット
+  useEffect(() => {
+    if (isEditingMemo && !memoDraft && typeof setMemoDraft === 'function') {
+      setMemoDraft(selectedRes?.cast_memo || customerInfo.latestMemo || "");
+    }
+  }, [isEditingMemo, memoDraft, customerInfo.latestMemo, selectedRes, setMemoDraft]);
+
+  // 3. 保存処理
   const handleSave = async () => {
     if (typeof onSaveMemo === 'function') {
       await onSaveMemo();
@@ -23,76 +47,86 @@ export default function ReservationModal({
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       {/* 背景 */}
-      <div className="absolute inset-0 bg-black/70" onClick={() => onClose?.()} />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => onClose?.()} />
       
-      {/* トースト（シンプルな文字だけ） */}
+      {/* 📍 トースト通知 */}
       {showToast && (
-        <div className="fixed top-10 left-1/2 -translate-x-1/2 z-[110] bg-pink-600 text-white px-6 py-3 rounded-full font-black shadow-xl">
-          ✅ 保存しました
+        <div className="fixed top-10 left-1/2 -translate-x-1/2 z-[110] bg-pink-600 text-white px-6 py-3 rounded-full shadow-2xl font-black text-[13px] border border-pink-400">
+          ✅ 保存しました。同じお客様のメモとして残ります
         </div>
       )}
 
-      {/* 本体：検証版で見やすかったサイズ感を採用 */}
-      <div className="relative w-full max-w-sm bg-white rounded-[32px] flex flex-col shadow-2xl overflow-hidden text-gray-800">
+      <div className="relative w-full max-w-sm bg-white rounded-[32px] flex flex-col max-h-[90vh] overflow-hidden text-gray-800 shadow-2xl">
         
-        {/* ヘッダー */}
-        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+        {/* ヘッダー：検証版のスタイル */}
+        <div className="px-6 py-4 border-b border-gray-50 flex justify-between items-center shrink-0">
           <div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</p>
-            <p className="text-[18px] font-black">{selectedRes.reservation_date || '----/--/--'}</p>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Reservation Date</p>
+            <p className="text-[20px] font-black leading-none">📅 {(selectedRes.reservation_date || "").replace(/-/g, '/')}</p>
           </div>
-          <button onClick={() => onClose?.()} className="w-10 h-10 flex items-center justify-center bg-gray-100 rounded-full text-gray-400 text-2xl font-bold">
+          <button onClick={() => onClose?.()} className="w-10 h-10 flex items-center justify-center bg-gray-50 rounded-full text-gray-400 font-bold text-2xl">
             ×
           </button>
         </div>
 
-        {/* コンテンツ */}
-        <div className="p-6 space-y-4 overflow-y-auto max-h-[70vh]">
+        {/* コンテンツエリア */}
+        <div className="overflow-y-auto p-6 space-y-4 flex-1 overscroll-contain">
           
-          {/* 時間・区分：検証版ベースの大きな文字 */}
+          {/* 時間・区分 */}
           <div className="flex items-center gap-2">
-            <span className="px-3 py-1 bg-pink-50 text-pink-500 rounded-lg text-[12px] font-black">
+            <span className="px-3 py-1 bg-pink-50 text-pink-500 rounded-lg text-[13px] font-black">
               {selectedRes.service_type || 'か'}
             </span>
-            <div className="ml-auto text-[26px] font-black tracking-tighter">
-              {selectedRes.start_time} ～ {selectedRes.end_time}
+            <span className="px-3 py-1 bg-gray-100 text-gray-500 rounded-lg text-[12px] font-black">
+              {selectedRes.nomination_category || 'FREE'}
+            </span>
+            <div className="ml-auto text-[26px] font-black tracking-tighter leading-none">
+              ⏰ {(selectedRes.start_time || "").substring(0, 5)} ～ {(selectedRes.end_time || "").substring(0, 5)}
             </div>
           </div>
 
-          {/* 予約情報ブロック：検証版で「見やすかった」グレーの箱 */}
+          {/* 予約内容ブロック：検証版デザイン */}
           <div className="space-y-2">
             <div className="p-4 bg-gray-50 rounded-[20px]">
-              <p className="text-[10px] font-black text-gray-400 mb-1">【コース / 料金】</p>
-              <p className="text-[18px] font-black">
-                {selectedRes.course_info} / <span className="text-pink-600">{selectedRes.total_price}円</span>
+              <p className="text-[10px] font-black text-gray-400 uppercase mb-1">【コース / 料金】</p>
+              <p className="text-[18px] font-black leading-tight">
+                {selectedRes.course_info} / <span className="text-pink-600 font-black">{Number(selectedRes.total_price || 0).toLocaleString()}円</span>
               </p>
             </div>
 
             <div className="p-4 bg-gray-50 rounded-[20px]">
-              <p className="text-[10px] font-black text-gray-400 mb-1">【場所 / スタッフ】</p>
+              <p className="text-[10px] font-black text-gray-400 uppercase mb-1">【場所 / スタッフ】</p>
               <p className="text-[15px] font-black text-gray-700">
                 🏨 {selectedRes.hotel_name || '-'} / 👤 {selectedRes.staff_name || '-'}
               </p>
             </div>
           </div>
 
-          {/* 顧客情報：ハッキリした大きな名前 */}
-          <div className="p-5 border-2 border-pink-100 rounded-[24px]">
-            <p className="text-[10px] font-black text-pink-400 uppercase mb-1">★ Customer</p>
+          {/* 顧客情報ブロック：ピンクのアクセント */}
+          <div className="p-5 border-2 border-pink-100 rounded-[24px] relative">
+            <p className="text-[11px] font-black text-pink-400 uppercase mb-1 flex items-center gap-1">⭐ CUSTOMER</p>
             <div className="flex items-baseline gap-2">
-              <span className="text-[24px] font-black">{selectedRes.customer_name || '名前なし'} 様</span>
+              <span className="text-[24px] font-black">【{selectedRes.customer_name} 様】</span>
+              <span className="text-[16px] font-black text-gray-400">〈{customerInfo.count}回目〉</span>
             </div>
+            {customerInfo.count > 1 && customerInfo.lastDate && (
+              <p className="text-[11px] font-bold text-gray-400 mt-1 pl-1">⌛ 前回：{(customerInfo.lastDate || "").replace(/-/g, '/')}</p>
+            )}
           </div>
 
-          {/* キャストメモ：シンプルに */}
-          <div className="bg-gray-50 rounded-[24px] overflow-hidden">
+          {/* キャストメモ：検証版デザインのまま高機能化 */}
+          <div className="bg-gray-50 rounded-[24px] overflow-hidden border-2 border-transparent focus-within:border-pink-200 transition-all">
             {isEditingMemo ? (
               <div className="p-4 space-y-3">
+                <div className="flex justify-between items-center px-1">
+                  <span className="text-pink-500 font-black text-[12px]">📝 CAST MEMO</span>
+                  <span className="text-[9px] text-gray-400 font-bold">※次回の履歴に引き継がれます</span>
+                </div>
                 <textarea
                   value={memoDraft || ""}
                   onChange={(e) => setMemoDraft?.(e.target.value)}
-                  className="w-full h-32 p-4 bg-white rounded-xl text-[16px] font-bold focus:outline-none"
-                  placeholder="メモを入力..."
+                  placeholder="お客様の特徴などをメモ..."
+                  className="w-full h-24 p-4 bg-white rounded-xl text-[16px] font-bold focus:outline-none border-none shadow-inner"
                   autoFocus
                 />
                 <div className="flex gap-2">
@@ -100,25 +134,27 @@ export default function ReservationModal({
                     閉じる
                   </button>
                   <button onClick={handleSave} className="flex-[2] py-4 bg-pink-500 text-white rounded-xl font-black text-[15px] shadow-lg">
-                    保存する
+                    💾 保存する
                   </button>
                 </div>
               </div>
             ) : (
-              <button onClick={() => setIsEditingMemo?.(true)} className="w-full py-6 flex items-center justify-center gap-2 text-pink-400 font-black italic">
-                📝 <span className="text-[14px] tracking-widest uppercase">【 キャストメモを書く 】</span>
+              <button onClick={() => setIsEditingMemo?.(true)} className="w-full py-6 flex items-center justify-center gap-2 text-pink-400 font-black italic active:bg-pink-50">
+                <span>📝</span>
+                <span className="text-[15px] tracking-widest uppercase">【 キャストメモを書く 】</span>
+                {(selectedRes.cast_memo || customerInfo.latestMemo) && <div className="w-2.5 h-2.5 bg-pink-400 rounded-full" />}
               </button>
             )}
           </div>
 
-          {/* 下部ボタン */}
-          <div className="pt-2 pb-6 space-y-4">
-            <button onClick={() => alert("起動")} className="w-full h-16 rounded-[20px] bg-blue-500 text-white font-black text-[18px] shadow-lg shadow-blue-100">
+          {/* 下部ボタン：押しやすく大きく */}
+          <div className="pt-2 pb-10 space-y-4">
+            <button onClick={() => alert("起動")} className="w-full h-16 rounded-[22px] bg-blue-500 text-white font-black text-[19px] shadow-lg active:scale-95 transition-all">
               🧮 OP計算君を開く
             </button>
             
-            <button onClick={() => onDelete?.()} className="w-full text-gray-300 font-bold text-[12px]">
-              {isDeleting ? '削除中...' : '🗑️ この予約データを取り消す'}
+            <button onClick={() => onDelete?.()} className="w-full text-gray-300 font-bold text-[12px] flex items-center justify-center gap-1">
+              🗑️ {isDeleting ? '削除中...' : 'この予約データを取り消す'}
             </button>
           </div>
 
