@@ -4,9 +4,9 @@ import React, { useState, useMemo } from 'react';
 
 export default function ReservationModal({ 
   selectedRes, onClose, onDelete, isDeleting, isEditingMemo, setIsEditingMemo, 
-  memoDraft, setMemoDraft, onSaveMemo, allPastReservations = [] 
+  memoDraft, setMemoDraft, onSaveMemo, getBadgeStyle, allPastReservations = [] 
 }: any) {
-  // 1. フックをすべて先に宣言
+  // 1. フックをすべて先に宣言（エラー回避）
   const [showToast, setShowToast] = useState(false);
 
   const customerInfo = useMemo(() => {
@@ -29,27 +29,21 @@ export default function ReservationModal({
     }
   }, [selectedRes, allPastReservations]);
 
-  // 2. フックの宣言が終わった後にガード
+  // 2. ガード
   if (!selectedRes) return null;
 
-  // 📍 保存処理：保存しても閉じず、トーストを出してから入力欄だけを閉じる
+  // 📍 保存処理
   const handleSave = async () => {
     if (typeof onSaveMemo !== 'function') return;
-
     try {
       await onSaveMemo();
-      
-      // ✅ トーストを表示
       setShowToast(true);
-
-      // ✅ 1.5秒待ってから入力欄だけを閉じる
       setTimeout(() => {
         setShowToast(false);
         if (typeof setIsEditingMemo === 'function') {
           setIsEditingMemo(false);
         }
       }, 1500);
-
     } catch (e) {
       console.error("Save error:", e);
       alert("保存エラー");
@@ -61,7 +55,7 @@ export default function ReservationModal({
       {/* 背景 */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => onClose?.()} />
       
-      {/* 📍 トースト通知：2行表示にアップデート */}
+      {/* 📍 トースト通知 */}
       {showToast && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[150] bg-pink-600 text-white px-7 py-5 rounded-[24px] shadow-2xl font-black text-center border-2 border-pink-400 whitespace-nowrap animate-bounce flex flex-col items-center gap-1">
           <div className="text-[16px]">✅ 保存されました</div>
@@ -88,8 +82,18 @@ export default function ReservationModal({
         {/* コンテンツエリア */}
         <div className="overflow-y-auto p-6 space-y-4 flex-1 overscroll-contain">
           
+          {/* 📍 バッジと時間：指名種別を復活させた */}
           <div className="flex items-center gap-2">
-            <span className="px-3 py-1 bg-pink-50 text-pink-500 rounded-lg text-[13px] font-black">{selectedRes.service_type || 'か'}</span>
+            <div className="flex gap-1">
+              <span className={`px-3 py-1 rounded-lg text-[13px] font-black ${getBadgeStyle?.(selectedRes.service_type) || 'bg-pink-500 text-white'}`}>
+                {selectedRes.service_type || 'か'}
+              </span>
+              {selectedRes.nomination_category && (
+                <span className={`px-3 py-1 rounded-lg text-[13px] font-black ${getBadgeStyle?.(selectedRes.nomination_category) || 'bg-gray-100 text-gray-400'}`}>
+                  {selectedRes.nomination_category}
+                </span>
+              )}
+            </div>
             <div className="ml-auto text-[24px] font-black tracking-tighter">
               {String(selectedRes.start_time || "").substring(0, 5)} ～ {String(selectedRes.end_time || "").substring(0, 5)}
             </div>
