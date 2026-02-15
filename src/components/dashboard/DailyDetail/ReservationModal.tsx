@@ -6,13 +6,14 @@ export default function ReservationModal({
   selectedRes, onClose, onDelete, isDeleting, isEditingMemo, setIsEditingMemo, 
   memoDraft, setMemoDraft, onSaveMemo, allPastReservations = [] 
 }: any) {
+  // 1. フックをすべて先に宣言（順序を固定）
   const [showToast, setShowToast] = useState(false);
 
-  // 1. ガード
-  if (!selectedRes) return null;
-
-  // 2. 履歴計算（絶対に落ちない安全な書き方）
+  // 履歴計算（絶対に落ちない安全な書き方）
   const customerInfo = useMemo(() => {
+    // selectedResがない場合の初期値を返しておく（後続のガードで弾かれるが、フックの動作上必要）
+    if (!selectedRes) return { count: 1, lastDate: null };
+
     try {
       const history = Array.isArray(allPastReservations) ? allPastReservations : [];
       const cNo = selectedRes.customer_no;
@@ -30,7 +31,10 @@ export default function ReservationModal({
     }
   }, [selectedRes, allPastReservations]);
 
-  // 3. 📍 保存処理：保存しても閉じず、トーストを出してから入力欄だけを閉じる
+  // 2. フックの宣言が終わった後にガードを実行
+  if (!selectedRes) return null;
+
+  // 📍 保存処理：保存しても閉じず、トーストを出してから入力欄だけを閉じる
   const handleSave = async () => {
     if (typeof onSaveMemo !== 'function') return;
 
