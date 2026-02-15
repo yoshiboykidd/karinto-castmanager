@@ -1,7 +1,10 @@
 'use client';
 
 import React, { useMemo, useEffect } from 'react';
-import { X, Calculator, Trash2, Edit3, Save, Loader2, StickyNote, History, Star, CreditCard, Layers, MessageSquare } from 'lucide-react';
+import { 
+  X, Calculator, Trash2, Edit3, Save, Loader2, StickyNote, 
+  History, Star, CreditCard, Layers, MessageSquare, AlertTriangle 
+} from 'lucide-react';
 
 export default function ReservationModal({ 
   selectedRes, onClose, onDelete, isDeleting, isEditingMemo, setIsEditingMemo, 
@@ -9,114 +12,211 @@ export default function ReservationModal({
 }: any) {
   if (!selectedRes) return null;
 
+  // 顧客の過去履歴と最新メモの計算
   const customerInfo = useMemo(() => {
     if (!selectedRes.customer_no) return { count: 1, lastDate: null, latestMemo: "" };
     const history = [...allPastReservations]
       .filter((r: any) => r.customer_no === selectedRes.customer_no)
       .sort((a: any, b: any) => (b.reservation_date || "").localeCompare(a.reservation_date || ""));
+    
     const count = history.length;
     const lastMet = history.find((r: any) => r.id !== selectedRes.id);
     const latestMemo = history.find((r: any) => r.cast_memo && r.cast_memo.trim() !== "")?.cast_memo || "";
+    
     return { count, lastDate: lastMet ? lastMet.reservation_date : null, latestMemo };
   }, [selectedRes, allPastReservations]);
 
+  // 編集モードに入った時、既存メモがなければ過去のメモをドラフトに入れる
   useEffect(() => {
     if (isEditingMemo && !memoDraft && customerInfo.latestMemo && !selectedRes.cast_memo) {
       setMemoDraft(customerInfo.latestMemo);
+    } else if (isEditingMemo && !memoDraft && selectedRes.cast_memo) {
+      setMemoDraft(selectedRes.cast_memo);
     }
   }, [isEditingMemo, memoDraft, customerInfo.latestMemo, selectedRes.cast_memo, setMemoDraft]);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center p-2 overflow-y-auto bg-black/90 backdrop-blur-sm pt-4 pb-24 text-gray-800">
-      <div className="absolute inset-0" onClick={onClose} />
-      <div className="relative bg-white w-full max-w-[340px] rounded-[32px] shadow-2xl animate-in zoom-in duration-150 flex flex-col">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      {/* 背景オーバーレイ */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      
+      {/* モーダル本体 */}
+      <div className="relative w-full max-w-md bg-gray-50 rounded-[32px] overflow-hidden shadow-2xl">
         
-        {/* モーダル全体の閉じるボタン */}
-        <div className="p-2 px-4 flex items-center justify-center gap-3 relative border-b border-gray-50">
-          <button onClick={onClose} className="absolute top-2 right-3 text-gray-300 hover:text-gray-500">
-            <X size={20} />
-          </button>
-          <div className="flex gap-1 shrink-0">
-            <span className={`w-10 h-6 flex items-center justify-center rounded text-[11px] font-black ${getBadgeStyle(selectedRes.service_type)}`}>{selectedRes.service_type || 'か'}</span>
-            <span className={`w-10 h-6 flex items-center justify-center rounded text-[11px] font-black ${getBadgeStyle(selectedRes.nomination_category)}`}>{selectedRes.nomination_category || 'FREE'}</span>
+        {/* ヘッダー部分 */}
+        <div className="bg-white p-6 pb-4">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-gray-400 text-[12px] font-black tracking-widest">RESERVATION</span>
+                {/* 📍 重複・最新バッジの表示 */}
+                {selectedRes.isDuplicate && (
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-0.5 ${
+                    selectedRes.isLatest ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'
+                  }`}>
+                    <AlertTriangle size={10} />
+                    {selectedRes.isLatest ? '最新の修正' : '古い内容'}
+                  </span>
+                )}
+              </div>
+              <h2 className="text-[28px] font-black text-gray-800 leading-none">
+                {selectedRes.start_time?.substring(0, 5)}
+                <span className="text-[16px] mx-1 text-gray-300">~</span>
+                {selectedRes.end_time?.substring(0, 5)}
+              </h2>
+              <p className="text-gray-400 text-[13px] font-bold mt-1">
+                {selectedRes.reservation_date.replace(/-/g, '/')}
+              </p>
+            </div>
+            <button onClick={onClose} className="p-2 bg-gray-100 rounded-full text-gray-400">
+              <X size={20} />
+            </button>
           </div>
-          <div className="flex items-baseline gap-0.5 font-black text-gray-900 leading-none">
-            <span className="text-[28px]">{selectedRes.start_time?.substring(0, 5)}</span>
-            <span className="text-[18px] opacity-20">/</span>
-            <span className="text-[28px]">{selectedRes.end_time?.substring(0, 5)}</span>
+
+          <div className="flex gap-2">
+            <span className={`px-4 py-1.5 rounded-xl text-[12px] font-black ${getBadgeStyle(selectedRes.service_type)}`}>
+              {selectedRes.service_type === 'か' ? 'かw' : '添い寝'}
+            </span>
+            <span className={`px-4 py-1.5 rounded-xl text-[12px] font-black ${getBadgeStyle(selectedRes.nomination_category)}`}>
+              {selectedRes.nomination_category}
+            </span>
           </div>
         </div>
 
-        <div className="px-4 py-4 space-y-5">
-          {/* お客様情報 */}
-          <div className="bg-gray-50/80 rounded-2xl p-3 border border-gray-100">
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="text-[20px] font-black">{selectedRes.customer_name}<span className="text-[12px] ml-1 text-gray-400">様</span></h3>
-              <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-full border border-gray-100 shadow-sm text-[11px] font-black text-gray-600">
-                <History size={12} className="text-pink-400" /> {customerInfo.count === 1 ? '初対面' : `${customerInfo.count}回目`}
+        {/* 📍 重複警告メッセージ */}
+        {selectedRes.isDuplicate && !selectedRes.isLatest && (
+          <div className="mx-4 mt-2 p-3 bg-gray-200/50 rounded-2xl flex items-center gap-3 text-gray-500 text-[11px] font-black">
+            <History size={16} className="shrink-0" />
+            <p>この予約には新しい修正版メールが届いています。<br/>内容が古い可能性があるため、確認してください。</p>
+          </div>
+        )}
+
+        <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+          {/* メイン情報カード */}
+          <div className="bg-white rounded-[24px] p-5 shadow-sm space-y-4">
+            <div className="flex justify-between items-end">
+              <div>
+                <div className="flex items-center gap-1.5 text-pink-400 mb-1">
+                  <Star size={14} fill="currentColor" />
+                  <span className="text-[10px] font-black tracking-wider uppercase">Customer</span>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-[22px] font-black text-gray-800">{selectedRes.customer_name}</span>
+                  <span className="text-[12px] font-bold text-gray-400">様</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] font-black text-gray-300 mb-1 tracking-wider uppercase">Visit Count</div>
+                <div className="inline-flex items-center gap-1.5 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
+                  <span className="text-[14px] font-black text-gray-700">{customerInfo.count}</span>
+                  <span className="text-[10px] font-bold text-gray-400">回目</span>
+                </div>
               </div>
             </div>
-            {customerInfo.lastDate && <div className="text-[10px] font-bold text-gray-400 flex items-center gap-1"><Star size={10} className="text-yellow-500 fill-yellow-500" />直近: {customerInfo.lastDate.replace(/-/g, '/')}</div>}
-          </div>
 
-          {/* コース料金 */}
-          <div className="space-y-4 px-1">
-            <div className="flex items-start gap-3">
-              <div className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded-lg shrink-0 border border-gray-200 mt-0.5"><Layers size={12} className="text-gray-600" /><span className="text-[11px] font-black text-gray-600">コース</span></div>
-              <p className={`font-black text-gray-700 leading-[1.2] break-all ${(selectedRes.course_info?.length || 0) > 15 ? 'text-[15px]' : 'text-[18px]'}`}>{selectedRes.course_info}</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1 bg-blue-50 px-2 py-1 rounded-lg shrink-0 border border-blue-100"><CreditCard size={12} className="text-blue-500" /><span className="text-[11px] font-black text-blue-500">料金</span></div>
-              <div className="text-blue-600 font-black"><span className="text-[14px]">¥</span><span className="text-[24px]">{(selectedRes.total_price || 0).toLocaleString()}</span></div>
-            </div>
-          </div>
-
-          {/* キャストメモエリア */}
-          <div className="bg-pink-50/50 rounded-2xl border border-pink-100/50 overflow-hidden">
-            {isEditingMemo ? (
-              <div className="p-3 space-y-2 animate-in slide-in-from-top-2">
-                {/* 📍 修正：キャストメモ編集エリア専用のヘッダーと閉じるボタンを追加 */}
-                <div className="flex items-center justify-between mb-1 px-1">
-                  <div className="flex items-center gap-1.5 text-pink-500 font-black text-[12px]">
-                    <Edit3 size={14} /> メモ編集
-                  </div>
-                  <button 
-                    onClick={() => setIsEditingMemo(false)} 
-                    className="p-1 text-pink-300 hover:text-pink-500 transition-colors"
-                  >
-                    <X size={20} />
-                  </button>
+            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50">
+              <div>
+                <div className="text-[10px] font-black text-gray-300 mb-1 uppercase tracking-wider">Course</div>
+                <div className="flex items-center gap-1.5 text-gray-700 font-black">
+                  <Layers size={14} className="text-gray-400" />
+                  <span className="text-[15px]">{selectedRes.course_info}</span>
                 </div>
+              </div>
+              <div>
+                <div className="text-[10px] font-black text-gray-300 mb-1 uppercase tracking-wider">Price</div>
+                <div className="flex items-center gap-1.5 text-gray-700 font-black">
+                  <CreditCard size={14} className="text-gray-400" />
+                  <span className="text-[15px]">{selectedRes.total_price?.toLocaleString()}円</span>
+                </div>
+              </div>
+            </div>
 
-                {!selectedRes.cast_memo && customerInfo.latestMemo && (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/60 rounded-xl border border-pink-100 text-[10px] font-black text-pink-400 italic">
-                    <MessageSquare size={12} /> 前回のメモを引き継いでいます
+            <div className="pt-2 border-t border-gray-50 space-y-2">
+              <div className="flex justify-between">
+                <span className="text-[11px] font-bold text-gray-400">ホテル</span>
+                <span className="text-[12px] font-black text-gray-600">{selectedRes.hotel_name || '未設定'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[11px] font-bold text-gray-400">スタッフ</span>
+                <span className="text-[12px] font-black text-gray-600">{selectedRes.staff_name || '-'}</span>
+              </div>
+              {selectedRes.memo && (
+                <div className="mt-2 p-3 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                  <div className="flex items-center gap-1.5 text-gray-400 mb-1">
+                    <MessageSquare size={12} />
+                    <span className="text-[10px] font-black">店舗からの連絡事項</span>
                   </div>
-                )}
-                <textarea 
-                  className="w-full p-4 rounded-2xl border-2 border-pink-200 bg-white text-[16px] font-bold focus:outline-none focus:border-pink-400 min-h-[160px] shadow-inner" 
-                  value={memoDraft} 
-                  onChange={(e) => setMemoDraft(e.target.value)} 
-                  placeholder="特徴、NG、会話内容など..." 
-                  autoFocus 
+                  <p className="text-[12px] text-gray-600 font-bold whitespace-pre-wrap">{selectedRes.memo}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* キャストメモセクション */}
+          <div className="bg-white rounded-[24px] shadow-sm overflow-hidden border-2 border-transparent focus-within:border-pink-200 transition-all">
+            {isEditingMemo ? (
+              <div className="p-4 space-y-3">
+                <div className="flex items-center gap-2 text-pink-400 mb-2">
+                  <Edit3 size={16} />
+                  <span className="text-[12px] font-black tracking-widest uppercase">Edit Memo</span>
+                </div>
+                <textarea
+                  value={memoDraft}
+                  onChange={(e) => setMemoDraft(e.target.value)}
+                  placeholder="お客様の特徴や会話内容をメモ..."
+                  className="w-full h-32 p-4 bg-gray-50 rounded-2xl text-[14px] font-bold text-gray-700 focus:outline-none focus:bg-pink-50/30 transition-all border-none"
+                  autoFocus
                 />
-                <button onClick={onSaveMemo} className="w-full h-14 bg-pink-500 text-white rounded-2xl flex items-center justify-center gap-2 font-black text-[15px] shadow-lg shadow-pink-200">
+                <button
+                  onClick={onSaveMemo}
+                  disabled={isDeleting}
+                  className="w-full py-4 bg-pink-500 text-white rounded-2xl flex items-center justify-center gap-2 font-black text-[15px] shadow-lg shadow-pink-200"
+                >
                   <Save size={18} /> 保存して閉じる
                 </button>
               </div>
             ) : (
-              <button onClick={() => setIsEditingMemo(true)} className="w-full py-5 flex flex-col items-center justify-center gap-1.5 hover:bg-white transition-all group">
-                <div className="flex items-center gap-2 text-pink-400"><StickyNote size={18} /><span className="text-[14px] font-black tracking-[0.2em]">【 キャストメモ 】</span></div>
-                {(selectedRes.cast_memo || customerInfo.latestMemo) && <div className="flex gap-1 mt-1"><div className="w-1.5 h-1.5 bg-pink-300 rounded-full animate-pulse" /></div>}
+              <button 
+                onClick={() => setIsEditingMemo(true)} 
+                className="w-full py-5 flex flex-col items-center justify-center gap-1.5 hover:bg-white transition-all group"
+              >
+                <div className="flex items-center gap-2 text-pink-400">
+                  <StickyNote size={18} />
+                  <span className="text-[14px] font-black tracking-[0.2em]">【 キャストメモ 】</span>
+                </div>
+                {/* メモがある場合のドット表示 */}
+                {(selectedRes.cast_memo || customerInfo.latestMemo) && (
+                  <div className="flex gap-1 mt-1">
+                    <div className="w-1.5 h-1.5 bg-pink-300 rounded-full animate-pulse" />
+                  </div>
+                )}
               </button>
             )}
           </div>
 
-          <div className="space-y-2 pt-2">
-            <button onClick={() => alert("OP計算君起動")} className="w-full h-14 rounded-2xl bg-blue-500 text-white flex items-center justify-center gap-2 font-black text-[16px] shadow-lg shadow-blue-100"><Calculator size={20} /> OP計算君</button>
-            <button onClick={onDelete} disabled={isDeleting} className="w-full h-10 rounded-xl text-gray-300 flex items-center justify-center gap-1 font-bold text-[11px] disabled:opacity-50">
-              {isDeleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-              予約を取り消す
+          <div className="space-y-2 pt-2 pb-4">
+            {/* OP計算君ボタン */}
+            <button 
+              onClick={() => alert("OP計算君起動")} 
+              className="w-full h-14 rounded-2xl bg-blue-500 text-white flex items-center justify-center gap-2 font-black text-[16px] shadow-lg shadow-blue-100"
+            >
+              <Calculator size={20} /> OP計算君
+            </button>
+            
+            {/* 📍 予約取り消し（削除）ボタン */}
+            <button 
+              onClick={onDelete} 
+              disabled={isDeleting} 
+              className="w-full h-10 rounded-xl text-gray-300 hover:text-red-400 flex items-center justify-center gap-1 font-bold text-[12px] transition-colors"
+            >
+              {isDeleting ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <>
+                  <Trash2 size={14} /> 
+                  <span>この予約データを削除する</span>
+                </>
+              )}
             </button>
           </div>
         </div>
