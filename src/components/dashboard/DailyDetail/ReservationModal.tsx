@@ -6,7 +6,7 @@ export default function ReservationModal({
   selectedRes, onClose, onDelete, isDeleting, isEditingMemo, setIsEditingMemo, 
   memoDraft, setMemoDraft, onSaveMemo, getBadgeStyle, allPastReservations = [] 
 }: any) {
-  // 1. フックをすべて先に宣言（Reactのルール厳守）
+  // 1. フックをすべて先に宣言
   const [showToast, setShowToast] = useState(false);
 
   const customerInfo = useMemo(() => {
@@ -53,7 +53,7 @@ export default function ReservationModal({
       {/* 背景 */}
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => onClose?.()} />
       
-      {/* トースト通知 */}
+      {/* トースト通知：中央2行表示 */}
       {showToast && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[150] bg-pink-600 text-white px-7 py-5 rounded-[24px] shadow-2xl font-black text-center border-2 border-pink-400 whitespace-nowrap animate-bounce flex flex-col items-center gap-1">
           <div className="text-[16px]">✅ 保存されました</div>
@@ -97,18 +97,16 @@ export default function ReservationModal({
             </div>
           </div>
 
-          {/* コース・料金セクション */}
+          {/* 📍 コース(course_info)・料金・値引きセクション */}
           <div className="flex justify-between items-start px-1">
             <div className="max-w-[60%]">
               <p className="text-[10px] font-black text-gray-400 uppercase leading-none mb-1">Course</p>
-              <p className="text-[16px] font-black text-gray-700 leading-tight">{selectedRes.course_name || 'コース未設定'}</p>
+              <p className="text-[16px] font-black text-gray-700 leading-tight">{selectedRes.course_info || 'コース未設定'}</p>
             </div>
             <div className="text-right">
               <p className="text-[10px] font-black text-gray-400 uppercase leading-none mb-1">Total</p>
               <div className="flex flex-col items-end">
-                {/* 📍 計算済みの最終金額を表示 */}
                 <p className="text-[20px] font-black text-pink-500 leading-none">¥{Number(selectedRes.total_price || 0).toLocaleString()}</p>
-                {/* 📍 値引き情報をそのまま表示（補足として） */}
                 {selectedRes.discount && (
                   <p className="text-[10px] font-bold text-rose-400 mt-1">値引き: {selectedRes.discount}</p>
                 )}
