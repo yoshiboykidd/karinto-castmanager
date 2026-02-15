@@ -1,22 +1,50 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 
 export default function ReservationModal({ 
   selectedRes, onClose, onDelete, isDeleting, isEditingMemo, setIsEditingMemo, 
-  memoDraft, setMemoDraft, onSaveMemo
+  memoDraft, setMemoDraft, onSaveMemo, allPastReservations = [] 
 }: any) {
   const [showToast, setShowToast] = useState(false);
 
   // 1. データがない場合は即終了
   if (!selectedRes) return null;
 
-  // 2. 保存ボタンを押した時の処理
+  // 2. 来店回数と前回日付の計算（useMemoを使って安全に計算）
+  const customerInfo = useMemo(() => {
+    try {
+      const historyData = Array.isArray(allPastReservations) ? allPastReservations : [];
+      const customerNo = selectedRes?.customer_no;
+
+      if (!customerNo) return { count: 1, lastDate: null };
+
+      // 同じ顧客番号の予約を抽出
+      const history = historyData.filter((r: any) => r && r.customer_no === customerNo);
+      
+      // 日付順に並び替え
+      const sorted = [...history].sort((a: any, b: any) => 
+        String(b?.reservation_date || "").localeCompare(String(a?.reservation_date || ""))
+      );
+
+      const count = history.length;
+      // 今回の予約ID以外の直近の予約を探す
+      const lastMet = sorted.find((r: any) => r && r.id !== selectedRes.id);
+      
+      return { 
+        count: count > 0 ? count : 1, 
+        lastDate: lastMet?.reservation_date || null 
+      };
+    } catch (e) {
+      return { count: 1, lastDate: null };
+    }
+  }, [selectedRes, allPastReservations]);
+
+  // 3. 保存処理
   const handleSave = async () => {
     if (typeof onSaveMemo === 'function') {
       await onSaveMemo();
       setShowToast(true);
-      // 3秒後に通知を消す
       setTimeout(() => setShowToast(false), 3000);
     }
   };
@@ -24,18 +52,17 @@ export default function ReservationModal({
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       {/* 背景 */}
-      <div className="absolute inset-0 bg-black/70" onClick={() => onClose?.()} />
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => onClose?.()} />
       
-      {/* 📍 トースト通知（シンプルな文字だけ） */}
-      {showToast && (
-        <div className="fixed top-10 left-1/2 -translate-x-1/2 z-[110] bg-pink-600 text-white px-6 py-3 rounded-full shadow-2xl font-black text-[13px]">
-          ✅ 保存完了。同じお客様のメモとして残ります
-        </div>
-      )}
-
-      {/* 本体 */}
       <div className="relative w-full max-w-sm bg-white rounded-[32px] flex flex-col shadow-2xl overflow-hidden text-gray-800 max-h-[90vh]">
         
+        {/* 📍 修正版トースト：モーダルの内側・上部に出現させる */}
+        {showToast && (
+          <div className="absolute top-4 left-4 right-4 z-[110] bg-pink-600 text-white px-4 py-3 rounded-2xl shadow-lg font-black text-[13px] text-center">
+            ✅ 保存しました。同じお客様のメモに残ります
+          </div>
+        )}
+
         {/* ヘッダー */}
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center shrink-0">
           <div>
@@ -62,13 +89,22 @@ export default function ReservationModal({
             </div>
           </div>
 
-          {/* 顧客名 */}
-          <div className="p-5 border-2 border-pink-100 rounded-[24px]">
+          {/* 📍 顧客情報：来店回数を表示 */}
+          <div className="p-5 border-2 border-pink-100 rounded-[24px] bg-white relative">
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-pink-400"></div>
             <p className="text-[10px] font-black text-pink-400 uppercase mb-1">★ CUSTOMER</p>
-            <span className="text-[22px] font-black">{selectedRes.customer_name || '不明'} 様</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-[22px] font-black">{selectedRes.customer_name || '不明'} 様</span>
+              <span className="text-[14px] font-black text-gray-400">〈{customerInfo.count}回目〉</span>
+            </div>
+            {customerInfo.lastDate && (
+              <p className="text-[11px] font-bold text-gray-400 mt-1">
+                前回：{(customerInfo.lastDate || "").replace(/-/g, '/')}
+              </p>
+            )}
           </div>
 
-          {/* 📍 キャストメモ：ここを追加 */}
+          {/* キャストメモ */}
           <div className="bg-gray-50 rounded-[24px] overflow-hidden">
             {isEditingMemo ? (
               <div className="p-4 space-y-3">
@@ -76,7 +112,7 @@ export default function ReservationModal({
                 <textarea
                   value={memoDraft || ""}
                   onChange={(e) => setMemoDraft?.(e.target.value)}
-                  placeholder="メモを入力..."
+                  placeholder="特徴などをメモ..."
                   className="w-full h-24 p-4 bg-white rounded-xl text-[16px] font-bold focus:outline-none border-none shadow-sm"
                   autoFocus
                 />
@@ -85,7 +121,7 @@ export default function ReservationModal({
                     閉じる
                   </button>
                   <button onClick={handleSave} className="flex-[2] py-4 bg-pink-500 text-white rounded-xl font-black text-[15px] shadow-lg">
-                    💾 保存
+                    💾 保存する
                   </button>
                 </div>
               </div>
