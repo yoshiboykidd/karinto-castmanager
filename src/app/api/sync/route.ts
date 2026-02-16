@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { addDays, format } from 'date-fns';
 
-export const maxDuration = 60;
+export const maxDuration = 60; 
 export const dynamic = 'force-dynamic';
 
 const ALL_SHOPS = [
@@ -68,7 +68,6 @@ export async function GET(req: NextRequest) {
         if (!res.ok) { logs.push(`${dateStrDB.slice(8)}日 HTTP ${res.status}`); continue; }
         
         const $ = cheerio.load(await res.text());
-        const foundInHP = new Set<string>();
         const upsertBatch: any[] = [];
         const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
 
@@ -76,9 +75,9 @@ export async function GET(req: NextRequest) {
         const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
 
         $('h3, .name, .cast_name, span.name, div.name, strong, td, a').each((_, nameEl) => {
-          const rawName = $(nameEl).text().trim(); 
+          const rawName = $(nameEl).text().trim();
           const cleanName = normalize(rawName);
-          const loginId = nameMap.get(cleanName);
+          const loginId = nameMap.get(cleanName); // 📍 定義名は loginId
           if (!loginId) return;
 
           const context = $(nameEl).text() + " " + $(nameEl).parent().text() + " " + $(nameEl).parent().parent().text();
@@ -88,13 +87,13 @@ export async function GET(req: NextRequest) {
             const hpStart = timeMatch[1].padStart(5, '0');
             const hpEnd = timeMatch[2].padStart(5, '0');
             const dbShift = existingMap.get(loginId);
-            foundInHP.add(loginId);
+            
             if (dbShift?.status === 'absent') return;
 
             upsertBatch.push({
-              login_id: login_id,
+              login_id: loginId, // 📍 loginId を login_id カラムに割り当て（波線の原因を修正）
               shift_date: dateStrDB,
-              hp_display_name: rawName, 
+              hp_display_name: rawName,
               status: 'official',
               is_official: true,
               hp_start_time: hpStart,
@@ -121,7 +120,7 @@ export async function GET(req: NextRequest) {
       } catch (e: any) { logs.push(`${dateStrDB.slice(8)}日 Error`); }
     }
 
-    // 📍 修正のポイント：すべての店舗の処理が終わった後に同期ログを記録
+    // 📍 修正箇所：同期完了後に sync_logs テーブルを更新する処理を追加
     try {
       await supabase
         .from('sync_logs')
@@ -137,6 +136,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ success: true, shop: shop.name, logs });
   } catch (e: any) { 
-    return NextResponse.json({ success: false, message: e.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: e.message }, { status: 500 }); 
   }
 }
