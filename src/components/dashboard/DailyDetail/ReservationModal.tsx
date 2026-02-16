@@ -10,7 +10,7 @@ export default function ReservationModal({
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
   const [isOpOpen, setIsOpOpen] = useState(false);
-  const [isInCall, setIsInCall] = useState(false); // 📍 入室中ステータス
+  const [isInCall, setIsInCall] = useState(false);
 
   const handleToast = (msg: string) => {
     setToastMsg(msg);
@@ -48,6 +48,7 @@ export default function ReservationModal({
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-1">
       <div className="absolute inset-0 bg-black/85 backdrop-blur-sm" onClick={() => onClose?.()} />
       
+      {/* 📍 OP計算君を別窓として表示 */}
       {isOpOpen && (
         <OpCalculator 
           selectedRes={selectedRes} 
@@ -63,7 +64,7 @@ export default function ReservationModal({
       {showToast && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[250] bg-pink-600 text-white px-8 py-5 rounded-[24px] shadow-2xl font-black text-center border-2 border-pink-400 whitespace-nowrap flex flex-col items-center gap-1 animate-bounce">
           <div className="text-[17px]">✅ {toastMsg}</div>
-          <div className="text-[11px] opacity-90 leading-tight">店舗へ通知されました</div>
+          <div className="text-[11px] opacity-90 leading-tight">店舗へ同期されました</div>
         </div>
       )}
 
@@ -71,21 +72,21 @@ export default function ReservationModal({
         <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center shrink-0">
           <div className="flex items-center gap-2">
             <p className="text-[18px] font-black">{String(selectedRes.reservation_date || "").replace(/-/g, '/')}</p>
-            {isInCall && <span className="bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse">入室中</span>}
+            {isInCall && <span className="bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse tracking-tighter">入室中</span>}
           </div>
           <button onClick={() => onClose?.()} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full text-gray-400 text-xl font-bold">×</button>
         </div>
 
         <div className="overflow-y-auto px-2 pt-2 pb-12 space-y-1.5 flex-1 overscroll-contain">
           
-          {/* OP計算機起動ボタン */}
-          <button onClick={() => setIsOpOpen(true)} className="w-full bg-gray-900 rounded-[18px] p-4 text-left shadow-lg active:scale-[0.98] transition-all relative overflow-hidden group">
+          {/* 📍 OP計算機起動ボタン：Group A (24px) / Group B (10px) */}
+          <button onClick={() => setIsOpOpen(true)} className="w-full bg-gray-900 rounded-[20px] p-4 text-left shadow-lg active:scale-[0.98] transition-all relative overflow-hidden group">
             <div className="flex justify-between items-end">
               <div>
-                <p className="text-[10px] text-gray-400 font-black uppercase mb-1">To Receive</p>
-                <p className="text-[24px] font-black text-green-400 leading-none">¥{Number(selectedRes.total_price || 0).toLocaleString()} <span className="text-[11px] text-white/40 ml-1 font-bold">~</span></p>
+                <p className="text-[10px] text-gray-400 font-black uppercase mb-1 leading-none tracking-widest">To Receive</p>
+                <p className="text-[24px] font-black text-green-400 leading-none tabular-nums">¥{Number(selectedRes.total_price || 0).toLocaleString()} <span className="text-[11px] text-white/40 ml-1 font-bold tracking-normal">~</span></p>
               </div>
-              <div className="bg-white/10 px-3 py-2 rounded-xl text-[12px] font-black text-white">
+              <div className="bg-white/10 px-3 py-2 rounded-xl text-[12px] font-black text-white group-hover:bg-white/20 transition-colors">
                 {isInCall ? '追加OP通知 ⚡' : 'OP計算・開始 🚀'}
               </div>
             </div>
@@ -98,7 +99,7 @@ export default function ReservationModal({
                 <span className={`${badgeBaseClass} ${getBadgeStyle?.(selectedRes.service_type) || 'bg-pink-500 text-white'}`}>{selectedRes.service_type || 'か'}</span>
                 {selectedRes.nomination_category && <span className={`${badgeBaseClass} ${getBadgeStyle?.(selectedRes.nomination_category) || 'bg-gray-100 text-gray-400'}`}>{selectedRes.nomination_category}</span>}
               </div>
-              <div className="text-[20px] font-black text-gray-700 leading-none">
+              <div className="text-[20px] font-black text-gray-700 leading-none tabular-nums">
                 {String(selectedRes.start_time || "").substring(0, 5)}<span className="text-[12px] opacity-20 mx-0.5">〜</span>{String(selectedRes.end_time || "").substring(0, 5)}
               </div>
             </div>
@@ -109,13 +110,13 @@ export default function ReservationModal({
           <div className="p-3 bg-white border border-gray-100 rounded-[18px] relative overflow-hidden">
             <div className="absolute top-0 left-0 w-1.5 h-full bg-pink-100"></div>
             <div className="flex items-center gap-2 leading-none">
-              <span className="text-[20px] font-black text-gray-800">{selectedRes.customer_name || '不明'} 様</span>
+              <span className="text-[20px] font-black text-gray-800 leading-none">{selectedRes.customer_name || '不明'} 様</span>
               <span className={`${badgeBaseClass} ${customerInfo.count === 1 ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-500'}`}>{customerInfo.count === 1 ? '初' : `${customerInfo.count}回目`}</span>
             </div>
             {customerInfo.lastDate && <p className="text-[11px] font-bold text-gray-400 mt-2 leading-none">⌛ 前回: {String(customerInfo.lastDate).replace(/-/g, '/')}</p>}
           </div>
 
-          {/* キャストメモ */}
+          {/* キャストメモ：16pxズーム防止 */}
           <div className="bg-gray-50 rounded-[18px] border-2 border-dashed border-gray-200">
             {isEditingMemo ? (
               <div className="p-2 space-y-1.5">
@@ -126,7 +127,7 @@ export default function ReservationModal({
                 </div>
               </div>
             ) : (
-              <button onClick={() => setIsEditingMemo?.(true)} className="w-full py-4 text-pink-400 font-black text-[13px] italic">📝 キャストメモを更新</button>
+              <button onClick={() => setIsEditingMemo?.(true)} className="w-full py-4 text-pink-400 font-black text-[11px] italic">📝 キャストメモを更新</button>
             )}
           </div>
 
