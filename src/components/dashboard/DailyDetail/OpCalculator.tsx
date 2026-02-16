@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo } from 'react';
 
-// 📍 データを番号と名称に分割して整理
 const OP_CATEGORIES = [
   { label: '¥500 Op', price: 500, items: [
     { n: '10', t: '上ラン' }, { n: '11', t: '抱きつき' }, { n: '12', t: '足なで' }, 
@@ -26,12 +25,23 @@ const OP_CATEGORIES = [
 ];
 
 export default function OpCalculator({ selectedRes, initialTotal, supabase, onToast, onClose }: any) {
-  const [selectedOps, setSelectedOps] = useState<{name: string, price: number}[]>([]);
+  const [selectedOps, setSelectedOps] = useState<{name: string, price: number, no: string}[]>([]);
   const [isInCall, setIsInCall] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
+  // 合計金額（初期料金 + 選択中OP）
   const opsTotal = useMemo(() => selectedOps.reduce((sum, op) => sum + op.price, 0), [selectedOps]);
   const displayTotal = initialTotal + opsTotal;
+
+  // 📍 選択/解除を切り替える関数
+  const toggleOp = (no: string, text: string, price: number) => {
+    const isAlreadySelected = selectedOps.some(op => op.no === no);
+    if (isAlreadySelected) {
+      setSelectedOps(prev => prev.filter(op => op.no !== no));
+    } else {
+      setSelectedOps(prev => [...prev, { no, name: text, price }]);
+    }
+  };
 
   const sendNotification = async (type: 'START' | 'ADD') => {
     if (!supabase) return;
@@ -49,7 +59,7 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         total_amount: displayTotal
       });
       if (type === 'START') setIsInCall(true);
-      setSelectedOps([]);
+      setSelectedOps([]); // 通知後にリセット
       onToast(type === 'START' ? "スタート通知完了" : "追加通知完了");
       if (type === 'START') onClose();
     } catch (err) {
@@ -64,60 +74,55 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
       {/* 金額ヘッダー */}
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900/95 backdrop-blur sticky top-0 z-20">
         <div>
-          <p className="text-[9px] text-gray-500 font-black uppercase mb-0.5">Total to Receive</p>
-          <p className="text-[24px] font-black text-green-400 tabular-nums">¥{displayTotal.toLocaleString()}</p>
+          <p className="text-[9px] text-gray-500 font-black uppercase mb-0.5 tracking-widest">Total to Receive</p>
+          <p className="text-[26px] font-black text-green-400 tabular-nums">¥{displayTotal.toLocaleString()}</p>
         </div>
-        <button onClick={onClose} className="w-9 h-9 flex items-center justify-center bg-white/10 rounded-full text-xl font-bold active:bg-white/20 transition-colors">×</button>
+        <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white/10 rounded-full text-xl font-bold active:scale-90 transition-transform">×</button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 pt-2 pb-28 space-y-4">
-        {/* 選択済リスト（11px） */}
-        {selectedOps.length > 0 && (
-          <div className="flex flex-wrap gap-1 p-2 bg-pink-500/10 rounded-xl border border-pink-500/20">
-            {selectedOps.map((op, i) => (
-              <button key={i} onClick={() => setSelectedOps(prev => prev.filter((_, idx) => idx !== i))}
-                className="bg-pink-600 px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 shadow-sm">
-                {op.name} <span className="opacity-60 text-[12px]">×</span>
-              </button>
-            ))}
-          </div>
-        )}
-
+      <div className="flex-1 overflow-y-auto px-2 pt-3 pb-32 space-y-5 scrollbar-hide">
         {/* カテゴリー別グリッド */}
         {OP_CATEGORIES.map((cat) => (
-          <div key={cat.label} className="space-y-1">
-            <h3 className="text-[10px] font-black text-gray-500 px-1 uppercase tracking-tighter">
+          <div key={cat.label} className="space-y-1.5">
+            <h3 className="text-[11px] font-black text-gray-500 px-1 uppercase tracking-widest border-l-2 border-gray-700 ml-1">
               {cat.label}
             </h3>
-            {/* 📍 1行6マスのグリッド */}
-            <div className="grid grid-cols-6 gap-1">
-              {cat.items.map((item, i) => (
-                <button 
-                  key={i} 
-                  onClick={() => setSelectedOps([...selectedOps, { name: item.t, price: cat.price }])}
-                  className="aspect-square bg-white/5 rounded-lg flex flex-col items-center justify-center active:bg-pink-500 active:scale-90 transition-all border border-white/5 shadow-inner"
-                >
-                  {/* Noを大きく表示 */}
-                  <span className="text-[15px] font-black leading-none mb-0.5">{item.n}</span>
-                  {/* 内容を下に小さく表示 */}
-                  <span className="text-[8px] font-bold text-gray-400 leading-none truncate w-full px-0.5 text-center">
-                    {item.t}
-                  </span>
-                </button>
-              ))}
+            {/* 📍 1行5マスのグリッド */}
+            <div className="grid grid-cols-5 gap-1.5">
+              {cat.items.map((item, i) => {
+                const isSelected = selectedOps.some(op => op.no === item.n);
+                return (
+                  <button 
+                    key={i} 
+                    onClick={() => toggleOp(item.n, item.t, cat.price)}
+                    className={`aspect-square rounded-xl flex flex-col items-center justify-center transition-all duration-150 border shadow-lg
+                      ${isSelected 
+                        ? 'bg-pink-500 border-pink-400 text-white scale-95 shadow-pink-500/20' 
+                        : 'bg-white/5 border-white/5 text-gray-400 active:bg-white/10'
+                      }`}
+                  >
+                    <span className={`text-[15px] font-black leading-none mb-1 ${isSelected ? 'text-white' : 'text-gray-200'}`}>
+                      {item.n}
+                    </span>
+                    <span className={`text-[8px] font-bold leading-none truncate w-full px-0.5 text-center ${isSelected ? 'text-white/90' : 'text-gray-500'}`}>
+                      {item.t}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         ))}
       </div>
 
       {/* 通知ボタン */}
-      <div className="p-3 bg-gray-900/95 backdrop-blur border-t border-gray-800 fixed bottom-0 left-0 right-0 z-30">
+      <div className="p-4 bg-gray-900/95 backdrop-blur border-t border-gray-800 fixed bottom-0 left-0 right-0 z-30">
         <button 
           onClick={() => sendNotification(isInCall ? 'ADD' : 'START')}
           disabled={isSending}
-          className={`w-full py-3.5 rounded-2xl font-black text-[17px] shadow-2xl transition-all active:scale-[0.98]
+          className={`w-full py-4 rounded-2xl font-black text-[18px] shadow-2xl transition-all active:scale-[0.98]
             ${isInCall ? 'bg-orange-500 text-white' : 'bg-green-500 text-white'}
-            ${isSending ? 'opacity-50 animate-pulse' : ''}
+            ${isSending ? 'opacity-50' : ''}
           `}
         >
           {isSending ? 'SENDING...' : isInCall ? '🔥 追加OPを店に通知' : '🚀 精算完了・スタート'}
