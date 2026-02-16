@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { addDays, format } from 'date-fns';
 
-export const maxDuration = 60; 
+export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 const ALL_SHOPS = [
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
         const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
 
         $('h3, .name, .cast_name, span.name, div.name, strong, td, a').each((_, nameEl) => {
-          const rawName = $(nameEl).text().trim(); // HP上の名前
+          const rawName = $(nameEl).text().trim(); 
           const cleanName = normalize(rawName);
           const loginId = nameMap.get(cleanName);
           if (!loginId) return;
@@ -91,11 +91,10 @@ export async function GET(req: NextRequest) {
             foundInHP.add(loginId);
             if (dbShift?.status === 'absent') return;
 
-            // 📍 修正のポイント：hp_display_name を追加
             upsertBatch.push({
-              login_id: loginId,
+              login_id: login_id,
               shift_date: dateStrDB,
-              hp_display_name: rawName, // 👈 これが欠けていたためエラーになっていました
+              hp_display_name: rawName, 
               status: 'official',
               is_official: true,
               hp_start_time: hpStart,
@@ -121,8 +120,23 @@ export async function GET(req: NextRequest) {
         }
       } catch (e: any) { logs.push(`${dateStrDB.slice(8)}日 Error`); }
     }
+
+    // 📍 修正のポイント：すべての店舗の処理が終わった後に同期ログを記録
+    try {
+      await supabase
+        .from('sync_logs')
+        .upsert({ 
+          shop_id: shop.id,
+          shop_name: shop.name,
+          last_sync_at: new Date().toISOString(),
+          status: 'success'
+        }, { onConflict: 'shop_id' });
+    } catch (logError) {
+      console.error("SYNC LOG UPDATE FAILED:", logError);
+    }
+
     return NextResponse.json({ success: true, shop: shop.name, logs });
   } catch (e: any) { 
-    return NextResponse.json({ success: false, message: e.message }, { status: 500 }); 
+    return NextResponse.json({ success: false, message: e.message }, { status: 500 });
   }
 }
