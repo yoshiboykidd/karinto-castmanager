@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
         $('h3, .name, .cast_name, span.name, div.name, strong, td, a').each((_, nameEl) => {
           const rawName = $(nameEl).text().trim();
           const cleanName = normalize(rawName);
-          const loginId = nameMap.get(cleanName); // 📍 定義名は loginId
+          const loginId = nameMap.get(cleanName); // 📍 変数名は loginId
           if (!loginId) return;
 
           const context = $(nameEl).text() + " " + $(nameEl).parent().text() + " " + $(nameEl).parent().parent().text();
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
             if (dbShift?.status === 'absent') return;
 
             upsertBatch.push({
-              login_id: loginId, // 📍 loginId を login_id カラムに割り当て（波線の原因を修正）
+              login_id: loginId, // 📍 右辺を loginId に修正（波線エラーの解消）
               shift_date: dateStrDB,
               hp_display_name: rawName,
               status: 'official',
@@ -120,16 +120,14 @@ export async function GET(req: NextRequest) {
       } catch (e: any) { logs.push(`${dateStrDB.slice(8)}日 Error`); }
     }
 
-    // 📍 修正箇所：同期完了後に sync_logs テーブルを更新する処理を追加
+    // 📍 修正箇所：単一レコードの sync_logs テーブルを更新
     try {
+      // 1つのレコードしかないため、値を現在時刻で update する
+      // Supabaseのupdateはフィルタが必要なため、既存のレコードを対象にする
       await supabase
         .from('sync_logs')
-        .upsert({ 
-          shop_id: shop.id,
-          shop_name: shop.name,
-          last_sync_at: new Date().toISOString(),
-          status: 'success'
-        }, { onConflict: 'shop_id' });
+        .update({ last_sync_at: new Date().toISOString() })
+        .not('last_sync_at', 'is', null); // 1行しか存在しない前提で、値が入っている行を更新
     } catch (logError) {
       console.error("SYNC LOG UPDATE FAILED:", logError);
     }
