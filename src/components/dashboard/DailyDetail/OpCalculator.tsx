@@ -29,18 +29,19 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
   const [isInCall, setIsInCall] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
-  // 合計金額（初期料金 + 選択中OP）
   const opsTotal = useMemo(() => selectedOps.reduce((sum, op) => sum + op.price, 0), [selectedOps]);
   const displayTotal = initialTotal + opsTotal;
 
-  // 📍 選択/解除を切り替える関数
+  // 📍 選択/解除のトグル関数
   const toggleOp = (no: string, text: string, price: number) => {
-    const isAlreadySelected = selectedOps.some(op => op.no === no);
-    if (isAlreadySelected) {
-      setSelectedOps(prev => prev.filter(op => op.no !== no));
-    } else {
-      setSelectedOps(prev => [...prev, { no, name: text, price }]);
-    }
+    setSelectedOps((prev) => {
+      const isAlreadySelected = prev.some(op => op.no === no);
+      if (isAlreadySelected) {
+        return prev.filter(op => op.no !== no);
+      } else {
+        return [...prev, { no, name: text, price }];
+      }
+    });
   };
 
   const sendNotification = async (type: 'START' | 'ADD') => {
@@ -59,7 +60,7 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         total_amount: displayTotal
       });
       if (type === 'START') setIsInCall(true);
-      setSelectedOps([]); // 通知後にリセット
+      setSelectedOps([]); 
       onToast(type === 'START' ? "スタート通知完了" : "追加通知完了");
       if (type === 'START') onClose();
     } catch (err) {
@@ -70,38 +71,55 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
   };
 
   return (
-    <div className="fixed inset-0 z-[300] flex flex-col bg-gray-900 text-white animate-in fade-in zoom-in-95 duration-150">
-      {/* 金額ヘッダー */}
-      <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900/95 backdrop-blur sticky top-0 z-20">
+    <div className="fixed inset-0 z-[300] flex flex-col bg-gray-900 text-white animate-in fade-in duration-200 overflow-hidden">
+      
+      {/* 1. 金額ヘッダー */}
+      <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900/95 shrink-0">
         <div>
-          <p className="text-[9px] text-gray-500 font-black uppercase mb-0.5 tracking-widest">Total to Receive</p>
-          <p className="text-[26px] font-black text-green-400 tabular-nums">¥{displayTotal.toLocaleString()}</p>
+          <p className="text-[9px] text-gray-500 font-black uppercase mb-0.5 tracking-widest">To Receive</p>
+          <p className="text-[26px] font-black text-green-400 tabular-nums leading-none">¥{displayTotal.toLocaleString()}</p>
         </div>
-        <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white/10 rounded-full text-xl font-bold active:scale-90 transition-transform">×</button>
+        <button onClick={onClose} className="w-10 h-10 flex items-center justify-center bg-white/10 rounded-full text-xl font-bold">×</button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 pt-3 pb-32 space-y-5 scrollbar-hide">
-        {/* カテゴリー別グリッド */}
+      {/* 2. 📍 選択済みOP一覧エリア (確実に表示されるよう高さを確保) */}
+      <div className="bg-gray-800/80 border-b border-gray-700 px-4 py-2 min-h-[50px] flex flex-wrap gap-2 shrink-0 items-center overflow-y-auto max-h-[120px]">
+        {selectedOps.length === 0 ? (
+          <p className="text-[11px] text-gray-500 font-bold italic">オプションを選択してください...</p>
+        ) : (
+          selectedOps.map((op) => (
+            <button 
+              key={op.no} 
+              onClick={() => toggleOp(op.no, op.name, op.price)}
+              className="bg-pink-600 border border-pink-400 text-white px-2.5 py-1 rounded-lg text-[11px] font-black flex items-center gap-1 active:scale-90 transition-all animate-in zoom-in-95"
+            >
+              {op.name} <span className="text-[13px] leading-none opacity-60">×</span>
+            </button>
+          ))
+        )}
+      </div>
+
+      {/* 3. メイン：グリッド（スクロール可能） */}
+      <div className="flex-1 overflow-y-auto px-3 pt-4 pb-32 space-y-6 scrollbar-hide overscroll-contain">
         {OP_CATEGORIES.map((cat) => (
-          <div key={cat.label} className="space-y-1.5">
-            <h3 className="text-[11px] font-black text-gray-500 px-1 uppercase tracking-widest border-l-2 border-gray-700 ml-1">
+          <div key={cat.label} className="space-y-2">
+            <h3 className="text-[11px] font-black text-gray-500 px-1 uppercase tracking-widest border-l-2 border-pink-500/50 ml-1">
               {cat.label}
             </h3>
-            {/* 📍 1行5マスのグリッド */}
             <div className="grid grid-cols-5 gap-1.5">
-              {cat.items.map((item, i) => {
+              {cat.items.map((item) => {
                 const isSelected = selectedOps.some(op => op.no === item.n);
                 return (
                   <button 
-                    key={i} 
+                    key={item.n} 
                     onClick={() => toggleOp(item.n, item.t, cat.price)}
-                    className={`aspect-square rounded-xl flex flex-col items-center justify-center transition-all duration-150 border shadow-lg
+                    className={`aspect-square rounded-xl flex flex-col items-center justify-center transition-all duration-150 border
                       ${isSelected 
-                        ? 'bg-pink-500 border-pink-400 text-white scale-95 shadow-pink-500/20' 
+                        ? 'bg-pink-500 border-pink-300 text-white shadow-[0_0_15px_rgba(236,72,153,0.3)] scale-95' 
                         : 'bg-white/5 border-white/5 text-gray-400 active:bg-white/10'
                       }`}
                   >
-                    <span className={`text-[15px] font-black leading-none mb-1 ${isSelected ? 'text-white' : 'text-gray-200'}`}>
+                    <span className={`text-[15px] font-black leading-none mb-0.5 ${isSelected ? 'text-white' : 'text-gray-200'}`}>
                       {item.n}
                     </span>
                     <span className={`text-[8px] font-bold leading-none truncate w-full px-0.5 text-center ${isSelected ? 'text-white/90' : 'text-gray-500'}`}>
@@ -115,8 +133,8 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         ))}
       </div>
 
-      {/* 通知ボタン */}
-      <div className="p-4 bg-gray-900/95 backdrop-blur border-t border-gray-800 fixed bottom-0 left-0 right-0 z-30">
+      {/* 4. 固定フッター */}
+      <div className="p-4 bg-gray-900/95 backdrop-blur-xl border-t border-gray-800 fixed bottom-0 left-0 right-0 z-40">
         <button 
           onClick={() => sendNotification(isInCall ? 'ADD' : 'START')}
           disabled={isSending}
