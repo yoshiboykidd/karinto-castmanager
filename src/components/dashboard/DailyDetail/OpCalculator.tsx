@@ -34,7 +34,6 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
 
   const toggleOp = (no: string, text: string, price: number, catLabel: string) => {
     setSelectedOps((prev) => {
-      // 添い寝の場合はカテゴリ(時間)も判定に含めてユニークにする
       const opId = selectedRes.service_type === '添' ? `${catLabel}-${no}` : no;
       const isAlreadySelected = prev.some(op => (selectedRes.service_type === '添' ? `${op.catLabel}-${op.no}` : op.no) === opId);
       
@@ -71,7 +70,7 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
       
       if (type === 'START') setIsInCall(true);
       setSelectedOps([]); 
-      onToast(type === 'HELP' ? "呼出を送信しました" : "通知を送信しました");
+      onToast(type === 'HELP' ? "呼出を送信しました" : "店舗へ通知しました");
       if (type === 'START') onClose();
     } catch (err) {
       alert("送信失敗");
@@ -86,12 +85,12 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
       {/* 1. 金額ヘッダー */}
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
         <div>
-          <p className="text-[10px] text-pink-400 font-black uppercase tracking-widest leading-none mb-1">
+          <p className="text-[10px] text-pink-400 font-black uppercase tracking-widest mb-1">
              {selectedRes.service_type === '添' ? '添い寝コース' : 'かりんとコース'}
           </p>
           <p className="text-[28px] font-black text-green-400 tabular-nums leading-none">¥{displayTotal.toLocaleString()}</p>
         </div>
-        <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold active:scale-90 transition-transform">×</button>
+        <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold">×</button>
       </div>
 
       {/* 2. 選択済み一覧 */}
@@ -116,7 +115,7 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
             <div className="grid grid-cols-5 gap-1.5">
               {cat.items.map((item: any) => {
                 const isSelected = selectedOps.some(op => op.no === item.n && (selectedRes.service_type !== '添' || op.catLabel === cat.label));
-                const price = item.p || (cat as any).price || 0; // 📍 TypeScriptエラー回避
+                const price = item.p || (cat as any).price || 0; 
                 
                 return (
                   <button key={`${cat.label}-${item.n}`} onClick={() => toggleOp(item.n, item.t, price, cat.label)}
