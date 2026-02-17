@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
         
         const $ = cheerio.load(await res.text());
         const upsertBatch: any[] = [];
+        const foundLoginIdsOnHp = new Set<string>();
         const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
 
         const { data: existingShifts } = await supabase.from('shifts').select('login_id, status, reward_amount').eq('shift_date', dateStrDB);
@@ -76,14 +77,19 @@ export async function GET(req: NextRequest) {
 
         $('h3, .name, .cast_name, span.name, div.name, strong, td, a').each((_, nameEl) => {
           const rawName = $(nameEl).text().trim();
+          
+          // 📍 名前からカッコ（全角・半角・角カッコ）とその中身（年齢等）を削除
+          const cleanedName = rawName.replace(/[（\(\[].*?[）\)\]]/g, '').trim();
+          
           const cleanName = normalize(rawName);
-          const loginId = nameMap.get(cleanName); // 📍 変数名は loginId
+          const loginId = nameMap.get(cleanName); 
           if (!loginId) return;
 
           const context = $(nameEl).text() + " " + $(nameEl).parent().text() + " " + $(nameEl).parent().parent().text();
           const timeMatch = context.match(timeRegex);
 
           if (timeMatch) {
+            foundLoginIdsOnHp.add(loginId);
             const hpStart = timeMatch[1].padStart(5, '0');
             const hpEnd = timeMatch[2].padStart(5, '0');
             const dbShift = existingMap.get(loginId);
@@ -91,9 +97,10 @@ export async function GET(req: NextRequest) {
             if (dbShift?.status === 'absent') return;
 
             upsertBatch.push({
-              login_id: loginId, // 📍 右辺を loginId に修正（波線エラーの解消）
+              login_id: loginId, 
               shift_date: dateStrDB,
-              hp_display_name: rawName,
+              // 📍 年齢等を除去した名前を保存
+              hp_display_name: cleanedName, 
               status: 'official',
               is_official: true,
               hp_start_time: hpStart,
@@ -107,10 +114,26 @@ export async function GET(req: NextRequest) {
         });
 
         if (upsertBatch.length > 0) {
-          const { error: upsertError } = await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
-          if (upsertError) {
-            console.error("UPSERT ERROR:", upsertError);
-            logs.push(`${dateStrDB.slice(8)}日 ERR:${upsertError.code}`);
+          await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
+        }
+
+        if (foundLoginIdsOnHp.size > 0) {
+          const deleteTargetIds: string[] = [];
+          existingShifts?.forEach(s => {
+            const lid = String(s.login_id).trim().padStart(8, '0');
+            if (s.status === 'official' && !foundLoginIdsOnHp.has(lid)) {
+              deleteTargetIds.push(lid);
+            }
+          });
+
+          if (deleteTargetIds.length > 0) {
+            await supabase
+              .from('shifts')
+              .delete()
+              .eq('shift_date', dateStrDB)
+              .in('login_id', deleteTargetIds);
+            
+            logs.push(`${dateStrDB.slice(8)}日(更:${upsertBatch.length}/消:${deleteTargetIds.length})`);
           } else {
             logs.push(`${dateStrDB.slice(8)}日(更:${upsertBatch.length})`);
           }
@@ -120,14 +143,11 @@ export async function GET(req: NextRequest) {
       } catch (e: any) { logs.push(`${dateStrDB.slice(8)}日 Error`); }
     }
 
-    // 📍 修正箇所：単一レコードの sync_logs テーブルを更新
     try {
-      // 1つのレコードしかないため、値を現在時刻で update する
-      // Supabaseのupdateはフィルタが必要なため、既存のレコードを対象にする
       await supabase
         .from('sync_logs')
         .update({ last_sync_at: new Date().toISOString() })
-        .not('last_sync_at', 'is', null); // 1行しか存在しない前提で、値が入っている行を更新
+        .not('last_sync_at', 'is', null);
     } catch (logError) {
       console.error("SYNC LOG UPDATE FAILED:", logError);
     }

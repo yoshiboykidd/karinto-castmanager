@@ -1,82 +1,61 @@
 'use server'
 
-import { createClient } from '@supabase/supabase-js'
-import { revalidatePath } from 'next/cache'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
-export async function createCast(formData: FormData) {
-  // 1. 特権キーでSupabaseに接続
-  const supabaseAdmin = createClient(
+/**
+ * 【共通】権限に基づいたキャスト一覧の取得
+ * ダッシュボードや統計画面など、メンバー管理以外でも使う場合はここに残します
+ */
+export async function getFilteredMembers(selectedShopId: string = 'all') {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!, // .env.localの管理者キー
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
+      cookies: {
+        get(name: string) { return cookieStore.get(name)?.value },
+      },
     }
   )
 
-  const display_name = formData.get('display_name') as string
-  const home_shop_id = formData.get('home_shop_id') as string
-  const personal_number = formData.get('personal_number') as string
-  
-  // パスワードは「0000」で固定（運用ルール準拠）
-  const default_password = "0000";
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { members: [], myProfile: null }
 
-  if (!display_name || !home_shop_id || !personal_number) {
-    return { error: '未入力の項目があります' }
+  const loginId = user.email?.split('@')[0] || ''
+  const { data: currentUser } = await supabase
+    .from('cast_members')
+    .select('role, home_shop_id')
+    .eq('login_id', loginId)
+    .single()
+
+  if (!currentUser) return { members: [], myProfile: null }
+
+  let query = supabase.from('cast_members').select('*')
+
+  if (currentUser.role === 'developer') {
+    if (selectedShopId !== 'all') {
+      query = query.eq('home_shop_id', selectedShopId)
+    }
+  } else if (currentUser.role === 'admin') {
+    query = query.eq('home_shop_id', currentUser.home_shop_id)
+  } else {
+    return { members: [], myProfile: currentUser }
   }
 
-  // 2. ID生成 (店番3桁 + 個人番5桁)
-  const formattedNumber = personal_number.padStart(5, '0');
-  const login_id = `${home_shop_id}${formattedNumber}`;
+  const { data: members, error } = await query
+    .eq('role', 'cast')
+    .order('login_id', { ascending: true })
 
-  // 3. 重複チェック
-  // 既にこのIDが使われていないかDBを確認
-  const { data: existingUser } = await supabaseAdmin
-    .from('cast_members')
-    .select('display_name')
-    .eq('login_id', login_id)
-    .single();
+  if (error) console.error(error)
 
-  if (existingUser) {
-    return { 
-      error: `🚫 エラー: 番号「${personal_number}」は既に「${existingUser.display_name}」さんが使っています。別の番号にしてください。` 
+  return { 
+    members: members || [], 
+    myProfile: {
+      role: currentUser.role,
+      home_shop_id: currentUser.home_shop_id
     }
   }
-
-  // 4. Supabase Auth (ログイン機能) 作成
-  const email = `${login_id}@karinto-internal.com`
-  
-  const { error: authError } = await supabaseAdmin.auth.admin.createUser({
-    email: email,
-    password: default_password,
-    email_confirm: true,
-    user_metadata: { role: 'cast', home_shop_id: home_shop_id }
-  })
-
-  // Authだけ既に存在する場合のエラーハンドリング
-  if (authError) {
-    console.error('Auth Error:', authError)
-    return { error: `ログイン作成失敗: ${authError.message}` }
-  }
-
-  // 5. DB (名簿) 登録
-  const { error: dbError } = await supabaseAdmin
-    .from('cast_members')
-    .insert({
-      login_id: login_id,
-      display_name: display_name,
-      hp_display_name: display_name,
-      home_shop_id: home_shop_id,
-      role: 'cast',
-      password: 'managed_by_supabase' // DB上はダミー
-    })
-
-  if (dbError) {
-    return { error: `名簿登録失敗: ${dbError.message}` }
-  }
-
-  revalidatePath('/admin')
-  return { success: true, message: `✨ ${display_name}さん (No.${personal_number}) を登録しました！\n初期パスワードは「0000」です。` }
 }
+
+// 📍 注意: createCast（登録ロジック）は members/actions.ts に移行したため、ここからは削除しました。
