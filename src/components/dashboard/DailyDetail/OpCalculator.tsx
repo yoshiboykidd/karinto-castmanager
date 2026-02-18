@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 
+// 📍 クライアント初期化
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -35,13 +36,22 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
   const [selectedOps, setSelectedOps] = useState<any[]>([]);
   const [isSending, setIsSending] = useState(false);
   
-  // 📍 修正：DB最新同期ステート
+  // 📍 修正：初期値を selectedRes に設定しつつ、DBと同期する
   const [dbRes, setDbRes] = useState(selectedRes);
 
   useEffect(() => {
+    // 📍 修正：406エラーを回避するため .single() を使わずに取得
     const fetchLatest = async () => {
-      const { data } = await supabase.from('reservations').select('*').eq('id', selectedRes.id).single();
-      if (data) setDbRes(data);
+      try {
+        const { data, error } = await supabase.from('reservations').select('*').eq('id', selectedRes.id);
+        if (error) throw error;
+        if (data && data.length > 0) {
+          setDbRes(data[0]);
+          console.log("[OpCalc] Sync Successful:", data[0]);
+        }
+      } catch (err) {
+        console.error("[OpCalc] Sync Failed:", err);
+      }
     };
     fetchLatest();
 
@@ -98,8 +108,8 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
     
     if (error) alert("更新失敗: " + error.message);
     else {
-      const { data } = await supabase.from('reservations').select('*').eq('id', dbRes.id).single();
-      if (data) setDbRes(data);
+      const { data } = await supabase.from('reservations').select('*').eq('id', dbRes.id);
+      if (data && data.length > 0) setDbRes(data[0]);
       router.refresh();
     }
   };
@@ -115,43 +125,33 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       if (shopNo === null) shopNo = Number(dbRes?.shop_id || dbRes?.shopId || 0);
 
       const prefix = dbRes.service_type === '添' ? '【添】' : '【か】';
-      
-      // 📍 修正：送信前に「既存分 ＋ 今回選択分」をマージした配列を作成
       const currentOpDetails = Array.isArray(dbRes.op_details) ? dbRes.op_details : [];
       const newOpDetails = [...currentOpDetails];
+      
+      // 📍 修正：今回の選択分をマージ
       if (selectedOps.length > 0) {
-        const taggedOps = selectedOps.map(op => ({ 
+        newOpDetails.push(...selectedOps.map(op => ({ 
           ...op, 
           timing: type === 'START' ? 'initial' : 'additional', 
           updatedAt: new Date().toISOString() 
-        }));
-        newOpDetails.push(...taggedOps);
+        })));
       }
 
-      // 📍 重要：スタート（またはフィニッシュ）時に reservations テーブルを確実に更新する
+      // 📍 修正：reservationsテーブルを確実に更新
       if (type === 'START' || type === 'FINISH') {
         const updateData: any = { 
-          actual_total_price: displayTotal, // ← ここに累積合計を入れる
-          op_details: newOpDetails,        // ← 累積された全Opを入れる
+          actual_total_price: displayTotal, 
+          op_details: newOpDetails, 
           updated_at: new Date().toISOString() 
         };
+        if (type === 'START') { updateData.status = 'playing'; updateData.in_call_at = new Date().toISOString(); }
+        if (type === 'FINISH') { updateData.status = 'completed'; updateData.end_time = new Date().toISOString(); }
         
-        if (type === 'START') { 
-          updateData.status = 'playing'; 
-          updateData.in_call_at = new Date().toISOString(); 
-        }
-        if (type === 'FINISH') { 
-          updateData.status = 'completed'; 
-          updateData.end_time = new Date().toISOString(); 
-        }
-
-        console.log(`[OpCalc] Updating reservations table for ${type}:`, updateData);
-        
+        console.log(`[OpCalc] DB Update for ${type}:`, updateData);
         const { error: resError } = await supabase.from('reservations').update(updateData).eq('id', dbRes.id);
-        if (resError) throw new Error(`予約本体(reservations)の保存に失敗しました: ${resError.message}`);
+        if (resError) throw resError;
       }
 
-      // 通知メッセージの作成
       let message = "";
       let toastMsg = "";
       const activeOps = newOpDetails.filter(o => o.status !== 'canceled');
@@ -162,17 +162,15 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       }
       else if (type === 'START') { 
         const opList = activeOps.map(o => `${o.no}.${o.name}`).join('・') || '無';
-        message = `${prefix}【入室】${dbRes.customer_name}様\n💰 総額：¥${displayTotal.toLocaleString()}\n内訳：基本¥${initialTotal.toLocaleString()} + Op¥${opsTotal.toLocaleString()}\nOp内訳：${opList}`;
+        message = `${prefix}【入室】${dbRes.customer_name}様\n💰 総額：¥${displayTotal.toLocaleString()}\n内訳：¥${initialTotal.toLocaleString()} + Op¥${opsTotal.toLocaleString()}\nOp内訳：${opList}`;
         toastMsg = "お店にプレイスタートを通知しました";
       } else if (type === 'FINISH') {
         const beforeTotal = Number(dbRes.actual_total_price || initialTotal);
-        message = `${prefix}【退出】${dbRes.customer_name}様\n追加料金：+¥${(displayTotal - beforeTotal).toLocaleString()}\n━━━━━━━━━━━━━━\n💰 最終お会計額：¥${displayTotal.toLocaleString()}\n━━━━━━━━━━━━━━\n全Op内訳：${activeOps.map(o => `${o.no}.${o.name}`).join('・') || '無し'}`;
+        message = `${prefix}【退出】${dbRes.customer_name}様\n追加料金：+¥${(displayTotal - beforeTotal).toLocaleString()}\n━━━━━━━━━━━━━━\n💰 最終お会計額：¥${displayTotal.toLocaleString()}\n━━━━━━━━━━━━━━\n全Op：${activeOps.map(o => `${o.no}.${o.name}`).join('・') || '無し'}`;
         toastMsg = "お店に退出を通知しました。お会計をお願いします。";
       }
 
       const finalMessage = label ? `[${label}] ${message}` : message;
-      
-      // 📍 通知の保存（履歴）
       const { error: notifError } = await supabase.from('notifications').insert({ 
         shop_id: shopNo, 
         cast_id: castId, 
@@ -181,30 +179,19 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         is_read: false 
       });
 
-      if (notifError) {
-        await supabase.from('notifications').insert({ cast_id: castId, type: type.toLowerCase(), message: finalMessage, is_read: false });
-      }
+      if (notifError) await supabase.from('notifications').insert({ cast_id: castId, type: type.toLowerCase(), message: finalMessage, is_read: false });
       
       if (type === 'START') setIsInCall(true);
       if (type === 'FINISH') setIsInCall(false);
-      
       setSelectedOps([]); 
       onToast(toastMsg);
       router.refresh();
-      
-      if (type === 'START' || type === 'FINISH') {
-        setTimeout(() => onClose(), 500);
-      }
-    } catch (err: any) { 
-      alert(`保存失敗: ${err.message}`); 
-    } finally { 
-      setIsSending(false); 
-    }
+      if (type === 'START' || type === 'FINISH') setTimeout(() => onClose(), 500);
+    } catch (err: any) { alert(`保存失敗: ${err.message}`); } finally { setIsSending(false); }
   };
 
   return (
     <div className="fixed inset-0 w-full h-[100dvh] z-[99999] flex flex-col bg-gray-900 text-white overflow-hidden font-sans">
-      {/* ... (UI部分は以前と同じ) ... */}
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
         <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-1.5 mb-1">
