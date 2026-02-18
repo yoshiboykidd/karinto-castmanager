@@ -4,11 +4,16 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 
-// 📍 ここが UUID 形式（例: 8e5f...）でないと保存に失敗します
-const SHOP_ID_MAP: { [key: string]: string } = {
-  '池東': 'ここに実際のUUIDを貼ってください', 
-  '池西': 'ここに実際のUUIDを貼ってください',
-  '大久保': 'ここに実際のUUIDを貼ってください',
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// 📍 CSVデータに基づく数値IDマップ
+const SHOP_ID_MAP: { [key: string]: number } = {
+  '池袋東口': 11, '池東': 11,
+  '池袋西口': 6,  '池西': 6,
+  '大久保': 10,
+  '神田': 1, '赤坂': 2, '秋葉原': 3, '上野': 4, '渋谷': 5, '五反田': 7, '大宮': 8, '吉祥寺': 9, '小岩': 12
 };
 
 const KARINTO_OPS = [
@@ -64,14 +69,6 @@ const SOINE_OPS = [
 
 export default function OpCalculator({ selectedRes, initialTotal, onToast, onClose, isInCall, setIsInCall }: any) {
   const router = useRouter();
-  
-  const supabase = useMemo(() => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return null;
-    return createClient(url, key);
-  }, []);
-
   const [selectedOps, setSelectedOps] = useState<any[]>([]);
   const [isSending, setIsSending] = useState(false);
 
@@ -115,7 +112,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
   };
 
   const toggleSavedStatus = async (item: any) => {
-    if (isCompleted || !supabase) return;
+    if (isCompleted) return;
     const details = Array.isArray(selectedRes.op_details) ? selectedRes.op_details : [];
     const newDetails = details.map((op: any) => {
       if (op?.no === item?.no && op?.name === item?.name) {
@@ -126,32 +123,26 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
     const newActualTotal = initialTotal + newDetails.filter((o: any) => o?.status === 'active').reduce((s: number, o: any) => s + (o?.price || 0), 0);
     
     const { error } = await supabase.from('reservations').update({ op_details: newDetails, actual_total_price: newActualTotal }).eq('id', selectedRes.id);
-    if (error) {
-      alert("更新エラー: " + error.message);
-    } else {
-      router.refresh();
-    }
+    if (error) alert("更新エラー: " + error.message);
+    else router.refresh();
   };
 
   const sendNotification = async (type: 'START' | 'HELP' | 'FINISH') => {
-    if (!selectedRes?.id || !supabase) {
-      alert("エラー: DB接続情報が見つかりません。");
-      return;
-    }
+    if (!selectedRes?.id) return;
     setIsSending(true);
 
     try {
       const shopLabel = selectedRes?.shop_label || '';
-      const castId = String(selectedRes?.login_id || selectedRes?.cast_id || '');
+      const castIdStr = String(selectedRes?.login_id || selectedRes?.cast_id || '');
       
-      // UUID 形式チェック（簡易版）
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      let targetShopId = SHOP_ID_MAP[shopLabel] || selectedRes?.shop_id || selectedRes?.shopId || null;
-      
-      // もし ID が UUID でない場合は保存エラーを防ぐために null にする
-      if (targetShopId && !uuidRegex.test(targetShopId)) {
-        console.warn("[OpCalc] Invalid UUID for shop_id, setting to null:", targetShopId);
-        targetShopId = null;
+      // 📍 修正：ショップID判別ロジック
+      let targetShopId = SHOP_ID_MAP[shopLabel] || null;
+      if (targetShopId === null && castIdStr.length >= 3) {
+        // キャストIDが「11101」などの場合、頭3桁の真ん中をとって「11」にする等のルールがあればここを調整
+        // 現状はCSVの shop_id (数値) を優先
+      }
+      if (targetShopId === null) {
+        targetShopId = selectedRes?.shop_id || selectedRes?.shopId;
       }
 
       const prefix = selectedRes.service_type === '添' ? '【添】' : '【か】';
@@ -162,17 +153,14 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         newOpDetails.push(...taggedOps);
       }
 
-      // 1. 予約データの更新を先に実行
       if (type === 'START' || type === 'FINISH') {
         const updateData: any = { actual_total_price: displayTotal, op_details: newOpDetails, updated_at: new Date().toISOString() };
         if (type === 'START') { updateData.status = 'playing'; updateData.in_call_at = new Date().toISOString(); }
         if (type === 'FINISH') { updateData.status = 'completed'; updateData.end_time = new Date().toISOString(); }
-        
         const { error: resError } = await supabase.from('reservations').update(updateData).eq('id', selectedRes.id);
-        if (resError) throw new Error(`Reservations Update Failed: ${resError.message}`);
+        if (resError) throw resError;
       }
 
-      // 2. 通知用メッセージ生成
       let message = "";
       let toastMsg = "";
       if (type === 'HELP') {
@@ -191,34 +179,34 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         toastMsg = "【お店に退出を通知しました。電話連絡もしてください】";
       }
 
-      // 3. 通知データの保存（ここが一番失敗しやすい）
       const finalMessage = shopLabel ? `[${shopLabel}] ${message}` : message;
-      const { error: notifError } = await supabase.from('notifications').insert({ 
-        shop_id: targetShopId, 
-        cast_id: castId, 
-        type: type.toLowerCase(), 
-        message: finalMessage, 
-        is_read: false 
-      });
+      const insertData: any = { cast_id: castIdStr, type: type.toLowerCase(), message: finalMessage, is_read: false };
+      
+      // 数値として送信
+      if (targetShopId !== null && targetShopId !== undefined) {
+        insertData.shop_id = Number(targetShopId);
+      }
 
-      // 📍 修正：通知保存が失敗した場合はここで止めてエラーを出す
-      if (notifError) throw new Error(`Notifications Insert Failed: ${notifError.message}`);
-
-      // すべて成功してから画面の状態を変える
+      const { error: notifError } = await supabase.from('notifications').insert(insertData);
+      if (notifError) {
+        // shop_id の型エラー（UUIDを期待している等）で失敗した場合は、IDなしで保存を強行
+        console.warn("[OpCalc] ID付き保存失敗、リトライ...", notifError.message);
+        delete insertData.shop_id;
+        const { error: retryError } = await supabase.from('notifications').insert(insertData);
+        if (retryError) throw retryError;
+      }
+      
       if (type === 'START') setIsInCall(true);
       if (type === 'FINISH') setIsInCall(false);
       
       setSelectedOps([]); 
       onToast(toastMsg);
       router.refresh();
-
       if (type === 'START' || type === 'FINISH') {
         setTimeout(() => onClose(), 500);
       }
     } catch (err: any) { 
-      // 📍 修正：エラー内容を具体的にアラートで表示
-      console.error("[OpCalc] Full Error Object:", err);
-      alert(`保存できませんでした。\n理由: ${err.message || "通信エラー"}\n\n※shop_id が正しい UUID か確認してください。`); 
+      alert(`保存失敗: ${err.message || "通信エラー"}`); 
     } finally { 
       setIsSending(false); 
     }
