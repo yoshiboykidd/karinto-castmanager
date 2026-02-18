@@ -1,3 +1,5 @@
+'use server'
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
@@ -61,18 +63,36 @@ export async function GET(req: NextRequest) {
     for (let i = 0; i < 8; i++) {
       const targetDate = addDays(new Date(Date.now() + JST_OFFSET), i);
       const dateStrDB = format(targetDate, 'yyyy-MM-dd');
-      const url = `${shop.baseUrl}?date_get=${format(targetDate, 'yyyy/MM/dd')}&t=${Date.now()}`;
+      const urlDateParam = format(targetDate, 'yyyy/MM/dd');
+      const url = `${shop.baseUrl}?date_get=${urlDateParam}&t=${Date.now()}`;
 
       try {
         const res = await fetch(url, { cache: 'no-store', headers: { 'User-Agent': 'Mozilla/5.0' } });
         if (!res.ok) { logs.push(`${dateStrDB.slice(8)}日 HTTP ${res.status}`); continue; }
         
-        const $ = cheerio.load(await res.text());
+        const html = await res.text();
+        const $ = cheerio.load(html);
+
+        // 📍 修正：ページ内の日付をチェックする（ゴーストデータ防止）
+        // 店舗HPの「2026年02月25日の出勤」のようなテキストを探す
+        const pageText = $('body').text();
+        const y = targetDate.getFullYear();
+        const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+        const d = String(targetDate.getDate()).padStart(2, '0');
+        
+        // ページ内に「2026年02月25日」または「2026/02/25」が含まれているか確認
+        const dateMatch = pageText.includes(`${y}年${m}月${d}日`) || pageText.includes(`${y}/${m}/${d}`);
+        
+        if (!dateMatch && i > 0) {
+          // リクエストした日付とページ内の日付が一致しない（＝今日に飛ばされた）場合
+          logs.push(`${dateStrDB.slice(8)}日(非公開)`);
+          continue; 
+        }
+
         const upsertBatch: any[] = [];
         const foundLoginIdsOnHp = new Set<string>();
         const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
 
-        // DBからこの店舗・この日付の既存シフトを取得（他店舗の巻き添え削除を防ぐ）
         const { data: existingShifts } = await supabase
           .from('shifts')
           .select('login_id, status, reward_amount')
@@ -97,14 +117,13 @@ export async function GET(req: NextRequest) {
             const hpEnd = timeMatch[2].padStart(5, '0');
             const dbShift = existingMap.get(loginId);
             
-            // 手動で「当欠」に設定されたデータは上書きしない
             if (dbShift?.status === 'absent') return;
 
             upsertBatch.push({
               login_id: loginId, 
               shift_date: dateStrDB,
               hp_display_name: cleanedName, 
-              store_code: shop.id, // 勤怠管理画面の表示に必須
+              store_code: shop.id, 
               status: 'official',
               is_official: true,
               hp_start_time: hpStart,
@@ -121,38 +140,28 @@ export async function GET(req: NextRequest) {
           await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
         }
 
-        // 📍 重要：HPが0人の時でも削除処理を走らせるように修正 (size >= 0)
         if (foundLoginIdsOnHp.size >= 0) {
           const deleteTargetIds: string[] = [];
           existingShifts?.forEach(s => {
             const lid = String(s.login_id).trim().padStart(8, '0');
-            // HPに名前がなく、かつ「確定」ステータスのものを削除対象とする
             if (s.status === 'official' && !foundLoginIdsOnHp.has(lid)) {
               deleteTargetIds.push(lid);
             }
           });
 
           if (deleteTargetIds.length > 0) {
-            await supabase
-              .from('shifts')
-              .delete()
-              .eq('shift_date', dateStrDB)
-              .in('login_id', deleteTargetIds);
-            
+            await supabase.from('shifts').delete().eq('shift_date', dateStrDB).in('login_id', deleteTargetIds);
             logs.push(`${dateStrDB.slice(8)}日(更:${upsertBatch.length}/消:${deleteTargetIds.length})`);
           } else if (upsertBatch.length > 0) {
             logs.push(`${dateStrDB.slice(8)}日(更:${upsertBatch.length})`);
           } else {
-            // HPもDBもデータがない場合
             logs.push(`${dateStrDB.slice(8)}日(HP:0)`);
           }
         }
       } catch (e: any) { logs.push(`${dateStrDB.slice(8)}日 Error`); }
     }
 
-    // 同期完了ログの更新
     await supabase.from('sync_logs').update({ last_sync_at: new Date().toISOString() }).not('last_sync_at', 'is', null);
-
     return NextResponse.json({ success: true, shop: shop.name, logs });
   } catch (e: any) { 
     return NextResponse.json({ success: false, message: e.message }, { status: 500 }); 
