@@ -125,7 +125,7 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
   return (
     <div className="fixed inset-0 z-[300] flex flex-col bg-gray-900 text-white animate-in fade-in duration-200 overflow-hidden font-sans">
       
-      {/* 📍 ヘッダー：バッジの横を具体的なコース名に修正 */}
+      {/* 📍 ヘッダー：バッジの横に動的なコース名を表示（course / course_name 両対応） */}
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
         <div>
           <div className="flex items-center gap-1.5 mb-1">
@@ -134,23 +134,23 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
             }`}>
               {selectedRes.service_type || 'か'}
             </span>
-            {/* 📍 selectedRes.course_name を表示（無い場合はデフォルト名） */}
-            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest leading-none">
-              {selectedRes.course_name || (selectedRes.service_type === '添' ? '添い寝コース' : 'かりんとコース')}
+            {/* 📍 予約データの course または course_name を優先表示 */}
+            <p className="text-[12px] text-gray-100 font-black tracking-tighter leading-none">
+              {selectedRes.course || selectedRes.course_name || (selectedRes.service_type === '添' ? '添い寝' : 'かりんと')}
             </p>
           </div>
           <p className="text-[28px] font-black text-green-400 tabular-nums leading-none">¥{displayTotal.toLocaleString()}</p>
         </div>
-        <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold">×</button>
+        <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold active:scale-90 transition-transform">×</button>
       </div>
 
-      <div className="bg-gray-800 border-b border-gray-700 px-3 py-2.5 min-h-[54px] flex flex-wrap gap-1.5 shrink-0 items-center overflow-y-auto max-h-[140px]">
+      <div className="bg-gray-800 border-b border-gray-700 px-3 py-2.5 min-h-[54px] flex flex-wrap gap-1.5 shrink-0 items-center overflow-y-auto max-h-[140px] shadow-lg">
         {selectedOps.length === 0 ? (
           <p className="text-[11px] text-gray-500 font-black italic opacity-60 pl-1">※ オプションを選択してください</p>
         ) : (
           selectedOps.map((op) => (
             <button key={`${op.catLabel}-${op.no}`} onClick={() => toggleOp(op.no, op.name, op.price, op.catLabel || "")}
-              className="bg-pink-600 border border-pink-400 text-white px-2 py-1 rounded-lg text-[11px] font-black flex items-center gap-1">
+              className="bg-pink-600 border border-pink-400 text-white px-2 py-1 rounded-lg text-[11px] font-black flex items-center gap-1 active:scale-95 transition-all shadow-md animate-in zoom-in-90">
               <span className="opacity-70 text-[10px]">{op.no}.</span>{op.name}<span className="opacity-50 ml-0.5">×</span>
             </button>
           ))
@@ -185,13 +185,14 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
       </div>
 
       <div className="p-4 bg-gray-900/95 backdrop-blur-xl border-t border-gray-800 fixed bottom-0 left-0 right-0 z-40 flex gap-2">
-        <button onClick={() => sendNotification('HELP')} disabled={isSending} className="flex-1 py-3 bg-gray-700 text-white rounded-xl font-black text-[14px]">✋ 呼出</button>
+        <button onClick={() => sendNotification('HELP')} disabled={isSending} className="flex-1 py-3 bg-gray-700 text-white rounded-xl font-black text-[14px] active:scale-95 transition-all">✋ 呼出</button>
         <button 
           onClick={() => sendNotification(isInCall ? 'ADD' : 'START')}
           disabled={isSending || (selectedOps.length === 0 && isInCall)}
-          className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] shadow-2xl transition-all ${
-            isInCall ? 'bg-orange-500 text-white' : 'bg-green-500 text-white'
-          } ${isSending ? 'opacity-50' : ''}`}
+          className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] shadow-2xl transition-all active:scale-[0.97]
+            ${isInCall ? 'bg-orange-500 text-white' : 'bg-green-500 text-white'}
+            ${isSending ? 'opacity-50' : ''}
+          `}
         >
           {isSending ? '...' : isInCall ? '🔥 追加OPを店に通知' : '🚀 スタート'}
         </button>
