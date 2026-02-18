@@ -35,7 +35,7 @@ const KARINTO_OPS = [
   ]},
 ];
 
-// 📍 添い寝専用オプションデータ（名称を「3点セット 45分1」形式に更新）
+// 📍 添い寝専用オプションデータ
 const SOINE_OPS = [
   { label: '45分価格', items: [
     { n: '3-1', t: '3点セット 45分1', p: 2500 }, { n: '3-2', t: '3点セット 45分2', p: 2500 }, { n: '3-3', t: '3点セット 45分3', p: 2500 }, { n: '3-4', t: '3点セット 45分4', p: 2500 }, { n: '3-5', t: '3点セット 45分5', p: 2500 },
@@ -125,7 +125,7 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
   return (
     <div className="fixed inset-0 z-[300] flex flex-col bg-gray-900 text-white animate-in fade-in duration-200 overflow-hidden font-sans">
       
-      {/* 金額ヘッダー：サービスバッジ付き */}
+      {/* 📍 ヘッダー：バッジの横を具体的なコース名に修正 */}
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
         <div>
           <div className="flex items-center gap-1.5 mb-1">
@@ -134,8 +134,9 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
             }`}>
               {selectedRes.service_type || 'か'}
             </span>
+            {/* 📍 selectedRes.course_name を表示（無い場合はデフォルト名） */}
             <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest leading-none">
-              {selectedRes.service_type === '添' ? '添い寝コース' : 'かりんとコース'}
+              {selectedRes.course_name || (selectedRes.service_type === '添' ? '添い寝コース' : 'かりんとコース')}
             </p>
           </div>
           <p className="text-[28px] font-black text-green-400 tabular-nums leading-none">¥{displayTotal.toLocaleString()}</p>
@@ -143,7 +144,6 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold">×</button>
       </div>
 
-      {/* 選択中エリア */}
       <div className="bg-gray-800 border-b border-gray-700 px-3 py-2.5 min-h-[54px] flex flex-wrap gap-1.5 shrink-0 items-center overflow-y-auto max-h-[140px]">
         {selectedOps.length === 0 ? (
           <p className="text-[11px] text-gray-500 font-black italic opacity-60 pl-1">※ オプションを選択してください</p>
@@ -157,7 +157,6 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         )}
       </div>
 
-      {/* 📍 メイングリッド：3列構成で統一 */}
       <div className="flex-1 overflow-y-auto px-2 pt-3 pb-40 space-y-6 scrollbar-hide overscroll-contain">
         {currentCategories.map((cat: any) => (
           <div key={cat.label} className="space-y-2">
@@ -185,7 +184,6 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         ))}
       </div>
 
-      {/* 通知ボタン */}
       <div className="p-4 bg-gray-900/95 backdrop-blur-xl border-t border-gray-800 fixed bottom-0 left-0 right-0 z-40 flex gap-2">
         <button onClick={() => sendNotification('HELP')} disabled={isSending} className="flex-1 py-3 bg-gray-700 text-white rounded-xl font-black text-[14px]">✋ 呼出</button>
         <button 
