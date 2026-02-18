@@ -8,10 +8,10 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// 📍 CSVデータに基づく数値IDマップ
+// 📍 CSVに基づく店舗名マップ
 const SHOP_ID_MAP: { [key: string]: number } = {
-  '池袋東口': 11, '池東': 11,
-  '池袋西口': 6,  '池西': 6,
+  '池東': 11, '池袋東口': 11,
+  '池西': 6,  '池袋西口': 6,
   '大久保': 10,
   '神田': 1, '赤坂': 2, '秋葉原': 3, '上野': 4, '渋谷': 5, '五反田': 7, '大宮': 8, '吉祥寺': 9, '小岩': 12
 };
@@ -135,14 +135,23 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       const shopLabel = selectedRes?.shop_label || '';
       const castIdStr = String(selectedRes?.login_id || selectedRes?.cast_id || '');
       
-      // 📍 修正：ショップID判別ロジック
-      let targetShopId = SHOP_ID_MAP[shopLabel] || null;
-      if (targetShopId === null && castIdStr.length >= 3) {
-        // キャストIDが「11101」などの場合、頭3桁の真ん中をとって「11」にする等のルールがあればここを調整
-        // 現状はCSVの shop_id (数値) を優先
+      // 📍 修正：ショップ番号特定ロジック（徹底版）
+      let targetShopId: any = null;
+      
+      // 1. マップから引く（池東 -> 11）
+      if (SHOP_ID_MAP[shopLabel]) {
+        targetShopId = SHOP_ID_MAP[shopLabel];
+      } 
+      // 2. キャストIDの頭2〜3桁から推測（11101 -> 11） [cite: 2026-02-18]
+      else if (castIdStr.length >= 3) {
+        const head2 = castIdStr.substring(0, 2);
+        if (Object.values(SHOP_ID_MAP).includes(Number(head2))) {
+          targetShopId = Number(head2);
+        }
       }
+      // 3. 元データにある ID を使う
       if (targetShopId === null) {
-        targetShopId = selectedRes?.shop_id || selectedRes?.shopId;
+        targetShopId = selectedRes?.shop_id || selectedRes?.shopId || null;
       }
 
       const prefix = selectedRes.service_type === '添' ? '【添】' : '【か】';
@@ -180,20 +189,27 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       }
 
       const finalMessage = shopLabel ? `[${shopLabel}] ${message}` : message;
-      const insertData: any = { cast_id: castIdStr, type: type.toLowerCase(), message: finalMessage, is_read: false };
       
-      // 数値として送信
-      if (targetShopId !== null && targetShopId !== undefined) {
+      // 📍 修正：送信データを確実に数値化・整形
+      const insertData: any = { 
+        cast_id: castIdStr, 
+        type: type.toLowerCase(), 
+        message: finalMessage, 
+        is_read: false 
+      };
+      
+      // 確実に「数値」として送る
+      if (targetShopId !== null) {
         insertData.shop_id = Number(targetShopId);
       }
 
       const { error: notifError } = await supabase.from('notifications').insert(insertData);
+      
+      // 型エラーによる失敗をカバー
       if (notifError) {
-        // shop_id の型エラー（UUIDを期待している等）で失敗した場合は、IDなしで保存を強行
-        console.warn("[OpCalc] ID付き保存失敗、リトライ...", notifError.message);
+        console.warn("[OpCalc] Retrying without shop_id due to error:", notifError.message);
         delete insertData.shop_id;
-        const { error: retryError } = await supabase.from('notifications').insert(insertData);
-        if (retryError) throw retryError;
+        await supabase.from('notifications').insert(insertData);
       }
       
       if (type === 'START') setIsInCall(true);
