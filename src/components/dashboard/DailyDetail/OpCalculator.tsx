@@ -133,12 +133,13 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
   };
 
   return (
-    <div className="absolute inset-0 h-screen z-[300] flex flex-col bg-gray-900 text-white overflow-hidden font-sans">
+    // 📍 修正：h-screen を h-[100dvh] (Dynamic Viewport Height) に変更し、fixed inset-0 で強制固定
+    <div className="fixed inset-0 w-full h-[100dvh] z-[9999] flex flex-col bg-gray-900 text-white overflow-hidden font-sans">
       
       {/* 1. ヘッダー (shrink-0) */}
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
         <p className="text-[28px] font-black text-green-400 tabular-nums leading-none">¥{displayTotal.toLocaleString()}</p>
-        <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold">×</button>
+        <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold active:scale-90">×</button>
       </div>
 
       {/* 2. 選択済みOP (shrink-0) */}
@@ -152,7 +153,7 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
       </div>
 
       {/* 3. メイン選択リスト (flex-1) */}
-      <div className="flex-1 overflow-y-auto px-2 pt-3 pb-6 space-y-6 scrollbar-hide min-h-0 overscroll-contain">
+      <div className="flex-1 overflow-y-auto px-2 pt-3 pb-4 space-y-6 scrollbar-hide overscroll-contain">
         {currentCategories.map((cat: any) => (
           <div key={cat.label} className="space-y-2">
             <h3 className="text-[10px] font-black text-gray-500 px-1 uppercase border-l-2 border-pink-500/50 ml-1">{cat.label}</h3>
@@ -161,9 +162,9 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
                 const isSelected = selectedOps.some(op => op.no === item.n && (selectedRes.service_type !== '添' || op.catLabel === cat.label));
                 const isSaved = savedOpsActive.some((op: any) => op.no === item.n && (selectedRes.service_type !== '添' || op.catLabel === cat.label));
                 return (
-                  <button key={`${cat.label}-${item.n}`} onClick={() => toggleOp(item.n, item.t, item.p || (cat as any).price || 0, cat.label)} className={`min-h-[70px] rounded-[20px] flex flex-col items-center justify-center border ${isSelected || isSaved ? 'bg-pink-500 border-pink-300' : 'bg-white/5 border-white/5 text-gray-400'}`}>
+                  <button key={`${cat.label}-${item.n}`} onClick={() => toggleOp(item.n, item.t, item.p || (cat as any).price || 0, cat.label)} className={`min-h-[75px] rounded-[20px] flex flex-col items-center justify-center border transition-all ${isSelected || isSaved ? 'bg-pink-500 border-pink-300 shadow-[0_0_20px_rgba(236,72,153,0.4)] scale-95' : 'bg-white/5 border-white/5 text-gray-400'}`}>
                     <span className="text-[20px] font-black">{item.n}</span>
-                    <span className="text-[11px] font-black leading-tight text-center px-1">{item.t}</span>
+                    <span className="text-[11px] font-black text-center line-clamp-2 px-1">{item.t}</span>
                   </button>
                 );
               })}
@@ -173,7 +174,8 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
       </div>
 
       {/* 4. フッターボタン (物理的な一番下に配置) */}
-      <div className="shrink-0 p-4 bg-gray-900 border-t border-gray-800 flex gap-2 pb-[calc(env(safe-area-inset-bottom)+16px)]">
+      {/* 📍 修正：pb-[calc(env(safe-area-inset-bottom)+20px)] でスマホのバーより上に強制表示 */}
+      <div className="shrink-0 p-4 bg-gray-900 border-t border-gray-800 flex gap-2 pb-[calc(env(safe-area-inset-bottom)+24px)] shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
         {isCompleted ? (
           <div className="flex-1 py-4 bg-gray-800 text-gray-500 rounded-2xl font-black text-center">✅ 精算済み</div>
         ) : (
@@ -185,7 +187,7 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
             <button 
               onClick={() => sendNotification(isActuallyPlaying ? 'ADD' : 'START')} 
               disabled={isSending || (isActuallyPlaying && selectedOps.length === 0)} 
-              className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] ${isActuallyPlaying ? 'bg-orange-500' : 'bg-green-500'} text-white shadow-xl`}
+              className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] ${isActuallyPlaying ? 'bg-orange-500' : 'bg-green-500'} text-white shadow-lg`}
             >
               {isSending ? '...' : isActuallyPlaying ? '🔥 追加通知' : '🚀 スタート'}
             </button>
