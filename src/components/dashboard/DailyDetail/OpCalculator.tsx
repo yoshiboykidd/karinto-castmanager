@@ -58,7 +58,6 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
   const [selectedOps, setSelectedOps] = useState<any[]>([]);
   const [isSending, setIsSending] = useState(false);
 
-  // 📍 計算機表示中にTOPフッターを隠す
   useEffect(() => {
     const style = document.createElement('style');
     style.id = 'hide-app-footer';
@@ -79,7 +78,6 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
     return details.filter((op: any) => op?.status !== 'canceled');
   }, [selectedRes?.op_details]);
 
-  // 📍 オプションのみの合計金額
   const opsTotal = useMemo(() => {
     const savedSum = savedOpsActive.reduce((sum: number, op: any) => sum + (op?.price || 0), 0);
     const newSum = selectedOps.reduce((sum, op) => sum + (op?.price || 0), 0);
@@ -153,15 +151,12 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
 
   return (
     <div className="fixed inset-0 w-full h-[100dvh] z-[99999] flex flex-col bg-gray-900 text-white overflow-hidden font-sans">
-      
-      {/* 1. ヘッダー */}
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
         <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-1.5 mb-1">
             <span className={`w-5 h-5 flex items-center justify-center rounded text-[10px] font-black shrink-0 ${selectedRes?.service_type === '添' ? 'bg-pink-500' : 'bg-blue-500'}`}>{selectedRes?.service_type || 'か'}</span>
             <p className="font-black text-[12px] truncate text-gray-100">{courseText}</p>
           </div>
-          {/* 📍 修正：計算式の形式で表示 */}
           <p className="text-[26px] font-black text-green-400 tabular-nums leading-none">
             <span className="text-[13px] align-middle opacity-60">¥</span>{initialTotal.toLocaleString()}
             <span className="text-[15px] mx-1 opacity-40">+</span>
@@ -173,22 +168,16 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold active:scale-90 shrink-0">×</button>
       </div>
 
-      {/* 2. 選択済みOP */}
       <div className="bg-gray-800 border-b border-gray-700 px-3 py-2 flex flex-wrap gap-1 shrink-0 items-center overflow-y-auto max-h-[80px]">
         {savedOpsActive.map((op: any, i: number) => (
-          <button key={`s-${i}`} onClick={() => toggleSavedStatus(op)} className="bg-blue-600 px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1">
-            {op?.no}.{op?.name} <span className="opacity-50">×</span>
-          </button>
+          <button key={`s-${i}`} onClick={() => toggleSavedStatus(op)} className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 ${op?.price < 0 ? 'bg-red-600' : 'bg-blue-600'}`}>{op?.no}.{op?.name} ×</button>
         ))}
         {selectedOps.map((op, i) => (
-          <button key={`n-${i}`} onClick={() => toggleOp(op.no, op.name, op.price, op.catLabel)} className="bg-pink-600 px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1">
-            {op.no}.{op.name} <span className="opacity-50">×</span>
-          </button>
+          <button key={`n-${i}`} onClick={() => toggleOp(op.no, op.name, op.price, op.catLabel)} className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 ${op.price < 0 ? 'bg-red-600' : 'bg-pink-600'}`}>{op.no}.{op.name} ×</button>
         ))}
         {savedOpsActive.length === 0 && selectedOps.length === 0 && <p className="text-[11px] text-gray-500 font-black italic">※ オプションを選択してください</p>}
       </div>
 
-      {/* 3. メインリスト */}
       <div className="flex-1 overflow-y-auto px-2 pt-3 pb-6 space-y-6 scrollbar-hide overscroll-contain min-h-0">
         {currentCategories.map((cat: any) => (
           <div key={cat.label} className="space-y-2">
@@ -207,9 +196,24 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
             </div>
           </div>
         ))}
+
+        {/* 📍 修正：Op割-500 ボタン (かりんと限定) */}
+        {selectedRes?.service_type !== '添' && (
+          <div className="px-1 pt-2">
+            <button
+              onClick={() => toggleOp('割', 'Op割', -500, '特別')}
+              className={`w-full py-4 rounded-[20px] border transition-all flex items-center justify-center gap-2 ${
+                selectedOps.some(op => op.no === '割') || savedOpsActive.some((op: any) => op.no === '割')
+                  ? 'bg-red-500 border-red-300 shadow-[0_0_15px_rgba(239,68,68,0.3)] text-white'
+                  : 'bg-white/5 border-white/5 text-gray-400'
+              }`}
+            >
+              <span className="text-[18px] font-black">Op割 -500</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* 4. フッターボタン */}
       <div className="shrink-0 p-4 bg-gray-900 border-t border-gray-800 flex gap-2 pb-[calc(env(safe-area-inset-bottom)+24px)] shadow-[0_-10px_40px_rgba(0,0,0,0.8)]">
         {isCompleted ? (
           <div className="flex-1 py-4 bg-gray-800 text-gray-500 rounded-2xl font-black text-center">✅ 精算済み</div>
