@@ -4,7 +4,6 @@ import { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import { ja } from 'date-fns/locale';
 
-// 分割したパーツをインポート
 import DailyStats from './DailyDetail/DailyStats';
 import ReservationModal from './DailyDetail/ReservationModal';
 import ReservationList from './DailyDetail/ReservationList';
@@ -14,11 +13,8 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditingMemo, setIsEditingMemo] = useState(false);
   const [memoDraft, setMemoDraft] = useState('');
-  
-  // 📍 履歴計算用に自分の過去の全予約を保持するステート
   const [allPastReservations, setAllPastReservations] = useState<any[]>([]);
 
-  // 1. 予約の本数を集計
   const dayTotals = useMemo(() => {
     return reservations.reduce((acc: any, res: any) => {
       const isSoe = res.service_type === '添';
@@ -36,24 +32,26 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   const isAbsent = shift?.status === 'absent';
   const isLate = shift?.is_late === true;
+  // 📍 シフト（仕事）があるかどうかの判定
+  const hasShift = shift?.status === 'official' || isAbsent;
 
-  // 2. 自分の全予約データを取得（履歴表示用）
+  // 📍 予約がない時のメッセージを生成
+  const noMissionMessage = useMemo(() => {
+    if (isAbsent) return '当欠処理済み';
+    return hasShift 
+      ? '本日もよろしくお願いします' 
+      : 'お休みです。ゆっくり過ごされてください';
+  }, [isAbsent, hasShift]);
+
   useEffect(() => {
     const fetchMyHistory = async () => {
       if (!myLoginId || !supabase) return;
-      const { data, error } = await supabase
-        .from('reservations')
-        .select('*')
-        .eq('login_id', myLoginId);
-      
-      if (!error && data) {
-        setAllPastReservations(data);
-      }
+      const { data, error } = await supabase.from('reservations').select('*').eq('login_id', myLoginId);
+      if (!error && data) setAllPastReservations(data);
     };
     fetchMyHistory();
   }, [myLoginId, supabase, date]);
 
-  // 3. 当欠時の予約自動削除ロジック
   useEffect(() => {
     const autoDelete = async () => {
       if (isAbsent && reservations.length > 0 && supabase && myLoginId) {
@@ -66,7 +64,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
     autoDelete();
   }, [isAbsent, reservations.length, date, myLoginId, supabase, onRefresh]);
 
-  // 📍 メモの下書き同期
   useEffect(() => {
     if (!selectedRes) {
       setMemoDraft('');
@@ -76,7 +73,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
     setMemoDraft(selectedRes.cast_memo || '');
   }, [selectedRes?.id]);
 
-  // 4. ハンドラー
   const handleDelete = async () => {
     if (!selectedRes?.id || !supabase) return;
     if (!window.confirm("この予約を完全に削除しますか？")) return;
@@ -90,32 +86,20 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
     } finally { setIsDeleting(false); }
   };
 
-  // 📍 顧客メモ一括更新ロジック（修正箇所）
   const handleSaveMemo = async () => {
     if (!selectedRes?.id || !supabase) return;
-    
     const cNo = selectedRes.customer_no;
-
     try {
       let query = supabase.from('reservations').update({ cast_memo: memoDraft });
-
       if (cNo) {
-        // ✅ 顧客番号がある場合：その顧客かつ自分のメモをすべて更新
         query = query.eq('customer_no', cNo).eq('login_id', myLoginId);
       } else {
-        // 顧客番号がない場合：この予約1件のみ更新
         query = query.eq('id', selectedRes.id);
       }
-
       const { error } = await query;
       if (error) throw error;
-
-      // ローカル表示を更新
       setSelectedRes({ ...selectedRes, cast_memo: memoDraft });
-      
-      // 全データを再取得して、カレンダーや他の日のリストにも反映させる
       if (onRefresh) onRefresh();
-
     } catch (err) { 
       console.error(err);
       alert("保存に失敗しました。"); 
@@ -150,14 +134,12 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
   return (
     <>
       <section className="relative overflow-hidden rounded-[32px] border border-gray-100 bg-white shadow-xl flex flex-col">
-        {/* イベント情報 */}
         {eventInfo && (
           <div className={`w-full py-1 ${eventInfo.color} ${eventInfo.text} text-center text-[12px] font-black tracking-widest uppercase`}>
             {eventInfo.label}
           </div>
         )}
         
-        {/* 日付・シフト時間ヘッダー */}
         <div className="flex items-center justify-center w-full p-2 border-b border-gray-50">
           <div className="flex items-center gap-2">
             <div className="flex items-baseline font-black tracking-tighter text-gray-800 leading-none">
@@ -166,7 +148,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
               <span className="text-[24px]">{format(date, 'd')}</span>
               <span className="text-[10px] ml-0.5 opacity-30">({format(date, 'E', { locale: ja })})</span>
             </div>
-            {shift?.status === 'official' || isAbsent ? (
+            {hasShift ? (
               <div className="flex items-center gap-1">
                 {isAbsent ? (
                   <span className="w-10 h-6 flex items-center justify-center rounded bg-rose-600 text-white text-[10px] font-black">当欠</span>
@@ -187,25 +169,26 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
           </div>
         </div>
 
-        {/* 1. 予約一覧 */}
         <div className="flex-1 min-h-[100px]">
           <ReservationList 
             reservations={reservations} 
             onSelect={setSelectedRes} 
             getBadgeStyle={getBadgeStyle} 
             isAbsent={isAbsent}
+            noMissionMessage={noMissionMessage} // 📍 動的メッセージを渡す
           />
         </div>
 
-        {/* 2. 統計情報 */}
-        <DailyStats 
-          dayTotals={dayTotals} 
-          rewardAmount={shift?.reward_amount} 
-          theme={theme} 
-        />
+        {/* 📍 3. 統計情報：予約が1件以上ある場合のみ表示 */}
+        {reservations.length > 0 && (
+          <DailyStats 
+            dayTotals={dayTotals} 
+            rewardAmount={shift?.reward_amount} 
+            theme={theme} 
+          />
+        )}
       </section>
 
-      {/* 予約詳細モーダル */}
       <ReservationModal 
         selectedRes={selectedRes}
         onClose={() => setSelectedRes(null)}
