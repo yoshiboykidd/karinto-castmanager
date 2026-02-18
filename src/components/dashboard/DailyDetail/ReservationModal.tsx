@@ -5,7 +5,7 @@ import OpCalculator from './OpCalculator';
 
 export default function ReservationModal({ 
   selectedRes, onClose, onDelete, isDeleting, isEditingMemo, setIsEditingMemo, 
-  memoDraft, setMemoDraft, onSaveMemo, getBadgeStyle, allPastReservations = [], supabase 
+  memoDraft, setMemoDraft, onSaveMemo, getBadgeStyle, allPastReservations = []
 }: any) {
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
@@ -15,7 +15,7 @@ export default function ReservationModal({
   const handleToast = (msg: string) => {
     setToastMsg(msg);
     setShowToast(true);
-    setTimeout(() => setShowToast(false), 2000);
+    setTimeout(() => setShowToast(false), 3000);
   };
 
   const customerContext = useMemo(() => {
@@ -55,12 +55,10 @@ export default function ReservationModal({
     <div className="fixed inset-0 z-[9998] flex items-center justify-center p-0">
       <div className="absolute inset-0 bg-black/85 backdrop-blur-sm" onClick={() => onClose?.()} />
       
-      {/* 📍 計算機表示中 */}
       {isOpOpen && (
         <OpCalculator 
           selectedRes={selectedRes} 
           initialTotal={Number(selectedRes.total_price || 0)} 
-          supabase={supabase} 
           onToast={handleToast}
           onClose={() => setIsOpOpen(false)}
           isInCall={isInCall}
@@ -74,7 +72,6 @@ export default function ReservationModal({
         </div>
       )}
 
-      {/* 📍 計算機が開いていない時だけメインカードを表示 */}
       {!isOpOpen && (
         <div className="relative w-full max-w-sm bg-white rounded-[24px] flex flex-col max-h-[98vh] overflow-hidden text-gray-800 shadow-2xl mx-1">
           <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center shrink-0">
@@ -95,7 +92,6 @@ export default function ReservationModal({
               </div>
             </button>
 
-            {/* 以下、メモエリア等は変更なし */}
             <div className="bg-pink-50/40 rounded-[18px] p-2.5 border border-pink-100/30">
               <div className="flex justify-between items-center mb-1.5 px-0.5">
                 <div className="flex gap-1">
