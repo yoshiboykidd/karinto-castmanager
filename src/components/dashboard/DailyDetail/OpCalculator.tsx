@@ -2,15 +2,37 @@
 
 import React, { useState, useMemo } from 'react';
 
-// 📍 かりんと専用オプションデータ
+// 📍 かりんと専用オプションデータ（テキストを詳細版に更新）
 const KARINTO_OPS = [
-  { label: '¥500 Op', price: 500, items: [{ n: '10', t: '上ラン' }, { n: '11', t: '抱きつき' }, { n: '12', t: '足なで' }, { n: '13', t: 'つば' }, { n: '14', t: '匂い' }, { n: '15', t: '踏付け' }, { n: '16', t: '足こき' }, { n: '17', t: 'チラ見' }, { n: '18', t: '拘束' }, { n: '19', t: '+500' }] },
-  { label: '¥1,000 Op', price: 1000, items: [{ n: '20', t: '乳もみ' }, { n: '21', t: '尻触り' }, { n: '22', t: '下ラン' }, { n: '23', t: 'スク水' }, { n: '24', t: '指穴' }, { n: '25', t: 'スト責' }, { n: '26', t: '+1000' }, { n: '27', t: '+1000' }] },
-  { label: '¥1,500 Op', price: 1500, items: [{ n: '30', t: '乳舐め' }, { n: '31', t: '全ラン' }, { n: '32', t: 'ハピセ' }, { n: '33', t: '尻(い)' }, { n: '34', t: '美脚' }, { n: '35', t: 'NB-T' }, { n: '36', t: '顔面' }, { n: '37', t: '+1500' }] },
-  { label: '¥2,000 Op', price: 2000, items: [{ n: '40', t: 'NB乳も' }, { n: '41', t: '+2000' }, { n: '42', t: '+2000' }] },
-  { label: '¥2,500 Op', price: 2500, items: [{ n: '50', t: '上生乳' }, { n: '51', t: '+2500' }, { n: '52', t: '+2500' }] },
-  { label: '¥3,000 Op', price: 3000, items: [{ n: '60', t: 'Tレス' }, { n: '61', t: 'バリュ' }, { n: '62', t: 'NB生乳' }, { n: '63', t: '+3000' }, { n: '64', t: '+3000' }] },
-  { label: '¥3,500 Op', price: 3500, items: [{ n: '71', t: 'T生乳も' }] },
+  { label: '¥500 Op', price: 500, items: [
+    { n: '10', t: '上ラン' }, { n: '11', t: '抱きつき' }, { n: '12', t: '足なで' }, 
+    { n: '13', t: 'つば垂らし' }, { n: '14', t: '匂い嗅ぎ' }, { n: '15', t: '踏付け' }, 
+    { n: '16', t: '足こき' }, { n: '17', t: 'チラっとパンツ見せ' }, { n: '18', t: '拘束テープ' }, 
+    { n: '19', t: '+500' }
+  ]},
+  { label: '¥1,000 Op', price: 1000, items: [
+    { n: '20', t: '乳もみ' }, { n: '21', t: 'お尻触り' }, { n: '22', t: '下ラン' }, 
+    { n: '23', t: 'スク水' }, { n: '24', t: '指アナル' }, { n: '25', t: 'ストッキング責め' }, 
+    { n: '26', t: '+1000' }, { n: '27', t: '+1000' }
+  ]},
+  { label: '¥1,500 Op', price: 1500, items: [
+    { n: '30', t: '乳舐め' }, { n: '31', t: 'オーラン' }, { n: '32', t: 'ハッピーセット' }, 
+    { n: '33', t: 'いやら尻触り' }, { n: '34', t: '美脚三昧' }, { n: '35', t: 'ノーブラTシャツ' }, 
+    { n: '36', t: '顔面騎乗' }, { n: '37', t: '+1500' }
+  ]},
+  { label: '¥2,000 Op', price: 2000, items: [
+    { n: '40', t: 'ノーブラTシャツ乳もみ' }, { n: '41', t: '+2000' }, { n: '42', t: '+2000' }
+  ]},
+  { label: '¥2,500 Op', price: 2500, items: [
+    { n: '50', t: '上ラン生乳もみ' }, { n: '51', t: '+2500' }, { n: '52', t: '+2500' }
+  ]},
+  { label: '¥3,000 Op', price: 3000, items: [
+    { n: '60', t: 'トップレス' }, { n: '61', t: 'バリューセット' }, { n: '62', t: 'ノーブラ生乳もみ' }, 
+    { n: '63', t: '+3000' }, { n: '64', t: '+3000' }
+  ]},
+  { label: '¥3,500 Op', price: 3500, items: [
+    { n: '71', t: 'トップレス生乳もみ' }
+  ]},
 ];
 
 // 📍 添い寝専用オプションデータ（コース時間別）
@@ -25,7 +47,6 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
   const [selectedOps, setSelectedOps] = useState<{name: string, price: number, no: string, catLabel?: string}[]>([]);
   const [isSending, setIsSending] = useState(false);
 
-  // サービスタイプによってリストを切り替え
   const currentCategories = useMemo(() => {
     return selectedRes.service_type === '添' ? SOINE_OPS : KARINTO_OPS;
   }, [selectedRes.service_type]);
@@ -33,7 +54,6 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
   const opsTotal = useMemo(() => selectedOps.reduce((sum, op) => sum + op.price, 0), [selectedOps]);
   const displayTotal = initialTotal + opsTotal;
 
-  // 📍 選択/解除の切り替え (トグル)
   const toggleOp = (no: string, text: string, price: number, catLabel: string) => {
     setSelectedOps((prev) => {
       const opId = selectedRes.service_type === '添' ? `${catLabel}-${no}` : no;
@@ -46,7 +66,6 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
     });
   };
 
-  // 📍 DB更新と店舗通知を同時に実行
   const sendNotification = async (type: 'START' | 'ADD' | 'HELP') => {
     if (!supabase || !selectedRes?.id) return;
     setIsSending(true);
@@ -55,28 +74,20 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
     const prefix = selectedRes.service_type === '添' ? '【添】' : '【か】';
 
     try {
-      // 1. DB (reservationsテーブル) の更新
       if (type === 'START' || type === 'ADD') {
         const updateData: any = {
           actual_total_price: displayTotal,
           op_details: [...(selectedRes.op_details || []), ...selectedOps],
           updated_at: new Date().toISOString()
         };
-
         if (type === 'START') {
           updateData.status = 'playing';
           updateData.in_call_at = new Date().toISOString();
         }
-
-        const { error: updateError } = await supabase
-          .from('reservations')
-          .update(updateData)
-          .eq('id', selectedRes.id);
-
+        const { error: updateError } = await supabase.from('reservations').update(updateData).eq('id', selectedRes.id);
         if (updateError) throw updateError;
       }
 
-      // 2. 店舗への通知送信 (notificationsテーブル)
       let message = "";
       if (type === 'HELP') {
         message = `${prefix}【呼出】${selectedRes.customer_name}様：スタッフ至急！`;
@@ -93,15 +104,12 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         message,
         is_read: false
       });
-
       if (notifyError) throw notifyError;
 
-      // 3. UIの反映
       if (type === 'START') setIsInCall(true);
       setSelectedOps([]); 
       onToast(type === 'HELP' ? "スタッフを呼びました" : "店舗へ通知・保存しました");
       if (type === 'START') onClose();
-      
     } catch (err) {
       console.error(err);
       alert("通信エラーが発生しました。");
@@ -113,7 +121,6 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
   return (
     <div className="fixed inset-0 z-[300] flex flex-col bg-gray-900 text-white animate-in fade-in duration-200 overflow-hidden font-sans">
       
-      {/* 金額ヘッダー */}
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
         <div>
           <p className="text-[10px] text-pink-400 font-black uppercase tracking-widest leading-none mb-1">
@@ -124,7 +131,6 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold active:scale-90 transition-transform">×</button>
       </div>
 
-      {/* 📍 選択済み一覧エリア */}
       <div className="bg-gray-800 border-b border-gray-700 px-3 py-2.5 min-h-[54px] flex flex-wrap gap-1.5 shrink-0 items-center overflow-y-auto max-h-[140px] shadow-lg">
         {selectedOps.length === 0 ? (
           <p className="text-[11px] text-gray-500 font-black italic opacity-60 pl-1">※ オプションを選択してください</p>
@@ -138,26 +144,28 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         )}
       </div>
 
-      {/* 📍 メイングリッド (1行5マス) */}
       <div className="flex-1 overflow-y-auto px-2 pt-3 pb-40 space-y-6 scrollbar-hide overscroll-contain">
         {currentCategories.map((cat: any) => (
           <div key={cat.label} className="space-y-2">
             <h3 className="text-[10px] font-black text-gray-500 px-1 uppercase tracking-[0.2em] border-l-2 border-pink-500/50 ml-1">{cat.label}</h3>
-            <div className="grid grid-cols-5 gap-1.5">
+            {/* 📍 グリッドを3列に変更し、視認性を向上 */}
+            <div className="grid grid-cols-3 gap-2">
               {cat.items.map((item: any) => {
                 const isSelected = selectedOps.some(op => op.no === item.n && (selectedRes.service_type !== '添' || op.catLabel === cat.label));
-                const price = item.p || (cat as any).price || 0; // 型エラー回避
+                const price = item.p || (cat as any).price || 0; 
                 
                 return (
                   <button key={`${cat.label}-${item.n}`} onClick={() => toggleOp(item.n, item.t, price, cat.label)}
-                    className={`aspect-square rounded-2xl flex flex-col items-center justify-center transition-all duration-150 border
+                    className={`min-h-[80px] rounded-[24px] flex flex-col items-center justify-center transition-all duration-150 border px-1
                       ${isSelected 
-                        ? 'bg-pink-500 border-pink-300 text-white shadow-[0_0_20px_rgba(236,72,153,0.4)] scale-90' 
+                        ? 'bg-pink-500 border-pink-300 text-white shadow-[0_0_20px_rgba(236,72,153,0.4)] scale-95' 
                         : 'bg-white/5 border-white/5 text-gray-400 active:bg-white/10'}`}>
-                    {/* Noを大きく表示 (15px) */}
-                    <span className={`text-[15px] font-black leading-none mb-0.5 ${isSelected ? 'text-white' : 'text-gray-200'}`}>{item.n}</span>
-                    {/* 内容を下に小さく表示 (8px) */}
-                    <span className={`text-[8px] font-bold leading-none truncate w-full px-0.5 text-center ${isSelected ? 'text-white/90' : 'text-gray-500'}`}>{item.t}</span>
+                    {/* 📍 数字をさらに大きく (text-2xl) */}
+                    <span className={`text-[22px] font-black leading-none mb-1 ${isSelected ? 'text-white' : 'text-gray-100'}`}>{item.n}</span>
+                    {/* 📍 文字を大きくし、2行で収まるように設定 */}
+                    <span className={`text-[12px] font-black leading-[1.1] text-center line-clamp-2 break-words px-1 ${isSelected ? 'text-white' : 'text-gray-400'}`}>
+                      {item.t}
+                    </span>
                   </button>
                 );
               })}
@@ -166,12 +174,8 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         ))}
       </div>
 
-      {/* 📍 フッター通知ボタン */}
       <div className="p-4 bg-gray-900/95 backdrop-blur-xl border-t border-gray-800 fixed bottom-0 left-0 right-0 z-40 flex gap-2">
-        {/* スタッフ呼出ボタン */}
         <button onClick={() => sendNotification('HELP')} disabled={isSending} className="flex-1 py-3 bg-gray-700 text-white rounded-xl font-black text-[14px] active:scale-95 transition-all">✋ 呼出</button>
-        
-        {/* メインアクションボタン */}
         <button 
           onClick={() => sendNotification(isInCall ? 'ADD' : 'START')}
           disabled={isSending || (selectedOps.length === 0 && isInCall)}
