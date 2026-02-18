@@ -9,7 +9,9 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const SHOP_ID_MAP: { [key: string]: number } = {
-  '池袋東口': 11, '池東': 11, '池袋西口': 6, '池西': 6, '大久保': 10,
+  '池袋東口': 11, '池東': 11,
+  '池袋西口': 6,  '池西': 6,
+  '大久保': 10,
   '神田': 1, '赤坂': 2, '秋葉原': 3, '上野': 4, '渋谷': 5, '五反田': 7, '大宮': 8, '吉祥寺': 9, '小岩': 12
 };
 
@@ -34,15 +36,24 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
   const router = useRouter();
   const [selectedOps, setSelectedOps] = useState<any[]>([]);
   const [isSending, setIsSending] = useState(false);
+  
+  // 📍 修正：dbRes を初期値 selectedRes で作成
   const [dbRes, setDbRes] = useState(selectedRes);
 
-  useEffect(() => {
-    const fetchLatest = async () => {
-      const { data } = await supabase.from('reservations').select('*').eq('id', selectedRes.id);
-      if (data && data.length > 0) setDbRes(data[0]);
-    };
-    fetchLatest();
+  const fetchLatest = async () => {
+    try {
+      const { data, error } = await supabase.from('reservations').select('*').eq('id', selectedRes.id);
+      if (data && data.length > 0) {
+        setDbRes(data[0]);
+        console.log("[OpCalc] Data Synced:", data[0].actual_total_price);
+      }
+    } catch (err) {
+      console.error("[OpCalc] Sync Error:", err);
+    }
+  };
 
+  useEffect(() => {
+    fetchLatest();
     const style = document.createElement('style');
     style.id = 'hide-app-footer';
     style.innerHTML = `nav, footer { display: none !important; }`;
@@ -54,18 +65,28 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
   const isCompleted = useMemo(() => dbRes?.status === 'completed', [dbRes?.status]);
   const currentCategories = useMemo(() => dbRes?.service_type === '添' ? SOINE_OPS : KARINTO_OPS, [dbRes?.service_type]);
 
+  // DB保存済みの有効なオプション
   const savedOpsActive = useMemo(() => {
     const details = Array.isArray(dbRes?.op_details) ? dbRes.op_details : [];
     return details.filter((op: any) => op?.status !== 'canceled');
   }, [dbRes?.op_details]);
 
+  // オプション料金合計
   const opsTotal = useMemo(() => {
     const savedSum = savedOpsActive.reduce((sum: number, op: any) => sum + (op?.price || 0), 0);
     const newSum = selectedOps.reduce((sum, op) => sum + (op?.price || 0), 0);
     return savedSum + newSum;
   }, [selectedOps, savedOpsActive]);
 
-  const displayTotal = initialTotal + opsTotal;
+  // 📍 修正：計算ロジックを強化。DBに確定合計があればそれを、なければ計算値を使う
+  const displayTotal = useMemo(() => {
+    // プレイ終了済み、かつDBに確定金額がある場合はそれを絶対優先
+    if (isCompleted && dbRes?.actual_total_price) {
+      return Number(dbRes.actual_total_price);
+    }
+    return initialTotal + opsTotal;
+  }, [isCompleted, dbRes?.actual_total_price, initialTotal, opsTotal]);
+
   const courseText = useMemo(() => dbRes?.course_info || (dbRes?.service_type === '添' ? '添い寝' : 'かりんと'), [dbRes]);
 
   const toggleOp = (no: string, text: string, price: number, catLabel: string) => {
@@ -89,15 +110,17 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
     });
     const newActualTotal = initialTotal + newDetails.filter((o: any) => o?.status === 'active').reduce((s: number, o: any) => s + (o?.price || 0), 0);
     
-    await supabase.from('reservations').update({ 
+    const { error } = await supabase.from('reservations').update({ 
       op_details: newDetails, 
       actual_total_price: newActualTotal,
       updated_at: new Date().toISOString()
     }).eq('id', dbRes.id);
     
-    const { data } = await supabase.from('reservations').select('*').eq('id', dbRes.id);
-    if (data && data.length > 0) setDbRes(data[0]);
-    router.refresh();
+    if (error) alert("更新失敗: " + error.message);
+    else {
+      await fetchLatest(); // 📍 修正：更新後にDBから再取得
+      router.refresh();
+    }
   };
 
   const sendNotification = async (type: 'START' | 'HELP' | 'FINISH') => {
@@ -116,6 +139,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         updatedAt: new Date().toISOString() 
       }))];
 
+      // 保存処理
       if (type === 'START' || type === 'FINISH') {
         const updateData: any = { 
           actual_total_price: displayTotal, 
@@ -129,6 +153,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         if (resError) throw resError;
       }
 
+      // 通知メッセージ
       let message = "";
       if (type === 'HELP') message = `【呼出】${dbRes.customer_name}様：スタッフ至急！`;
       else if (type === 'START') message = `【入室】${dbRes.customer_name}様\n💰 合計：¥${displayTotal.toLocaleString()}`;
@@ -139,8 +164,10 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       
       if (type === 'START') setIsInCall(true);
       if (type === 'FINISH') setIsInCall(false);
+      
       setSelectedOps([]); 
       onToast("送信完了");
+      await fetchLatest(); // 📍 修正：保存完了後にDBから最新データを再取得して画面反映
       router.refresh();
       if (type !== 'HELP') setTimeout(() => onClose(), 500);
     } catch (err: any) { alert(`保存失敗: ${err.message}`); } finally { setIsSending(false); }
@@ -154,6 +181,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
             <span className={`w-5 h-5 flex items-center justify-center rounded text-[10px] font-black shrink-0 ${dbRes?.service_type === '添' ? 'bg-pink-500' : 'bg-blue-500'}`}>{dbRes?.service_type || 'か'}</span>
             <p className="font-black text-[12px] truncate text-gray-100">{courseText}</p>
           </div>
+          {/* 現在の累積合計額を表示 */}
           <p className="text-[26px] font-black text-green-400 tabular-nums leading-none">
             <span className="text-[13px] align-middle opacity-60">¥</span>{initialTotal.toLocaleString()}
             <span className="text-[15px] mx-1 opacity-40">+</span>
