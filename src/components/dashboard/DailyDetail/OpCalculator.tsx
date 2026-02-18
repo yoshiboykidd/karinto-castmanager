@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+// 📍 修正：エラーの出る auth-helpers を避け、コアライブラリを使用
+import { createClient } from '@supabase/supabase-js';
 
 const KARINTO_OPS = [
   { label: '¥500 Op', price: 500, items: [
@@ -55,7 +56,12 @@ const SOINE_OPS = [
 ];
 
 export default function OpCalculator({ selectedRes, initialTotal, onToast, onClose, isInCall, setIsInCall }: any) {
-  const supabase = createClientComponentClient();
+  // 📍 修正：環境変数を使用して直接初期化。ビルド時の export missing を完全に回避します。
+  const supabase = useMemo(() => createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  ), []);
+
   const [selectedOps, setSelectedOps] = useState<any[]>([]);
   const [isSending, setIsSending] = useState(false);
 
