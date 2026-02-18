@@ -1,10 +1,9 @@
-'use server'
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
 import { addDays, format } from 'date-fns';
 
+// 📍 Route Handlerでは以下の定数エクスポートが許可されています
 export const maxDuration = 60; 
 export const dynamic = 'force-dynamic';
 
@@ -73,18 +72,15 @@ export async function GET(req: NextRequest) {
         const html = await res.text();
         const $ = cheerio.load(html);
 
-        // 📍 修正：ページ内の日付をチェックする（ゴーストデータ防止）
-        // 店舗HPの「2026年02月25日の出勤」のようなテキストを探す
+        // 📍 ページ内の日付検証（今日へのリダイレクト防止）
         const pageText = $('body').text();
         const y = targetDate.getFullYear();
         const m = String(targetDate.getMonth() + 1).padStart(2, '0');
         const d = String(targetDate.getDate()).padStart(2, '0');
         
-        // ページ内に「2026年02月25日」または「2026/02/25」が含まれているか確認
         const dateMatch = pageText.includes(`${y}年${m}月${d}日`) || pageText.includes(`${y}/${m}/${d}`);
         
         if (!dateMatch && i > 0) {
-          // リクエストした日付とページ内の日付が一致しない（＝今日に飛ばされた）場合
           logs.push(`${dateStrDB.slice(8)}日(非公開)`);
           continue; 
         }
