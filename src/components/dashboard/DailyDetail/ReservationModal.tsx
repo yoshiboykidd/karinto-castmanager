@@ -56,10 +56,10 @@ export default function ReservationModal({
   const badgeBaseClass = "px-2 py-0.5 rounded text-[11px] font-black leading-none flex items-center justify-center";
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-1">
+    // 📍 修正: z-indexを9999に引き上げ、paddingを0に変更
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-0">
       <div className="absolute inset-0 bg-black/85 backdrop-blur-sm" onClick={() => onClose?.()} />
       
-      {/* 📍 計算機が開いている時は、独立して最前面に表示される (OpCalculator側が fixed のため) */}
       {isOpOpen && (
         <OpCalculator 
           selectedRes={selectedRes} 
@@ -73,14 +73,14 @@ export default function ReservationModal({
       )}
 
       {showToast && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[250] bg-pink-600 text-white px-8 py-5 rounded-[24px] shadow-2xl font-black text-center border-2 border-pink-400 whitespace-nowrap flex flex-col items-center gap-1 animate-bounce">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[10001] bg-pink-600 text-white px-8 py-5 rounded-[24px] shadow-2xl font-black text-center border-2 border-pink-400 whitespace-nowrap flex flex-col items-center gap-1 animate-bounce">
           <div className="text-[17px]">✅ {toastMsg}</div>
         </div>
       )}
 
-      {/* 📍 修正：計算機が開いている時は、後ろのモーダルを非表示にして干渉を防ぐ */}
+      {/* 📍 修正: 計算機が開いている時はカードを隠す */}
       {!isOpOpen && (
-        <div className="relative w-full max-w-sm bg-white rounded-[24px] flex flex-col max-h-[98vh] overflow-hidden text-gray-800 shadow-2xl">
+        <div className="relative w-full max-w-sm bg-white rounded-[24px] flex flex-col max-h-[98vh] overflow-hidden text-gray-800 shadow-2xl mx-1">
           <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center shrink-0">
             <p className="text-[18px] font-black">{String(selectedRes.reservation_date || "").replace(/-/g, '/')}</p>
             <button onClick={() => onClose?.()} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full text-gray-400 text-xl font-bold">×</button>
@@ -94,7 +94,7 @@ export default function ReservationModal({
                   <p className="text-[24px] font-black text-green-400 leading-none tabular-nums">¥{Number(selectedRes.total_price || 0).toLocaleString()} <span className="text-[11px] text-white/40 ml-1 font-bold">~</span></p>
                 </div>
                 <div className="bg-white/10 px-3 py-2 rounded-xl text-[12px] font-black text-white">
-                  {isInCall ? '追加OP通知 ⚡' : 'OP計算・開始 🚀'}
+                  {isInCall || selectedRes.status === 'playing' ? '追加OP通知 ⚡' : 'OP計算・開始 🚀'}
                 </div>
               </div>
             </button>
@@ -124,7 +124,7 @@ export default function ReservationModal({
             <div className="bg-gray-50 rounded-[18px] border-2 border-dashed border-gray-200 overflow-hidden">
               {isEditingMemo ? (
                 <div className="p-2 space-y-1.5">
-                  <textarea value={memoDraft || ""} onChange={(e) => setMemoDraft?.(e.target.value)} className="w-full min-h-[120px] p-3 bg-white rounded-xl text-[15px] font-bold focus:outline-none resize-none border-none shadow-inner leading-relaxed" placeholder="過去のメモを引き継いでいます..." autoFocus />
+                  <textarea value={memoDraft || ""} onChange={(e) => setMemoDraft?.(e.target.value)} className="w-full min-h-[120px] p-3 bg-white rounded-xl text-[15px] font-bold focus:outline-none resize-none border-none shadow-inner leading-relaxed" placeholder="メモを入力..." autoFocus />
                   <div className="flex gap-1">
                     <button onClick={() => setIsEditingMemo?.(false)} className="flex-1 py-3 bg-white text-gray-400 rounded-xl font-black text-[13px] border border-gray-100">閉じる</button>
                     <button onClick={handleSave} className="flex-[2] py-3 bg-pink-500 text-white rounded-xl font-black text-[14px]">💾 メモを上書き保存</button>

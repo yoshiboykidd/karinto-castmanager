@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo } from 'react';
 
-// 📍 オプションデータ（変更なし）
 const KARINTO_OPS = [
   { label: '¥500 Op', price: 500, items: [
     { n: '10', t: '上ラン' }, { n: '11', t: '抱きつき' }, { n: '12', t: '足なで' }, 
@@ -60,9 +59,7 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
 
   const isActuallyPlaying = useMemo(() => isInCall || selectedRes.status === 'playing', [isInCall, selectedRes.status]);
   const isCompleted = useMemo(() => selectedRes.status === 'completed', [selectedRes.status]);
-
   const currentCategories = useMemo(() => selectedRes.service_type === '添' ? SOINE_OPS : KARINTO_OPS, [selectedRes.service_type]);
-
   const savedOpsActive = useMemo(() => (selectedRes.op_details || []).filter((op: any) => op.status !== 'canceled'), [selectedRes.op_details]);
 
   const opsTotal = useMemo(() => {
@@ -133,16 +130,16 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
   };
 
   return (
-    // 📍 修正：h-screen を h-[100dvh] (Dynamic Viewport Height) に変更し、fixed inset-0 で強制固定
-    <div className="fixed inset-0 w-full h-[100dvh] z-[9999] flex flex-col bg-gray-900 text-white overflow-hidden font-sans">
+    // 📍 修正：fixed inset-0 z-[10000] であらゆる要素の最前面に強制
+    <div className="fixed inset-0 w-full h-[100dvh] z-[10000] flex flex-col bg-gray-900 text-white overflow-hidden font-sans">
       
-      {/* 1. ヘッダー (shrink-0) */}
+      {/* 1. ヘッダー */}
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
-        <p className="text-[28px] font-black text-green-400 tabular-nums leading-none">¥{displayTotal.toLocaleString()}</p>
-        <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold active:scale-90">×</button>
+        <p className="text-[28px] font-black text-green-400 tabular-nums">¥{displayTotal.toLocaleString()}</p>
+        <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold">×</button>
       </div>
 
-      {/* 2. 選択済みOP (shrink-0) */}
+      {/* 2. 選択中OP表示 */}
       <div className="bg-gray-800 border-b border-gray-700 px-3 py-2 flex flex-wrap gap-1 shrink-0 items-center overflow-y-auto max-h-[80px]">
         {savedOpsActive.map((op: any, i: number) => (
           <button key={`s-${i}`} onClick={() => toggleSavedStatus(op)} className="bg-blue-600 px-2 py-0.5 rounded text-[10px] font-black">{op.no}.{op.name}×</button>
@@ -152,8 +149,8 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         ))}
       </div>
 
-      {/* 3. メイン選択リスト (flex-1) */}
-      <div className="flex-1 overflow-y-auto px-2 pt-3 pb-4 space-y-6 scrollbar-hide overscroll-contain">
+      {/* 3. リスト */}
+      <div className="flex-1 overflow-y-auto px-2 pt-3 pb-40 space-y-6 scrollbar-hide">
         {currentCategories.map((cat: any) => (
           <div key={cat.label} className="space-y-2">
             <h3 className="text-[10px] font-black text-gray-500 px-1 uppercase border-l-2 border-pink-500/50 ml-1">{cat.label}</h3>
@@ -162,9 +159,9 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
                 const isSelected = selectedOps.some(op => op.no === item.n && (selectedRes.service_type !== '添' || op.catLabel === cat.label));
                 const isSaved = savedOpsActive.some((op: any) => op.no === item.n && (selectedRes.service_type !== '添' || op.catLabel === cat.label));
                 return (
-                  <button key={`${cat.label}-${item.n}`} onClick={() => toggleOp(item.n, item.t, item.p || (cat as any).price || 0, cat.label)} className={`min-h-[75px] rounded-[20px] flex flex-col items-center justify-center border transition-all ${isSelected || isSaved ? 'bg-pink-500 border-pink-300 shadow-[0_0_20px_rgba(236,72,153,0.4)] scale-95' : 'bg-white/5 border-white/5 text-gray-400'}`}>
+                  <button key={`${cat.label}-${item.n}`} onClick={() => toggleOp(item.n, item.t, item.p || (cat as any).price || 0, cat.label)} className={`min-h-[70px] rounded-[20px] flex flex-col items-center justify-center border transition-all ${isSelected || isSaved ? 'bg-pink-500 border-pink-300' : 'bg-white/5 border-white/5 text-gray-400'}`}>
                     <span className="text-[20px] font-black">{item.n}</span>
-                    <span className="text-[11px] font-black text-center line-clamp-2 px-1">{item.t}</span>
+                    <span className="text-[11px] font-black leading-tight text-center px-1">{item.t}</span>
                   </button>
                 );
               })}
@@ -173,9 +170,9 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         ))}
       </div>
 
-      {/* 4. フッターボタン (物理的な一番下に配置) */}
-      {/* 📍 修正：pb-[calc(env(safe-area-inset-bottom)+20px)] でスマホのバーより上に強制表示 */}
-      <div className="shrink-0 p-4 bg-gray-900 border-t border-gray-800 flex gap-2 pb-[calc(env(safe-area-inset-bottom)+24px)] shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+      {/* 4. フッターボタン */}
+      {/* 📍 修正：共通フッターを避けるため pb-24 (96px以上) を指定し、強制的に画面下部より浮かせる */}
+      <div className="shrink-0 p-4 bg-gray-900 border-t border-gray-800 flex gap-2 pb-[calc(env(safe-area-inset-bottom)+80px)] shadow-[0_-15px_50px_rgba(0,0,0,0.8)]">
         {isCompleted ? (
           <div className="flex-1 py-4 bg-gray-800 text-gray-500 rounded-2xl font-black text-center">✅ 精算済み</div>
         ) : (
@@ -187,7 +184,7 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
             <button 
               onClick={() => sendNotification(isActuallyPlaying ? 'ADD' : 'START')} 
               disabled={isSending || (isActuallyPlaying && selectedOps.length === 0)} 
-              className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] ${isActuallyPlaying ? 'bg-orange-500' : 'bg-green-500'} text-white shadow-lg`}
+              className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] ${isActuallyPlaying ? 'bg-orange-500' : 'bg-green-500'} text-white shadow-xl`}
             >
               {isSending ? '...' : isActuallyPlaying ? '🔥 追加通知' : '🚀 スタート'}
             </button>
