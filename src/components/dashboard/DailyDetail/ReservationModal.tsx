@@ -33,30 +33,34 @@ export default function ReservationModal({
   };
 
   const customerContext = useMemo(() => {
-    if (!selectedRes) return { count: 1, lastDate: null, lastMemo: "" };
+    if (!selectedRes?.customer_no) return { count: 1, lastDate: null, lastMemo: "" };
     try {
       const history = Array.isArray(allPastReservations) ? allPastReservations : [];
       const cNo = selectedRes.customer_no;
-      if (!cNo) return { count: 1, lastDate: null, lastMemo: "" };
       const myHistory = history
         .filter(r => r && r.customer_no === cNo && r.id !== selectedRes.id)
         .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")));
-      const recordWithMemo = myHistory.find(r => r.cast_mem && r.cast_mem.trim() !== "");
+      const recordWithMemo = myHistory.find(r => r?.cast_mem && String(r.cast_mem).trim() !== "");
       return { 
-        count: history.filter(r => r.customer_no === cNo).length || 1, 
+        count: history.filter(r => r?.customer_no === cNo).length || 1, 
         lastDate: myHistory[0]?.reservation_date || null, 
         lastMemo: recordWithMemo?.cast_mem || "" 
       };
     } catch (e) { return { count: 1, lastDate: null, lastMemo: "" }; }
-  }, [selectedRes, allPastReservations]);
+  }, [selectedRes?.customer_no, selectedRes?.id, allPastReservations]);
 
   if (!selectedRes) return null;
 
+  // 💡 ロジック修正：表示内容を直接計算（無限ループ回避）
+  const currentMemo = (selectedRes.cast_mem || "").toString().trim();
+  const displayMemoContent = currentMemo !== "" 
+    ? currentMemo 
+    : (customerContext.lastMemo ? `(引き継ぎ)\n${customerContext.lastMemo}` : "タップして入力...");
+
   const handleEditMemoStart = () => {
-    const currentMemo = (selectedRes.cast_mem || "").trim();
     const initialMemo = currentMemo !== "" ? currentMemo : customerContext.lastMemo;
-    setMemoDraft(initialMemo);
-    setIsEditingMemo(true);
+    if (typeof setMemoDraft === 'function') setMemoDraft(initialMemo);
+    if (typeof setIsEditingMemo === 'function') setIsEditingMemo(true);
   };
 
   const handleSave = async () => {
@@ -71,14 +75,6 @@ export default function ReservationModal({
   };
 
   const badgeBaseClass = "px-2 py-0.5 rounded text-[11px] font-black leading-none flex items-center justify-center";
-
-  // ロジック：表示するメモの内容を事前に確定させる
-  const displayMemoContent = useMemo(() => {
-    const current = (selectedRes.cast_mem || "").trim();
-    if (current !== "") return current;
-    if (customerContext.lastMemo) return `(引き継ぎ)\n${customerContext.lastMemo}`;
-    return "タップして入力...";
-  }, [selectedRes.cast_mem, customerContext.lastMemo]);
 
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center p-0">
@@ -102,7 +98,7 @@ export default function ReservationModal({
       )}
 
       {!isOpOpen && (
-        <div className="relative z-10 w-full max-w-sm bg-white rounded-[24px] flex flex-col max-h-[98vh] overflow-hidden text-gray-800 shadow-2xl mx-1">
+        <div className="relative z-10 w-full max-sm bg-white rounded-[24px] flex flex-col max-h-[98vh] overflow-hidden text-gray-800 shadow-2xl mx-1">
           <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center shrink-0">
             <p className="text-[18px] font-black">{String(selectedRes.reservation_date || "").replace(/-/g, '/')}</p>
             <button onClick={() => onClose?.()} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full text-gray-400 text-xl font-bold">×</button>
