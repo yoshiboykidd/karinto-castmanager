@@ -8,6 +8,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// 📍 既に成功している店舗ID辞書
 const SHOP_DICT: { [key: string]: number } = {
   '池東': 11, '池袋東口': 11, '池西': 6, '池袋西口': 6, '大久保': 10,
   '神田': 1, '赤坂': 2, '秋葉原': 3, '上野': 4, '渋谷': 5, '五反田': 7, '大宮': 8, '吉祥寺': 9, '小岩': 12
@@ -34,49 +35,59 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
   const router = useRouter();
   const [selectedOps, setSelectedOps] = useState<any[]>([]);
   const [isSending, setIsSending] = useState(false);
+  
+  // 📍 修正：DBから直接取得した「最新データ」を保持するステート
+  const [dbRes, setDbRes] = useState(selectedRes);
 
   useEffect(() => {
+    // 📍 修正：開いた瞬間に最新データを読み込み、前回の追加分を復元する
+    const fetchLatest = async () => {
+      const { data } = await supabase.from('reservations').select('*').eq('id', selectedRes.id).single();
+      if (data) setDbRes(data);
+    };
+    fetchLatest();
+
     const style = document.createElement('style');
     style.id = 'hide-app-footer';
     style.innerHTML = `nav, footer { display: none !important; }`;
     document.head.appendChild(style);
     return () => { document.getElementById('hide-app-footer')?.remove(); };
-  }, []);
+  }, [selectedRes.id]);
 
-  const isActuallyPlaying = useMemo(() => isInCall || selectedRes?.status === 'playing', [isInCall, selectedRes?.status]);
-  const isCompleted = useMemo(() => selectedRes?.status === 'completed', [selectedRes?.status]);
-  const currentCategories = useMemo(() => selectedRes?.service_type === '添' ? SOINE_OPS : KARINTO_OPS, [selectedRes?.service_type]);
+  const isActuallyPlaying = useMemo(() => isInCall || dbRes?.status === 'playing', [isInCall, dbRes?.status]);
+  const isCompleted = useMemo(() => dbRes?.status === 'completed', [dbRes?.status]);
+  const currentCategories = useMemo(() => dbRes?.service_type === '添' ? SOINE_OPS : KARINTO_OPS, [dbRes?.service_type]);
 
-  // DBに既に保存されている、アクティブな（キャンセルされていない）オプション
+  // 📍 修正：dbRes（最新）を元に、既に保存されているオプションを抽出
   const savedOpsActive = useMemo(() => {
-    const details = Array.isArray(selectedRes?.op_details) ? selectedRes.op_details : [];
+    const details = Array.isArray(dbRes?.op_details) ? dbRes.op_details : [];
     return details.filter((op: any) => op?.status !== 'canceled');
-  }, [selectedRes?.op_details]);
+  }, [dbRes?.op_details]);
 
-  // 「既にDBにある分」 ＋ 「今、画面でポチポチ選んでいる分」 の合計オプション料金
+  // 累積オプション合計
   const opsTotal = useMemo(() => {
     const savedSum = savedOpsActive.reduce((sum: number, op: any) => sum + (op?.price || 0), 0);
     const newSum = selectedOps.reduce((sum, op) => sum + (op?.price || 0), 0);
     return savedSum + newSum;
   }, [selectedOps, savedOpsActive]);
 
-  // 常に 「コース基本料 ＋ 全オプション」 を表示総額とする
+  // 常に「コース初期料金 ＋ 過去の全オプション ＋ 今選んでるオプション」を表示
   const displayTotal = initialTotal + opsTotal;
-  const courseText = useMemo(() => selectedRes?.course_info || (selectedRes?.service_type === '添' ? '添い寝' : 'かりんと'), [selectedRes]);
+  const courseText = useMemo(() => dbRes?.course_info || (dbRes?.service_type === '添' ? '添い寝' : 'かりんと'), [dbRes]);
 
   const toggleOp = (no: string, text: string, price: number, catLabel: string) => {
     if (isCompleted) return;
     setSelectedOps((prev) => {
-      const opId = selectedRes?.service_type === '添' ? `${catLabel}-${no}` : no;
-      const isAlreadySelected = prev.some(op => (selectedRes?.service_type === '添' ? `${op.catLabel}-${op.no}` : op.no) === opId);
-      if (isAlreadySelected) return prev.filter(op => (selectedRes?.service_type === '添' ? `${op.catLabel}-${op.no}` : op.no) !== opId);
+      const opId = dbRes?.service_type === '添' ? `${catLabel}-${no}` : no;
+      const isAlreadySelected = prev.some(op => (dbRes?.service_type === '添' ? `${op.catLabel}-${op.no}` : op.no) === opId);
+      if (isAlreadySelected) return prev.filter(op => (dbRes?.service_type === '添' ? `${op.catLabel}-${op.no}` : op.no) !== opId);
       return [...prev, { no, name: text, price, catLabel, timing: 'additional', status: 'active' }];
     });
   };
 
   const toggleSavedStatus = async (item: any) => {
     if (isCompleted) return;
-    const details = Array.isArray(selectedRes.op_details) ? selectedRes.op_details : [];
+    const details = Array.isArray(dbRes.op_details) ? dbRes.op_details : [];
     const newDetails = details.map((op: any) => {
       if (op?.no === item?.no && op?.name === item?.name) {
         return { ...op, status: op.status === 'canceled' ? 'active' : 'canceled', updatedAt: new Date().toISOString() };
@@ -84,59 +95,63 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       return op;
     });
     const newActualTotal = initialTotal + newDetails.filter((o: any) => o?.status === 'active').reduce((s: number, o: any) => s + (o?.price || 0), 0);
-    const { error } = await supabase.from('reservations').update({ op_details: newDetails, actual_total_price: newActualTotal }).eq('id', selectedRes.id);
+    const { error } = await supabase.from('reservations').update({ op_details: newDetails, actual_total_price: newActualTotal }).eq('id', dbRes.id);
     if (error) alert("更新失敗: " + error.message);
-    else router.refresh();
+    else {
+      // ローカルの状態も更新して画面に即座に反映
+      const { data } = await supabase.from('reservations').select('*').eq('id', dbRes.id).single();
+      if (data) setDbRes(data);
+      router.refresh();
+    }
   };
 
   const sendNotification = async (type: 'START' | 'HELP' | 'FINISH') => {
-    if (!selectedRes?.id) return;
+    if (!dbRes?.id) return;
     setIsSending(true);
 
     try {
-      const label = selectedRes?.shop_label || "";
-      const castId = String(selectedRes?.login_id || selectedRes?.cast_id || "");
+      const label = dbRes?.shop_label || "";
+      const castId = String(dbRes?.login_id || dbRes?.cast_id || "");
       let shopNo: number | null = null;
       if (SHOP_DICT[label]) shopNo = SHOP_DICT[label];
       else if (castId.length >= 2 && SHOP_DICT[Object.keys(SHOP_DICT).find(k => SHOP_DICT[k] === Number(castId.substring(0, 2))) || ""]) {
         shopNo = Number(castId.substring(0, 2));
       }
-      if (shopNo === null) shopNo = Number(selectedRes?.shop_id || selectedRes?.shopId || 0);
+      if (shopNo === null) shopNo = Number(dbRes?.shop_id || dbRes?.shopId || 0);
 
-      const prefix = selectedRes.service_type === '添' ? '【添】' : '【か】';
-      const details = Array.isArray(selectedRes.op_details) ? selectedRes.op_details : [];
-      const newOpDetails = [...details];
+      const prefix = dbRes.service_type === '添' ? '【添】' : '【か】';
+      const currentOpDetails = Array.isArray(dbRes.op_details) ? dbRes.op_details : [];
+      const newOpDetails = [...currentOpDetails];
       if (selectedOps.length > 0) {
         newOpDetails.push(...selectedOps.map(op => ({ ...op, timing: type === 'START' ? 'initial' : 'additional', updatedAt: new Date().toISOString() })));
       }
 
-      // 1. 予約DBを更新（ actual_total_price を最新の displayTotal に上書き ）
+      // 1. 予約DBを更新（ actual_total_price を累積総額 displayTotal に上書き ）
       const updateData: any = { actual_total_price: displayTotal, op_details: newOpDetails, updated_at: new Date().toISOString() };
       if (type === 'START') { updateData.status = 'playing'; updateData.in_call_at = new Date().toISOString(); }
       if (type === 'FINISH') { updateData.status = 'completed'; updateData.end_time = new Date().toISOString(); }
-      const { error: resError } = await supabase.from('reservations').update(updateData).eq('id', selectedRes.id);
+      const { error: resError } = await supabase.from('reservations').update(updateData).eq('id', dbRes.id);
       if (resError) throw resError;
 
-      // 2. 通知メッセージの作成
+      // 2. 通知メッセージ
       let message = "";
       let toastMsg = "";
+      const activeOps = newOpDetails.filter(o => o.status !== 'canceled');
+      
       if (type === 'HELP') { 
-        message = `${prefix}【呼出】${selectedRes.customer_name}様：スタッフ至急！`; 
+        message = `${prefix}【呼出】${dbRes.customer_name}様：スタッフ至急！`; 
         toastMsg = "スタッフを呼びました"; 
       }
       else if (type === 'START') { 
-        const opDetail = newOpDetails.filter(o => o.status !== 'canceled').map(o => `${o.no}.${o.name}`).join('・') || '無';
-        message = `${prefix}【入室】${selectedRes.customer_name}様\n金額：¥${initialTotal.toLocaleString()} + Op¥${opsTotal.toLocaleString()}\n＝合計：¥${displayTotal.toLocaleString()}\nOp内訳：${opDetail}`;
+        const opList = activeOps.map(o => `${o.no}.${o.name}`).join('・') || '無';
+        message = `${prefix}【入室】${dbRes.customer_name}様\n💰 総額：¥${displayTotal.toLocaleString()}\n(内訳: ¥${initialTotal.toLocaleString()} + Op¥${opsTotal.toLocaleString()})\nOp内訳：${opList}`;
         toastMsg = "お店にプレイスタートを通知しました";
-      } 
-      else if (type === 'FINISH') {
-        // スタート時からの「増分」を計算
-        const beforeTotal = Number(selectedRes.actual_total_price || initialTotal);
-        const diffTotal = displayTotal - beforeTotal;
-        const opFinalDetail = newOpDetails.filter(o => o.status !== 'canceled').map(o => `${o.no}.${o.name}`).join('・');
+      } else if (type === 'FINISH') {
+        const addedStr = selectedOps.map(o => `${o.no}.${o.name}`).join('・');
+        const canceledStr = newOpDetails.filter((o: any) => o?.status === 'canceled' && o?.updatedAt > (dbRes.in_call_at || "")).map((o: any) => `(取)${o.name}`).join('・');
         
-        // 📍 ここが重要：最終的にいくら貰えばいいかをDiscordに叩き込む
-        message = `${prefix}【退出】${selectedRes.customer_name}様\n追加料金：+¥${diffTotal.toLocaleString()}\n━━━━━━━━━━━━━━\n💰 最終お会計額：¥${displayTotal.toLocaleString()}\n━━━━━━━━━━━━━━\nOp全内訳：${opFinalDetail || '無し'}`;
+        // 📍 終了時は「最終的にいくら払うべきか」を最優先で伝えるロジック
+        message = `${prefix}【退出】${dbRes.customer_name}様\n追加料金：+¥${(displayTotal - (dbRes.actual_total_price || initialTotal)).toLocaleString()}\n━━━━━━━━━━━━━━\n💰 最終お会計額：¥${displayTotal.toLocaleString()}\n━━━━━━━━━━━━━━\nOp全内訳：${activeOps.map(o => `${o.no}.${o.name}`).join('・') || '無し'}`;
         toastMsg = "お店に退出を通知しました。お会計をお願いします。";
       }
 
@@ -148,9 +163,9 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         message: finalMessage, 
         is_read: false 
       });
+
       if (notifError) {
-        const retryData = { cast_id: castId, type: type.toLowerCase(), message: finalMessage, is_read: false };
-        await supabase.from('notifications').insert(retryData);
+        await supabase.from('notifications').insert({ cast_id: castId, type: type.toLowerCase(), message: finalMessage, is_read: false });
       }
       
       if (type === 'START') setIsInCall(true);
@@ -167,10 +182,9 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
         <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-1.5 mb-1">
-            <span className={`w-5 h-5 flex items-center justify-center rounded text-[10px] font-black shrink-0 ${selectedRes?.service_type === '添' ? 'bg-pink-500' : 'bg-blue-500'}`}>{selectedRes?.service_type || 'か'}</span>
+            <span className={`w-5 h-5 flex items-center justify-center rounded text-[10px] font-black shrink-0 ${dbRes?.service_type === '添' ? 'bg-pink-500' : 'bg-blue-500'}`}>{dbRes?.service_type || 'か'}</span>
             <p className="font-black text-[12px] truncate text-gray-100">{courseText}</p>
           </div>
-          {/* 現在のリアルタイム合計額を常に表示 */}
           <p className="text-[26px] font-black text-green-400 tabular-nums leading-none">
             <span className="text-[13px] align-middle opacity-60">¥</span>{initialTotal.toLocaleString()}
             <span className="text-[15px] mx-1 opacity-40">+</span>
@@ -183,7 +197,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       </div>
 
       <div className="bg-gray-800 border-b border-gray-700 px-3 py-2 flex flex-wrap gap-1 shrink-0 items-center overflow-y-auto max-h-[80px]">
-        {/* 青色：既にDB保存済みのオプション / ピンク色：今選んでいるオプション */}
         {savedOpsActive.map((op: any, i: number) => (
           <button key={`s-${i}`} onClick={() => toggleSavedStatus(op)} className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 ${op?.price < 0 ? 'bg-red-600' : 'bg-blue-600'}`}>{op?.no}.{op?.name} <span className="opacity-50">×</span></button>
         ))}
@@ -199,8 +212,8 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
             <h3 className="text-[10px] font-black text-gray-500 px-1 uppercase border-l-2 border-pink-500/50 ml-1 tracking-widest">{cat.label}</h3>
             <div className="grid grid-cols-3 gap-2">
               {cat.items.map((item: any) => {
-                const isSelected = selectedOps.some(op => op.no === item.n && (selectedRes?.service_type !== '添' || op.catLabel === cat.label));
-                const isSaved = savedOpsActive.some((op: any) => op?.no === item.n && (selectedRes?.service_type !== '添' || op.catLabel === cat.label));
+                const isSelected = selectedOps.some(op => op.no === item.n && (dbRes?.service_type !== '添' || op.catLabel === cat.label));
+                const isSaved = savedOpsActive.some((op: any) => op?.no === item.n && (dbRes?.service_type !== '添' || op.catLabel === cat.label));
                 return (
                   <button key={`${cat.label}-${item.n}`} onClick={() => toggleOp(item.n, item.t, item.p || (cat as any).price || 0, cat.label)} className={`min-h-[75px] rounded-[20px] flex flex-col items-center justify-center border transition-all ${isSelected || isSaved ? 'bg-pink-500 border-pink-300 shadow-[0_0_15px_rgba(236,72,153,0.3)]' : 'bg-white/5 border-white/5 text-gray-400'}`}>
                     <span className="text-[20px] font-black">{item.n}</span>
@@ -211,7 +224,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
             </div>
           </div>
         ))}
-        {selectedRes?.service_type !== '添' && (
+        {dbRes?.service_type !== '添' && (
           <div className="px-1 pt-2">
             <button onClick={() => toggleOp('割', 'Op割', -500, '特別')} className={`w-full py-4 rounded-[20px] border transition-all flex items-center justify-center gap-2 ${selectedOps.some(op => op.no === '割') || savedOpsActive.some((op: any) => op.no === '割') ? 'bg-red-500 border-red-300 shadow-[0_0_15px_rgba(239,68,68,0.3)] text-white' : 'bg-white/5 border-white/5 text-gray-400'}`}>
               <span className="text-[18px] font-black">Op割 -500</span>
