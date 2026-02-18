@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 
-// 📍 かりんと専用オプションデータ
+// 📍 オプションデータ（変更なし）
 const KARINTO_OPS = [
   { label: '¥500 Op', price: 500, items: [
     { n: '10', t: '上ラン' }, { n: '11', t: '抱きつき' }, { n: '12', t: '足なで' }, 
@@ -55,7 +55,6 @@ const SOINE_OPS = [
 ];
 
 export default function OpCalculator({ selectedRes, initialTotal, supabase, onToast, onClose, isInCall, setIsInCall }: any) {
-  // 📍 保存済みOPと新規選択OPを分離
   const [selectedOps, setSelectedOps] = useState<any[]>([]);
   const [isSending, setIsSending] = useState(false);
 
@@ -63,7 +62,6 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
     return selectedRes.service_type === '添' ? SOINE_OPS : KARINTO_OPS;
   }, [selectedRes.service_type]);
 
-  // 📍 ロジック：有効な保存済みOPの合計を算出
   const savedOpsActive = useMemo(() => {
     return (selectedRes.op_details || []).filter((op: any) => op.status !== 'canceled');
   }, [selectedRes.op_details]);
@@ -80,7 +78,6 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
     return selectedRes.course_info || (selectedRes.service_type === '添' ? '添い寝' : 'かりんと');
   }, [selectedRes]);
 
-  // 📍 ロジック：新規OPの選択トグル
   const toggleOp = (no: string, text: string, price: number, catLabel: string) => {
     setSelectedOps((prev) => {
       const opId = selectedRes.service_type === '添' ? `${catLabel}-${no}` : no;
@@ -90,7 +87,6 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
     });
   };
 
-  // 📍 ロジック：保存済みOPのキャンセル（赤黒処理）
   const toggleSavedStatus = async (item: any) => {
     if (!supabase || !selectedRes?.id) return;
     const newDetails = selectedRes.op_details.map((op: any) => {
@@ -127,7 +123,6 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         await supabase.from('reservations').update(updateData).eq('id', selectedRes.id);
       }
 
-      // 📍 通知メッセージの構築
       let message = "";
       const opNames = selectedOps.map(o => `${o.no}.${o.name}`).join('/');
       
@@ -152,7 +147,8 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
   return (
     <div className="fixed inset-0 z-[300] flex flex-col bg-gray-900 text-white animate-in fade-in duration-200 overflow-hidden font-sans">
       
-      <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
+      {/* 📍 ヘッダー：縮まないように shrink-0 */}
+      <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0 z-10">
         <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-1.5 mb-1">
             <span className={`w-5 h-5 flex items-center justify-center rounded text-[10px] font-black shrink-0 ${
@@ -171,7 +167,7 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold active:scale-90 shrink-0">×</button>
       </div>
 
-      {/* 📍 選択済みエリア：保存済みOP(青)と新規OP(ピンク)を両方出す */}
+      {/* 📍 選択中エリア：ここも縮まないように shrink-0 */}
       <div className="bg-gray-800 border-b border-gray-700 px-3 py-2.5 min-h-[54px] flex flex-wrap gap-1.5 shrink-0 items-center overflow-y-auto max-h-[140px]">
         {savedOpsActive.map((op: any, i: number) => (
           <button key={`saved-${i}`} onClick={() => toggleSavedStatus(op)} className="bg-blue-600 border border-blue-400 text-white px-2 py-1 rounded-lg text-[11px] font-black flex items-center gap-1"><span className="opacity-70 text-[10px]">{op.no}.</span>{op.name}<span className="opacity-50 ml-0.5">×</span></button>
@@ -182,7 +178,8 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         {savedOpsActive.length === 0 && selectedOps.length === 0 && <p className="text-[11px] text-gray-500 font-black italic opacity-60 pl-1">※ オプションを選択してください</p>}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 pt-3 pb-40 space-y-6 scrollbar-hide overscroll-contain">
+      {/* 📍 メイン：pb-40 を削除し、flex-1 で余白をすべて使う */}
+      <div className="flex-1 overflow-y-auto px-2 pt-3 pb-6 space-y-6 scrollbar-hide overscroll-contain">
         {currentCategories.map((cat: any) => (
           <div key={cat.label} className="space-y-2">
             <h3 className="text-[10px] font-black text-gray-500 px-1 uppercase tracking-[0.2em] border-l-2 border-pink-500/50 ml-1">{cat.label}</h3>
@@ -202,12 +199,13 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         ))}
       </div>
 
-      <div className="p-4 bg-gray-900/95 backdrop-blur-xl border-t border-gray-800 fixed bottom-0 left-0 right-0 z-40 flex gap-2">
-        <button onClick={() => sendNotification('HELP')} className="flex-1 py-3 bg-gray-700 text-white rounded-xl font-black text-[14px]">✋ 呼出</button>
+      {/* 📍 フッター：fixed をやめ、コンテナの末尾に sticky 配置。z-indexを50に上げて確実に手前に出す */}
+      <div className="sticky bottom-0 left-0 right-0 p-4 bg-gray-900/95 backdrop-blur-xl border-t border-gray-800 z-50 flex gap-2 shrink-0">
+        <button onClick={() => sendNotification('HELP')} className="flex-1 py-3 bg-gray-700 text-white rounded-xl font-black text-[14px] active:scale-95 transition-transform">✋ 呼出</button>
         {isInCall && (
-          <button onClick={() => sendNotification('FINISH')} disabled={isSending} className="flex-1 py-3 bg-gray-100 text-gray-900 rounded-xl font-black text-[14px]">🏁 精算完了</button>
+          <button onClick={() => sendNotification('FINISH')} disabled={isSending} className="flex-1 py-3 bg-gray-100 text-gray-900 rounded-xl font-black text-[14px] active:scale-95 transition-transform">🏁 精算完了</button>
         )}
-        <button onClick={() => sendNotification(isInCall ? 'ADD' : 'START')} disabled={isSending || (selectedOps.length === 0 && isInCall)} className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] ${isInCall ? 'bg-orange-500 text-white' : 'bg-green-500 text-white'} ${isSending ? 'opacity-50' : ''}`}>{isSending ? '...' : isInCall ? '🔥 追加通知' : '🚀 スタート'}</button>
+        <button onClick={() => sendNotification(isInCall ? 'ADD' : 'START')} disabled={isSending || (selectedOps.length === 0 && isInCall)} className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] active:scale-95 transition-all ${isInCall ? 'bg-orange-500 text-white' : 'bg-green-500 text-white'} ${isSending ? 'opacity-50' : ''}`}>{isSending ? '...' : isInCall ? '🔥 追加通知' : '🚀 スタート'}</button>
       </div>
     </div>
   );
