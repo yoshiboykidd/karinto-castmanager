@@ -58,7 +58,7 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
   const [selectedOps, setSelectedOps] = useState<any[]>([]);
   const [isSending, setIsSending] = useState(false);
 
-  // 📍 内部ステータス判定
+  // 📍 ステータス判定ロジック
   const isActuallyPlaying = useMemo(() => isInCall || selectedRes.status === 'playing', [isInCall, selectedRes.status]);
   const isCompleted = useMemo(() => selectedRes.status === 'completed', [selectedRes.status]);
 
@@ -83,7 +83,7 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
   }, [selectedRes]);
 
   const toggleOp = (no: string, text: string, price: number, catLabel: string) => {
-    if (isCompleted) return; // 完了済みなら変更不可
+    if (isCompleted) return;
     setSelectedOps((prev) => {
       const opId = selectedRes.service_type === '添' ? `${catLabel}-${no}` : no;
       const isAlreadySelected = prev.some(op => (selectedRes.service_type === '添' ? `${op.catLabel}-${op.no}` : op.no) === opId);
@@ -117,11 +117,7 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
           newOpDetails.push(...taggedOps);
         }
 
-        const updateData: any = { 
-          actual_total_price: displayTotal, 
-          op_details: newOpDetails, 
-          updated_at: new Date().toISOString() 
-        };
+        const updateData: any = { actual_total_price: displayTotal, op_details: newOpDetails, updated_at: new Date().toISOString() };
         if (type === 'START') { updateData.status = 'playing'; updateData.in_call_at = new Date().toISOString(); }
         if (type === 'FINISH') { updateData.status = 'completed'; updateData.end_time = new Date().toISOString(); }
         
@@ -150,52 +146,49 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
   };
 
   return (
+    // 📍 全体を Flexbox (flex-col) にして、中身を縦に並べる
     <div className="fixed inset-0 z-[300] flex flex-col bg-gray-900 text-white animate-in fade-in duration-200 overflow-hidden font-sans">
       
-      {/* 📍 ヘッダー */}
+      {/* 1. ヘッダー (縮ませない) */}
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
         <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-1.5 mb-1">
-            <span className={`w-5 h-5 flex items-center justify-center rounded text-[10px] font-black shrink-0 ${
-              selectedRes.service_type === '添' ? 'bg-pink-500 text-white' : 'bg-blue-500 text-white'
-            }`}>
-              {selectedRes.service_type || 'か'}
-            </span>
-            <p className={`font-black tracking-tighter leading-tight text-gray-100 ${
-              courseText.length > 12 ? 'text-[9px]' : courseText.length > 8 ? 'text-[10px]' : 'text-[12px]'
-            }`}>
-              {courseText}
-            </p>
+            <span className={`w-5 h-5 flex items-center justify-center rounded text-[10px] font-black shrink-0 ${selectedRes.service_type === '添' ? 'bg-pink-500' : 'bg-blue-500'}`}>{selectedRes.service_type || 'か'}</span>
+            <p className="font-black tracking-tighter leading-tight text-[12px] truncate">{courseText}</p>
           </div>
           <p className="text-[28px] font-black text-green-400 tabular-nums leading-none">¥{displayTotal.toLocaleString()}</p>
         </div>
-        <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold active:scale-90 shrink-0">×</button>
+        <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold">×</button>
       </div>
 
-      {/* 📍 選択済みエリア */}
-      <div className="bg-gray-800 border-b border-gray-700 px-3 py-2.5 min-h-[54px] flex flex-wrap gap-1.5 shrink-0 items-center overflow-y-auto max-h-[140px]">
+      {/* 2. 選択済みOP (縮ませない) */}
+      <div className="bg-gray-800 border-b border-gray-700 px-3 py-2.5 min-h-[54px] flex flex-wrap gap-1.5 shrink-0 items-center overflow-y-auto max-h-[120px]">
         {savedOpsActive.map((op: any, i: number) => (
-          <button key={`saved-${i}`} onClick={() => toggleSavedStatus(op)} className="bg-blue-600 border border-blue-400 text-white px-2 py-1 rounded-lg text-[11px] font-black flex items-center gap-1"><span className="opacity-70 text-[10px]">{op.no}.</span>{op.name}<span className="opacity-50 ml-0.5">×</span></button>
+          <button key={`saved-${i}`} onClick={() => toggleSavedStatus(op)} className="bg-blue-600 border border-blue-400 text-white px-2 py-1 rounded-lg text-[11px] font-black flex items-center gap-1">
+            {op.no}.{op.name}<span className="opacity-50">×</span>
+          </button>
         ))}
-        {selectedOps.map((op) => (
-          <button key={`new-${op.catLabel}-${op.no}`} onClick={() => toggleOp(op.no, op.name, op.price, op.catLabel || "")} className="bg-pink-600 border border-pink-400 text-white px-2 py-1 rounded-lg text-[11px] font-black flex items-center gap-1"><span className="opacity-70 text-[10px]">{op.no}.</span>{op.name}<span className="opacity-50 ml-0.5">×</span></button>
+        {selectedOps.map((op, i) => (
+          <button key={`new-${i}`} onClick={() => toggleOp(op.no, op.name, op.price, op.catLabel)} className="bg-pink-600 border border-pink-400 text-white px-2 py-1 rounded-lg text-[11px] font-black flex items-center gap-1">
+            {op.no}.{op.name}<span className="opacity-50">×</span>
+          </button>
         ))}
-        {savedOpsActive.length === 0 && selectedOps.length === 0 && <p className="text-[11px] text-gray-500 font-black italic opacity-60 pl-1">※ オプションを選択してください</p>}
+        {savedOpsActive.length === 0 && selectedOps.length === 0 && <p className="text-[11px] text-gray-500 font-black italic">※ オプションを選択してください</p>}
       </div>
 
-      {/* 📍 メインコンテンツ：pb-40でフッターとの重なりを防止 */}
-      <div className="flex-1 overflow-y-auto px-2 pt-3 pb-40 space-y-6 scrollbar-hide overscroll-contain">
+      {/* 3. メインの選択リスト (ここだけをスクロールさせる) */}
+      <div className="flex-1 overflow-y-auto px-2 pt-3 pb-6 space-y-6 scrollbar-hide overscroll-contain">
         {currentCategories.map((cat: any) => (
           <div key={cat.label} className="space-y-2">
-            <h3 className="text-[10px] font-black text-gray-500 px-1 uppercase tracking-[0.2em] border-l-2 border-pink-500/50 ml-1">{cat.label}</h3>
+            <h3 className="text-[10px] font-black text-gray-500 px-1 uppercase border-l-2 border-pink-500/50 ml-1">{cat.label}</h3>
             <div className="grid grid-cols-3 gap-2">
               {cat.items.map((item: any) => {
                 const isSelected = selectedOps.some(op => op.no === item.n && (selectedRes.service_type !== '添' || op.catLabel === cat.label));
                 const isSaved = savedOpsActive.some((op: any) => op.no === item.n && (selectedRes.service_type !== '添' || op.catLabel === cat.label));
                 return (
                   <button key={`${cat.label}-${item.n}`} onClick={() => toggleOp(item.n, item.t, item.p || (cat as any).price || 0, cat.label)} className={`min-h-[80px] rounded-[24px] flex flex-col items-center justify-center transition-all border px-1 ${isSelected || isSaved ? 'bg-pink-500 border-pink-300 text-white shadow-[0_0_20px_rgba(236,72,153,0.4)] scale-95' : 'bg-white/5 border-white/5 text-gray-400'}`}>
-                    <span className={`text-[22px] font-black mb-1 ${isSelected || isSaved ? 'text-white' : 'text-gray-100'}`}>{item.n}</span>
-                    <span className={`text-[12px] font-black leading-[1.1] text-center line-clamp-2 break-words px-1 ${isSelected || isSaved ? 'text-white' : 'text-gray-400'}`}>{item.t}</span>
+                    <span className="text-[22px] font-black mb-1">{item.n}</span>
+                    <span className="text-[12px] font-black leading-[1.1] text-center line-clamp-2 px-1">{item.t}</span>
                   </button>
                 );
               })}
@@ -204,20 +197,20 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         ))}
       </div>
 
-      {/* 📍 フッター（操作パネル）：fixed で最前面に固定 */}
-      <div className="p-4 bg-gray-900/95 backdrop-blur-xl border-t border-gray-800 fixed bottom-0 left-0 right-0 z-50 flex gap-2">
+      {/* 4. フッターボタン (縮ませず、常に一番下に表示) */}
+      <div className="px-4 py-5 bg-gray-900/95 backdrop-blur-xl border-t border-gray-800 shrink-0 z-50 flex gap-2 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
         {isCompleted ? (
           <div className="flex-1 py-4 bg-gray-800 text-gray-500 rounded-2xl font-black text-center text-[16px]">✅ この予約は精算済みです</div>
         ) : (
           <>
-            <button onClick={() => sendNotification('HELP')} className="flex-1 py-3 bg-gray-700 text-white rounded-xl font-black text-[14px]">✋ 呼出</button>
+            <button onClick={() => sendNotification('HELP')} className="flex-1 py-3 bg-gray-700 text-white rounded-xl font-black text-[14px] active:scale-95 transition-transform">✋ 呼出</button>
             {isActuallyPlaying && (
-              <button onClick={() => sendNotification('FINISH')} disabled={isSending} className="flex-1 py-3 bg-gray-100 text-gray-900 rounded-xl font-black text-[14px]">🏁 精算完了</button>
+              <button onClick={() => sendNotification('FINISH')} disabled={isSending} className="flex-1 py-3 bg-gray-100 text-gray-900 rounded-xl font-black text-[14px] active:scale-95 transition-transform">🏁 精算完了</button>
             )}
             <button 
               onClick={() => sendNotification(isActuallyPlaying ? 'ADD' : 'START')} 
               disabled={isSending || (isActuallyPlaying && selectedOps.length === 0)} 
-              className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] ${isActuallyPlaying ? 'bg-orange-500 text-white' : 'bg-green-500 text-white'} ${isSending ? 'opacity-50' : ''}`}
+              className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] active:scale-95 transition-all ${isActuallyPlaying ? 'bg-orange-500' : 'bg-green-500'} text-white ${isSending ? 'opacity-50' : ''}`}
             >
               {isSending ? '...' : isActuallyPlaying ? '🔥 追加通知' : '🚀 スタート'}
             </button>
