@@ -4,12 +4,11 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 
-// 📍 修正：店舗名から UUID への変換マップ（実際の UUID に書き換えてください）
+// 📍 ここが UUID 形式（例: 8e5f...）でないと保存に失敗します
 const SHOP_ID_MAP: { [key: string]: string } = {
-  '池東': 'ここに池袋東店のUUIDを貼る',
-  '池西': 'ここに池袋西店のUUIDを貼る',
-  '大久保': 'ここに大久保店のUUIDを貼る',
-  // 追加が必要な場合はここに増やす
+  '池東': 'ここに実際のUUIDを貼ってください', 
+  '池西': 'ここに実際のUUIDを貼ってください',
+  '大久保': 'ここに実際のUUIDを貼ってください',
 };
 
 const KARINTO_OPS = [
@@ -135,24 +134,25 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
   };
 
   const sendNotification = async (type: 'START' | 'HELP' | 'FINISH') => {
-    if (!selectedRes?.id || !supabase) return;
+    if (!selectedRes?.id || !supabase) {
+      alert("エラー: DB接続情報が見つかりません。");
+      return;
+    }
     setIsSending(true);
 
     try {
-      // 📍 修正：shop_id の特定ロジック
       const shopLabel = selectedRes?.shop_label || '';
       const castId = String(selectedRes?.login_id || selectedRes?.cast_id || '');
       
-      // 1. ラベルから特定 2. キャストIDの頭3桁から特定 3. 既存のshop_idを使用
-      let targetShopId = SHOP_ID_MAP[shopLabel] || null;
-      if (!targetShopId && castId.length >= 3) {
-        // 例: 101xxx -> 101 の店
-        const prefix = castId.substring(0, 3);
-        // prefix に基づく判定が必要ならここにロジック追加
+      // UUID 形式チェック（簡易版）
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      let targetShopId = SHOP_ID_MAP[shopLabel] || selectedRes?.shop_id || selectedRes?.shopId || null;
+      
+      // もし ID が UUID でない場合は保存エラーを防ぐために null にする
+      if (targetShopId && !uuidRegex.test(targetShopId)) {
+        console.warn("[OpCalc] Invalid UUID for shop_id, setting to null:", targetShopId);
+        targetShopId = null;
       }
-      if (!targetShopId) targetShopId = selectedRes?.shop_id || selectedRes?.shopId || null;
-
-      console.log(`[OpCalc] shop_label: ${shopLabel}, resolved_shop_id: ${targetShopId}`);
 
       const prefix = selectedRes.service_type === '添' ? '【添】' : '【か】';
       const details = Array.isArray(selectedRes.op_details) ? selectedRes.op_details : [];
@@ -162,26 +162,27 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         newOpDetails.push(...taggedOps);
       }
 
+      // 1. 予約データの更新を先に実行
       if (type === 'START' || type === 'FINISH') {
         const updateData: any = { actual_total_price: displayTotal, op_details: newOpDetails, updated_at: new Date().toISOString() };
         if (type === 'START') { updateData.status = 'playing'; updateData.in_call_at = new Date().toISOString(); }
         if (type === 'FINISH') { updateData.status = 'completed'; updateData.end_time = new Date().toISOString(); }
-        await supabase.from('reservations').update(updateData).eq('id', selectedRes.id);
+        
+        const { error: resError } = await supabase.from('reservations').update(updateData).eq('id', selectedRes.id);
+        if (resError) throw new Error(`Reservations Update Failed: ${resError.message}`);
       }
 
+      // 2. 通知用メッセージ生成
       let message = "";
       let toastMsg = "";
-
       if (type === 'HELP') {
         message = `${prefix}【呼出】${selectedRes.customer_name}様：スタッフ至急！`;
         toastMsg = "スタッフを呼びました";
-      } 
-      else if (type === 'START') {
+      } else if (type === 'START') {
         const opDetail = selectedOps.map(o => `${o.no}.${o.name}`).join('・') || '無';
         message = `${prefix}【入室】${selectedRes.customer_name}様\nコース：${courseText}\n金額：¥${initialTotal.toLocaleString()}+Op¥${opsTotal.toLocaleString()}＝合計¥${displayTotal.toLocaleString()}\nOp内訳：${opDetail}`;
         toastMsg = "【お店にプレイスタートを通知しました】";
-      } 
-      else if (type === 'FINISH') {
+      } else if (type === 'FINISH') {
         const addedOpsStr = selectedOps.map(o => `${o.no}.${o.name}`).join('・');
         const canceledAtEnd = newOpDetails.filter((o: any) => o?.status === 'canceled' && o?.updatedAt > (selectedRes.in_call_at || "")).map((o: any) => `(取)${o.name}`).join('・');
         const changeDetail = [addedOpsStr, canceledAtEnd].filter(Boolean).join('・') || '無し';
@@ -190,28 +191,34 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         toastMsg = "【お店に退出を通知しました。電話連絡もしてください】";
       }
 
-      // 📍 修正：通知メッセージに店舗ラベルを保険で付ける
+      // 3. 通知データの保存（ここが一番失敗しやすい）
       const finalMessage = shopLabel ? `[${shopLabel}] ${message}` : message;
-
-      await supabase.from('notifications').insert({ 
+      const { error: notifError } = await supabase.from('notifications').insert({ 
         shop_id: targetShopId, 
         cast_id: castId, 
         type: type.toLowerCase(), 
         message: finalMessage, 
         is_read: false 
       });
-      
+
+      // 📍 修正：通知保存が失敗した場合はここで止めてエラーを出す
+      if (notifError) throw new Error(`Notifications Insert Failed: ${notifError.message}`);
+
+      // すべて成功してから画面の状態を変える
       if (type === 'START') setIsInCall(true);
       if (type === 'FINISH') setIsInCall(false);
       
       setSelectedOps([]); 
       onToast(toastMsg);
       router.refresh();
+
       if (type === 'START' || type === 'FINISH') {
         setTimeout(() => onClose(), 500);
       }
     } catch (err: any) { 
-      alert("保存エラー: " + (err.message || "通信に失敗しました。")); 
+      // 📍 修正：エラー内容を具体的にアラートで表示
+      console.error("[OpCalc] Full Error Object:", err);
+      alert(`保存できませんでした。\n理由: ${err.message || "通信エラー"}\n\n※shop_id が正しい UUID か確認してください。`); 
     } finally { 
       setIsSending(false); 
     }
