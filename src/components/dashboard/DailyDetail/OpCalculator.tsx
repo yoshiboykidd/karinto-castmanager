@@ -8,6 +8,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// 店舗名から店舗ID（数字）へのマッピング [cite: 2026-01-06]
 const SHOP_ID_MAP: { [key: string]: number } = {
   '池袋東口': 11, '池東': 11,
   '池袋西口': 6,  '池西': 6,
@@ -101,7 +102,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
     router.refresh();
   };
 
-  // 📍 修正：確定を取り消して修正モードに戻す関数
   const handleReEdit = async () => {
     if (!window.confirm("【確認】\n確定を取り消して、再度オプションの追加ができる状態に戻しますか？")) return;
     setIsSending(true);
@@ -120,6 +120,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
     }
   };
 
+  // 💡 修正：Edge Functionに合わせた通知ロジック [cite: 2026-01-29]
   const sendNotification = async (type: 'START' | 'HELP' | 'FINISH') => {
     if (!dbRes?.id) return;
     setIsSending(true);
@@ -132,6 +133,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       const currentOps = Array.isArray(dbRes.op_details) ? dbRes.op_details : [];
       const newOps = [...currentOps, ...selectedOps.map(op => ({ ...op, timing: type === 'START' ? 'initial' : 'additional', updatedAt: new Date().toISOString() }))];
 
+      // 1. 予約ステータスの更新 [cite: 2026-01-29]
       if (type === 'START' || type === 'FINISH') {
         const updateData: any = { actual_total_price: displayTotal, op_details: newOps, updated_at: new Date().toISOString() };
         if (type === 'START') { updateData.status = 'playing'; updateData.in_call_at = new Date().toISOString(); }
@@ -140,13 +142,25 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         if (resError) throw resError;
       }
 
+      // 2. メッセージ本文の組み立て [cite: 2026-01-29]
       let message = "";
-      if (type === 'HELP') message = `【呼出】${dbRes.customer_name}様：スタッフ至急！`;
-      else if (type === 'START') message = `【入室】${dbRes.customer_name}様\n💰 合計：¥${displayTotal.toLocaleString()}`;
-      else if (type === 'FINISH') message = `【退出】${dbRes.customer_name}様\n💰 最終会計：¥${displayTotal.toLocaleString()}`;
+      if (type === 'HELP') message = `🆘 スタッフ至急！\n客名: ${dbRes.customer_name}様`;
+      else if (type === 'START') message = `🚀 入室完了\n客名: ${dbRes.customer_name}様\n💰 会計: ¥${displayTotal.toLocaleString()}`;
+      else if (type === 'FINISH') message = `🏁 プレイ終了\n客名: ${dbRes.customer_name}様\n💰 最終: ¥${displayTotal.toLocaleString()}`;
 
       const finalMsg = label ? `[${label}] ${message}` : message;
-      await supabase.from('notifications').insert({ shop_id: shopNo, cast_id: castId, type: type.toLowerCase(), message: finalMsg, is_read: false });
+
+      // 3. notificationsテーブルへの挿入（これがEdge Functionを起動させる） [cite: 2026-01-29]
+      const { error: notifyError } = await supabase.from('notifications').insert({ 
+        shop_id: shopNo, 
+        cast_id: castId, 
+        type: type === 'HELP' ? 'help' : 'in_out', // help か in_out で振り分け
+        title: type === 'START' ? '入室通知' : type === 'FINISH' ? '退室通知' : 'スタッフ呼出',
+        content: finalMsg, 
+        is_read: false 
+      });
+
+      if (notifyError) throw notifyError;
       
       if (type === 'START') setIsInCall(true);
       if (type === 'FINISH') setIsInCall(false);
@@ -155,11 +169,16 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       await fetchLatest();
       router.refresh();
       if (type !== 'HELP') setTimeout(() => onClose(), 500);
-    } catch (err: any) { alert(`保存失敗: ${err.message}`); } finally { setIsSending(false); }
+    } catch (err: any) { 
+      alert(`エラー: ${err.message}`); 
+    } finally { 
+      setIsSending(false); 
+    }
   };
 
   return (
     <div className="fixed inset-0 w-full h-[100dvh] z-[99999] flex flex-col bg-gray-900 text-white overflow-hidden font-sans">
+      {/* ヘッダー */}
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
         <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-1.5 mb-1">
@@ -177,6 +196,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold active:scale-90 shrink-0">×</button>
       </div>
 
+      {/* 選択済みオプション表示 */}
       <div className="bg-gray-800 border-b border-gray-700 px-3 py-2 flex flex-wrap gap-1 shrink-0 items-center overflow-y-auto max-h-[80px]">
         {savedOpsActive.map((op: any, i: number) => (
           <button key={`s-${i}`} onClick={() => toggleSavedStatus(op)} className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 ${op?.price < 0 ? 'bg-red-600' : 'bg-blue-600'}`}>{op?.no}.{op?.name} <span className="opacity-50">×</span></button>
@@ -186,6 +206,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         ))}
       </div>
 
+      {/* オプション選択エリア */}
       <div className="flex-1 overflow-y-auto px-2 pt-3 pb-6 space-y-6 scrollbar-hide overscroll-contain min-h-0">
         {currentCategories.map((cat: any) => (
           <div key={cat.label} className="space-y-2">
@@ -206,6 +227,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         ))}
       </div>
 
+      {/* アクションボタン */}
       <div className="shrink-0 p-4 bg-gray-900 border-t border-gray-800 flex gap-2 pb-[calc(env(safe-area-inset-bottom)+24px)] shadow-[0_-10px_40px_rgba(0,0,0,0.8)]">
         {isCompleted ? (
           <div className="flex-1 flex flex-col gap-2">
