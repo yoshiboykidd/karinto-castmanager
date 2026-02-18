@@ -51,16 +51,16 @@ export default function ReservationModal({
 
   if (!selectedRes) return null;
 
-  // 💡 ロジック修正：表示内容を直接計算（無限ループ回避）
-  const currentMemo = (selectedRes.cast_mem || "").toString().trim();
-  const displayMemoContent = currentMemo !== "" 
+  // 💡 修正：表示するテキストの決定ロジックを単純化
+  const currentMemo = String(selectedRes?.cast_mem || "").trim();
+  const displayMemo = currentMemo !== "" 
     ? currentMemo 
     : (customerContext.lastMemo ? `(引き継ぎ)\n${customerContext.lastMemo}` : "タップして入力...");
 
   const handleEditMemoStart = () => {
     const initialMemo = currentMemo !== "" ? currentMemo : customerContext.lastMemo;
-    if (typeof setMemoDraft === 'function') setMemoDraft(initialMemo);
-    if (typeof setIsEditingMemo === 'function') setIsEditingMemo(true);
+    setMemoDraft?.(initialMemo);
+    setIsEditingMemo?.(true);
   };
 
   const handleSave = async () => {
@@ -68,7 +68,7 @@ export default function ReservationModal({
     try {
       await onSaveMemo();
       handleToast("メモを保存しました");
-      if (typeof setIsEditingMemo === 'function') setIsEditingMemo(false);
+      setIsEditingMemo?.(false);
     } catch (e) { 
       alert("保存に失敗しました"); 
     }
@@ -98,7 +98,7 @@ export default function ReservationModal({
       )}
 
       {!isOpOpen && (
-        <div className="relative z-10 w-full max-sm bg-white rounded-[24px] flex flex-col max-h-[98vh] overflow-hidden text-gray-800 shadow-2xl mx-1">
+        <div className="relative z-10 w-full max-w-sm bg-white rounded-[24px] flex flex-col max-h-[98vh] overflow-hidden text-gray-800 shadow-2xl mx-1">
           <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center shrink-0">
             <p className="text-[18px] font-black">{String(selectedRes.reservation_date || "").replace(/-/g, '/')}</p>
             <button onClick={() => onClose?.()} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full text-gray-400 text-xl font-bold">×</button>
@@ -161,7 +161,8 @@ export default function ReservationModal({
                     <span className="text-[10px] text-gray-300 font-bold">編集 ✎</span>
                   </div>
                   <div className="text-[13px] font-bold text-gray-600 leading-relaxed break-words whitespace-pre-wrap">
-                    {displayMemoContent}
+                    {/* 💡 修正：直接変数を表示 */}
+                    {displayMemo}
                   </div>
                 </button>
               )}
