@@ -16,7 +16,7 @@ const ALL_SHOPS = [
   { id: '007', name: '五反田', baseUrl: 'https://www.karin-go.com/attend.php' }, 
   { id: '008', name: '大宮', baseUrl: 'https://www.karin10omiya.com/attend.php' }, 
   { id: '009', name: '吉祥寺', baseUrl: 'https://www.kari-kichi.com/attend.php' },
-  { id: '010', name: '大久保', baseUrl: 'https://www.ookubo-karinto.com/attend.php' },
+  { id: '010', name: '大久保', baseUrl: 'https://www.ookubo-karinto.com/ookubo-attend.php' },
   { id: '011', name: '池東', baseUrl: 'https://www.karin10bukuro-3shine.com/attend.php' }, 
   { id: '012', name: '小岩', baseUrl: 'https://www.karin10koiwa.com/attend.php' }, 
 ];
@@ -72,12 +72,12 @@ export async function GET(req: NextRequest) {
         const foundLoginIdsOnHp = new Set<string>();
         const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
 
-        // 📍 修正1：DBからの取得を「この店舗のキャスト」だけに限定する
+        // DBからこの店舗・この日付の既存シフトを取得（他店舗の巻き添え削除を防ぐ）
         const { data: existingShifts } = await supabase
           .from('shifts')
           .select('login_id, status, reward_amount')
           .eq('shift_date', dateStrDB)
-          .like('login_id', `${shop.id}%`); // 店舗IDで前方一致フィルタリング
+          .like('login_id', `${shop.id}%`);
 
         const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
 
@@ -97,13 +97,14 @@ export async function GET(req: NextRequest) {
             const hpEnd = timeMatch[2].padStart(5, '0');
             const dbShift = existingMap.get(loginId);
             
+            // 手動で「当欠」に設定されたデータは上書きしない
             if (dbShift?.status === 'absent') return;
 
             upsertBatch.push({
               login_id: loginId, 
               shift_date: dateStrDB,
               hp_display_name: cleanedName, 
-              store_code: shop.id, // 📍 修正2：勤怠画面の表示に必須な store_code を追加
+              store_code: shop.id, // 勤怠管理画面の表示に必須
               status: 'official',
               is_official: true,
               hp_start_time: hpStart,
@@ -120,31 +121,36 @@ export async function GET(req: NextRequest) {
           await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
         }
 
-        // 📍 修正3：削除対象の特定を「この店舗のキャスト」のみに限定
-        const deleteTargetIds: string[] = [];
-        existingShifts?.forEach(s => {
-          const lid = String(s.login_id).trim().padStart(8, '0');
-          // HPに名前がなく、かつステータスが official のものだけ削除対象にする
-          if (s.status === 'official' && !foundLoginIdsOnHp.has(lid)) {
-            deleteTargetIds.push(lid);
-          }
-        });
+        // 📍 重要：HPが0人の時でも削除処理を走らせるように修正 (size >= 0)
+        if (foundLoginIdsOnHp.size >= 0) {
+          const deleteTargetIds: string[] = [];
+          existingShifts?.forEach(s => {
+            const lid = String(s.login_id).trim().padStart(8, '0');
+            // HPに名前がなく、かつ「確定」ステータスのものを削除対象とする
+            if (s.status === 'official' && !foundLoginIdsOnHp.has(lid)) {
+              deleteTargetIds.push(lid);
+            }
+          });
 
-        if (deleteTargetIds.length > 0) {
-          await supabase
-            .from('shifts')
-            .delete()
-            .eq('shift_date', dateStrDB)
-            .in('login_id', deleteTargetIds);
-          
-          logs.push(`${dateStrDB.slice(8)}日(更:${upsertBatch.length}/消:${deleteTargetIds.length})`);
-        } else {
-          logs.push(`${dateStrDB.slice(8)}日(更:${upsertBatch.length})`);
+          if (deleteTargetIds.length > 0) {
+            await supabase
+              .from('shifts')
+              .delete()
+              .eq('shift_date', dateStrDB)
+              .in('login_id', deleteTargetIds);
+            
+            logs.push(`${dateStrDB.slice(8)}日(更:${upsertBatch.length}/消:${deleteTargetIds.length})`);
+          } else if (upsertBatch.length > 0) {
+            logs.push(`${dateStrDB.slice(8)}日(更:${upsertBatch.length})`);
+          } else {
+            // HPもDBもデータがない場合
+            logs.push(`${dateStrDB.slice(8)}日(HP:0)`);
+          }
         }
       } catch (e: any) { logs.push(`${dateStrDB.slice(8)}日 Error`); }
     }
 
-    // 最後に同期ログを更新
+    // 同期完了ログの更新
     await supabase.from('sync_logs').update({ last_sync_at: new Date().toISOString() }).not('last_sync_at', 'is', null);
 
     return NextResponse.json({ success: true, shop: shop.name, logs });
