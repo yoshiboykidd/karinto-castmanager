@@ -72,15 +72,18 @@ export async function GET(req: NextRequest) {
         const foundLoginIdsOnHp = new Set<string>();
         const timeRegex = /(\d{1,2}:\d{2}).*?(\d{1,2}:\d{2})/;
 
-        const { data: existingShifts } = await supabase.from('shifts').select('login_id, status, reward_amount').eq('shift_date', dateStrDB);
+        // 📍 修正1：DBからの取得を「この店舗のキャスト」だけに限定する
+        const { data: existingShifts } = await supabase
+          .from('shifts')
+          .select('login_id, status, reward_amount')
+          .eq('shift_date', dateStrDB)
+          .like('login_id', `${shop.id}%`); // 店舗IDで前方一致フィルタリング
+
         const existingMap = new Map(existingShifts?.map(s => [String(s.login_id).trim().padStart(8, '0'), s]));
 
         $('h3, .name, .cast_name, span.name, div.name, strong, td, a').each((_, nameEl) => {
           const rawName = $(nameEl).text().trim();
-          
-          // 📍 名前からカッコ（全角・半角・角カッコ）とその中身（年齢等）を削除
           const cleanedName = rawName.replace(/[（\(\[].*?[）\)\]]/g, '').trim();
-          
           const cleanName = normalize(rawName);
           const loginId = nameMap.get(cleanName); 
           if (!loginId) return;
@@ -99,8 +102,8 @@ export async function GET(req: NextRequest) {
             upsertBatch.push({
               login_id: loginId, 
               shift_date: dateStrDB,
-              // 📍 年齢等を除去した名前を保存
               hp_display_name: cleanedName, 
+              store_code: shop.id, // 📍 修正2：勤怠画面の表示に必須な store_code を追加
               status: 'official',
               is_official: true,
               hp_start_time: hpStart,
@@ -117,40 +120,32 @@ export async function GET(req: NextRequest) {
           await supabase.from('shifts').upsert(upsertBatch, { onConflict: 'login_id, shift_date' });
         }
 
-        if (foundLoginIdsOnHp.size > 0) {
-          const deleteTargetIds: string[] = [];
-          existingShifts?.forEach(s => {
-            const lid = String(s.login_id).trim().padStart(8, '0');
-            if (s.status === 'official' && !foundLoginIdsOnHp.has(lid)) {
-              deleteTargetIds.push(lid);
-            }
-          });
-
-          if (deleteTargetIds.length > 0) {
-            await supabase
-              .from('shifts')
-              .delete()
-              .eq('shift_date', dateStrDB)
-              .in('login_id', deleteTargetIds);
-            
-            logs.push(`${dateStrDB.slice(8)}日(更:${upsertBatch.length}/消:${deleteTargetIds.length})`);
-          } else {
-            logs.push(`${dateStrDB.slice(8)}日(更:${upsertBatch.length})`);
+        // 📍 修正3：削除対象の特定を「この店舗のキャスト」のみに限定
+        const deleteTargetIds: string[] = [];
+        existingShifts?.forEach(s => {
+          const lid = String(s.login_id).trim().padStart(8, '0');
+          // HPに名前がなく、かつステータスが official のものだけ削除対象にする
+          if (s.status === 'official' && !foundLoginIdsOnHp.has(lid)) {
+            deleteTargetIds.push(lid);
           }
+        });
+
+        if (deleteTargetIds.length > 0) {
+          await supabase
+            .from('shifts')
+            .delete()
+            .eq('shift_date', dateStrDB)
+            .in('login_id', deleteTargetIds);
+          
+          logs.push(`${dateStrDB.slice(8)}日(更:${upsertBatch.length}/消:${deleteTargetIds.length})`);
         } else {
-          logs.push(`${dateStrDB.slice(8)}日(HP:0)`);
+          logs.push(`${dateStrDB.slice(8)}日(更:${upsertBatch.length})`);
         }
       } catch (e: any) { logs.push(`${dateStrDB.slice(8)}日 Error`); }
     }
 
-    try {
-      await supabase
-        .from('sync_logs')
-        .update({ last_sync_at: new Date().toISOString() })
-        .not('last_sync_at', 'is', null);
-    } catch (logError) {
-      console.error("SYNC LOG UPDATE FAILED:", logError);
-    }
+    // 最後に同期ログを更新
+    await supabase.from('sync_logs').update({ last_sync_at: new Date().toISOString() }).not('last_sync_at', 'is', null);
 
     return NextResponse.json({ success: true, shop: shop.name, logs });
   } catch (e: any) { 
