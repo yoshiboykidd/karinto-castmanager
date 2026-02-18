@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import OpCalculator from './OpCalculator';
 
-// 📍 修正：環境変数のガード
+// 📍 環境変数のガード
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
@@ -13,7 +13,7 @@ export default function ReservationModal({
   selectedRes, onClose, onDelete, isDeleting, isEditingMemo, setIsEditingMemo, 
   memoDraft, setMemoDraft, onSaveMemo, getBadgeStyle, allPastReservations = []
 }: any) {
-  // 📍 修正：データがない場合は即座に終了（クラッシュ防止）
+  // 📍 修正：nullチェック（クラッシュ防止） [cite: 2026-01-29]
   if (!selectedRes) return null;
 
   const [showToast, setShowToast] = useState(false);
@@ -22,13 +22,8 @@ export default function ReservationModal({
   const [isInCall, setIsInCall] = useState(selectedRes?.status === 'playing');
   const [isSaving, setIsSaving] = useState(false);
   
-  // 内部管理用のステート（金額同期用）
+  // 内部管理用のステート（金額・メモ同期用） [cite: 2026-01-29]
   const [dbRes, setDbRes] = useState(selectedRes);
-
-  // 📍 修正：親から渡された selectedRes が変わった時に内部ステートも同期させる
-  useEffect(() => {
-    if (selectedRes) setDbRes(selectedRes);
-  }, [selectedRes]);
 
   const fetchLatest = async () => {
     if (!supabase || !selectedRes?.id) return;
@@ -60,7 +55,7 @@ export default function ReservationModal({
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  // 過去メモの引き継ぎロジック
+  // 過去メモの引き継ぎロジック [cite: 2026-01-29]
   const customerContext = useMemo(() => {
     if (!dbRes?.customer_no) return { count: 1, lastDate: null, lastMemo: "" };
     try {
@@ -79,30 +74,26 @@ export default function ReservationModal({
   }, [dbRes?.customer_no, dbRes?.id, allPastReservations]);
 
   const handleEditMemoStart = () => {
+    // 📍 修正：現在のメモが空なら、過去メモを引き継ぐ [cite: 2026-01-29]
     if (dbRes?.cast_mem && dbRes.cast_mem.trim() !== "") {
       setMemoDraft(dbRes.cast_mem);
     } else {
-      setMemoDraft(customerContext.lastMemo); // 引き継ぎ
+      setMemoDraft(customerContext.lastMemo);
     }
-    setIsEditingMemo(true);
+    setIsEditingMemo?.(true);
   };
 
+  // 📍 修正：親コンポーネントの onSaveMemo プロップスを使用する [cite: 2026-02-04]
   const handleSave = async () => {
-    if (isSaving || !supabase) return;
+    if (typeof onSaveMemo !== 'function') return;
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .from('reservations')
-        .update({ cast_mem: memoDraft, updated_at: new Date().toISOString() })
-        .eq('id', dbRes.id);
-      
-      if (error) throw error;
-      
+      await onSaveMemo(); // 親側の保存処理を実行
       handleToast("メモを保存しました");
-      await fetchLatest();
-      setTimeout(() => setIsEditingMemo(false), 500);
+      await fetchLatest(); // 表示を最新に更新
+      setTimeout(() => setIsEditingMemo?.(false), 500);
     } catch (e) { 
-      alert("保存エラー"); 
+      alert("保存に失敗しました"); 
     } finally {
       setIsSaving(false);
     }
@@ -112,7 +103,6 @@ export default function ReservationModal({
 
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center p-0">
-      {/* 📍 修正：背後のクリックで閉じる処理 */}
       <div className="absolute inset-0 bg-black/85 backdrop-blur-sm z-0" onClick={() => onClose?.()} />
       
       {isOpOpen && (
@@ -136,7 +126,6 @@ export default function ReservationModal({
         <div className="relative z-10 w-full max-w-sm bg-white rounded-[24px] flex flex-col max-h-[98vh] overflow-hidden text-gray-800 shadow-2xl mx-1">
           <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center shrink-0">
             <p className="text-[18px] font-black">{String(dbRes?.reservation_date || "").replace(/-/g, '/')}</p>
-            {/* 📍 修正：z-indexを明示して確実にクリック可能に */}
             <button onClick={() => onClose?.()} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full text-gray-400 text-xl font-bold relative z-20">×</button>
           </div>
 
@@ -177,6 +166,7 @@ export default function ReservationModal({
             <div className="bg-gray-50 rounded-[18px] border-2 border-dashed border-gray-200 overflow-hidden">
               {isEditingMemo ? (
                 <div className="p-2 space-y-1.5">
+                  {/* 📍 修正：ズーム防止の16px設定 */}
                   <textarea value={memoDraft || ""} onChange={(e) => setMemoDraft?.(e.target.value)} className="w-full min-h-[120px] p-3 bg-white rounded-xl text-[16px] font-bold focus:outline-none resize-none" placeholder="メモを入力..." autoFocus />
                   <div className="flex gap-1">
                     <button onClick={() => setIsEditingMemo?.(false)} className="flex-1 py-3 bg-white text-gray-400 rounded-xl font-black text-[13px] border">閉じる</button>
@@ -192,7 +182,7 @@ export default function ReservationModal({
                     <span className="text-[10px] text-gray-300 font-bold">編集 ✎</span>
                   </div>
                   <div className="text-[13px] font-bold text-gray-600 leading-relaxed break-words whitespace-pre-wrap">
-                    {/* 初期状態で中身を隠し、引き継ぎ表示にも対応 */}
+                    {/* 📍 修正：お客様に見られないよう基本は閉じる [cite: 2026-01-29] */}
                     {dbRes?.cast_mem ? "（タップして内容を確認）" : (customerContext.lastMemo ? "（過去メモあり：タップして確認）" : "タップして入力...")}
                   </div>
                 </button>
