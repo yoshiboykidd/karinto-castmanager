@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-// 📍 修正：エラーの出る auth-helpers を避け、コアライブラリを使用
 import { createClient } from '@supabase/supabase-js';
+// 📍 追加：画面更新用
+import { useRouter } from 'next/navigation';
 
 const KARINTO_OPS = [
   { label: '¥500 Op', price: 500, items: [
@@ -56,11 +57,15 @@ const SOINE_OPS = [
 ];
 
 export default function OpCalculator({ selectedRes, initialTotal, onToast, onClose, isInCall, setIsInCall }: any) {
-  // 📍 修正：環境変数を使用して直接初期化。ビルド時の export missing を完全に回避します。
-  const supabase = useMemo(() => createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ), []);
+  const router = useRouter();
+  
+  // 📍 修正：環境変数の存在確認付き初期化
+  const supabase = useMemo(() => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!url || !key) return null;
+    return createClient(url, key);
+  }, []);
 
   const [selectedOps, setSelectedOps] = useState<any[]>([]);
   const [isSending, setIsSending] = useState(false);
@@ -105,7 +110,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
   };
 
   const toggleSavedStatus = async (item: any) => {
-    if (isCompleted) return;
+    if (isCompleted || !supabase) return;
     const details = Array.isArray(selectedRes.op_details) ? selectedRes.op_details : [];
     const newDetails = details.map((op: any) => {
       if (op?.no === item?.no && op?.name === item?.name) {
@@ -114,11 +119,23 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       return op;
     });
     const newActualTotal = initialTotal + newDetails.filter((o: any) => o?.status === 'active').reduce((s: number, o: any) => s + (o?.price || 0), 0);
-    await supabase.from('reservations').update({ op_details: newDetails, actual_total_price: newActualTotal }).eq('id', selectedRes.id);
+    
+    // 📍 エラーチェック追加
+    const { error } = await supabase.from('reservations').update({ op_details: newDetails, actual_total_price: newActualTotal }).eq('id', selectedRes.id);
+    if (error) {
+      alert("更新エラー: " + error.message);
+    } else {
+      router.refresh();
+    }
   };
 
   const sendNotification = async (type: 'START' | 'HELP' | 'FINISH') => {
     if (!selectedRes?.id) return;
+    if (!supabase) {
+      alert("環境変数が設定されていません。Vercelの設定を確認してください。");
+      return;
+    }
+    
     setIsSending(true);
     const prefix = selectedRes.service_type === '添' ? '【添】' : '【か】';
 
@@ -134,7 +151,10 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         const updateData: any = { actual_total_price: displayTotal, op_details: newOpDetails, updated_at: new Date().toISOString() };
         if (type === 'START') { updateData.status = 'playing'; updateData.in_call_at = new Date().toISOString(); }
         if (type === 'FINISH') { updateData.status = 'completed'; updateData.end_time = new Date().toISOString(); }
-        await supabase.from('reservations').update(updateData).eq('id', selectedRes.id);
+        
+        // 📍 修正：エラーを明示的にキャッチ
+        const { error: resError } = await supabase.from('reservations').update(updateData).eq('id', selectedRes.id);
+        if (resError) throw resError;
       }
 
       let message = "";
@@ -158,16 +178,23 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         toastMsg = "【お店に退出を通知しました。電話連絡もしてください】";
       }
 
-      await supabase.from('notifications').insert({ shop_id: selectedRes.shop_id, cast_id: selectedRes.login_id, type: type.toLowerCase(), message, is_read: false });
+      const { error: notifError } = await supabase.from('notifications').insert({ shop_id: selectedRes.shop_id, cast_id: selectedRes.login_id, type: type.toLowerCase(), message, is_read: false });
+      if (notifError) throw notifError;
       
       if (type === 'START') setIsInCall(true);
       if (type === 'FINISH') setIsInCall(false);
       
       setSelectedOps([]); 
       onToast(toastMsg);
-      if (type === 'START' || type === 'FINISH') onClose();
+      
+      // 📍 修正：DB更新後にUIをリフレッシュ
+      router.refresh();
+
+      if (type === 'START' || type === 'FINISH') {
+        setTimeout(() => onClose(), 500);
+      }
     } catch (err: any) { 
-      alert("エラー: " + err.message); 
+      alert("保存エラー: " + (err.message || "通信に失敗しました。RLS設定を確認してください。")); 
     } finally { 
       setIsSending(false); 
     }
@@ -199,6 +226,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         {selectedOps.map((op, i) => (
           <button key={`n-${i}`} onClick={() => toggleOp(op.no, op.name, op.price, op.catLabel)} className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 ${op.price < 0 ? 'bg-red-600' : 'bg-pink-600'}`}>{op.no}.{op.name} <span className="opacity-50">×</span></button>
         ))}
+        {savedOpsActive.length === 0 && selectedOps.length === 0 && <p className="text-[11px] text-gray-500 font-black italic">※ オプションを選択してください</p>}
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pt-3 pb-6 space-y-6 scrollbar-hide overscroll-contain min-h-0">
