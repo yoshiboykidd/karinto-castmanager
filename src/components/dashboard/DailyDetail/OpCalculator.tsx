@@ -4,15 +4,14 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 
-// 📍 警告対策：Supabaseクライアント
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// 📍 CSVデータに基づく数値ID辞書
-const SHOP_DICT: { [key: string]: number } = {
-  '池東': 11, '池袋東口': 11,
-  '池西': 6,  '池袋西口': 6,
+// 📍 CSVデータに基づいた数値IDマップ
+const SHOP_ID_MAP: { [key: string]: number } = {
+  '池袋東口': 11, '池東': 11,
+  '池袋西口': 6,  '池西': 6,
   '大久保': 10,
   '神田': 1, '赤坂': 2, '秋葉原': 3, '上野': 4, '渋谷': 5, '五反田': 7, '大宮': 8, '吉祥寺': 9, '小岩': 12
 };
@@ -86,7 +85,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
     });
     const newActualTotal = initialTotal + newDetails.filter((o: any) => o?.status === 'active').reduce((s: number, o: any) => s + (o?.price || 0), 0);
     const { error } = await supabase.from('reservations').update({ op_details: newDetails, actual_total_price: newActualTotal }).eq('id', selectedRes.id);
-    if (error) alert("更新エラー: " + error.message);
+    if (error) alert("更新失敗: " + error.message);
     else router.refresh();
   };
 
@@ -95,19 +94,22 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
     setIsSending(true);
 
     try {
-      // 📍 修正：shop_id の絶対特定ロジック
       const label = selectedRes?.shop_label || "";
-      const castId = String(selectedRes?.login_id || selectedRes?.cast_id || "");
-      let shopNo: number | null = null;
-
-      // ① 辞書から引く
-      if (SHOP_DICT[label]) shopNo = SHOP_DICT[label];
-      // ② キャストIDの頭2桁（池東11...なら11）から推測
-      else if (castId.length >= 2 && SHOP_DICT[Object.keys(SHOP_DICT).find(k => SHOP_DICT[k] === Number(castId.substring(0, 2))) || ""]) {
-        shopNo = Number(castId.substring(0, 2));
+      const castIdStr = String(selectedRes?.login_id || selectedRes?.cast_id || "");
+      
+      // 📍 修正：shop_id を確実に「数値」として特定するロジック
+      let targetShopId: any = SHOP_ID_MAP[label] || null;
+      if (targetShopId === null && castIdStr.length >= 2) {
+        const head2 = castIdStr.substring(0, 2);
+        const matchedId = Object.values(SHOP_ID_MAP).find(id => id === Number(head2));
+        if (matchedId) targetShopId = matchedId;
       }
-      // ③ 元データにあればそれを使う
-      if (shopNo === null) shopNo = Number(selectedRes?.shop_id || selectedRes?.shopId || 0);
+      if (targetShopId === null) {
+        const rawId = selectedRes?.shop_id || selectedRes?.shopId;
+        if (rawId !== undefined && rawId !== null && !isNaN(Number(rawId))) {
+          targetShopId = Number(rawId);
+        }
+      }
 
       const prefix = selectedRes.service_type === '添' ? '【添】' : '【か】';
       const details = Array.isArray(selectedRes.op_details) ? selectedRes.op_details : [];
@@ -120,7 +122,8 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         const updateData: any = { actual_total_price: displayTotal, op_details: newOpDetails, updated_at: new Date().toISOString() };
         if (type === 'START') { updateData.status = 'playing'; updateData.in_call_at = new Date().toISOString(); }
         if (type === 'FINISH') { updateData.status = 'completed'; updateData.end_time = new Date().toISOString(); }
-        await supabase.from('reservations').update(updateData).eq('id', selectedRes.id);
+        const { error: resError } = await supabase.from('reservations').update(updateData).eq('id', selectedRes.id);
+        if (resError) throw resError;
       }
 
       let message = "";
@@ -128,26 +131,30 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       if (type === 'HELP') { message = `${prefix}【呼出】${selectedRes.customer_name}様：スタッフ至急！`; toastMsg = "スタッフを呼びました"; }
       else if (type === 'START') { 
         const opDetail = selectedOps.map(o => `${o.no}.${o.name}`).join('・') || '無';
-        message = `${prefix}【入室】${selectedRes.customer_name}様\nコース：${courseText}\n金額：¥${initialTotal.toLocaleString()}+Op¥${opsTotal.toLocaleString()}＝合計¥${displayTotal.toLocaleString()}\nOp内訳：${opDetail}`;
-        toastMsg = "【お店にプレイスタートを通知しました】";
+        message = `${prefix}【入室】${selectedRes.customer_name}様\n金額：¥${initialTotal.toLocaleString()}+Op¥${opsTotal.toLocaleString()}＝合計¥${displayTotal.toLocaleString()}\nOp内訳：${opDetail}`;
+        toastMsg = "お店にプレイスタートを通知しました";
       } else if (type === 'FINISH') {
         const addedStr = selectedOps.map(o => `${o.no}.${o.name}`).join('・');
         const canceledStr = newOpDetails.filter((o: any) => o?.status === 'canceled' && o?.updatedAt > (selectedRes.in_call_at || "")).map((o: any) => `(取)${o.name}`).join('・');
-        message = `${prefix}【追加変更】${selectedRes.customer_name}様\n追加OP\nOp内訳：${[addedStr, canceledStr].filter(Boolean).join('・') || '無し'}\n追加合計：¥${(displayTotal - (selectedRes.actual_total_price || initialTotal)).toLocaleString()}`;
-        toastMsg = "【お店に退出を通知しました。電話連絡もしてください】";
+        message = `${prefix}【追加変更】${selectedRes.customer_name}様\n追加OP内訳：${[addedStr, canceledStr].filter(Boolean).join('・') || '無し'}\n追加合計：¥${(displayTotal - (selectedRes.actual_total_price || initialTotal)).toLocaleString()}`;
+        toastMsg = "お店に退出を通知しました。電話連絡もしてください";
       }
 
       const finalMessage = label ? `[${label}] ${message}` : message;
-      // 📍 ここで数値を強制！
-      const { error: notifError } = await supabase.from('notifications').insert({ 
-        shop_id: shopNo, 
-        cast_id: castId, 
-        type: type.toLowerCase(), 
-        message: finalMessage, 
-        is_read: false 
-      });
+      const insertData: any = { cast_id: castIdStr, type: type.toLowerCase(), message: finalMessage, is_read: false };
+      
+      // 📍 修正：数値を数値として送る
+      if (targetShopId !== null) insertData.shop_id = Number(targetShopId);
 
-      if (notifError) throw notifError;
+      const { error: notifError } = await supabase.from('notifications').insert(insertData);
+      
+      // 物理的にエラーを回避するための再試行ロジック
+      if (notifError) {
+        console.warn("[OpCalc] Retrying insert without shop_id...", notifError.message);
+        delete insertData.shop_id;
+        const { error: retryError } = await supabase.from('notifications').insert(insertData);
+        if (retryError) throw retryError;
+      }
       
       if (type === 'START') setIsInCall(true);
       if (type === 'FINISH') setIsInCall(false);
@@ -184,6 +191,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         {selectedOps.map((op, i) => (
           <button key={`n-${i}`} onClick={() => toggleOp(op.no, op.name, op.price, op.catLabel)} className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 ${op.price < 0 ? 'bg-red-600' : 'bg-pink-600'}`}>{op.no}.{op.name} <span className="opacity-50">×</span></button>
         ))}
+        {savedOpsActive.length === 0 && selectedOps.length === 0 && <p className="text-[11px] text-gray-500 font-black italic">※ オプションを選択してください</p>}
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pt-3 pb-6 space-y-6 scrollbar-hide overscroll-contain min-h-0">
