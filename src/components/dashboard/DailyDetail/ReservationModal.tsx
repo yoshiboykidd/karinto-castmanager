@@ -53,10 +53,8 @@ export default function ReservationModal({
   if (!selectedRes) return null;
 
   const handleEditMemoStart = () => {
-    // 💡 ロジック修正：既存メモがあればそれを、なければ過去メモをセット
-    const initialMemo = (selectedRes.cast_mem && selectedRes.cast_mem.trim() !== "") 
-      ? selectedRes.cast_mem 
-      : customerContext.lastMemo;
+    const currentMemo = (selectedRes.cast_mem || "").trim();
+    const initialMemo = currentMemo !== "" ? currentMemo : customerContext.lastMemo;
     setMemoDraft(initialMemo);
     setIsEditingMemo(true);
   };
@@ -73,6 +71,14 @@ export default function ReservationModal({
   };
 
   const badgeBaseClass = "px-2 py-0.5 rounded text-[11px] font-black leading-none flex items-center justify-center";
+
+  // ロジック：表示するメモの内容を事前に確定させる
+  const displayMemoContent = useMemo(() => {
+    const current = (selectedRes.cast_mem || "").trim();
+    if (current !== "") return current;
+    if (customerContext.lastMemo) return `(引き継ぎ)\n${customerContext.lastMemo}`;
+    return "タップして入力...";
+  }, [selectedRes.cast_mem, customerContext.lastMemo]);
 
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center p-0">
@@ -139,7 +145,6 @@ export default function ReservationModal({
             <div className="bg-gray-50 rounded-[18px] border-2 border-dashed border-gray-200 overflow-hidden">
               {isEditingMemo ? (
                 <div className="p-2 space-y-1.5">
-                  {/* 💡 ロジック修正：style={{ fontSize: '16px' }} を追加してズームを強制停止 */}
                   <textarea 
                     value={memoDraft || ""} 
                     onChange={(e) => setMemoDraft?.(e.target.value)} 
@@ -160,10 +165,7 @@ export default function ReservationModal({
                     <span className="text-[10px] text-gray-300 font-bold">編集 ✎</span>
                   </div>
                   <div className="text-[13px] font-bold text-gray-600 leading-relaxed break-words whitespace-pre-wrap">
-                    {/* 💡 ロジック修正：評価順序を確実に */}
-                    {selectedRes.cast_mem && selectedRes.cast_mem.trim() !== "" 
-                      ? selectedRes.cast_mem 
-                      : (customerContext.lastMemo ? `(引き継ぎ)\n${customerContext.lastMemo}` : "タップして入力...")}
+                    {displayMemoContent}
                   </div>
                 </button>
               )}
