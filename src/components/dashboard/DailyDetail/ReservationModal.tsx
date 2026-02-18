@@ -4,28 +4,32 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import OpCalculator from './OpCalculator';
 
-// Supabaseクライアントの初期化
+// 📍 修正：環境変数のガード（Vercelでのクラッシュ防止） [cite: 2026-01-29]
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
 export default function ReservationModal({ selectedRes, onClose, onToast }: any) {
+  // 📍 修正：コンポーネント冒頭でデータの存在チェック（Uncaught TypeError 回避）
+  if (!selectedRes) return null;
+
   const [isOpOpen, setIsOpOpen] = useState(false);
   const [memoDraft, setMemoDraft] = useState(selectedRes?.memo || "");
   const [isSaving, setIsSaving] = useState(false);
   const [isInCall, setIsInCall] = useState(selectedRes?.status === 'playing');
 
-  // 📍 修正：最新のDBデータを保持するためのステート
+  // 最新のDBデータを保持するためのステート [cite: 2026-01-29]
   const [dbRes, setDbRes] = useState(selectedRes);
 
   // 📍 修正：DBから最新の予約情報を取得する関数
   const fetchLatest = async () => {
+    if (!supabase || !selectedRes?.id) return;
     try {
       const { data, error } = await supabase
         .from('reservations')
         .select('*')
         .eq('id', selectedRes.id)
-        .single();
+        .maybeSingle(); // エラーになりにくい maybeSingle を使用
       
       if (data) {
         setDbRes(data);
@@ -36,14 +40,14 @@ export default function ReservationModal({ selectedRes, onClose, onToast }: any)
     }
   };
 
-  // 📍 修正：初回表示時と、OP計算画面が閉じられた時にデータを更新
+  // 📍 修正：OP画面が閉じられた時や、IDが変わった時にデータを更新
   useEffect(() => {
-    if (!isOpOpen) {
+    if (!isOpOpen && selectedRes?.id) {
       fetchLatest();
     }
-  }, [isOpOpen, selectedRes.id]);
+  }, [isOpOpen, selectedRes?.id]);
 
-  // 📍 修正：dbRes（最新データ）を基に金額を計算
+  // 最新データ（dbRes）を基に表示金額を決定 [cite: 2026-01-29]
   const displayAmount = useMemo(() => {
     const actual = Number(dbRes?.actual_total_price || 0);
     const initial = Number(dbRes?.total_price || 0);
@@ -51,6 +55,7 @@ export default function ReservationModal({ selectedRes, onClose, onToast }: any)
   }, [dbRes?.actual_total_price, dbRes?.total_price]);
 
   const handleSaveMemo = async () => {
+    if (!supabase || isSaving) return;
     setIsSaving(true);
     try {
       const { error } = await supabase
@@ -98,7 +103,6 @@ export default function ReservationModal({ selectedRes, onClose, onToast }: any)
         {/* コンテンツエリア */}
         <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
           
-          {/* 金額・コース情報カード */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
               <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">現在の合計金額</p>
@@ -110,13 +114,12 @@ export default function ReservationModal({ selectedRes, onClose, onToast }: any)
             </div>
           </div>
 
-          {/* メモ入力エリア */}
           <div className="space-y-2">
             <div className="flex justify-between items-center px-1">
               <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest">キャストメモ</label>
               <button onClick={handleSaveMemo} disabled={isSaving} className="text-[11px] font-black text-blue-500 hover:text-blue-600 transition-colors uppercase tracking-widest">{isSaving ? '保存中...' : '変更を保存'}</button>
             </div>
-            {/* 📍 修正：text-[16px] にしてズームを防止 */}
+            {/* 📍 修正：ズーム防止のため text-[16px] を指定 [cite: 2026-01-29] */}
             <textarea 
               value={memoDraft} 
               onChange={(e) => setMemoDraft(e.target.value)} 
@@ -125,7 +128,6 @@ export default function ReservationModal({ selectedRes, onClose, onToast }: any)
             />
           </div>
 
-          {/* 基本情報リスト */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             {[
               { label: 'お客様', value: dbRes.customer_name },
@@ -140,7 +142,6 @@ export default function ReservationModal({ selectedRes, onClose, onToast }: any)
           </div>
         </div>
 
-        {/* 下部アクションエリア */}
         <div className="p-6 bg-white border-t border-gray-100">
           <button 
             onClick={() => setIsOpOpen(true)}
