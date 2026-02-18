@@ -35,11 +35,10 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
   const [selectedOps, setSelectedOps] = useState<any[]>([]);
   const [isSending, setIsSending] = useState(false);
   
-  // 📍 修正：DBから直接取得した「最新データ」を保持するステート
+  // 📍 修正：DB最新同期ステート
   const [dbRes, setDbRes] = useState(selectedRes);
 
   useEffect(() => {
-    // 📍 修正：開いた瞬間に最新データを読み込み、前回の追加分を復元する
     const fetchLatest = async () => {
       const { data } = await supabase.from('reservations').select('*').eq('id', selectedRes.id).single();
       if (data) setDbRes(data);
@@ -57,20 +56,17 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
   const isCompleted = useMemo(() => dbRes?.status === 'completed', [dbRes?.status]);
   const currentCategories = useMemo(() => dbRes?.service_type === '添' ? SOINE_OPS : KARINTO_OPS, [dbRes?.service_type]);
 
-  // 📍 修正：dbRes（最新）を元に、既に保存されているオプションを抽出
   const savedOpsActive = useMemo(() => {
     const details = Array.isArray(dbRes?.op_details) ? dbRes.op_details : [];
     return details.filter((op: any) => op?.status !== 'canceled');
   }, [dbRes?.op_details]);
 
-  // 累積オプション合計
   const opsTotal = useMemo(() => {
     const savedSum = savedOpsActive.reduce((sum: number, op: any) => sum + (op?.price || 0), 0);
     const newSum = selectedOps.reduce((sum, op) => sum + (op?.price || 0), 0);
     return savedSum + newSum;
   }, [selectedOps, savedOpsActive]);
 
-  // 常に「初期コース料金 ＋ 全オプション」を表示総額とする
   const displayTotal = initialTotal + opsTotal;
   const courseText = useMemo(() => dbRes?.course_info || (dbRes?.service_type === '添' ? '添い寝' : 'かりんと'), [dbRes]);
 
@@ -95,7 +91,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
     });
     const newActualTotal = initialTotal + newDetails.filter((o: any) => o?.status === 'active').reduce((s: number, o: any) => s + (o?.price || 0), 0);
     
-    // 📍 修正：reservationsテーブルの更新を即座に行う
     const { error } = await supabase.from('reservations').update({ 
       op_details: newDetails, 
       actual_total_price: newActualTotal 
@@ -103,7 +98,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
     
     if (error) alert("更新失敗: " + error.message);
     else {
-      // ローカルの状態も更新
       const { data } = await supabase.from('reservations').select('*').eq('id', dbRes.id).single();
       if (data) setDbRes(data);
       router.refresh();
@@ -121,25 +115,43 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       if (shopNo === null) shopNo = Number(dbRes?.shop_id || dbRes?.shopId || 0);
 
       const prefix = dbRes.service_type === '添' ? '【添】' : '【か】';
+      
+      // 📍 修正：送信前に「既存分 ＋ 今回選択分」をマージした配列を作成
       const currentOpDetails = Array.isArray(dbRes.op_details) ? dbRes.op_details : [];
       const newOpDetails = [...currentOpDetails];
       if (selectedOps.length > 0) {
-        newOpDetails.push(...selectedOps.map(op => ({ ...op, timing: type === 'START' ? 'initial' : 'additional', updatedAt: new Date().toISOString() })));
+        const taggedOps = selectedOps.map(op => ({ 
+          ...op, 
+          timing: type === 'START' ? 'initial' : 'additional', 
+          updatedAt: new Date().toISOString() 
+        }));
+        newOpDetails.push(...taggedOps);
       }
 
-      // 📍 修正：予約本体（reservations）の更新を最優先。ここで actual_total_price を確定させる
-      const updateData: any = { 
-        actual_total_price: displayTotal, 
-        op_details: newOpDetails, 
-        updated_at: new Date().toISOString() 
-      };
-      if (type === 'START') { updateData.status = 'playing'; updateData.in_call_at = new Date().toISOString(); }
-      if (type === 'FINISH') { updateData.status = 'completed'; updateData.end_time = new Date().toISOString(); }
-      
-      const { error: resError } = await supabase.from('reservations').update(updateData).eq('id', dbRes.id);
-      if (resError) throw new Error(`予約本体の保存に失敗しました: ${resError.message}`);
+      // 📍 重要：スタート（またはフィニッシュ）時に reservations テーブルを確実に更新する
+      if (type === 'START' || type === 'FINISH') {
+        const updateData: any = { 
+          actual_total_price: displayTotal, // ← ここに累積合計を入れる
+          op_details: newOpDetails,        // ← 累積された全Opを入れる
+          updated_at: new Date().toISOString() 
+        };
+        
+        if (type === 'START') { 
+          updateData.status = 'playing'; 
+          updateData.in_call_at = new Date().toISOString(); 
+        }
+        if (type === 'FINISH') { 
+          updateData.status = 'completed'; 
+          updateData.end_time = new Date().toISOString(); 
+        }
 
-      // 2. 通知メッセージの作成
+        console.log(`[OpCalc] Updating reservations table for ${type}:`, updateData);
+        
+        const { error: resError } = await supabase.from('reservations').update(updateData).eq('id', dbRes.id);
+        if (resError) throw new Error(`予約本体(reservations)の保存に失敗しました: ${resError.message}`);
+      }
+
+      // 通知メッセージの作成
       let message = "";
       let toastMsg = "";
       const activeOps = newOpDetails.filter(o => o.status !== 'canceled');
@@ -150,40 +162,39 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       }
       else if (type === 'START') { 
         const opList = activeOps.map(o => `${o.no}.${o.name}`).join('・') || '無';
-        message = `${prefix}【入室】${dbRes.customer_name}様\n💰 総額：¥${displayTotal.toLocaleString()}\n(¥${initialTotal.toLocaleString()} + Op¥${opsTotal.toLocaleString()})\nOp：${opList}`;
+        message = `${prefix}【入室】${dbRes.customer_name}様\n💰 総額：¥${displayTotal.toLocaleString()}\n内訳：基本¥${initialTotal.toLocaleString()} + Op¥${opsTotal.toLocaleString()}\nOp内訳：${opList}`;
         toastMsg = "お店にプレイスタートを通知しました";
       } else if (type === 'FINISH') {
-        const addedStr = selectedOps.map(o => `${o.no}.${o.name}`).join('・');
         const beforeTotal = Number(dbRes.actual_total_price || initialTotal);
-        // 📍 終了時は「最終的にいくら払うべきか」をDiscordに明示
-        message = `${prefix}【退出】${dbRes.customer_name}様\n追加分：+¥${(displayTotal - beforeTotal).toLocaleString()}\n━━━━━━━━━━━━━━\n💰 最終お会計額：¥${displayTotal.toLocaleString()}\n━━━━━━━━━━━━━━\n全Op：${activeOps.map(o => `${o.no}.${o.name}`).join('・') || '無し'}`;
+        message = `${prefix}【退出】${dbRes.customer_name}様\n追加料金：+¥${(displayTotal - beforeTotal).toLocaleString()}\n━━━━━━━━━━━━━━\n💰 最終お会計額：¥${displayTotal.toLocaleString()}\n━━━━━━━━━━━━━━\n全Op内訳：${activeOps.map(o => `${o.no}.${o.name}`).join('・') || '無し'}`;
         toastMsg = "お店に退出を通知しました。お会計をお願いします。";
       }
 
       const finalMessage = label ? `[${label}] ${message}` : message;
       
-      // 3. 通知保存（数値 shop_id 対応済）
-      const insertData: any = { 
+      // 📍 通知の保存（履歴）
+      const { error: notifError } = await supabase.from('notifications').insert({ 
+        shop_id: shopNo, 
         cast_id: castId, 
         type: type.toLowerCase(), 
         message: finalMessage, 
-        is_read: false,
-        shop_id: shopNo
-      };
+        is_read: false 
+      });
 
-      const { error: notifError } = await supabase.from('notifications').insert(insertData);
       if (notifError) {
-        // IDなしで再試行
-        delete insertData.shop_id;
-        await supabase.from('notifications').insert(insertData);
+        await supabase.from('notifications').insert({ cast_id: castId, type: type.toLowerCase(), message: finalMessage, is_read: false });
       }
       
       if (type === 'START') setIsInCall(true);
       if (type === 'FINISH') setIsInCall(false);
+      
       setSelectedOps([]); 
       onToast(toastMsg);
       router.refresh();
-      if (type === 'START' || type === 'FINISH') setTimeout(() => onClose(), 500);
+      
+      if (type === 'START' || type === 'FINISH') {
+        setTimeout(() => onClose(), 500);
+      }
     } catch (err: any) { 
       alert(`保存失敗: ${err.message}`); 
     } finally { 
@@ -193,13 +204,13 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
 
   return (
     <div className="fixed inset-0 w-full h-[100dvh] z-[99999] flex flex-col bg-gray-900 text-white overflow-hidden font-sans">
+      {/* ... (UI部分は以前と同じ) ... */}
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
         <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-1.5 mb-1">
             <span className={`w-5 h-5 flex items-center justify-center rounded text-[10px] font-black shrink-0 ${dbRes?.service_type === '添' ? 'bg-pink-500' : 'bg-blue-500'}`}>{dbRes?.service_type || 'か'}</span>
             <p className="font-black text-[12px] truncate text-gray-100">{courseText}</p>
           </div>
-          {/* 最新の合計額を表示 */}
           <p className="text-[26px] font-black text-green-400 tabular-nums leading-none">
             <span className="text-[13px] align-middle opacity-60">¥</span>{initialTotal.toLocaleString()}
             <span className="text-[15px] mx-1 opacity-40">+</span>
@@ -212,7 +223,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       </div>
 
       <div className="bg-gray-800 border-b border-gray-700 px-3 py-2 flex flex-wrap gap-1 shrink-0 items-center overflow-y-auto max-h-[80px]">
-        {/* 青色：既にDBにある分 / ピンク色：今選んでる分 */}
         {savedOpsActive.map((op: any, i: number) => (
           <button key={`s-${i}`} onClick={() => toggleSavedStatus(op)} className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 ${op?.price < 0 ? 'bg-red-600' : 'bg-blue-600'}`}>{op?.no}.{op?.name} <span className="opacity-50">×</span></button>
         ))}
