@@ -1,13 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js'; // 📍 追加
 import OpCalculator from './OpCalculator';
-
-// 📍 Supabase初期化を追加
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function ReservationModal({ 
   selectedRes, onClose, onDelete, isDeleting, isEditingMemo, setIsEditingMemo, 
@@ -17,38 +11,20 @@ export default function ReservationModal({
   const [toastMsg, setToastMsg] = useState('');
   const [isOpOpen, setIsOpOpen] = useState(false);
   const [isInCall, setIsInCall] = useState(false);
-  const [isSaving, setIsSaving] = useState(false); // 📍 追加
-
-  // 📍 内部管理用の最新データステート
-  const [dbRes, setDbRes] = useState(selectedRes);
-
-  // 📍 最新データを取得する関数
-  const fetchLatest = async () => {
-    if (!selectedRes?.id) return;
-    try {
-      const { data } = await supabase.from('reservations').select('*').eq('id', selectedRes.id).single();
-      if (data) setDbRes(data);
-    } catch (err) { console.error(err); }
-  };
 
   useEffect(() => {
-    if (dbRes?.status === 'playing') {
+    if (selectedRes?.status === 'playing') {
       setIsInCall(true);
     } else {
       setIsInCall(false);
     }
-  }, [dbRes?.status]);
-
-  // 📍 OP計算を閉じた時に金額を更新
-  useEffect(() => {
-    if (!isOpOpen) fetchLatest();
-  }, [isOpOpen, selectedRes?.id]);
+  }, [selectedRes?.status]);
 
   const displayAmount = useMemo(() => {
-    const actual = Number(dbRes?.actual_total_price || 0);
-    const initial = Number(dbRes?.total_price || 0);
+    const actual = Number(selectedRes?.actual_total_price || 0);
+    const initial = Number(selectedRes?.total_price || 0);
     return actual > 0 ? actual : initial;
-  }, [dbRes?.actual_total_price, dbRes?.total_price]);
+  }, [selectedRes?.actual_total_price, selectedRes?.total_price]);
 
   const handleToast = (msg: string) => {
     setToastMsg(msg);
@@ -57,41 +33,43 @@ export default function ReservationModal({
   };
 
   const customerContext = useMemo(() => {
-    if (!dbRes) return { count: 1, lastDate: null, lastMemo: "" };
+    if (!selectedRes) return { count: 1, lastDate: null, lastMemo: "" };
     try {
       const history = Array.isArray(allPastReservations) ? allPastReservations : [];
-      const cNo = dbRes.customer_no;
+      const cNo = selectedRes.customer_no;
       if (!cNo) return { count: 1, lastDate: null, lastMemo: "" };
       const myHistory = history
-        .filter(r => r && r.customer_no === cNo && r.id !== dbRes.id)
+        .filter(r => r && r.customer_no === cNo && r.id !== selectedRes.id)
         .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")));
       const recordWithMemo = myHistory.find(r => r.cast_mem && r.cast_mem.trim() !== "");
-      return { count: history.filter(r => r.customer_no === cNo).length || 1, lastDate: myHistory[0]?.reservation_date || null, lastMemo: recordWithMemo?.cast_mem || "" };
+      return { 
+        count: history.filter(r => r.customer_no === cNo).length || 1, 
+        lastDate: myHistory[0]?.reservation_date || null, 
+        lastMemo: recordWithMemo?.cast_mem || "" 
+      };
     } catch (e) { return { count: 1, lastDate: null, lastMemo: "" }; }
-  }, [dbRes, allPastReservations]);
+  }, [selectedRes, allPastReservations]);
 
-  if (!dbRes) return null;
+  if (!selectedRes) return null;
 
   const handleEditMemoStart = () => {
-    // 📍 修正：現在のメモがなければ過去メモを引き継ぐ
-    if (dbRes.cast_mem && dbRes.cast_mem.trim() !== "") setMemoDraft(dbRes.cast_mem);
-    else setMemoDraft(customerContext.lastMemo);
+    const initialMemo = (selectedRes.cast_mem && selectedRes.cast_mem.trim() !== "") 
+      ? selectedRes.cast_mem 
+      : customerContext.lastMemo;
+    setMemoDraft(initialMemo);
     setIsEditingMemo(true);
   };
 
   const handleSave = async () => {
-    if (isSaving) return;
-    setIsSaving(true);
+    if (typeof onSaveMemo !== 'function') return;
     try {
-      // 📍 修正：直接DBの cast_mem カラムを更新
-      const { error } = await supabase.from('reservations').update({ cast_mem: memoDraft }).eq('id', dbRes.id);
-      if (error) throw error;
-      
+      await onSaveMemo();
       handleToast("メモを保存しました");
-      await fetchLatest();
-      setTimeout(() => setIsEditingMemo(false), 500);
-    } catch (e) { alert("保存エラー"); }
-    finally { setIsSaving(false); }
+      if (typeof setIsEditingMemo === 'function') setIsEditingMemo(false);
+    } catch (e) { 
+      console.error(e);
+      alert("保存に失敗しました"); 
+    }
   };
 
   const badgeBaseClass = "px-2 py-0.5 rounded text-[11px] font-black leading-none flex items-center justify-center";
@@ -102,8 +80,8 @@ export default function ReservationModal({
       
       {isOpOpen && (
         <OpCalculator 
-          selectedRes={dbRes} 
-          initialTotal={Number(dbRes.total_price || 0)} 
+          selectedRes={selectedRes} 
+          initialTotal={Number(selectedRes.total_price || 0)} 
           onToast={handleToast}
           onClose={() => setIsOpOpen(false)}
           isInCall={isInCall}
@@ -120,8 +98,8 @@ export default function ReservationModal({
       {!isOpOpen && (
         <div className="relative z-10 w-full max-w-sm bg-white rounded-[24px] flex flex-col max-h-[98vh] overflow-hidden text-gray-800 shadow-2xl mx-1">
           <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center shrink-0">
-            <p className="text-[18px] font-black">{String(dbRes.reservation_date || "").replace(/-/g, '/')}</p>
-            <button onClick={() => onClose?.()} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full text-gray-400 text-xl font-bold relative z-20">×</button>
+            <p className="text-[18px] font-black">{String(selectedRes.reservation_date || "").replace(/-/g, '/')}</p>
+            <button onClick={() => onClose?.()} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full text-gray-400 text-xl font-bold">×</button>
           </div>
 
           <div className="overflow-y-auto px-2 pt-2 pb-12 space-y-1.5 flex-1 overscroll-contain">
@@ -140,20 +118,20 @@ export default function ReservationModal({
             <div className="bg-pink-50/40 rounded-[18px] p-2.5 border border-pink-100/30">
               <div className="flex justify-between items-center mb-1.5 px-0.5">
                 <div className="flex gap-1">
-                  <span className={`${badgeBaseClass} ${getBadgeStyle?.(dbRes.service_type) || 'bg-pink-500 text-white'}`}>{dbRes.service_type || 'か'}</span>
-                  {dbRes.nomination_category && <span className={`${badgeBaseClass} ${getBadgeStyle?.(dbRes.nomination_category) || 'bg-gray-100 text-gray-400'}`}>{dbRes.nomination_category}</span>}
+                  <span className={`${badgeBaseClass} ${getBadgeStyle?.(selectedRes.service_type) || 'bg-pink-500 text-white'}`}>{selectedRes.service_type || 'か'}</span>
+                  {selectedRes.nomination_category && <span className={`${badgeBaseClass} ${getBadgeStyle?.(selectedRes.nomination_category) || 'bg-gray-100 text-gray-400'}`}>{selectedRes.nomination_category}</span>}
                 </div>
                 <div className="text-[20px] font-black text-gray-700 leading-none tabular-nums">
-                  {String(dbRes.start_time || "").substring(0, 5)}〜{String(dbRes.end_time || "").substring(0, 5)}
+                  {String(selectedRes.start_time || "").substring(0, 5)}〜{String(selectedRes.end_time || "").substring(0, 5)}
                 </div>
               </div>
-              <p className="text-[15px] font-black text-gray-700 leading-tight mb-1">{dbRes.course_info || 'コース未設定'}</p>
+              <p className="text-[15px] font-black text-gray-700 leading-tight mb-1">{selectedRes.course_info || 'コース未設定'}</p>
             </div>
 
             <div className="p-3 bg-white border border-gray-100 rounded-[18px] relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1.5 h-full bg-pink-100"></div>
               <div className="flex items-center gap-2">
-                <span className="text-[20px] font-black text-gray-800">{dbRes.customer_name || '不明'} 様</span>
+                <span className="text-[20px] font-black text-gray-800">{selectedRes.customer_name || '不明'} 様</span>
                 <span className={`${badgeBaseClass} ${customerContext.count === 1 ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-500'}`}>{customerContext.count === 1 ? '初' : `${customerContext.count}回目`}</span>
               </div>
             </div>
@@ -161,8 +139,7 @@ export default function ReservationModal({
             <div className="bg-gray-50 rounded-[18px] border-2 border-dashed border-gray-200 overflow-hidden">
               {isEditingMemo ? (
                 <div className="p-2 space-y-1.5">
-                  {/* 📍 修正：ズーム防止の16px */}
-                  <textarea value={memoDraft || ""} onChange={(e) => setMemoDraft?.(e.target.value)} className="w-full min-h-[120px] p-3 bg-white rounded-xl text-[16px] font-bold focus:outline-none resize-none" placeholder="メモを入力..." autoFocus />
+                  <textarea value={memoDraft || ""} onChange={(e) => setMemoDraft?.(e.target.value)} className="w-full min-h-[120px] p-3 bg-white rounded-xl text-[15px] font-bold focus:outline-none resize-none" placeholder="メモを入力..." autoFocus />
                   <div className="flex gap-1">
                     <button onClick={() => setIsEditingMemo?.(false)} className="flex-1 py-3 bg-white text-gray-400 rounded-xl font-black text-[13px] border">閉じる</button>
                     <button onClick={handleSave} className="flex-[2] py-3 bg-pink-500 text-white rounded-xl font-black text-[14px]">💾 保存</button>
@@ -175,8 +152,7 @@ export default function ReservationModal({
                     <span className="text-[10px] text-gray-300 font-bold">編集 ✎</span>
                   </div>
                   <div className="text-[13px] font-bold text-gray-600 leading-relaxed break-words whitespace-pre-wrap">
-                    {/* 📍 修正：秘匿表示 */}
-                    {dbRes.cast_mem ? "（タップして内容を確認）" : (customerContext.lastMemo ? "（過去メモあり：タップして確認）" : "タップして入力...")}
+                    {selectedRes.cast_mem || (customerContext.lastMemo ? `(引き継ぎ)\n${customerContext.lastMemo}` : "タップして入力...")}
                   </div>
                 </button>
               )}
