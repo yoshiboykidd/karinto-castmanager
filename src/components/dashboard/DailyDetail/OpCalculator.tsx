@@ -47,16 +47,19 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
 
   useEffect(() => {
     fetchLatest();
+    const style = document.createElement('style');
+    style.id = 'hide-app-footer';
+    style.innerHTML = `nav, footer { display: none !important; }`;
+    document.head.appendChild(style);
+    return () => { document.getElementById('hide-app-footer')?.remove(); };
   }, [selectedRes.id]);
 
   const isActuallyPlaying = useMemo(() => isInCall || dbRes?.status === 'playing', [isInCall, dbRes?.status]);
   const isCompleted = useMemo(() => dbRes?.status === 'completed', [dbRes?.status]);
   const currentCategories = useMemo(() => dbRes?.service_type === '添' ? SOINE_OPS : KARINTO_OPS, [dbRes?.service_type]);
 
-  const savedOpsActive = useMemo(() => {
-    const details = Array.isArray(dbRes?.op_details) ? dbRes.op_details : [];
-    return details.filter((op: any) => op?.status !== 'canceled');
-  }, [dbRes?.op_details]);
+  const allSavedOps = useMemo(() => Array.isArray(dbRes?.op_details) ? dbRes.op_details : [], [dbRes?.op_details]);
+  const savedOpsActive = useMemo(() => allSavedOps.filter((op: any) => op?.status !== 'canceled'), [allSavedOps]);
 
   const opsTotal = useMemo(() => {
     const savedSum = savedOpsActive.reduce((sum: number, op: any) => sum + (op?.price || 0), 0);
@@ -69,92 +72,125 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
     return initialTotal + opsTotal;
   }, [isCompleted, dbRes?.actual_total_price, initialTotal, opsTotal]);
 
+  const courseText = useMemo(() => dbRes?.course_info || (dbRes?.service_type === '添' ? '添い寝' : 'かりんと'), [dbRes]);
+
   const toggleOp = (no: string, text: string, price: number, catLabel: string) => {
     if (isCompleted) return;
     setSelectedOps((prev) => {
-      const opId = dbRes?.service_type === '添' ? `${catLabel}-${no}` : no;
-      const isAlreadySelected = prev.some(op => (dbRes?.service_type === '添' ? `${op.catLabel}-${op.no}` : op.no) === opId);
-      if (isAlreadySelected) return prev.filter(op => (dbRes?.service_type === '添' ? `${op.catLabel}-${op.no}` : op.no) !== opId);
+      const isAlreadySelected = prev.some(op => op.no === no && (dbRes?.service_type !== '添' || op.catLabel === catLabel));
+      if (isAlreadySelected) return prev.filter(op => !(op.no === no && (dbRes?.service_type !== '添' || op.catLabel === catLabel)));
       return [...prev, { no, name: text, price, catLabel, timing: 'additional', status: 'active' }];
     });
+  };
+
+  const toggleSavedStatus = async (item: any) => {
+    if (isCompleted) return;
+    const newDetails = allSavedOps.map((op: any) => {
+      if (op?.no === item?.no && op?.name === item?.name && (dbRes?.service_type !== '添' || op?.catLabel === item?.catLabel)) {
+        return { ...op, status: op.status === 'canceled' ? 'active' : 'canceled', updatedAt: new Date().toISOString() };
+      }
+      return op;
+    });
+    const newActualTotal = initialTotal + newDetails.filter((o: any) => o?.status === 'active').reduce((s: number, o: any) => s + (o?.price || 0), 0);
+    await supabase.from('reservations').update({ op_details: newDetails, actual_total_price: newActualTotal, updated_at: new Date().toISOString() }).eq('id', dbRes.id);
+    await fetchLatest();
+    router.refresh();
+  };
+
+  const handleReEdit = async () => {
+    if (!window.confirm("【確認】\n確定を取り消して、再度オプションの追加ができる状態に戻しますか？")) return;
+    setIsSending(true);
+    try {
+      const { error } = await supabase.from('reservations').update({ status: 'playing' }).eq('id', dbRes.id);
+      if (error) throw error;
+      setIsInCall(true);
+      await fetchLatest();
+      onToast("修正モードに戻りました");
+      router.refresh();
+    } catch (err: any) { alert("エラー: " + err.message); } finally { setIsSending(false); }
   };
 
   const sendNotification = async (type: 'START' | 'HELP' | 'FINISH') => {
     if (!dbRes?.id) return;
     setIsSending(true);
-
     try {
       const label = dbRes?.shop_label || "";
       const castId = String(dbRes?.login_id || dbRes?.cast_id || "");
       let shopNo = SHOP_ID_MAP[label] || Number(dbRes?.shop_id || 0) || null;
+      const cName = dbRes.customer_name || '不明';
 
-      const nowTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
-      const timeRange = `${String(dbRes.start_time || "").substring(0, 5)}-${String(dbRes.end_time || "").substring(0, 5)}`;
-      
-      const allOps = [...savedOpsActive, ...selectedOps];
-      const opNos = allOps.map(o => o.no).sort((a,b) => a.localeCompare(b, undefined, {numeric: true})).join('，');
-      
-      let statusText = type === 'START' ? '入室完了' : type === 'FINISH' ? 'プレイ終了' : 'スタッフ呼出';
-
-      // 📍 修正：ご要望の通知フォーマットに変更
-      const message = `【${dbRes.course_info || 'コース未設定'}】【${timeRange}】\n` +
-                      `【${dbRes.customer_name || '不明'}様】\n` +
-                      `【${nowTime}】 ${statusText}\n` +
-                      `【Op】(${opNos || 'なし'}) ${displayTotal.toLocaleString()}円`;
+      const newOps = [...allSavedOps, ...selectedOps.map(op => ({ ...op, timing: type === 'START' ? 'initial' : 'additional', updatedAt: new Date().toISOString() }))];
 
       if (type === 'START' || type === 'FINISH') {
-        const updateData: any = { 
-          actual_total_price: displayTotal, 
-          op_details: [...(Array.isArray(dbRes.op_details) ? dbRes.op_details : []), ...selectedOps], 
-          updated_at: new Date().toISOString() 
-        };
-        if (type === 'START') { updateData.status = 'playing'; }
-        if (type === 'FINISH') { updateData.status = 'completed'; }
-        await supabase.from('reservations').update(updateData).eq('id', dbRes.id);
+        const updateData: any = { actual_total_price: displayTotal, op_details: newOps, updated_at: new Date().toISOString() };
+        if (type === 'START') { updateData.status = 'playing'; updateData.in_call_at = new Date().toISOString(); }
+        if (type === 'FINISH') { updateData.status = 'completed'; updateData.end_time = new Date().toISOString(); }
+        const { error } = await supabase.from('reservations').update(updateData).eq('id', dbRes.id);
+        if (error) throw error;
       }
 
-      await supabase.from('notifications').insert({ 
-        shop_id: shopNo, 
-        cast_id: castId, 
-        type: type === 'HELP' ? 'help' : 'in_out',
-        content: message, 
-      });
+      let message = "";
+      if (type === 'HELP') message = `🆘 スタッフ至急！\n客名: ${cName}様`;
+      else if (type === 'START') message = `🚀 入室完了\n客名: ${cName}様\n💰 会計: ¥${displayTotal.toLocaleString()}`;
+      else if (type === 'FINISH') message = `🏁 プレイ終了\n客名: ${cName}様\n💰 最終: ¥${displayTotal.toLocaleString()}`;
 
+      const finalMsg = label ? `[${label}] ${message}` : message;
+
+      const { error: notifyError } = await supabase.from('notifications').insert({ 
+        shop_id: shopNo, cast_id: castId, type: type === 'HELP' ? 'help' : 'in_out',
+        title: type === 'START' ? '入室通知' : type === 'FINISH' ? '退室通知' : 'スタッフ呼出',
+        content: finalMsg, is_read: false 
+      });
+      if (notifyError) throw notifyError;
+      
+      if (type === 'START') setIsInCall(true);
+      if (type === 'FINISH') setIsInCall(false);
+      setSelectedOps([]); 
       onToast("送信完了");
       await fetchLatest();
-      setTimeout(() => onClose(), 500);
-    } catch (err: any) { alert(`エラー: ${err.message}`); }
-    finally { setIsSending(false); }
-  };
-
-  const handleReEdit = () => {
-    if (!confirm("完了済みの予約を修正モードに戻しますか？")) return;
-    supabase.from('reservations').update({ status: 'playing' }).eq('id', dbRes.id).then(() => fetchLatest());
+      router.refresh();
+      if (type !== 'HELP') setTimeout(() => onClose(), 500);
+    } catch (err: any) { alert(`エラー: ${err.message}`); } finally { setIsSending(false); }
   };
 
   return (
     <div className="fixed inset-0 w-full h-[100dvh] z-[99999] flex flex-col bg-gray-900 text-white overflow-hidden font-sans">
-      {/* ヘッダー */}
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
         <div className="flex-1 min-w-0 pr-2">
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className={`w-5 h-5 flex items-center justify-center rounded text-[10px] font-black shrink-0 ${dbRes?.service_type === '添' ? 'bg-pink-500' : 'bg-blue-500'}`}>{dbRes?.service_type || 'か'}</span>
+            <p className="font-black text-[12px] truncate text-gray-100">{courseText}</p>
+          </div>
           <p className="text-[26px] font-black text-green-400 tabular-nums leading-none">
-            <span className="text-[13px] opacity-60">¥</span>{displayTotal.toLocaleString()}
+            <span className="text-[13px] align-middle opacity-60">¥</span>{initialTotal.toLocaleString()}
+            <span className="text-[15px] mx-1 opacity-40">+</span>
+            <span className="text-[13px] align-middle opacity-60">¥</span>{opsTotal.toLocaleString()}
+            <span className="text-[15px] mx-1 opacity-40">=</span>
+            <span className="text-[13px] align-middle opacity-60 mr-0.5">¥</span>{displayTotal.toLocaleString()}
           </p>
         </div>
-        <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold">×</button>
+        <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold active:scale-90 shrink-0">×</button>
       </div>
 
-      {/* オプションリスト */}
-      <div className="flex-1 overflow-y-auto px-2 pt-3 pb-6 space-y-6 overscroll-contain">
+      <div className="bg-gray-800 border-b border-gray-700 px-3 py-2 flex flex-wrap gap-1 shrink-0 items-center overflow-y-auto max-h-[80px]">
+        {allSavedOps.map((op: any, i: number) => (
+          <button key={`s-${i}`} onClick={() => toggleSavedStatus(op)} className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 ${op.status === 'canceled' ? 'bg-gray-600 opacity-40' : op?.price < 0 ? 'bg-red-600' : 'bg-blue-600'}`}>{op?.no}.{op?.name} <span className="opacity-50">{op.status === 'canceled' ? '○' : '×'}</span></button>
+        ))}
+        {selectedOps.map((op, i) => (
+          <button key={`n-${i}`} onClick={() => toggleOp(op.no, op.name, op.price, op.catLabel)} className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 ${op.price < 0 ? 'bg-red-600' : 'bg-pink-600'}`}>{op.no}.{op.name} <span className="opacity-50">×</span></button>
+        ))}
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-2 pt-3 pb-6 space-y-6 scrollbar-hide overscroll-contain min-h-0">
         {currentCategories.map((cat: any) => (
           <div key={cat.label} className="space-y-2">
-            <h3 className="text-[10px] font-black text-gray-500 px-1 uppercase border-l-2 border-pink-500 ml-1 tracking-widest">{cat.label}</h3>
-            <div className="grid grid-cols-4 gap-2">
+            <h3 className="text-[10px] font-black text-gray-500 px-1 uppercase border-l-2 border-pink-500/50 ml-1 tracking-widest">{cat.label}</h3>
+            <div className="grid grid-cols-3 gap-2">
               {cat.items.map((item: any) => {
                 const isSelected = selectedOps.some(op => op.no === item.n && (dbRes?.service_type !== '添' || op.catLabel === cat.label));
                 const isSaved = savedOpsActive.some((op: any) => op?.no === item.n && (dbRes?.service_type !== '添' || op.catLabel === cat.label));
                 return (
-                  <button key={`${cat.label}-${item.n}`} onClick={() => toggleOp(item.n, item.t, item.p || (cat as any).price || 0, cat.label)} className={`min-h-[75px] rounded-[20px] flex flex-col items-center justify-center border transition-all ${isSelected || isSaved ? 'bg-pink-500 border-pink-300' : 'bg-white/5 border-white/5 text-gray-400'}`}>
+                  <button key={`${cat.label}-${item.n}`} onClick={() => toggleOp(item.n, item.t, item.p || (cat as any).price || 0, cat.label)} className={`min-h-[75px] rounded-[20px] flex flex-col items-center justify-center border transition-all ${isSelected || isSaved ? 'bg-pink-500 border-pink-300 shadow-[0_0_15px_rgba(236,72,153,0.3)]' : 'bg-white/5 border-white/5 text-gray-400'}`}>
                     <span className="text-[20px] font-black">{item.n}</span>
                     <span className="text-[11px] font-black leading-tight text-center px-1">{item.t}</span>
                   </button>
@@ -165,17 +201,16 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         ))}
       </div>
 
-      {/* アクションボタン */}
       <div className="shrink-0 p-4 bg-gray-900 border-t border-gray-800 flex gap-2 pb-[calc(env(safe-area-inset-bottom)+24px)] shadow-[0_-10px_40px_rgba(0,0,0,0.8)]">
         {isCompleted ? (
           <div className="flex-1 flex flex-col gap-2">
             <div className="py-4 bg-gray-800 text-gray-400 rounded-2xl font-black text-center">✅ プレイ終了済み</div>
-            <button onClick={handleReEdit} className="py-3 bg-red-900/30 text-red-400 border border-red-900/50 rounded-xl text-xs font-black active:scale-95 transition-all">⚠️ 内容を修正する</button>
+            <button onClick={handleReEdit} disabled={isSending} className="py-3 bg-red-900/30 text-red-400 border border-red-900/50 rounded-xl text-xs font-black active:scale-95 transition-all">⚠️ 内容を修正する</button>
           </div>
         ) : (
           <>
             <button onClick={() => sendNotification('HELP')} className="flex-1 py-3 bg-gray-700 text-white rounded-xl font-black text-[13px] active:scale-95 transition-transform">✋ 呼出</button>
-            <button onClick={() => sendNotification(isActuallyPlaying ? 'FINISH' : 'START')} disabled={isSending} className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] shadow-xl transition-all ${isActuallyPlaying ? 'bg-orange-600 shadow-orange-900/40' : 'bg-green-500 shadow-green-900/40'}`}>
+            <button onClick={() => sendNotification(isActuallyPlaying ? 'FINISH' : 'START')} disabled={isSending} className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] ${isActuallyPlaying ? 'bg-orange-600' : 'bg-green-500'} text-white shadow-xl active:scale-95 transition-all`}>
               {isSending ? '...' : isActuallyPlaying ? '🏁 プレイ終了' : '🚀 スタート'}
             </button>
           </>

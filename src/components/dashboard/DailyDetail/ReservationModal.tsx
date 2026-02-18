@@ -53,6 +53,7 @@ export default function ReservationModal({
   if (!selectedRes) return null;
 
   const handleEditMemoStart = () => {
+    // 💡 ロジック修正：既存メモがあればそれを、なければ過去メモをセット
     const initialMemo = (selectedRes.cast_mem && selectedRes.cast_mem.trim() !== "") 
       ? selectedRes.cast_mem 
       : customerContext.lastMemo;
@@ -67,7 +68,6 @@ export default function ReservationModal({
       handleToast("メモを保存しました");
       if (typeof setIsEditingMemo === 'function') setIsEditingMemo(false);
     } catch (e) { 
-      console.error(e);
       alert("保存に失敗しました"); 
     }
   };
@@ -139,7 +139,15 @@ export default function ReservationModal({
             <div className="bg-gray-50 rounded-[18px] border-2 border-dashed border-gray-200 overflow-hidden">
               {isEditingMemo ? (
                 <div className="p-2 space-y-1.5">
-                  <textarea value={memoDraft || ""} onChange={(e) => setMemoDraft?.(e.target.value)} className="w-full min-h-[120px] p-3 bg-white rounded-xl text-[15px] font-bold focus:outline-none resize-none" placeholder="メモを入力..." autoFocus />
+                  {/* 💡 ロジック修正：style={{ fontSize: '16px' }} を追加してズームを強制停止 */}
+                  <textarea 
+                    value={memoDraft || ""} 
+                    onChange={(e) => setMemoDraft?.(e.target.value)} 
+                    className="w-full min-h-[120px] p-3 bg-white rounded-xl text-[15px] font-bold focus:outline-none resize-none" 
+                    placeholder="メモを入力..." 
+                    autoFocus 
+                    style={{ fontSize: '16px' }}
+                  />
                   <div className="flex gap-1">
                     <button onClick={() => setIsEditingMemo?.(false)} className="flex-1 py-3 bg-white text-gray-400 rounded-xl font-black text-[13px] border">閉じる</button>
                     <button onClick={handleSave} className="flex-[2] py-3 bg-pink-500 text-white rounded-xl font-black text-[14px]">💾 保存</button>
@@ -152,7 +160,10 @@ export default function ReservationModal({
                     <span className="text-[10px] text-gray-300 font-bold">編集 ✎</span>
                   </div>
                   <div className="text-[13px] font-bold text-gray-600 leading-relaxed break-words whitespace-pre-wrap">
-                    {selectedRes.cast_mem || (customerContext.lastMemo ? `(引き継ぎ)\n${customerContext.lastMemo}` : "タップして入力...")}
+                    {/* 💡 ロジック修正：評価順序を確実に */}
+                    {selectedRes.cast_mem && selectedRes.cast_mem.trim() !== "" 
+                      ? selectedRes.cast_mem 
+                      : (customerContext.lastMemo ? `(引き継ぎ)\n${customerContext.lastMemo}` : "タップして入力...")}
                   </div>
                 </button>
               )}
