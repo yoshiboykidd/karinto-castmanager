@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import OpCalculator from './OpCalculator';
 
 export default function ReservationModal({ 
@@ -11,6 +11,15 @@ export default function ReservationModal({
   const [toastMsg, setToastMsg] = useState('');
   const [isOpOpen, setIsOpOpen] = useState(false);
   const [isInCall, setIsInCall] = useState(false);
+
+  // 📍 修正：DBの状態とローカルの「isInCall」を同期させる
+  useEffect(() => {
+    if (selectedRes?.status === 'playing') {
+      setIsInCall(true);
+    } else {
+      setIsInCall(false);
+    }
+  }, [selectedRes?.status]);
 
   const handleToast = (msg: string) => {
     setToastMsg(msg);
@@ -52,9 +61,12 @@ export default function ReservationModal({
   const badgeBaseClass = "px-2 py-0.5 rounded text-[11px] font-black leading-none flex items-center justify-center";
 
   return (
+    // 📍 修正：z-indexを整理し、背景クリックとボタンクリックが混同しないように設定
     <div className="fixed inset-0 z-[9998] flex items-center justify-center p-0">
-      <div className="absolute inset-0 bg-black/85 backdrop-blur-sm" onClick={() => onClose?.()} />
+      {/* 📍 背景オーバーレイ（カードの裏側） */}
+      <div className="absolute inset-0 bg-black/85 backdrop-blur-sm z-0" onClick={() => onClose?.()} />
       
+      {/* 📍 修正：計算機表示中（最前面 z-[99999]） */}
       {isOpOpen && (
         <OpCalculator 
           selectedRes={selectedRes} 
@@ -72,22 +84,30 @@ export default function ReservationModal({
         </div>
       )}
 
+      {/* 📍 メインカード（計算機が開いていない時のみ表示） */}
       {!isOpOpen && (
-        <div className="relative w-full max-w-sm bg-white rounded-[24px] flex flex-col max-h-[98vh] overflow-hidden text-gray-800 shadow-2xl mx-1">
+        <div className="relative z-10 w-full max-w-sm bg-white rounded-[24px] flex flex-col max-h-[98vh] overflow-hidden text-gray-800 shadow-2xl mx-1 animate-in zoom-in-95 duration-200">
           <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center shrink-0">
             <p className="text-[18px] font-black">{String(selectedRes.reservation_date || "").replace(/-/g, '/')}</p>
             <button onClick={() => onClose?.()} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full text-gray-400 text-xl font-bold">×</button>
           </div>
 
           <div className="overflow-y-auto px-2 pt-2 pb-12 space-y-1.5 flex-1 overscroll-contain">
-            <button onClick={() => setIsOpOpen(true)} className="w-full bg-gray-900 rounded-[20px] p-4 text-left shadow-lg active:scale-[0.98] transition-all relative overflow-hidden group">
+            {/* 📍 操作ボタン */}
+            <button 
+              onClick={() => {
+                console.log("Opening OpCalculator...");
+                setIsOpOpen(true);
+              }} 
+              className="w-full bg-gray-900 rounded-[20px] p-4 text-left shadow-lg active:scale-[0.98] transition-all relative overflow-hidden group"
+            >
               <div className="flex justify-between items-end">
                 <div>
                   <p className="text-[10px] text-gray-400 font-black uppercase mb-1 tracking-widest">To Receive</p>
                   <p className="text-[24px] font-black text-green-400 leading-none tabular-nums">¥{Number(selectedRes.total_price || 0).toLocaleString()} <span className="text-[11px] text-white/40 ml-1 font-bold">~</span></p>
                 </div>
                 <div className="bg-white/10 px-3 py-2 rounded-xl text-[12px] font-black text-white">
-                  {isInCall || selectedRes.status === 'playing' ? '追加OP通知 ⚡' : 'OP計算・開始 🚀'}
+                  {isInCall ? '追加変更・終了 ⚡' : 'OP計算・開始 🚀'}
                 </div>
               </div>
             </button>
@@ -113,6 +133,7 @@ export default function ReservationModal({
               </div>
             </div>
 
+            {/* メモエリア */}
             <div className="bg-gray-50 rounded-[18px] border-2 border-dashed border-gray-200 overflow-hidden">
               {isEditingMemo ? (
                 <div className="p-2 space-y-1.5">
@@ -123,7 +144,7 @@ export default function ReservationModal({
                   </div>
                 </div>
               ) : (
-                <button onClick={handleEditMemoStart} className="w-full p-4 text-left group">
+                <button onClick={handleEditMemoStart} className="w-full p-4 text-left group active:bg-gray-100">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-[11px] font-black text-pink-400 italic">Cast Memo</span>
                     <span className="text-[10px] text-gray-300 font-bold">編集 ✎</span>
@@ -135,7 +156,7 @@ export default function ReservationModal({
               )}
             </div>
 
-            <button onClick={() => onDelete?.()} className="w-full py-2 text-gray-300 font-bold text-[10px]">
+            <button onClick={() => onDelete?.()} className="w-full py-2 text-gray-300 font-bold text-[10px] active:text-red-400">
               {isDeleting ? '削除中...' : '🗑️ 予約を取り消す'}
             </button>
           </div>
