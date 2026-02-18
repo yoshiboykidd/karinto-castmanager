@@ -37,7 +37,7 @@ export default function MonthlySummary({ month, totals, targetAmount = 0, theme 
         <h2 className={`text-[18px] font-black ${c.textSub} tracking-tighter leading-none`}>{month}の実績</h2>
       </div>
 
-      {/* 2行目：実績バッジ（3桁対応） */}
+      {/* 2行目：実績バッジ */}
       <div className="flex justify-between gap-1 relative z-10">
         {[
           { label: '出勤', val: totals.count, unit: '日', text: c.textSub },
@@ -53,7 +53,7 @@ export default function MonthlySummary({ month, totals, targetAmount = 0, theme 
         ))}
       </div>
       
-      {/* 3行目：合計金額（さらに上下を詰める） */}
+      {/* 3行目：合計金額 */}
       <div className="text-center relative z-10 -my-2">
         <p className={`text-[52px] font-black ${c.textMain} leading-none tracking-tighter filter drop-shadow-sm [text-shadow:_0.8px_0_0_currentColor]`}>
           <span className="text-2xl mr-0.5 opacity-40 translate-y-[-4px] inline-block font-black">¥</span>
@@ -61,7 +61,7 @@ export default function MonthlySummary({ month, totals, targetAmount = 0, theme 
         </p>
       </div>
 
-      {/* 4行目：表題ラベル（枠外） */}
+      {/* 4行目：ラベル */}
       <div className="grid grid-cols-[56px_1fr_1fr_1fr] relative z-10 px-1 pt-1">
         <div />
         <p className={`text-[9px] ${c.textLabel} font-black text-center tracking-widest scale-y-90`}>フリー</p>
@@ -69,25 +69,26 @@ export default function MonthlySummary({ month, totals, targetAmount = 0, theme 
         <p className={`text-[9px] ${c.textLabel} font-black text-center tracking-widest scale-y-90`}>本指名</p>
       </div>
 
-      {/* 5〜6行目：実績グリッド（内側に薄い線を追加） */}
-      <div className={`bg-white/80 backdrop-blur-sm rounded-[20px] border ${c.subBorder} shadow-sm divide-y divide-gray-100 relative z-10 overflow-hidden`}>
-        {/* 〈か〉行 */}
-        <div className="grid grid-cols-[56px_1fr_1fr_1fr] items-center text-center divide-x divide-gray-50">
-          <div className="flex justify-center py-1.5 bg-gray-50/30 border-r border-gray-100">
-            <span className="text-[10px] font-black w-6 h-6 flex items-center justify-center rounded shrink-0 bg-blue-500 text-white shadow-sm">か</span>
+      {/* 5〜6行目：帯状の実績グリッド */}
+      <div className="space-y-1.5 relative z-10">
+        {/* 📍 〈か〉の帯 */}
+        <div className="grid grid-cols-[56px_1fr_1fr_1fr] items-center text-center bg-blue-50/60 border border-blue-100/50 rounded-2xl overflow-hidden shadow-sm">
+          <div className="flex justify-center py-2 bg-blue-500 text-white border-r border-blue-400/30">
+            <span className="text-[10px] font-black w-6 h-6 flex items-center justify-center rounded shrink-0">か</span>
           </div>
-          <p className={`py-1.5 text-[24px] font-black ${c.textMain} leading-none tracking-tighter`}>{totals.ka_f || 0}</p>
-          <p className={`py-1.5 text-[24px] font-black ${c.textMain} leading-none tracking-tighter`}>{totals.ka_first || 0}</p>
-          <p className={`py-1.5 text-[24px] font-black ${c.textMain} leading-none tracking-tighter`}>{totals.ka_main || 0}</p>
+          <p className="py-2 text-[24px] font-black text-blue-600/90 leading-none tracking-tighter">{totals.ka_f || 0}</p>
+          <p className="py-2 text-[24px] font-black text-blue-600/90 leading-none tracking-tighter">{totals.ka_first || 0}</p>
+          <p className="py-2 text-[24px] font-black text-blue-600/90 leading-none tracking-tighter">{totals.ka_main || 0}</p>
         </div>
-        {/* 〈添〉行 */}
-        <div className="grid grid-cols-[56px_1fr_1fr_1fr] items-center text-center divide-x divide-gray-50">
-          <div className="flex justify-center py-1.5 bg-gray-50/30 border-r border-gray-100">
-            <span className="text-[10px] font-black w-6 h-6 flex items-center justify-center rounded shrink-0 bg-pink-500 text-white shadow-sm">添</span>
+
+        {/* 📍 〈添〉の帯 */}
+        <div className="grid grid-cols-[56px_1fr_1fr_1fr] items-center text-center bg-pink-50/60 border border-pink-100/50 rounded-2xl overflow-hidden shadow-sm">
+          <div className="flex justify-center py-2 bg-pink-500 text-white border-r border-pink-400/30">
+            <span className="text-[10px] font-black w-6 h-6 flex items-center justify-center rounded shrink-0">添</span>
           </div>
-          <p className={`py-1.5 text-[24px] font-black ${c.textMain} leading-none tracking-tighter`}>{totals.soe_f || 0}</p>
-          <p className={`py-1.5 text-[24px] font-black ${c.textMain} leading-none tracking-tighter`}>{totals.soe_first || 0}</p>
-          <p className={`py-1.5 text-[24px] font-black ${c.textMain} leading-none tracking-tighter`}>{totals.soe_main || 0}</p>
+          <p className="py-2 text-[24px] font-black text-pink-600/90 leading-none tracking-tighter">{totals.soe_f || 0}</p>
+          <p className="py-2 text-[24px] font-black text-pink-600/90 leading-none tracking-tighter">{totals.soe_first || 0}</p>
+          <p className="py-2 text-[24px] font-black text-pink-600/90 leading-none tracking-tighter">{totals.soe_main || 0}</p>
         </div>
       </div>
     </section>
