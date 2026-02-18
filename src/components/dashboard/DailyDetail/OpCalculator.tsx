@@ -4,11 +4,11 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 
-// 📍 クライアント初期化
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// 📍 CSV確定データ
 const SHOP_DICT: { [key: string]: number } = {
   '池東': 11, '池袋東口': 11, '池西': 6, '池袋西口': 6, '大久保': 10,
   '神田': 1, '赤坂': 2, '秋葉原': 3, '上野': 4, '渋谷': 5, '五反田': 7, '大宮': 8, '吉祥寺': 9, '小岩': 12
@@ -35,23 +35,13 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
   const router = useRouter();
   const [selectedOps, setSelectedOps] = useState<any[]>([]);
   const [isSending, setIsSending] = useState(false);
-  
-  // 📍 修正：初期値を selectedRes に設定しつつ、DBと同期する
   const [dbRes, setDbRes] = useState(selectedRes);
 
   useEffect(() => {
-    // 📍 修正：406エラーを回避するため .single() を使わずに取得
+    // 📍 修正：406エラーを回避して最新データを取得
     const fetchLatest = async () => {
-      try {
-        const { data, error } = await supabase.from('reservations').select('*').eq('id', selectedRes.id);
-        if (error) throw error;
-        if (data && data.length > 0) {
-          setDbRes(data[0]);
-          console.log("[OpCalc] Sync Successful:", data[0]);
-        }
-      } catch (err) {
-        console.error("[OpCalc] Sync Failed:", err);
-      }
+      const { data } = await supabase.from('reservations').select('*').eq('id', selectedRes.id);
+      if (data && data.length > 0) setDbRes(data[0]);
     };
     fetchLatest();
 
@@ -101,17 +91,11 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
     });
     const newActualTotal = initialTotal + newDetails.filter((o: any) => o?.status === 'active').reduce((s: number, o: any) => s + (o?.price || 0), 0);
     
-    const { error } = await supabase.from('reservations').update({ 
-      op_details: newDetails, 
-      actual_total_price: newActualTotal 
-    }).eq('id', dbRes.id);
-    
-    if (error) alert("更新失敗: " + error.message);
-    else {
-      const { data } = await supabase.from('reservations').select('*').eq('id', dbRes.id);
-      if (data && data.length > 0) setDbRes(data[0]);
-      router.refresh();
-    }
+    // 📍 修正：reservationsを直接叩く
+    await supabase.from('reservations').update({ op_details: newDetails, actual_total_price: newActualTotal }).eq('id', dbRes.id);
+    const { data } = await supabase.from('reservations').select('*').eq('id', dbRes.id);
+    if (data && data.length > 0) setDbRes(data[0]);
+    router.refresh();
   };
 
   const sendNotification = async (type: 'START' | 'HELP' | 'FINISH') => {
@@ -121,73 +105,40 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
     try {
       const label = dbRes?.shop_label || "";
       const castId = String(dbRes?.login_id || dbRes?.cast_id || "");
-      let shopNo: number | null = SHOP_DICT[label] || null;
-      if (shopNo === null) shopNo = Number(dbRes?.shop_id || dbRes?.shopId || 0);
+      let shopNo: number | null = SHOP_DICT[label] || Number(dbRes?.shop_id || 0) || null;
 
-      const prefix = dbRes.service_type === '添' ? '【添】' : '【か】';
-      const currentOpDetails = Array.isArray(dbRes.op_details) ? dbRes.op_details : [];
-      const newOpDetails = [...currentOpDetails];
-      
-      // 📍 修正：今回の選択分をマージ
-      if (selectedOps.length > 0) {
-        newOpDetails.push(...selectedOps.map(op => ({ 
-          ...op, 
-          timing: type === 'START' ? 'initial' : 'additional', 
-          updatedAt: new Date().toISOString() 
-        })));
-      }
+      // 📍 累積データの準備
+      const currentOps = Array.isArray(dbRes.op_details) ? dbRes.op_details : [];
+      const newOps = [...currentOps, ...selectedOps.map(op => ({ ...op, timing: type === 'START' ? 'initial' : 'additional', updatedAt: new Date().toISOString() }))];
 
-      // 📍 修正：reservationsテーブルを確実に更新
+      // 📍 修正：reservationsテーブルの上書き保存を強制
       if (type === 'START' || type === 'FINISH') {
-        const updateData: any = { 
-          actual_total_price: displayTotal, 
-          op_details: newOpDetails, 
-          updated_at: new Date().toISOString() 
-        };
-        if (type === 'START') { updateData.status = 'playing'; updateData.in_call_at = new Date().toISOString(); }
-        if (type === 'FINISH') { updateData.status = 'completed'; updateData.end_time = new Date().toISOString(); }
+        const upData: any = { actual_total_price: displayTotal, op_details: newOps, updated_at: new Date().toISOString() };
+        if (type === 'START') { upData.status = 'playing'; upData.in_call_at = new Date().toISOString(); }
+        if (type === 'FINISH') { upData.status = 'completed'; upData.end_time = new Date().toISOString(); }
         
-        console.log(`[OpCalc] DB Update for ${type}:`, updateData);
-        const { error: resError } = await supabase.from('reservations').update(updateData).eq('id', dbRes.id);
-        if (resError) throw resError;
+        const { error } = await supabase.from('reservations').update(upData).eq('id', dbRes.id);
+        if (error) throw new Error(`reservations更新失敗: ${error.message}`);
       }
 
+      // メッセージ作成
       let message = "";
-      let toastMsg = "";
-      const activeOps = newOpDetails.filter(o => o.status !== 'canceled');
+      if (type === 'HELP') message = `【呼出】${dbRes.customer_name}様：スタッフ至急！`;
+      else if (type === 'START') message = `【入室】${dbRes.customer_name}様\n💰 合計：¥${displayTotal.toLocaleString()}\n内訳：基本¥${initialTotal.toLocaleString()} + Op¥${opsTotal.toLocaleString()}`;
+      else if (type === 'FINISH') message = `【退出】${dbRes.customer_name}様\n━━━━━━━━━━━━━━\n💰 最終会計：¥${displayTotal.toLocaleString()}\n━━━━━━━━━━━━━━`;
+
+      const finalMsg = label ? `[${label}] ${message}` : message;
       
-      if (type === 'HELP') { 
-        message = `${prefix}【呼出】${dbRes.customer_name}様：スタッフ至急！`; 
-        toastMsg = "スタッフを呼びました"; 
-      }
-      else if (type === 'START') { 
-        const opList = activeOps.map(o => `${o.no}.${o.name}`).join('・') || '無';
-        message = `${prefix}【入室】${dbRes.customer_name}様\n💰 総額：¥${displayTotal.toLocaleString()}\n内訳：¥${initialTotal.toLocaleString()} + Op¥${opsTotal.toLocaleString()}\nOp内訳：${opList}`;
-        toastMsg = "お店にプレイスタートを通知しました";
-      } else if (type === 'FINISH') {
-        const beforeTotal = Number(dbRes.actual_total_price || initialTotal);
-        message = `${prefix}【退出】${dbRes.customer_name}様\n追加料金：+¥${(displayTotal - beforeTotal).toLocaleString()}\n━━━━━━━━━━━━━━\n💰 最終お会計額：¥${displayTotal.toLocaleString()}\n━━━━━━━━━━━━━━\n全Op：${activeOps.map(o => `${o.no}.${o.name}`).join('・') || '無し'}`;
-        toastMsg = "お店に退出を通知しました。お会計をお願いします。";
-      }
-
-      const finalMessage = label ? `[${label}] ${message}` : message;
-      const { error: notifError } = await supabase.from('notifications').insert({ 
-        shop_id: shopNo, 
-        cast_id: castId, 
-        type: type.toLowerCase(), 
-        message: finalMessage, 
-        is_read: false 
-      });
-
-      if (notifError) await supabase.from('notifications').insert({ cast_id: castId, type: type.toLowerCase(), message: finalMessage, is_read: false });
+      // 📍 notificationsへ履歴追加
+      await supabase.from('notifications').insert({ shop_id: shopNo, cast_id: castId, type: type.toLowerCase(), message: finalMsg, is_read: false });
       
       if (type === 'START') setIsInCall(true);
       if (type === 'FINISH') setIsInCall(false);
       setSelectedOps([]); 
-      onToast(toastMsg);
+      onToast("送信完了");
       router.refresh();
-      if (type === 'START' || type === 'FINISH') setTimeout(() => onClose(), 500);
-    } catch (err: any) { alert(`保存失敗: ${err.message}`); } finally { setIsSending(false); }
+      if (type !== 'HELP') setTimeout(() => onClose(), 500);
+    } catch (err: any) { alert(err.message); } finally { setIsSending(false); }
   };
 
   return (
@@ -236,13 +187,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
             </div>
           </div>
         ))}
-        {dbRes?.service_type !== '添' && (
-          <div className="px-1 pt-2">
-            <button onClick={() => toggleOp('割', 'Op割', -500, '特別')} className={`w-full py-4 rounded-[20px] border transition-all flex items-center justify-center gap-2 ${selectedOps.some(op => op.no === '割') || savedOpsActive.some((op: any) => op.no === '割') ? 'bg-red-500 border-red-300 shadow-[0_0_15px_rgba(239,68,68,0.3)] text-white' : 'bg-white/5 border-white/5 text-gray-400'}`}>
-              <span className="text-[18px] font-black">Op割 -500</span>
-            </button>
-          </div>
-        )}
       </div>
 
       <div className="shrink-0 p-4 bg-gray-900 border-t border-gray-800 flex gap-2 pb-[calc(env(safe-area-inset-bottom)+24px)] shadow-[0_-10px_40px_rgba(0,0,0,0.8)]">
