@@ -20,6 +20,13 @@ export default function ReservationModal({
     }
   }, [selectedRes?.status]);
 
+  // 📍 修正：表示料金の計算ロジックを追加
+  const displayAmount = useMemo(() => {
+    const actual = Number(selectedRes?.actual_total_price || 0);
+    const initial = Number(selectedRes?.total_price || 0);
+    return actual > 0 ? actual : initial;
+  }, [selectedRes?.actual_total_price, selectedRes?.total_price]);
+
   const handleToast = (msg: string) => {
     setToastMsg(msg);
     setShowToast(true);
@@ -92,7 +99,8 @@ export default function ReservationModal({
               <div className="flex justify-between items-end">
                 <div>
                   <p className="text-[10px] text-gray-400 font-black uppercase mb-1 tracking-widest">To Receive</p>
-                  <p className="text-[24px] font-black text-green-400 leading-none tabular-nums">¥{Number(selectedRes.total_price || 0).toLocaleString()} <span className="text-[11px] text-white/40 ml-1 font-bold">~</span></p>
+                  {/* 📍 修正：確定額または基本料金を表示 */}
+                  <p className="text-[24px] font-black text-green-400 leading-none tabular-nums">¥{displayAmount.toLocaleString()} <span className="text-[11px] text-white/40 ml-1 font-bold">~</span></p>
                 </div>
                 <div className="bg-white/10 px-3 py-2 rounded-xl text-[12px] font-black text-white">
                   {isInCall ? '追加変更・終了 ⚡' : 'OP計算・開始 🚀'}
