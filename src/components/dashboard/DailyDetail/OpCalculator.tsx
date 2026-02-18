@@ -4,12 +4,13 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 
+// 📍 警告対策：Supabaseクライアント
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// 📍 CSVに基づく店舗名マップ
-const SHOP_ID_MAP: { [key: string]: number } = {
+// 📍 CSVデータに基づく数値ID辞書
+const SHOP_DICT: { [key: string]: number } = {
   '池東': 11, '池袋東口': 11,
   '池西': 6,  '池袋西口': 6,
   '大久保': 10,
@@ -17,54 +18,20 @@ const SHOP_ID_MAP: { [key: string]: number } = {
 };
 
 const KARINTO_OPS = [
-  { label: '¥500 Op', price: 500, items: [
-    { n: '10', t: '上ラン' }, { n: '11', t: '抱きつき' }, { n: '12', t: '足なで' }, 
-    { n: '13', t: 'つば垂らし' }, { n: '14', t: '匂い嗅ぎ' }, { n: '15', t: '踏付け' }, 
-    { n: '16', t: '足こき' }, { n: '17', t: 'チラっとパンツ見せ' }, { n: '18', t: '拘束テープ' }, 
-    { n: '19', t: '+500' }
-  ]},
-  { label: '¥1,000 Op', price: 1000, items: [
-    { n: '20', t: '乳もみ' }, { n: '21', t: 'お尻触り' }, { n: '22', t: '下ラン' }, 
-    { n: '23', t: 'スク水' }, { n: '24', t: '指アナル' }, { n: '25', t: 'ストッキング責め' }, 
-    { n: '26', t: '+1000' }, { n: '27', t: '+1000' }
-  ]},
-  { label: '¥1,500 Op', price: 1500, items: [
-    { n: '30', t: '乳舐め' }, { n: '31', t: 'オーラン' }, { n: '32', t: 'ハッピーセット' }, 
-    { n: '33', t: 'いやら尻触り' }, { n: '34', t: '美脚三昧' }, { n: '35', t: 'ノーブラTシャツ' }, 
-    { n: '36', t: '顔面騎乗' }, { n: '37', t: '+1500' }
-  ]},
-  { label: '¥2,000 Op', price: 2000, items: [
-    { n: '40', t: 'ノーブラTシャツ乳もみ' }, { n: '41', t: '+2000' }, { n: '42', t: '+2000' }
-  ]},
-  { label: '¥2,500 Op', price: 2500, items: [
-    { n: '50', t: '上ラン生乳もみ' }, { n: '51', t: '+2500' }, { n: '52', t: '+2500' }
-  ]},
-  { label: '¥3,000 Op', price: 3000, items: [
-    { n: '60', t: 'トップレス' }, { n: '61', t: 'バリューセット' }, { n: '62', t: 'ノーブラ生乳もみ' }, 
-    { n: '63', t: '+3000' }, { n: '64', t: '+3000' }
-  ]},
-  { label: '¥3,500 Op', price: 3500, items: [
-    { n: '71', t: 'トップレス生乳もみ' }
-  ]},
+  { label: '¥500 Op', price: 500, items: [{ n: '10', t: '上ラン' }, { n: '11', t: '抱きつき' }, { n: '12', t: '足なで' }, { n: '13', t: 'つば垂らし' }, { n: '14', t: '匂い嗅ぎ' }, { n: '15', t: '踏付け' }, { n: '16', t: '足こき' }, { n: '17', t: 'チラっとパンツ見せ' }, { n: '18', t: '拘束テープ' }, { n: '19', t: '+500' }]},
+  { label: '¥1,000 Op', price: 1000, items: [{ n: '20', t: '乳もみ' }, { n: '21', t: 'お尻触り' }, { n: '22', t: '下ラン' }, { n: '23', t: 'スク水' }, { n: '24', t: '指アナル' }, { n: '25', t: 'ストッキング責め' }, { n: '26', t: '+1000' }, { n: '27', t: '+1000' }]},
+  { label: '¥1,500 Op', price: 1500, items: [{ n: '30', t: '乳舐め' }, { n: '31', t: 'オーラン' }, { n: '32', t: 'ハッピーセット' }, { n: '33', t: 'いやら尻触り' }, { n: '34', t: '美脚三昧' }, { n: '35', t: 'ノーブラTシャツ' }, { n: '36', t: '顔面騎乗' }, { n: '37', t: '+1500' }]},
+  { label: '¥2,000 Op', price: 2000, items: [{ n: '40', t: 'ノーブラTシャツ乳もみ' }, { n: '41', t: '+2000' }, { n: '42', t: '+2000' }]},
+  { label: '¥2,500 Op', price: 2500, items: [{ n: '50', t: '上ラン生乳もみ' }, { n: '51', t: '+2500' }, { n: '52', t: '+2500' }]},
+  { label: '¥3,000 Op', price: 3000, items: [{ n: '60', t: 'トップレス' }, { n: '61', t: 'バリューセット' }, { n: '62', t: 'ノーブラ生乳もみ' }, { n: '63', t: '+3000' }, { n: '64', t: '+3000' }]},
+  { label: '¥3,500 Op', price: 3500, items: [{ n: '71', t: 'トップレス生乳もみ' }]},
 ];
 
 const SOINE_OPS = [
-  { label: '45分価格', items: [
-    { n: '3-1', t: '3点セット 45分1', p: 2500 }, { n: '3-2', t: '3点セット 45分2', p: 2500 }, { n: '3-3', t: '3点セット 45分3', p: 2500 }, { n: '3-4', t: '3点セット 45分4', p: 2500 }, { n: '3-5', t: '3点セット 45分5', p: 2500 },
-    { n: '1', t: '単品 45分1', p: 1000 }, { n: '2', t: '単品 45分2', p: 1000 }, { n: '3', t: '単品 45分3', p: 1000 }, { n: '4', t: '単品 45分4', p: 1000 }, { n: '5', t: '単品 45分5', p: 1000 }
-  ]},
-  { label: '60分価格', items: [
-    { n: '3-1', t: '3点セット 60分1', p: 2000 }, { n: '3-2', t: '3点セット 60分2', p: 2000 }, { n: '3-3', t: '3点セット 60分3', p: 2000 }, { n: '3-4', t: '3点セット 60分4', p: 2000 }, { n: '3-5', t: '3点セット 60分5', p: 2000 },
-    { n: '1', t: '単品 60分1', p: 1000 }, { n: '2', t: '単品 60分2', p: 1000 }, { n: '3', t: '単品 60分3', p: 1000 }, { n: '4', t: '単品 60分4', p: 1000 }, { n: '5', t: '単品 60分5', p: 1000 }
-  ]},
-  { label: '90分価格', items: [
-    { n: '3-1', t: '3点セット 90分1', p: 1500 }, { n: '3-2', t: '3点セット 90分2', p: 1500 }, { n: '3-3', t: '3点セット 90分3', p: 1500 }, { n: '3-4', t: '3点セット 90分4', p: 1500 }, { n: '3-5', t: '3点セット 90分5', p: 1500 },
-    { n: '1', t: '単品 90分1', p: 500 }, { n: '2', t: '単品 90分2', p: 500 }, { n: '3', t: '単品 90分3', p: 500 }, { n: '4', t: '単品 90分4', p: 500 }, { n: '5', t: '単品 90分5', p: 500 }
-  ]},
-  { label: '120分価格', items: [
-    { n: '3-1', t: '3点セット 120分1', p: 1000 }, { n: '3-2', t: '3点セット 120分2', p: 1000 }, { n: '3-3', t: '3点セット 120分3', p: 1000 }, { n: '3-4', t: '3点セット 120分4', p: 1000 }, { n: '3-5', t: '3点セット 120分5', p: 1000 },
-    { n: '1', t: '単品 120分1', p: 500 }, { n: '2', t: '単品 120分2', p: 500 }, { n: '3', t: '単品 120分3', p: 500 }, { n: '4', t: '単品 120分4', p: 500 }, { n: '5', t: '単品 120分5', p: 500 }
-  ]},
+  { label: '45分価格', items: [{ n: '3-1', t: '3点セット 45分1', p: 2500 }, { n: '3-2', t: '3点セット 45分2', p: 2500 }, { n: '3-3', t: '3点セット 45分3', p: 2500 }, { n: '3-4', t: '3点セット 45分4', p: 2500 }, { n: '3-5', t: '3点セット 45分5', p: 2500 }, { n: '1', t: '単品 45分1', p: 1000 }, { n: '2', t: '単品 45分2', p: 1000 }, { n: '3', t: '単品 45分3', p: 1000 }, { n: '4', t: '単品 45分4', p: 1000 }, { n: '5', t: '単品 45分5', p: 1000 }]},
+  { label: '60分価格', items: [{ n: '3-1', t: '3点セット 60分1', p: 2000 }, { n: '3-2', t: '3点セット 60分2', p: 2000 }, { n: '3-3', t: '3点セット 60分3', p: 2000 }, { n: '3-4', t: '3点セット 60分4', p: 2000 }, { n: '3-5', t: '3点セット 60分5', p: 2000 }, { n: '1', t: '単品 60分1', p: 1000 }, { n: '2', t: '単品 60分2', p: 1000 }, { n: '3', t: '単品 60分3', p: 1000 }, { n: '4', t: '単品 60分4', p: 1000 }, { n: '5', t: '単品 60分5', p: 1000 }]},
+  { label: '90分価格', items: [{ n: '3-1', t: '3点セット 90分1', p: 1500 }, { n: '3-2', t: '3点セット 90分2', p: 1500 }, { n: '3-3', t: '3点セット 90分3', p: 1500 }, { n: '3-4', t: '3点セット 90分4', p: 1500 }, { n: '3-5', t: '3点セット 90分5', p: 1500 }, { n: '1', t: '単品 90分1', p: 500 }, { n: '2', t: '単品 90分2', p: 500 }, { n: '3', t: '単品 90分3', p: 500 }, { n: '4', t: '単品 90分4', p: 500 }, { n: '5', t: '単品 90分5', p: 500 }]},
+  { label: '120分価格', items: [{ n: '3-1', t: '3点セット 120分1', p: 1000 }, { n: '3-2', t: '3点セット 120分2', p: 1000 }, { n: '3-3', t: '3点セット 120分3', p: 1000 }, { n: '3-4', t: '3点セット 120分4', p: 1000 }, { n: '3-5', t: '3点セット 120分5', p: 1000 }, { n: '1', t: '単品 120分1', p: 500 }, { n: '2', t: '単品 120分2', p: 500 }, { n: '3', t: '単品 120分3', p: 500 }, { n: '4', t: '単品 120分4', p: 500 }, { n: '5', t: '単品 120分5', p: 500 }]},
 ];
 
 export default function OpCalculator({ selectedRes, initialTotal, onToast, onClose, isInCall, setIsInCall }: any) {
@@ -77,10 +44,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
     style.id = 'hide-app-footer';
     style.innerHTML = `nav, footer { display: none !important; }`;
     document.head.appendChild(style);
-    return () => {
-      const target = document.getElementById('hide-app-footer');
-      if (target) target.remove();
-    };
+    return () => { document.getElementById('hide-app-footer')?.remove(); };
   }, []);
 
   const isActuallyPlaying = useMemo(() => isInCall || selectedRes?.status === 'playing', [isInCall, selectedRes?.status]);
@@ -121,7 +85,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       return op;
     });
     const newActualTotal = initialTotal + newDetails.filter((o: any) => o?.status === 'active').reduce((s: number, o: any) => s + (o?.price || 0), 0);
-    
     const { error } = await supabase.from('reservations').update({ op_details: newDetails, actual_total_price: newActualTotal }).eq('id', selectedRes.id);
     if (error) alert("更新エラー: " + error.message);
     else router.refresh();
@@ -132,100 +95,67 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
     setIsSending(true);
 
     try {
-      const shopLabel = selectedRes?.shop_label || '';
-      const castIdStr = String(selectedRes?.login_id || selectedRes?.cast_id || '');
-      
-      // 📍 修正：ショップ番号特定ロジック（徹底版）
-      let targetShopId: any = null;
-      
-      // 1. マップから引く（池東 -> 11）
-      if (SHOP_ID_MAP[shopLabel]) {
-        targetShopId = SHOP_ID_MAP[shopLabel];
-      } 
-      // 2. キャストIDの頭2〜3桁から推測（11101 -> 11） [cite: 2026-02-18]
-      else if (castIdStr.length >= 3) {
-        const head2 = castIdStr.substring(0, 2);
-        if (Object.values(SHOP_ID_MAP).includes(Number(head2))) {
-          targetShopId = Number(head2);
-        }
+      // 📍 修正：shop_id の絶対特定ロジック
+      const label = selectedRes?.shop_label || "";
+      const castId = String(selectedRes?.login_id || selectedRes?.cast_id || "");
+      let shopNo: number | null = null;
+
+      // ① 辞書から引く
+      if (SHOP_DICT[label]) shopNo = SHOP_DICT[label];
+      // ② キャストIDの頭2桁（池東11...なら11）から推測
+      else if (castId.length >= 2 && SHOP_DICT[Object.keys(SHOP_DICT).find(k => SHOP_DICT[k] === Number(castId.substring(0, 2))) || ""]) {
+        shopNo = Number(castId.substring(0, 2));
       }
-      // 3. 元データにある ID を使う
-      if (targetShopId === null) {
-        targetShopId = selectedRes?.shop_id || selectedRes?.shopId || null;
-      }
+      // ③ 元データにあればそれを使う
+      if (shopNo === null) shopNo = Number(selectedRes?.shop_id || selectedRes?.shopId || 0);
 
       const prefix = selectedRes.service_type === '添' ? '【添】' : '【か】';
       const details = Array.isArray(selectedRes.op_details) ? selectedRes.op_details : [];
       const newOpDetails = [...details];
       if (selectedOps.length > 0) {
-        const taggedOps = selectedOps.map(op => ({ ...op, timing: type === 'START' ? 'initial' : 'additional', updatedAt: new Date().toISOString() }));
-        newOpDetails.push(...taggedOps);
+        newOpDetails.push(...selectedOps.map(op => ({ ...op, timing: type === 'START' ? 'initial' : 'additional', updatedAt: new Date().toISOString() })));
       }
 
       if (type === 'START' || type === 'FINISH') {
         const updateData: any = { actual_total_price: displayTotal, op_details: newOpDetails, updated_at: new Date().toISOString() };
         if (type === 'START') { updateData.status = 'playing'; updateData.in_call_at = new Date().toISOString(); }
         if (type === 'FINISH') { updateData.status = 'completed'; updateData.end_time = new Date().toISOString(); }
-        const { error: resError } = await supabase.from('reservations').update(updateData).eq('id', selectedRes.id);
-        if (resError) throw resError;
+        await supabase.from('reservations').update(updateData).eq('id', selectedRes.id);
       }
 
       let message = "";
       let toastMsg = "";
-      if (type === 'HELP') {
-        message = `${prefix}【呼出】${selectedRes.customer_name}様：スタッフ至急！`;
-        toastMsg = "スタッフを呼びました";
-      } else if (type === 'START') {
+      if (type === 'HELP') { message = `${prefix}【呼出】${selectedRes.customer_name}様：スタッフ至急！`; toastMsg = "スタッフを呼びました"; }
+      else if (type === 'START') { 
         const opDetail = selectedOps.map(o => `${o.no}.${o.name}`).join('・') || '無';
         message = `${prefix}【入室】${selectedRes.customer_name}様\nコース：${courseText}\n金額：¥${initialTotal.toLocaleString()}+Op¥${opsTotal.toLocaleString()}＝合計¥${displayTotal.toLocaleString()}\nOp内訳：${opDetail}`;
         toastMsg = "【お店にプレイスタートを通知しました】";
       } else if (type === 'FINISH') {
-        const addedOpsStr = selectedOps.map(o => `${o.no}.${o.name}`).join('・');
-        const canceledAtEnd = newOpDetails.filter((o: any) => o?.status === 'canceled' && o?.updatedAt > (selectedRes.in_call_at || "")).map((o: any) => `(取)${o.name}`).join('・');
-        const changeDetail = [addedOpsStr, canceledAtEnd].filter(Boolean).join('・') || '無し';
-        const diffTotal = displayTotal - (selectedRes.actual_total_price || initialTotal);
-        message = `${prefix}【追加変更】${selectedRes.customer_name}様\n追加OP\nOp内訳：${changeDetail}\n追加合計：¥${diffTotal.toLocaleString()}`;
+        const addedStr = selectedOps.map(o => `${o.no}.${o.name}`).join('・');
+        const canceledStr = newOpDetails.filter((o: any) => o?.status === 'canceled' && o?.updatedAt > (selectedRes.in_call_at || "")).map((o: any) => `(取)${o.name}`).join('・');
+        message = `${prefix}【追加変更】${selectedRes.customer_name}様\n追加OP\nOp内訳：${[addedStr, canceledStr].filter(Boolean).join('・') || '無し'}\n追加合計：¥${(displayTotal - (selectedRes.actual_total_price || initialTotal)).toLocaleString()}`;
         toastMsg = "【お店に退出を通知しました。電話連絡もしてください】";
       }
 
-      const finalMessage = shopLabel ? `[${shopLabel}] ${message}` : message;
-      
-      // 📍 修正：送信データを確実に数値化・整形
-      const insertData: any = { 
-        cast_id: castIdStr, 
+      const finalMessage = label ? `[${label}] ${message}` : message;
+      // 📍 ここで数値を強制！
+      const { error: notifError } = await supabase.from('notifications').insert({ 
+        shop_id: shopNo, 
+        cast_id: castId, 
         type: type.toLowerCase(), 
         message: finalMessage, 
         is_read: false 
-      };
-      
-      // 確実に「数値」として送る
-      if (targetShopId !== null) {
-        insertData.shop_id = Number(targetShopId);
-      }
+      });
 
-      const { error: notifError } = await supabase.from('notifications').insert(insertData);
-      
-      // 型エラーによる失敗をカバー
-      if (notifError) {
-        console.warn("[OpCalc] Retrying without shop_id due to error:", notifError.message);
-        delete insertData.shop_id;
-        await supabase.from('notifications').insert(insertData);
-      }
+      if (notifError) throw notifError;
       
       if (type === 'START') setIsInCall(true);
       if (type === 'FINISH') setIsInCall(false);
-      
       setSelectedOps([]); 
       onToast(toastMsg);
       router.refresh();
-      if (type === 'START' || type === 'FINISH') {
-        setTimeout(() => onClose(), 500);
-      }
-    } catch (err: any) { 
-      alert(`保存失敗: ${err.message || "通信エラー"}`); 
-    } finally { 
-      setIsSending(false); 
-    }
+      if (type === 'START' || type === 'FINISH') setTimeout(() => onClose(), 500);
+    } catch (err: any) { alert(`保存失敗: ${err.message}`); } finally { setIsSending(false); }
   };
 
   return (
@@ -254,7 +184,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         {selectedOps.map((op, i) => (
           <button key={`n-${i}`} onClick={() => toggleOp(op.no, op.name, op.price, op.catLabel)} className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 ${op.price < 0 ? 'bg-red-600' : 'bg-pink-600'}`}>{op.no}.{op.name} <span className="opacity-50">×</span></button>
         ))}
-        {savedOpsActive.length === 0 && selectedOps.length === 0 && <p className="text-[11px] text-gray-500 font-black italic">※ オプションを選択してください</p>}
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pt-3 pb-6 space-y-6 scrollbar-hide overscroll-contain min-h-0">
@@ -285,9 +214,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       </div>
 
       <div className="shrink-0 p-4 bg-gray-900 border-t border-gray-800 flex gap-2 pb-[calc(env(safe-area-inset-bottom)+24px)] shadow-[0_-10px_40px_rgba(0,0,0,0.8)]">
-        {isCompleted ? (
-          <div className="flex-1 py-4 bg-gray-800 text-gray-500 rounded-2xl font-black text-center">✅ プレイ終了済み</div>
-        ) : (
+        {isCompleted ? <div className="flex-1 py-4 bg-gray-800 text-gray-500 rounded-2xl font-black text-center">✅ プレイ終了済み</div> : (
           <>
             <button onClick={() => sendNotification('HELP')} className="flex-1 py-3 bg-gray-700 text-white rounded-xl font-black text-[13px] active:scale-95 transition-transform">✋ 呼出</button>
             <button onClick={() => sendNotification(isActuallyPlaying ? 'FINISH' : 'START')} disabled={isSending} className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] ${isActuallyPlaying ? 'bg-orange-600' : 'bg-green-500'} text-white shadow-xl active:scale-95 transition-all`}>
