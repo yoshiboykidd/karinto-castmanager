@@ -1,156 +1,186 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import React, { useState, useMemo, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js'; // 📍 修正：追加
 import OpCalculator from './OpCalculator';
 
-// 📍 修正：環境変数のガード（Vercelでのクラッシュ防止） [cite: 2026-01-29]
+// 📍 修正：Supabaseクライアントの初期化 [cite: 2026-01-29]
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-export default function ReservationModal({ selectedRes, onClose, onToast }: any) {
-  // 📍 修正：コンポーネント冒頭でデータの存在チェック（Uncaught TypeError 回避）
-  if (!selectedRes) return null;
-
+export default function ReservationModal({ 
+  selectedRes, onClose, onDelete, isDeleting, isEditingMemo, setIsEditingMemo, 
+  memoDraft, setMemoDraft, onSaveMemo, getBadgeStyle, allPastReservations = []
+}: any) {
+  const [showToast, setShowToast] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
   const [isOpOpen, setIsOpOpen] = useState(false);
-  const [memoDraft, setMemoDraft] = useState(selectedRes?.memo || "");
-  const [isSaving, setIsSaving] = useState(false);
-  const [isInCall, setIsInCall] = useState(selectedRes?.status === 'playing');
-
-  // 最新のDBデータを保持するためのステート [cite: 2026-01-29]
+  const [isInCall, setIsInCall] = useState(false);
+  
+  // 📍 修正：最新データを保持するステート [cite: 2026-01-29]
   const [dbRes, setDbRes] = useState(selectedRes);
 
-  // 📍 修正：DBから最新の予約情報を取得する関数
+  // 📍 修正：DBから最新情報を取得する関数 [cite: 2026-01-29]
   const fetchLatest = async () => {
-    if (!supabase || !selectedRes?.id) return;
     try {
-      const { data, error } = await supabase
-        .from('reservations')
-        .select('*')
-        .eq('id', selectedRes.id)
-        .maybeSingle(); // エラーになりにくい maybeSingle を使用
-      
-      if (data) {
-        setDbRes(data);
-        setMemoDraft(data.memo || "");
-      }
-    } catch (err) {
-      console.error("Fetch error:", err);
-    }
+      const { data } = await supabase.from('reservations').select('*').eq('id', selectedRes.id).single();
+      if (data) setDbRes(data);
+    } catch (err) { console.error(err); }
   };
 
-  // 📍 修正：OP画面が閉じられた時や、IDが変わった時にデータを更新
   useEffect(() => {
-    if (!isOpOpen && selectedRes?.id) {
+    if (dbRes?.status === 'playing') {
+      setIsInCall(true);
+    } else {
+      setIsInCall(false);
+    }
+  }, [dbRes?.status]);
+
+  // 📍 修正：OP計算画面が閉じられた時にデータを再取得する
+  useEffect(() => {
+    if (!isOpOpen) {
       fetchLatest();
     }
-  }, [isOpOpen, selectedRes?.id]);
+  }, [isOpOpen, selectedRes.id]);
 
-  // 最新データ（dbRes）を基に表示金額を決定 [cite: 2026-01-29]
+  // 📍 修正：dbRes（最新）を参照するように変更
   const displayAmount = useMemo(() => {
     const actual = Number(dbRes?.actual_total_price || 0);
     const initial = Number(dbRes?.total_price || 0);
     return actual > 0 ? actual : initial;
   }, [dbRes?.actual_total_price, dbRes?.total_price]);
 
-  const handleSaveMemo = async () => {
-    if (!supabase || isSaving) return;
-    setIsSaving(true);
-    try {
-      const { error } = await supabase
-        .from('reservations')
-        .update({ memo: memoDraft, updated_at: new Date().toISOString() })
-        .eq('id', dbRes.id);
-      
-      if (error) throw error;
-      onToast("メモを保存しました");
-      await fetchLatest();
-    } catch (err: any) {
-      alert("保存失敗: " + err.message);
-    } finally {
-      setIsSaving(false);
-    }
+  const handleToast = (msg: string) => {
+    setToastMsg(msg);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
   };
 
-  if (isOpOpen) {
-    return (
-      <OpCalculator 
-        selectedRes={dbRes} 
-        initialTotal={Number(dbRes.total_price || 0)}
-        onToast={onToast}
-        onClose={() => setIsOpOpen(false)}
-        isInCall={isInCall}
-        setIsInCall={setIsInCall}
-      />
-    );
-  }
+  const customerContext = useMemo(() => {
+    if (!dbRes) return { count: 1, lastDate: null, lastMemo: "" };
+    try {
+      const history = Array.isArray(allPastReservations) ? allPastReservations : [];
+      const cNo = dbRes.customer_no;
+      if (!cNo) return { count: 1, lastDate: null, lastMemo: "" };
+      const myHistory = history
+        .filter(r => r && r.customer_no === cNo && r.id !== dbRes.id)
+        .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")));
+      const recordWithMemo = myHistory.find(r => r.cast_mem && r.cast_mem.trim() !== "");
+      return { count: history.filter(r => r.customer_no === cNo).length || 1, lastDate: myHistory[0]?.reservation_date || null, lastMemo: recordWithMemo?.cast_mem || "" };
+    } catch (e) { return { count: 1, lastDate: null, lastMemo: "" }; }
+  }, [dbRes, allPastReservations]);
+
+  if (!dbRes) return null;
+
+  const handleEditMemoStart = () => {
+    if (dbRes.cast_mem && dbRes.cast_mem.trim() !== "") setMemoDraft(dbRes.cast_mem);
+    else setMemoDraft(customerContext.lastMemo);
+    setIsEditingMemo(true);
+  };
+
+  const handleSave = async () => {
+    if (typeof onSaveMemo !== 'function') return;
+    try {
+      await onSaveMemo();
+      handleToast("メモを保存しました");
+      setTimeout(() => { if (typeof setIsEditingMemo === 'function') setIsEditingMemo(false); }, 1500);
+    } catch (e) { alert("保存エラー"); }
+  };
+
+  const badgeBaseClass = "px-2 py-0.5 rounded text-[11px] font-black leading-none flex items-center justify-center";
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-gray-50 rounded-[32px] overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8 duration-300">
-        
-        {/* ヘッダーエリア */}
-        <div className="relative p-6 bg-white border-b border-gray-100">
-          <button onClick={onClose} className="absolute right-6 top-6 w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors">×</button>
-          <div className="flex items-center gap-3 mb-2">
-            <span className="px-3 py-1 bg-pink-100 text-pink-600 rounded-full text-[10px] font-black tracking-wider uppercase">{dbRes.service_type || 'か'}</span>
-            <span className="text-gray-400 font-bold text-sm">{dbRes.reservation_date}</span>
-          </div>
-          <h2 className="text-2xl font-black text-gray-900">{dbRes.cast_name} <span className="text-sm font-normal text-gray-400 ml-1">キャスト</span></h2>
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center p-0">
+      <div className="absolute inset-0 bg-black/85 backdrop-blur-sm z-0" onClick={() => onClose?.()} />
+      
+      {isOpOpen && (
+        <OpCalculator 
+          selectedRes={dbRes} 
+          initialTotal={Number(dbRes.total_price || 0)} 
+          onToast={handleToast}
+          onClose={() => setIsOpOpen(false)}
+          isInCall={isInCall}
+          setIsInCall={setIsInCall}
+        />
+      )}
+
+      {showToast && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100000] bg-pink-600 text-white px-8 py-5 rounded-[24px] shadow-2xl font-black text-center border-2 border-pink-400 animate-bounce">
+          <div className="text-[17px]">✅ {toastMsg}</div>
         </div>
+      )}
 
-        {/* コンテンツエリア */}
-        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-              <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">現在の合計金額</p>
-              <p className="text-2xl font-black text-green-500">¥{displayAmount.toLocaleString()}</p>
-            </div>
-            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-              <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">コース時間</p>
-              <p className="text-2xl font-black text-gray-800">{dbRes.course_info}</p>
-            </div>
+      {!isOpOpen && (
+        <div className="relative z-10 w-full max-w-sm bg-white rounded-[24px] flex flex-col max-h-[98vh] overflow-hidden text-gray-800 shadow-2xl mx-1">
+          <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center shrink-0">
+            <p className="text-[18px] font-black">{String(dbRes.reservation_date || "").replace(/-/g, '/')}</p>
+            <button onClick={() => onClose?.()} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full text-gray-400 text-xl font-bold">×</button>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between items-center px-1">
-              <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest">キャストメモ</label>
-              <button onClick={handleSaveMemo} disabled={isSaving} className="text-[11px] font-black text-blue-500 hover:text-blue-600 transition-colors uppercase tracking-widest">{isSaving ? '保存中...' : '変更を保存'}</button>
-            </div>
-            {/* 📍 修正：ズーム防止のため text-[16px] を指定 [cite: 2026-01-29] */}
-            <textarea 
-              value={memoDraft} 
-              onChange={(e) => setMemoDraft(e.target.value)} 
-              className="w-full min-h-[120px] p-4 bg-white border border-gray-100 rounded-2xl text-[16px] font-bold text-gray-700 focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 outline-none transition-all resize-none shadow-sm" 
-              placeholder="お客様の特徴や注意事項をメモ..." 
-            />
-          </div>
-
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            {[
-              { label: 'お客様', value: dbRes.customer_name },
-              { label: '予約時間', value: `${dbRes.start_time?.substring(0,5) || '--:--'} 〜` },
-              { label: 'ステータス', value: dbRes.status === 'playing' ? '🟢 プレイ中' : dbRes.status === 'completed' ? '✅ 終了' : '⚪️ 待機中' },
-            ].map((item, i) => (
-              <div key={i} className={`flex justify-between items-center p-4 ${i !== 0 ? 'border-t border-gray-50' : ''}`}>
-                <span className="text-xs font-bold text-gray-400 uppercase">{item.label}</span>
-                <span className="text-sm font-black text-gray-800">{item.value}</span>
+          <div className="overflow-y-auto px-2 pt-2 pb-12 space-y-1.5 flex-1 overscroll-contain">
+            <button onClick={() => setIsOpOpen(true)} className="w-full bg-gray-900 rounded-[20px] p-4 text-left shadow-lg active:scale-[0.98] transition-all relative overflow-hidden group">
+              <div className="flex justify-between items-end">
+                <div>
+                  <p className="text-[10px] text-gray-400 font-black uppercase mb-1 tracking-widest">To Receive</p>
+                  <p className="text-[24px] font-black text-green-400 leading-none tabular-nums">¥{displayAmount.toLocaleString()} <span className="text-[11px] text-white/40 ml-1 font-bold">~</span></p>
+                </div>
+                <div className="bg-white/10 px-3 py-2 rounded-xl text-[12px] font-black text-white">
+                  {isInCall ? '追加変更・終了 ⚡' : 'OP計算・開始 🚀'}
+                </div>
               </div>
-            ))}
+            </button>
+
+            <div className="bg-pink-50/40 rounded-[18px] p-2.5 border border-pink-100/30">
+              <div className="flex justify-between items-center mb-1.5 px-0.5">
+                <div className="flex gap-1">
+                  <span className={`${badgeBaseClass} ${getBadgeStyle?.(dbRes.service_type) || 'bg-pink-500 text-white'}`}>{dbRes.service_type || 'か'}</span>
+                  {dbRes.nomination_category && <span className={`${badgeBaseClass} ${getBadgeStyle?.(dbRes.nomination_category) || 'bg-gray-100 text-gray-400'}`}>{dbRes.nomination_category}</span>}
+                </div>
+                <div className="text-[20px] font-black text-gray-700 leading-none tabular-nums">
+                  {String(dbRes.start_time || "").substring(0, 5)}〜{String(dbRes.end_time || "").substring(0, 5)}
+                </div>
+              </div>
+              <p className="text-[15px] font-black text-gray-700 leading-tight mb-1">{dbRes.course_info || 'コース未設定'}</p>
+            </div>
+
+            <div className="p-3 bg-white border border-gray-100 rounded-[18px] relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-pink-100"></div>
+              <div className="flex items-center gap-2">
+                <span className="text-[20px] font-black text-gray-800">{dbRes.customer_name || '不明'} 様</span>
+                <span className={`${badgeBaseClass} ${customerContext.count === 1 ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-500'}`}>{customerContext.count === 1 ? '初' : `${customerContext.count}回目`}</span>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 rounded-[18px] border-2 border-dashed border-gray-200 overflow-hidden">
+              {isEditingMemo ? (
+                <div className="p-2 space-y-1.5">
+                  {/* 📍 修正：text-[15px] を text-[16px] に変更（ズーム防止） [cite: 2026-01-29] */}
+                  <textarea value={memoDraft || ""} onChange={(e) => setMemoDraft?.(e.target.value)} className="w-full min-h-[120px] p-3 bg-white rounded-xl text-[16px] font-bold focus:outline-none resize-none" placeholder="メモを入力..." autoFocus />
+                  <div className="flex gap-1">
+                    <button onClick={() => setIsEditingMemo?.(false)} className="flex-1 py-3 bg-white text-gray-400 rounded-xl font-black text-[13px] border">閉じる</button>
+                    <button onClick={handleSave} className="flex-[2] py-3 bg-pink-500 text-white rounded-xl font-black text-[14px]">💾 保存</button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={handleEditMemoStart} className="w-full p-4 text-left group">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[11px] font-black text-pink-400 italic">Cast Memo</span>
+                    <span className="text-[10px] text-gray-300 font-bold">編集 ✎</span>
+                  </div>
+                  <div className="text-[13px] font-bold text-gray-600 leading-relaxed break-words whitespace-pre-wrap">
+                    {dbRes.cast_mem || (customerContext.lastMemo ? `(引き継ぎ)\n${customerContext.lastMemo}` : "タップして入力...")}
+                  </div>
+                </button>
+              )}
+            </div>
+
+            <button onClick={() => onDelete?.()} className="w-full py-2 text-gray-300 font-bold text-[10px]">
+              {isDeleting ? '削除中...' : '🗑️ 予約を取り消す'}
+            </button>
           </div>
         </div>
-
-        <div className="p-6 bg-white border-t border-gray-100">
-          <button 
-            onClick={() => setIsOpOpen(true)}
-            className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black text-[15px] shadow-xl shadow-gray-200 active:scale-95 transition-all flex items-center justify-center gap-2"
-          >
-            ➕ オプション計算を開く
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
