@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 
-// 📍 かりんと専用オプションデータ（テキストを詳細版に更新）
+// 📍 かりんと専用オプションデータ（テキスト確定版）
 const KARINTO_OPS = [
   { label: '¥500 Op', price: 500, items: [
     { n: '10', t: '上ラン' }, { n: '11', t: '抱きつき' }, { n: '12', t: '足なで' }, 
@@ -35,12 +35,26 @@ const KARINTO_OPS = [
   ]},
 ];
 
-// 📍 添い寝専用オプションデータ（コース時間別）
+// 📍 添い寝専用オプションデータ（3点セットを先に配置）
 const SOINE_OPS = [
-  { label: '45分価格', items: [{ n: '1', t: 'OP1', p: 1000 }, { n: '2', t: 'OP2', p: 1000 }, { n: '3', t: 'OP3', p: 1000 }, { n: '4', t: 'OP4', p: 1000 }, { n: '5', t: 'OP5', p: 1000 }, { n: '3-1', t: '3点1', p: 2500 }, { n: '3-2', t: '3点2', p: 2500 }, { n: '3-3', t: '3点3', p: 2500 }, { n: '3-4', t: '3点4', p: 2500 }, { n: '3-5', t: '3点5', p: 2500 }] },
-  { label: '60分価格', items: [{ n: '1', t: 'OP1', p: 1000 }, { n: '2', t: 'OP2', p: 1000 }, { n: '3', t: 'OP3', p: 1000 }, { n: '4', t: 'OP4', p: 1000 }, { n: '5', t: 'OP5', p: 1000 }, { n: '3-1', t: '3点1', p: 2000 }, { n: '3-2', t: '3点2', p: 2000 }, { n: '3-3', t: '3点3', p: 2000 }, { n: '3-4', t: '3点4', p: 2000 }, { n: '3-5', t: '3点5', p: 2000 }] },
-  { label: '90分価格', items: [{ n: '1', t: 'OP1', p: 500 }, { n: '2', t: 'OP2', p: 500 }, { n: '3', t: 'OP3', p: 500 }, { n: '4', t: 'OP4', p: 500 }, { n: '5', t: 'OP5', p: 500 }, { n: '3-1', t: '3点1', p: 1500 }, { n: '3-2', t: '3点2', p: 1500 }, { n: '3-3', t: '3点3', p: 1500 }, { n: '3-4', t: '3点4', p: 1500 }, { n: '3-5', t: '3点5', p: 1500 }] },
-  { label: '120分価格', items: [{ n: '1', t: 'OP1', p: 500 }, { n: '2', t: 'OP2', p: 500 }, { n: '3', t: 'OP3', p: 500 }, { n: '4', t: 'OP4', p: 500 }, { n: '5', t: 'OP5', p: 500 }, { n: '3-1', t: '3点1', p: 1000 }, { n: '3-2', t: '3点2', p: 1000 }, { n: '3-3', t: '3点3', p: 1000 }, { n: '3-4', t: '3点4', p: 1000 }, { n: '3-5', t: '3点5', p: 1000 }] },
+  { label: '45分価格', items: [
+    /* 3点セットを先頭に */
+    { n: '3-1', t: '3点1', p: 2500 }, { n: '3-2', t: '3点2', p: 2500 }, { n: '3-3', t: '3点3', p: 2500 }, { n: '3-4', t: '3点4', p: 2500 }, { n: '3-5', t: '3点5', p: 2500 },
+    /* 単品をその後に */
+    { n: '1', t: 'OP1', p: 1000 }, { n: '2', t: 'OP2', p: 1000 }, { n: '3', t: 'OP3', p: 1000 }, { n: '4', t: 'OP4', p: 1000 }, { n: '5', t: 'OP5', p: 1000 }
+  ]},
+  { label: '60分価格', items: [
+    { n: '3-1', t: '3点1', p: 2000 }, { n: '3-2', t: '3点2', p: 2000 }, { n: '3-3', t: '3点3', p: 2000 }, { n: '3-4', t: '3点4', p: 2000 }, { n: '3-5', t: '3点5', p: 2000 },
+    { n: '1', t: 'OP1', p: 1000 }, { n: '2', t: 'OP2', p: 1000 }, { n: '3', t: 'OP3', p: 1000 }, { n: '4', t: 'OP4', p: 1000 }, { n: '5', t: 'OP5', p: 1000 }
+  ]},
+  { label: '90分価格', items: [
+    { n: '3-1', t: '3点1', p: 1500 }, { n: '3-2', t: '3点2', p: 1500 }, { n: '3-3', t: '3点3', p: 1500 }, { n: '3-4', t: '3点4', p: 1500 }, { n: '3-5', t: '3点5', p: 1500 },
+    { n: '1', t: 'OP1', p: 500 }, { n: '2', t: 'OP2', p: 500 }, { n: '3', t: 'OP3', p: 500 }, { n: '4', t: 'OP4', p: 500 }, { n: '5', t: 'OP5', p: 500 }
+  ]},
+  { label: '120分価格', items: [
+    { n: '3-1', t: '3点1', p: 1000 }, { n: '3-2', t: '3点2', p: 1000 }, { n: '3-3', t: '3点3', p: 1000 }, { n: '3-4', t: '3点4', p: 1000 }, { n: '3-5', t: '3点5', p: 1000 },
+    { n: '1', t: 'OP1', p: 500 }, { n: '2', t: 'OP2', p: 500 }, { n: '3', t: 'OP3', p: 500 }, { n: '4', t: 'OP4', p: 500 }, { n: '5', t: 'OP5', p: 500 }
+  ]},
 ];
 
 export default function OpCalculator({ selectedRes, initialTotal, supabase, onToast, onClose, isInCall, setIsInCall }: any) {
@@ -58,7 +72,6 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
     setSelectedOps((prev) => {
       const opId = selectedRes.service_type === '添' ? `${catLabel}-${no}` : no;
       const isAlreadySelected = prev.some(op => (selectedRes.service_type === '添' ? `${op.catLabel}-${op.no}` : op.no) === opId);
-      
       if (isAlreadySelected) {
         return prev.filter(op => (selectedRes.service_type === '添' ? `${op.catLabel}-${op.no}` : op.no) !== opId);
       }
@@ -69,7 +82,6 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
   const sendNotification = async (type: 'START' | 'ADD' | 'HELP') => {
     if (!supabase || !selectedRes?.id) return;
     setIsSending(true);
-
     const opNames = selectedOps.map(o => `${o.no}.${o.name}`).join('/');
     const prefix = selectedRes.service_type === '添' ? '【添】' : '【か】';
 
@@ -84,34 +96,28 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
           updateData.status = 'playing';
           updateData.in_call_at = new Date().toISOString();
         }
-        const { error: updateError } = await supabase.from('reservations').update(updateData).eq('id', selectedRes.id);
-        if (updateError) throw updateError;
+        const { error } = await supabase.from('reservations').update(updateData).eq('id', selectedRes.id);
+        if (error) throw error;
       }
 
       let message = "";
-      if (type === 'HELP') {
-        message = `${prefix}【呼出】${selectedRes.customer_name}様：スタッフ至急！`;
-      } else if (type === 'START') {
-        message = `${prefix}【入室】${selectedRes.customer_name}様：¥${displayTotal.toLocaleString()}（内訳:${opNames || '無'}）`;
-      } else {
-        message = `${prefix}【追加】${selectedRes.customer_name}様：追加OP（${opNames}）計¥${opsTotal.toLocaleString()}`;
-      }
+      if (type === 'HELP') message = `${prefix}【呼出】${selectedRes.customer_name}様：スタッフ至急！`;
+      else if (type === 'START') message = `${prefix}【入室】${selectedRes.customer_name}様：¥${displayTotal.toLocaleString()}（内訳:${opNames || '無'}）`;
+      else message = `${prefix}【追加】${selectedRes.customer_name}様：追加OP（${opNames}）計¥${opsTotal.toLocaleString()}`;
 
-      const { error: notifyError } = await supabase.from('notifications').insert({
+      await supabase.from('notifications').insert({
         shop_id: selectedRes.shop_id,
         cast_id: selectedRes.login_id,
         type: type.toLowerCase(),
         message,
         is_read: false
       });
-      if (notifyError) throw notifyError;
 
       if (type === 'START') setIsInCall(true);
       setSelectedOps([]); 
       onToast(type === 'HELP' ? "スタッフを呼びました" : "店舗へ通知・保存しました");
       if (type === 'START') onClose();
     } catch (err) {
-      console.error(err);
       alert("通信エラーが発生しました。");
     } finally {
       setIsSending(false);
@@ -121,34 +127,43 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
   return (
     <div className="fixed inset-0 z-[300] flex flex-col bg-gray-900 text-white animate-in fade-in duration-200 overflow-hidden font-sans">
       
+      {/* 金額ヘッダー：サービスバッジ付き */}
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
         <div>
-          <p className="text-[10px] text-pink-400 font-black uppercase tracking-widest leading-none mb-1">
-             {selectedRes.service_type === '添' ? '添い寝コース' : 'かりんとコース'}
-          </p>
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className={`w-5 h-5 flex items-center justify-center rounded text-[10px] font-black ${
+              selectedRes.service_type === '添' ? 'bg-pink-500 text-white' : 'bg-blue-500 text-white'
+            }`}>
+              {selectedRes.service_type || 'か'}
+            </span>
+            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest leading-none">
+              {selectedRes.service_type === '添' ? '添い寝コース' : 'かりんとコース'}
+            </p>
+          </div>
           <p className="text-[28px] font-black text-green-400 tabular-nums leading-none">¥{displayTotal.toLocaleString()}</p>
         </div>
-        <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold active:scale-90 transition-transform">×</button>
+        <button onClick={onClose} className="w-11 h-11 flex items-center justify-center bg-white/10 rounded-full text-2xl font-bold">×</button>
       </div>
 
-      <div className="bg-gray-800 border-b border-gray-700 px-3 py-2.5 min-h-[54px] flex flex-wrap gap-1.5 shrink-0 items-center overflow-y-auto max-h-[140px] shadow-lg">
+      {/* 選択中エリア */}
+      <div className="bg-gray-800 border-b border-gray-700 px-3 py-2.5 min-h-[54px] flex flex-wrap gap-1.5 shrink-0 items-center overflow-y-auto max-h-[140px]">
         {selectedOps.length === 0 ? (
           <p className="text-[11px] text-gray-500 font-black italic opacity-60 pl-1">※ オプションを選択してください</p>
         ) : (
           selectedOps.map((op) => (
             <button key={`${op.catLabel}-${op.no}`} onClick={() => toggleOp(op.no, op.name, op.price, op.catLabel || "")}
-              className="bg-pink-600 border border-pink-400 text-white px-2 py-1 rounded-lg text-[11px] font-black flex items-center gap-1 active:scale-95 transition-all shadow-md animate-in zoom-in-90">
+              className="bg-pink-600 border border-pink-400 text-white px-2 py-1 rounded-lg text-[11px] font-black flex items-center gap-1">
               <span className="opacity-70 text-[10px]">{op.no}.</span>{op.name}<span className="opacity-50 ml-0.5">×</span>
             </button>
           ))
         )}
       </div>
 
+      {/* 📍 メイングリッド：3列構成で統一 */}
       <div className="flex-1 overflow-y-auto px-2 pt-3 pb-40 space-y-6 scrollbar-hide overscroll-contain">
         {currentCategories.map((cat: any) => (
           <div key={cat.label} className="space-y-2">
             <h3 className="text-[10px] font-black text-gray-500 px-1 uppercase tracking-[0.2em] border-l-2 border-pink-500/50 ml-1">{cat.label}</h3>
-            {/* 📍 グリッドを3列に変更し、視認性を向上 */}
             <div className="grid grid-cols-3 gap-2">
               {cat.items.map((item: any) => {
                 const isSelected = selectedOps.some(op => op.no === item.n && (selectedRes.service_type !== '添' || op.catLabel === cat.label));
@@ -160,9 +175,7 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
                       ${isSelected 
                         ? 'bg-pink-500 border-pink-300 text-white shadow-[0_0_20px_rgba(236,72,153,0.4)] scale-95' 
                         : 'bg-white/5 border-white/5 text-gray-400 active:bg-white/10'}`}>
-                    {/* 📍 数字をさらに大きく (text-2xl) */}
                     <span className={`text-[22px] font-black leading-none mb-1 ${isSelected ? 'text-white' : 'text-gray-100'}`}>{item.n}</span>
-                    {/* 📍 文字を大きくし、2行で収まるように設定 */}
                     <span className={`text-[12px] font-black leading-[1.1] text-center line-clamp-2 break-words px-1 ${isSelected ? 'text-white' : 'text-gray-400'}`}>
                       {item.t}
                     </span>
@@ -174,15 +187,15 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
         ))}
       </div>
 
+      {/* 通知ボタン */}
       <div className="p-4 bg-gray-900/95 backdrop-blur-xl border-t border-gray-800 fixed bottom-0 left-0 right-0 z-40 flex gap-2">
-        <button onClick={() => sendNotification('HELP')} disabled={isSending} className="flex-1 py-3 bg-gray-700 text-white rounded-xl font-black text-[14px] active:scale-95 transition-all">✋ 呼出</button>
+        <button onClick={() => sendNotification('HELP')} disabled={isSending} className="flex-1 py-3 bg-gray-700 text-white rounded-xl font-black text-[14px]">✋ 呼出</button>
         <button 
           onClick={() => sendNotification(isInCall ? 'ADD' : 'START')}
           disabled={isSending || (selectedOps.length === 0 && isInCall)}
-          className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] shadow-2xl transition-all active:scale-[0.97]
-            ${isInCall ? 'bg-orange-500 text-white' : 'bg-green-500 text-white'}
-            ${isSending ? 'opacity-50' : ''}
-          `}
+          className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] shadow-2xl transition-all ${
+            isInCall ? 'bg-orange-500 text-white' : 'bg-green-500 text-white'
+          } ${isSending ? 'opacity-50' : ''}`}
         >
           {isSending ? '...' : isInCall ? '🔥 追加OPを店に通知' : '🚀 スタート'}
         </button>
