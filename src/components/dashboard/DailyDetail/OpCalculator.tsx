@@ -110,8 +110,13 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
     await supabase.from('reservations').update({ op_details: newDetails, actual_total_price: newActualTotal }).eq('id', selectedRes.id);
   };
 
+  // 📍 修正：sendNotification 内のデバッグ強化
   const sendNotification = async (type: 'START' | 'HELP' | 'FINISH') => {
-    if (!supabase || !selectedRes?.id) return;
+    console.log(`[OpCalc] sendNotification start: ${type}`);
+    
+    if (!supabase) { console.error("Supabase instance is missing"); return; }
+    if (!selectedRes?.id) { console.error("Reservation ID is missing"); return; }
+
     setIsSending(true);
     const prefix = selectedRes.service_type === '添' ? '【添】' : '【か】';
 
@@ -124,37 +129,64 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
       }
 
       if (type === 'START' || type === 'FINISH') {
-        const updateData: any = { actual_total_price: displayTotal, op_details: newOpDetails, updated_at: new Date().toISOString() };
-        if (type === 'START') { updateData.status = 'playing'; updateData.in_call_at = new Date().toISOString(); }
-        if (type === 'FINISH') { updateData.status = 'completed'; updateData.end_time = new Date().toISOString(); }
-        await supabase.from('reservations').update(updateData).eq('id', selectedRes.id);
+        const updateData: any = { 
+          actual_total_price: displayTotal, 
+          op_details: newOpDetails, 
+          updated_at: new Date().toISOString() 
+        };
+        if (type === 'START') { 
+          updateData.status = 'playing'; 
+          updateData.in_call_at = new Date().toISOString(); 
+        }
+        if (type === 'FINISH') { 
+          updateData.status = 'completed'; 
+          updateData.end_time = new Date().toISOString(); 
+        }
+        
+        const { error: resError } = await supabase.from('reservations').update(updateData).eq('id', selectedRes.id);
+        if (resError) throw new Error(`Reservation Update Error: ${resError.message}`);
       }
 
       let message = "";
       if (type === 'HELP') {
-        message = `${prefix}【呼出】${selectedRes.customer_name}様：スタッフ至急！`;
+        message = `${prefix}【呼出】${selectedRes.customer_name || '不明'}様：スタッフ至急！`;
       } 
       else if (type === 'START') {
         const opDetail = selectedOps.map(o => `${o.no}.${o.name}`).join('・') || '無';
-        message = `${prefix}【入室】${selectedRes.customer_name}様\nコース：${courseText}\n金額：¥${initialTotal.toLocaleString()}+Op¥${opsTotal.toLocaleString()}＝合計¥${displayTotal.toLocaleString()}\nOp内訳：${opDetail}`;
+        message = `${prefix}【入室】${selectedRes.customer_name || '不明'}様\nコース：${courseText}\n金額：¥${initialTotal.toLocaleString()}+Op¥${opsTotal.toLocaleString()}＝合計¥${displayTotal.toLocaleString()}\nOp内訳：${opDetail}`;
       } 
       else if (type === 'FINISH') {
-        // 📍 プレイ終了時の「変更・追加」抽出ロジック
-        const addedOps = selectedOps.map(o => `${o.no}.${o.name}`).join('・');
+        const addedOpsStr = selectedOps.map(o => `${o.no}.${o.name}`).join('・');
         const canceledAtEnd = newOpDetails.filter((o: any) => o?.status === 'canceled' && o?.updatedAt > (selectedRes.in_call_at || "")).map((o: any) => `(取)${o.name}`).join('・');
-        const changeDetail = [addedOps, canceledAtEnd].filter(Boolean).join(' / ') || '無し';
+        const changeDetail = [addedOpsStr, canceledAtEnd].filter(Boolean).join(' / ') || '無し';
         const diffTotal = displayTotal - (selectedRes.actual_total_price || initialTotal);
 
-        message = `${prefix}【追加変更】${selectedRes.customer_name}様\n追加OP\nOp内訳：${changeDetail}\n追加合計：¥${diffTotal.toLocaleString()}`;
+        message = `${prefix}【追加変更】${selectedRes.customer_name || '不明'}様\n追加OP\nOp内訳：${changeDetail}\n追加合計：¥${diffTotal.toLocaleString()}`;
       }
 
-      await supabase.from('notifications').insert({ shop_id: selectedRes.shop_id, cast_id: selectedRes.login_id, type: type.toLowerCase(), message, is_read: false });
+      const { error: notifError } = await supabase.from('notifications').insert({ 
+        shop_id: selectedRes.shop_id, 
+        cast_id: selectedRes.login_id, 
+        type: type.toLowerCase(), 
+        message, 
+        is_read: false 
+      });
+      if (notifError) throw new Error(`Notification Insert Error: ${notifError.message}`);
+
       if (type === 'START') setIsInCall(true);
       if (type === 'FINISH') { setIsInCall(false); onClose(); }
+      
       setSelectedOps([]); 
       onToast(type === 'HELP' ? "スタッフを呼びました" : "店舗へ通知・保存しました");
       if (type === 'START') onClose();
-    } catch (err) { alert("エラーが発生しました"); } finally { setIsSending(false); }
+      
+      console.log(`[OpCalc] sendNotification success: ${type}`);
+    } catch (err: any) { 
+      console.error(`[OpCalc] error:`, err);
+      alert(`エラーが発生しました: ${err.message || "不明なエラー"}`); 
+    } finally { 
+      setIsSending(false); 
+    }
   };
 
   return (
