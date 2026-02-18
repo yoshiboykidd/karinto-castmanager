@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 
-// 📍 オプションデータ
+// 📍 オプションデータ（変更なし）
 const KARINTO_OPS = [
   { label: '¥500 Op', price: 500, items: [
     { n: '10', t: '上ラン' }, { n: '11', t: '抱きつき' }, { n: '12', t: '足なで' }, 
@@ -110,19 +110,20 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
     await supabase.from('reservations').update({ op_details: newDetails, actual_total_price: newActualTotal }).eq('id', selectedRes.id);
   };
 
-  const sendNotification = async (type: 'START' | 'ADD' | 'HELP' | 'FINISH') => {
+  const sendNotification = async (type: 'START' | 'HELP' | 'FINISH') => {
     if (!supabase || !selectedRes?.id) return;
     setIsSending(true);
     const prefix = selectedRes.service_type === '添' ? '【添】' : '【か】';
 
     try {
-      if (type === 'START' || type === 'ADD' || type === 'FINISH') {
-        const details = Array.isArray(selectedRes.op_details) ? selectedRes.op_details : [];
-        const newOpDetails = [...details];
-        if (selectedOps.length > 0) {
-          const taggedOps = selectedOps.map(op => ({ ...op, timing: type === 'START' ? 'initial' : 'additional', updatedAt: new Date().toISOString() }));
-          newOpDetails.push(...taggedOps);
-        }
+      const details = Array.isArray(selectedRes.op_details) ? selectedRes.op_details : [];
+      const newOpDetails = [...details];
+      if (selectedOps.length > 0) {
+        const taggedOps = selectedOps.map(op => ({ ...op, timing: type === 'START' ? 'initial' : 'additional', updatedAt: new Date().toISOString() }));
+        newOpDetails.push(...taggedOps);
+      }
+
+      if (type === 'START' || type === 'FINISH') {
         const updateData: any = { actual_total_price: displayTotal, op_details: newOpDetails, updated_at: new Date().toISOString() };
         if (type === 'START') { updateData.status = 'playing'; updateData.in_call_at = new Date().toISOString(); }
         if (type === 'FINISH') { updateData.status = 'completed'; updateData.end_time = new Date().toISOString(); }
@@ -130,14 +131,21 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
       }
 
       let message = "";
-      const opNames = selectedOps.map(o => `${o.no}.${o.name}`).join('/');
-      if (type === 'HELP') message = `${prefix}【呼出】${selectedRes.customer_name}様：スタッフ至急！`;
-      else if (type === 'START') message = `${prefix}【入室】${selectedRes.customer_name}様：¥${displayTotal.toLocaleString()}（内訳:${opNames || '無'}）`;
-      else if (type === 'ADD') message = `${prefix}【追加】${selectedRes.customer_name}様：追加OP（${opNames}）計¥${(displayTotal - (selectedRes.actual_total_price || initialTotal)).toLocaleString()}UP`;
+      if (type === 'HELP') {
+        message = `${prefix}【呼出】${selectedRes.customer_name}様：スタッフ至急！`;
+      } 
+      else if (type === 'START') {
+        const opDetail = selectedOps.map(o => `${o.no}.${o.name}`).join('・') || '無';
+        message = `${prefix}【入室】${selectedRes.customer_name}様\nコース：${courseText}\n金額：¥${initialTotal.toLocaleString()}+Op¥${opsTotal.toLocaleString()}＝合計¥${displayTotal.toLocaleString()}\nOp内訳：${opDetail}`;
+      } 
       else if (type === 'FINISH') {
-        const details = Array.isArray(selectedRes.op_details) ? selectedRes.op_details : [];
-        const diffText = details.filter((o: any) => o?.status === 'canceled' && o?.updatedAt > (selectedRes.in_call_at || "")).map((o: any) => `取:${o.name}`).join('/') || "";
-        message = `${prefix}【精算】${selectedRes.customer_name}様：最終¥${displayTotal.toLocaleString()}${diffText ? `（${diffText}）` : ""}`;
+        // 📍 プレイ終了時の「変更・追加」抽出ロジック
+        const addedOps = selectedOps.map(o => `${o.no}.${o.name}`).join('・');
+        const canceledAtEnd = newOpDetails.filter((o: any) => o?.status === 'canceled' && o?.updatedAt > (selectedRes.in_call_at || "")).map((o: any) => `(取)${o.name}`).join('・');
+        const changeDetail = [addedOps, canceledAtEnd].filter(Boolean).join(' / ') || '無し';
+        const diffTotal = displayTotal - (selectedRes.actual_total_price || initialTotal);
+
+        message = `${prefix}【追加変更】${selectedRes.customer_name}様\n追加OP\nOp内訳：${changeDetail}\n追加合計：¥${diffTotal.toLocaleString()}`;
       }
 
       await supabase.from('notifications').insert({ shop_id: selectedRes.shop_id, cast_id: selectedRes.login_id, type: type.toLowerCase(), message, is_read: false });
@@ -170,10 +178,10 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
 
       <div className="bg-gray-800 border-b border-gray-700 px-3 py-2 flex flex-wrap gap-1 shrink-0 items-center overflow-y-auto max-h-[80px]">
         {savedOpsActive.map((op: any, i: number) => (
-          <button key={`s-${i}`} onClick={() => toggleSavedStatus(op)} className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 ${op?.price < 0 ? 'bg-red-600' : 'bg-blue-600'}`}>{op?.no}.{op?.name} ×</button>
+          <button key={`s-${i}`} onClick={() => toggleSavedStatus(op)} className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 ${op?.price < 0 ? 'bg-red-600' : 'bg-blue-600'}`}>{op?.no}.{op?.name} <span className="opacity-50">×</span></button>
         ))}
         {selectedOps.map((op, i) => (
-          <button key={`n-${i}`} onClick={() => toggleOp(op.no, op.name, op.price, op.catLabel)} className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 ${op.price < 0 ? 'bg-red-600' : 'bg-pink-600'}`}>{op.no}.{op.name} ×</button>
+          <button key={`n-${i}`} onClick={() => toggleOp(op.no, op.name, op.price, op.catLabel)} className={`px-2 py-0.5 rounded text-[10px] font-black flex items-center gap-1 ${op.price < 0 ? 'bg-red-600' : 'bg-pink-600'}`}>{op.no}.{op.name} <span className="opacity-50">×</span></button>
         ))}
         {savedOpsActive.length === 0 && selectedOps.length === 0 && <p className="text-[11px] text-gray-500 font-black italic">※ オプションを選択してください</p>}
       </div>
@@ -197,17 +205,9 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
           </div>
         ))}
 
-        {/* 📍 修正：Op割-500 ボタン (かりんと限定) */}
         {selectedRes?.service_type !== '添' && (
           <div className="px-1 pt-2">
-            <button
-              onClick={() => toggleOp('割', 'Op割', -500, '特別')}
-              className={`w-full py-4 rounded-[20px] border transition-all flex items-center justify-center gap-2 ${
-                selectedOps.some(op => op.no === '割') || savedOpsActive.some((op: any) => op.no === '割')
-                  ? 'bg-red-500 border-red-300 shadow-[0_0_15px_rgba(239,68,68,0.3)] text-white'
-                  : 'bg-white/5 border-white/5 text-gray-400'
-              }`}
-            >
+            <button onClick={() => toggleOp('割', 'Op割', -500, '特別')} className={`w-full py-4 rounded-[20px] border transition-all flex items-center justify-center gap-2 ${selectedOps.some(op => op.no === '割') || savedOpsActive.some((op: any) => op.no === '割') ? 'bg-red-500 border-red-300 shadow-[0_0_15px_rgba(239,68,68,0.3)] text-white' : 'bg-white/5 border-white/5 text-gray-400'}`}>
               <span className="text-[18px] font-black">Op割 -500</span>
             </button>
           </div>
@@ -216,19 +216,12 @@ export default function OpCalculator({ selectedRes, initialTotal, supabase, onTo
 
       <div className="shrink-0 p-4 bg-gray-900 border-t border-gray-800 flex gap-2 pb-[calc(env(safe-area-inset-bottom)+24px)] shadow-[0_-10px_40px_rgba(0,0,0,0.8)]">
         {isCompleted ? (
-          <div className="flex-1 py-4 bg-gray-800 text-gray-500 rounded-2xl font-black text-center">✅ 精算済み</div>
+          <div className="flex-1 py-4 bg-gray-800 text-gray-500 rounded-2xl font-black text-center">✅ プレイ終了済み</div>
         ) : (
           <>
             <button onClick={() => sendNotification('HELP')} className="flex-1 py-3 bg-gray-700 text-white rounded-xl font-black text-[13px] active:scale-95 transition-transform">✋ 呼出</button>
-            {isActuallyPlaying && (
-              <button onClick={() => sendNotification('FINISH')} disabled={isSending} className="flex-1 py-3 bg-gray-100 text-gray-900 rounded-xl font-black text-[13px] active:scale-95 transition-transform">🏁 精算完了</button>
-            )}
-            <button 
-              onClick={() => sendNotification(isActuallyPlaying ? 'ADD' : 'START')} 
-              disabled={isSending || (isActuallyPlaying && selectedOps.length === 0)} 
-              className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] ${isActuallyPlaying ? 'bg-orange-500' : 'bg-green-500'} text-white shadow-xl active:scale-95 transition-all`}
-            >
-              {isSending ? '...' : isActuallyPlaying ? '🔥 追加通知' : '🚀 スタート'}
+            <button onClick={() => sendNotification(isActuallyPlaying ? 'FINISH' : 'START')} disabled={isSending} className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] ${isActuallyPlaying ? 'bg-orange-600' : 'bg-green-500'} text-white shadow-xl active:scale-95 transition-all`}>
+              {isSending ? '...' : isActuallyPlaying ? '🏁 プレイ終了' : '🚀 スタート'}
             </button>
           </>
         )}
