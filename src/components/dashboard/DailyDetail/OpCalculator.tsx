@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-// 📍 波線対策：クライアント側専用のインポート
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 const KARINTO_OPS = [
@@ -205,4 +204,36 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
                 const isSelected = selectedOps.some(op => op.no === item.n && (selectedRes?.service_type !== '添' || op.catLabel === cat.label));
                 const isSaved = savedOpsActive.some((op: any) => op?.no === item.n && (selectedRes?.service_type !== '添' || op.catLabel === cat.label));
                 return (
-                  <button key={`${cat.label}-${item.n}`} onClick={() => toggleOp(
+                  <button key={`${cat.label}-${item.n}`} onClick={() => toggleOp(item.n, item.t, item.p || (cat as any).price || 0, cat.label)} className={`min-h-[75px] rounded-[20px] flex flex-col items-center justify-center border transition-all ${isSelected || isSaved ? 'bg-pink-500 border-pink-300 shadow-[0_0_15px_rgba(236,72,153,0.3)]' : 'bg-white/5 border-white/5 text-gray-400'}`}>
+                    <span className="text-[20px] font-black">{item.n}</span>
+                    <span className="text-[11px] font-black leading-tight text-center px-1">{item.t}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        {selectedRes?.service_type !== '添' && (
+          <div className="px-1 pt-2">
+            <button onClick={() => toggleOp('割', 'Op割', -500, '特別')} className={`w-full py-4 rounded-[20px] border transition-all flex items-center justify-center gap-2 ${selectedOps.some(op => op.no === '割') || savedOpsActive.some((op: any) => op.no === '割') ? 'bg-red-500 border-red-300 shadow-[0_0_15px_rgba(239,68,68,0.3)] text-white' : 'bg-white/5 border-white/5 text-gray-400'}`}>
+              <span className="text-[18px] font-black">Op割 -500</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="shrink-0 p-4 bg-gray-900 border-t border-gray-800 flex gap-2 pb-[calc(env(safe-area-inset-bottom)+24px)] shadow-[0_-10px_40px_rgba(0,0,0,0.8)]">
+        {isCompleted ? (
+          <div className="flex-1 py-4 bg-gray-800 text-gray-500 rounded-2xl font-black text-center">✅ プレイ終了済み</div>
+        ) : (
+          <>
+            <button onClick={() => sendNotification('HELP')} className="flex-1 py-3 bg-gray-700 text-white rounded-xl font-black text-[13px] active:scale-95 transition-transform">✋ 呼出</button>
+            <button onClick={() => sendNotification(isActuallyPlaying ? 'FINISH' : 'START')} disabled={isSending} className={`flex-[2.5] py-4 rounded-2xl font-black text-[18px] ${isActuallyPlaying ? 'bg-orange-600' : 'bg-green-500'} text-white shadow-xl active:scale-95 transition-all`}>
+              {isSending ? '...' : isActuallyPlaying ? '🏁 プレイ終了' : '🚀 スタート'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
