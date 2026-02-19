@@ -32,7 +32,6 @@ export default function ReservationModal({
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  // 💡 ロジック修正：カラム名を cast_memo に統一
   const lastMemoFromHistory = useMemo(() => {
     if (!selectedRes?.customer_no) return "";
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
@@ -45,11 +44,7 @@ export default function ReservationModal({
 
   if (!selectedRes) return null;
 
-  // 💡 ロジック修正：表示内容を直接計算（cast_memo を参照）
   const currentCastMemo = (selectedRes.cast_memo || "").toString().trim();
-  const displayMemoContent = currentCastMemo !== "" 
-    ? currentCastMemo 
-    : (lastMemoFromHistory !== "" ? `(引き継ぎ)\n${lastMemoFromHistory}` : "タップして入力...");
 
   const handleEditMemoStart = () => {
     const initialMemo = currentCastMemo !== "" ? currentCastMemo : lastMemoFromHistory;
@@ -154,8 +149,9 @@ export default function ReservationModal({
                     <span className="text-[11px] font-black text-pink-400 italic">Cast Memo</span>
                     <span className="text-[10px] text-gray-300 font-bold">編集 ✎</span>
                   </div>
-                  <div className="text-[13px] font-bold text-gray-600 leading-relaxed break-words whitespace-pre-wrap">
-                    {displayMemoContent}
+                  <div className="text-[13px] font-bold text-gray-300 leading-relaxed italic">
+                    {/* 💡 ロジック修正：通常時は内容を表示せず、ステータスのみ表示 */}
+                    {currentCastMemo !== "" ? "内容が保存されています" : "タップして入力..."}
                   </div>
                 </button>
               )}
