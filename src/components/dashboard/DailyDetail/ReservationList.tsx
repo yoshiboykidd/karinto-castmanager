@@ -3,6 +3,13 @@
 import React from 'react';
 
 export default function ReservationList({ reservations, onSelect, getBadgeStyle, isAbsent, noMissionMessage }: any) {
+  // 💡 修正：どんな形式の時刻・日付文字列が来ても "13:30" の形式に抽出するヘルパー
+  const formatTime = (t: string) => {
+    if (!t) return "--:--";
+    const match = t.match(/\d{2}:\d{2}/);
+    return match ? match[0] : t.substring(0, 5);
+  };
+
   // 📍 予約がない場合の表示（受け取ったメッセージを表示）
   if (reservations.length === 0) {
     return (
@@ -38,9 +45,10 @@ export default function ReservationList({ reservations, onSelect, getBadgeStyle,
 
           <div className="flex flex-col items-start shrink-0 font-black text-gray-700 ml-1">
             <div className="flex items-center tracking-tighter">
-              <span className="text-[16px]">{res.start_time?.substring(0, 5)}</span>
+              {/* 💡 修正：formatTime ヘルパーを使用 */}
+              <span className="text-[16px]">{formatTime(res.start_time)}</span>
               <span className="text-[9px] mx-0.5 opacity-20">〜</span>
-              <span className="text-[16px]">{res.end_time?.substring(0, 5)}</span>
+              <span className="text-[16px]">{formatTime(res.end_time)}</span>
             </div>
             {res.isDuplicate && (
               <span className={`text-[8px] flex items-center gap-0.5 leading-none mt-0.5 ${res.isLatest ? 'text-amber-600' : 'text-gray-400'}`}>
