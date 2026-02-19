@@ -12,27 +12,19 @@ export default function ReservationModal({
   const [isOpOpen, setIsOpOpen] = useState(false);
   const [isInCall, setIsInCall] = useState(false);
 
+  // 1. Hooks はすべて関数の先頭（return より前）にまとめる
   useEffect(() => {
-    // 💡 安全な参照に変更
     if (selectedRes?.status === 'playing') setIsInCall(true);
     else setIsInCall(false);
   }, [selectedRes?.status]);
 
   const displayAmount = useMemo(() => {
-    // 💡 安全な参照に変更
     const actual = Number(selectedRes?.actual_total_price || 0);
     const initial = Number(selectedRes?.total_price || 0);
     return actual > 0 ? actual : initial;
   }, [selectedRes?.actual_total_price, selectedRes?.total_price]);
 
-  const handleToast = (msg: string) => {
-    setToastMsg(msg);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
-  };
-
   const lastMemoFromHistory = useMemo(() => {
-    // 💡 プロパティアクセスを安全に
     if (!selectedRes?.customer_no) return "";
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
     const record = history
@@ -42,16 +34,25 @@ export default function ReservationModal({
     return record?.cast_memo ? String(record.cast_memo).trim() : "";
   }, [selectedRes?.customer_no, selectedRes?.id, allPastReservations]);
 
-  // 💡 早期リターンをより上部に配置し、以下の変数定義でのクラッシュを防ぐ
-  if (!selectedRes) return null;
-
-  const currentCastMemo = (selectedRes?.cast_memo || "").toString().trim();
+  const currentCastMemo = useMemo(() => {
+    return (selectedRes?.cast_memo || "").toString().trim();
+  }, [selectedRes?.cast_memo]);
 
   const displayMemoContent = useMemo(() => {
     if (currentCastMemo !== "") return currentCastMemo;
     if (lastMemoFromHistory !== "") return `【前回からの引き継ぎ】\n${lastMemoFromHistory}`;
     return "タップして入力...";
   }, [currentCastMemo, lastMemoFromHistory]);
+
+  // 2. すべての Hooks の定義が終わった後に return を書く
+  if (!selectedRes) return null;
+
+  // --- 以下、レンダリングロジック ---
+  const handleToast = (msg: string) => {
+    setToastMsg(msg);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
 
   const handleEditMemoStart = () => {
     const initialMemo = currentCastMemo !== "" ? currentCastMemo : lastMemoFromHistory;
@@ -154,10 +155,10 @@ export default function ReservationModal({
                 <button onClick={handleEditMemoStart} className="w-full p-4 text-left group">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-[11px] font-black text-pink-400 italic">Cast Memo</span>
-                    <span className={`${isDeleting ? 'hidden' : 'text-[10px] text-gray-300 font-bold'}`}>編集 ✎</span>
+                    <span className="text-[10px] text-gray-300 font-bold">編集 ✎</span>
                   </div>
                   <div className="text-[13px] font-bold text-gray-400 leading-relaxed italic">
-                    {currentCastMemo !== "" ? "最新のメモが保存されています" : (lastMemoFromHistory !== "" ? "過去のメモを引き継いでいます" : "タップして入力...")}
+                    {displayMemoContent}
                   </div>
                 </button>
               )}
