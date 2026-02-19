@@ -153,10 +153,20 @@ export default function ReservationModal({
               <p className="text-[15px] font-black text-gray-700 leading-tight mb-1">{selectedRes?.course_info || 'コース未設定'}</p>
             </div>
 
+            {/* 📍 顧客情報セクション */}
             <div className="p-3 bg-white border border-gray-100 rounded-[18px] relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1.5 h-full bg-pink-100"></div>
-              <div className="flex items-center gap-2">
-                <span className="text-[20px] font-black text-gray-800">{selectedRes?.customer_name || '不明'} 様</span>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[20px] font-black text-gray-800 leading-none">{selectedRes?.customer_name || '不明'} 様</span>
+                  
+                  {/* 💡 修正：会員番号（customer_no）を表示。select-all でコピーしやすく */}
+                  <div className="bg-gray-50 border border-gray-100 px-2 py-1 rounded-lg select-all active:bg-gray-100 transition-colors">
+                    <span className="text-[10px] font-black text-gray-400 mr-1 italic uppercase tracking-tighter">ID:</span>
+                    <span className="text-[12px] font-black text-gray-600 tabular-nums">#{selectedRes?.customer_no || '---'}</span>
+                  </div>
+                </div>
+
                 <div className="flex items-center gap-1.5">
                   <span className={`${badgeBaseClass} ${visitCountForThisCast === 1 ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
                     {visitCountForThisCast === 1 ? '初' : `${visitCountForThisCast}回目`}
