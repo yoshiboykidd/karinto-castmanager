@@ -171,9 +171,10 @@ export default function ReservationModal({
                 <div className="flex items-center justify-between">
                   <span className="text-[20px] font-black text-gray-800 leading-none">{currentRes?.customer_name || '不明'} 様</span>
                   
-                  <div className="bg-gray-50 border border-gray-100 px-2 py-1 rounded-lg select-all active:bg-gray-100 transition-colors">
-                    <span className="text-[10px] font-black text-gray-400 mr-1 italic uppercase tracking-tighter">ID:</span>
-                    <span className="text-[12px] font-black text-gray-600 tabular-nums">#{currentRes?.customer_no || '---'}</span>
+                  {/* 📍 修正：会員Noを大きく強調 [cite: 2026-01-29] */}
+                  <div className="bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-xl select-all active:bg-gray-100 transition-colors">
+                    <span className="text-[11px] font-black text-gray-400 mr-1.5 italic uppercase tracking-tighter">会員No:</span>
+                    <span className="text-[18px] font-black text-gray-800 tabular-nums">#{currentRes?.customer_no || '---'}</span>
                   </div>
                 </div>
 
@@ -188,24 +189,25 @@ export default function ReservationModal({
                   )}
                 </div>
 
-                <div className="mt-2 space-y-1 border-t border-gray-50 pt-2">
+                {/* 📍 修正：ラベル崩れ防止と指定項目表示 [cite: 2026-01-29] */}
+                <div className="mt-2 space-y-1.5 border-t border-gray-50 pt-2">
                   {currentRes?.hotel_name && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-black text-gray-400 w-12 shrink-0">＜ホテル＞</span>
-                      <span className="text-[13px] font-black text-gray-700 truncate">{currentRes.hotel_name}</span>
+                    <div className="flex items-start gap-1">
+                      <span className="text-[11px] font-black text-gray-400 shrink-0 mt-0.5">＜ホテル＞</span>
+                      <span className="text-[14px] font-black text-gray-700 break-all">{currentRes.hotel_name}</span>
                     </div>
                   )}
                   {currentRes?.discount && Number(currentRes.discount) > 0 && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-black text-gray-400 w-12 shrink-0">＜割引＞</span>
-                      <span className="text-[13px] font-black text-rose-500 italic">
+                    <div className="flex items-start gap-1">
+                      <span className="text-[11px] font-black text-gray-400 shrink-0 mt-0.5">＜割引＞</span>
+                      <span className="text-[14px] font-black text-rose-500 italic">
                         ¥{Number(currentRes.discount).toLocaleString()}
                       </span>
                     </div>
                   )}
                   {currentRes?.options && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      <span className="text-[11px] font-black text-gray-400 w-12 shrink-0">＜ＯＰ＞</span>
+                    <div className="flex items-start gap-1">
+                      <span className="text-[11px] font-black text-gray-400 shrink-0 mt-0.5">＜ＯＰ＞</span>
                       <div className="flex-1">
                         <span className="text-[11px] font-black text-gray-600 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100 inline-block">
                           {currentRes.options}
@@ -213,12 +215,11 @@ export default function ReservationModal({
                       </div>
                     </div>
                   )}
-                  {/* 📍 修正：＜メモ＞ の追加 [cite: 2026-01-29] */}
                   {currentRes?.memo && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      <span className="text-[11px] font-black text-gray-400 w-12 shrink-0">＜メモ＞</span>
+                    <div className="flex items-start gap-1">
+                      <span className="text-[11px] font-black text-gray-400 shrink-0 mt-0.5">＜メモ＞</span>
                       <div className="flex-1">
-                        <p className="text-[12px] font-bold text-gray-600 leading-relaxed bg-amber-50/50 p-2 rounded-lg border border-amber-100/50">
+                        <p className="text-[12px] font-bold text-gray-600 leading-relaxed bg-amber-50/50 p-2 rounded-lg border border-amber-100/50 break-all">
                           {currentRes.memo}
                         </p>
                       </div>
