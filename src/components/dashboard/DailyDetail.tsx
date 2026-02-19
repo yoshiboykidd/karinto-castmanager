@@ -32,10 +32,8 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   const isAbsent = shift?.status === 'absent';
   const isLate = shift?.is_late === true;
-  // 📍 シフト（仕事）があるかどうかの判定
   const hasShift = shift?.status === 'official' || isAbsent;
 
-  // 📍 予約がない時のメッセージを生成
   const noMissionMessage = useMemo(() => {
     if (isAbsent) return '当欠処理済み';
     return hasShift 
@@ -64,6 +62,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
     autoDelete();
   }, [isAbsent, reservations.length, date, myLoginId, supabase, onRefresh]);
 
+  // 💡 ロジック修正：カラム名を cast_memo に統一
   useEffect(() => {
     if (!selectedRes) {
       setMemoDraft('');
@@ -71,7 +70,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
       return;
     }
     setMemoDraft(selectedRes.cast_memo || '');
-  }, [selectedRes?.id]);
+  }, [selectedRes?.id, selectedRes?.cast_memo]);
 
   const handleDelete = async () => {
     if (!selectedRes?.id || !supabase) return;
@@ -86,6 +85,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
     } finally { setIsDeleting(false); }
   };
 
+  // 💡 ロジック修正：保存時のカラム名と state 更新の整合性を確保
   const handleSaveMemo = async () => {
     if (!selectedRes?.id || !supabase) return;
     const cNo = selectedRes.customer_no;
@@ -98,7 +98,10 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
       }
       const { error } = await query;
       if (error) throw error;
+
+      // 重要：ローカルの selectedRes を更新して子コンポーネントに即時反映させる
       setSelectedRes({ ...selectedRes, cast_memo: memoDraft });
+      
       if (onRefresh) onRefresh();
     } catch (err) { 
       console.error(err);
@@ -175,11 +178,10 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
             onSelect={setSelectedRes} 
             getBadgeStyle={getBadgeStyle} 
             isAbsent={isAbsent}
-            noMissionMessage={noMissionMessage} // 📍 動的メッセージを渡す
+            noMissionMessage={noMissionMessage}
           />
         </div>
 
-        {/* 📍 3. 統計情報：予約が1件以上ある場合のみ表示 */}
         {reservations.length > 0 && (
           <DailyStats 
             dayTotals={dayTotals} 
