@@ -8,11 +8,13 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const SHOP_ID_MAP: { [key: string]: number } = {
-  '池袋東口': 11, '池東': 11,
-  '池袋西口': 6,  '池西': 6,
-  '大久保': 10,
-  '神田': 1, '赤坂': 2, '秋葉原': 3, '上野': 4, '渋谷': 5, '五反田': 7, '大宮': 8, '吉祥寺': 9, '小岩': 12
+// 💡 修正： shop_master の shop_id（文字列3桁）と完全に一致させる
+const SHOP_ID_MAP: { [key: string]: string } = {
+  '池袋東口': '011', '池東': '011',
+  '池袋西口': '006', '池西': '006',
+  '大久保': '010', '神田': '001', '赤坂': '002', '秋葉原': '003', 
+  '上野': '004', '渋谷': '005', '五反田': '007', '大宮': '008', 
+  '吉祥寺': '009', '小岩': '012'
 };
 
 const KARINTO_OPS = [
@@ -115,31 +117,43 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
     setIsSending(true);
     try {
       const label = dbRes?.shop_label || "";
+      const castName = dbRes?.cast_name || 'キャスト';
       const castId = String(dbRes?.login_id || dbRes?.cast_id || "");
-      let shopNo = SHOP_ID_MAP[label] || Number(dbRes?.shop_id || 0) || null;
+      const shopId = SHOP_ID_MAP[label] || String(dbRes?.shop_id || '000').padStart(3, '0');
       const cName = dbRes.customer_name || '不明';
+      const timeRange = `${String(dbRes.start_time || "").substring(0, 5)}〜${String(dbRes.end_time || "").substring(0, 5)}`;
+      const courseInfo = dbRes.course_info || 'コース未設定';
+      
+      const combinedOps = [...savedOpsActive, ...selectedOps];
+      const opNames = combinedOps.map(o => o.name).join('、') || 'なし';
 
-      const newOps = [...allSavedOps, ...selectedOps.map(op => ({ ...op, timing: type === 'START' ? 'initial' : 'additional', updatedAt: new Date().toISOString() }))];
+      const newOpsDetails = [...allSavedOps, ...selectedOps.map(op => ({ ...op, timing: type === 'START' ? 'initial' : 'additional', updatedAt: new Date().toISOString() }))];
 
       if (type === 'START' || type === 'FINISH') {
-        const updateData: any = { actual_total_price: displayTotal, op_details: newOps, updated_at: new Date().toISOString() };
+        const updateData: any = { actual_total_price: displayTotal, op_details: newOpsDetails, updated_at: new Date().toISOString() };
         if (type === 'START') { updateData.status = 'playing'; updateData.in_call_at = new Date().toISOString(); }
         if (type === 'FINISH') { updateData.status = 'completed'; updateData.end_time = new Date().toISOString(); }
         const { error } = await supabase.from('reservations').update(updateData).eq('id', dbRes.id);
         if (error) throw error;
       }
 
+      // 💡 修正：ご要望のフォーマットに本文を組み立て
       let message = "";
-      if (type === 'HELP') message = `🆘 スタッフ至急！\n客名: ${cName}様`;
-      else if (type === 'START') message = `🚀 入室完了\n客名: ${cName}様\n💰 会計: ¥${displayTotal.toLocaleString()}`;
-      else if (type === 'FINISH') message = `🏁 プレイ終了\n客名: ${cName}様\n💰 最終: ¥${displayTotal.toLocaleString()}`;
-
-      const finalMsg = label ? `[${label}] ${message}` : message;
+      if (type === 'HELP') {
+        message = `🆘 スタッフ至急！\n客名: ${cName}様`;
+      } else if (type === 'START') {
+        message = `${castName} 入室完了\n${courseInfo} [${timeRange}]\n${cName}様 [OP: ${opNames}]\nスタート会計: ¥${displayTotal.toLocaleString()}`;
+      } else if (type === 'FINISH') {
+        message = `${castName} 退室完了\n${courseInfo} [${timeRange}]\n${cName}様 [追加OP: ${opNames}]\n最終会計: ¥${displayTotal.toLocaleString()}`;
+      }
 
       const { error: notifyError } = await supabase.from('notifications').insert({ 
-        shop_id: shopNo, cast_id: castId, type: type === 'HELP' ? 'help' : 'in_out',
+        shop_id: shopId, 
+        cast_id: castId, 
+        type: type === 'HELP' ? 'help' : 'in_out',
         title: type === 'START' ? '入室通知' : type === 'FINISH' ? '退室通知' : 'スタッフ呼出',
-        content: finalMsg, is_read: false 
+        content: message, 
+        is_read: false 
       });
       if (notifyError) throw notifyError;
       
