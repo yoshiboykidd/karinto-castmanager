@@ -15,22 +15,30 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
   const [memoDraft, setMemoDraft] = useState('');
   const [allPastReservations, setAllPastReservations] = useState<any[]>([]);
   
-  // 💡 修正：隠し状態のステート [cite: 2026-01-29]
+  // 💡 隠し状態のステート [cite: 2026-01-29]
   const [isCovered, setIsCovered] = useState(true);
   const imageURL = "https://gstsgybukinlkzdqotyv.supabase.co/storage/v1/object/public/assets/KCMlogo2.png";
 
   const dayTotals = useMemo(() => {
     return (reservations || []).reduce((acc: any, res: any) => {
-      const isSoe = res.service_type === '添';
-      const cat = res.nomination_category;
-      const target = isSoe ? acc.soe : acc.ka;
-      if (cat === 'FREE') target.free++;
-      else if (cat === '初指') target.first++;
-      else if (cat === '本指') target.main++;
+      // 💡 修正：プレイ終了（status === 'done'）の予約のみをカウント・集計対象にする
+      if (res.status === 'done') {
+        const isSoe = res.service_type === '添';
+        const cat = res.nomination_category;
+        const target = isSoe ? acc.soe : acc.ka;
+
+        if (cat === 'FREE') target.free++;
+        else if (cat === '初指') target.first++;
+        else if (cat === '本指') target.main++;
+
+        // 💡 修正：プレイ終了した予約の金額を合計に加算
+        acc.totalSales += Number(res.total_price || 0);
+      }
       return acc;
     }, {
       ka: { free: 0, first: 0, main: 0 },
-      soe: { free: 0, first: 0, main: 0 }
+      soe: { free: 0, first: 0, main: 0 },
+      totalSales: 0 // 💡 初期値を追加
     });
   }, [reservations]);
 
@@ -146,7 +154,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
           </div>
         )}
         
-        {/* 日付ヘッダー（常に表示） */}
         <div className="flex items-center justify-center w-full p-2 border-b border-gray-50">
           <div className="flex items-center gap-2">
             <div className="flex items-baseline font-black tracking-tighter text-gray-800 leading-none">
@@ -176,7 +183,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
           </div>
         </div>
 
-        {/* 予約リスト（常に表示） */}
         <div className="flex-1 min-h-[100px]">
           <ReservationList 
             reservations={reservations} 
@@ -187,7 +193,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
           />
         </div>
 
-        {/* 実績エリア（ここだけをマスクする） */}
         {reservations?.length > 0 && (
           <div 
             className="relative cursor-pointer select-none"

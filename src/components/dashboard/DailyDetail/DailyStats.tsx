@@ -14,7 +14,8 @@ export default function DailyStats({ dayTotals, rewardAmount, theme = 'pink' }: 
         <div className="flex items-baseline gap-1">
           <span className={`text-[12px] font-black ${accentColor}`}>¥</span>
           <span className={`text-[32px] font-black tracking-tighter ${accentColor} [text-shadow:_0.8px_0_0_currentColor]`}>
-            {(rewardAmount || 0).toLocaleString()}
+            {/* 💡 修正：rewardAmount ではなく、ロジックで集計した totalSales を表示 */}
+            {(dayTotals.totalSales || 0).toLocaleString()}
           </span>
         </div>
       </div>
