@@ -122,9 +122,11 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       const shopId = SHOP_ID_MAP[label] || String(dbRes?.shop_id || '000').padStart(3, '0');
       const cName = dbRes.customer_name || '不明';
 
-      // 💡 修正：時刻のみを整形して表示
-      const startTime = String(dbRes.start_time || "").substring(0, 5);
-      const endTime = String(dbRes.end_time || "").substring(0, 5);
+      // 💡 修正：時刻のみを抜き出す（12:10〜12:40 のように整形）
+      const startTimeRaw = String(dbRes.start_time || "").split(' ')[0] || "";
+      const endTimeRaw = String(dbRes.end_time || "").split(' ')[0] || "";
+      const startTime = startTimeRaw.substring(0, 5);
+      const endTime = endTimeRaw.substring(0, 5);
       const timeDisplay = `${startTime}〜${endTime}`;
 
       const courseInfo = dbRes.course_info || 'コース未設定';
@@ -143,14 +145,17 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         if (error) throw error;
       }
 
-      // 💡 修正：指定の通知フォーマット
+      // 💡 修正：会計内訳（基本 + Op = 合計）
+      const basePrice = displayTotal - opsTotal;
+      const amountRow = `¥${basePrice.toLocaleString()} + ¥${opsTotal.toLocaleString()} = ¥${displayTotal.toLocaleString()}`;
+
       let message = "";
       if (type === 'HELP') {
         message = `🆘 スタッフ至急！\n客名: ${cName}様`;
       } else if (type === 'START') {
-        message = `${castName} 入室完了 🚀\n${courseInfo} [${timeDisplay}]\n${cName}様 [OP: ${opNos}]\nスタート会計: ¥${displayTotal.toLocaleString()}`;
+        message = `${castName} 入室完了 🚀\n${courseInfo} [${timeDisplay}]\n${cName}様 [OP: ${opNos}]\nスタート会計: ${amountRow}`;
       } else if (type === 'FINISH') {
-        message = `${castName} 退室完了 🏁\n${courseInfo} [${timeDisplay}]\n${cName}様 [追加OP: ${opNos}]\n最終会計: ¥${displayTotal.toLocaleString()}`;
+        message = `${castName} 退室完了 🏁\n${courseInfo} [${timeDisplay}]\n${cName}様 [追加OP: ${opNos}]\n最終会計: ${amountRow}`;
       }
 
       const { error: notifyError } = await supabase.from('notifications').insert({ 
