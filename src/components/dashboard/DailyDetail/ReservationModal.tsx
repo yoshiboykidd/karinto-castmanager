@@ -13,11 +13,8 @@ export default function ReservationModal({
   const [isInCall, setIsInCall] = useState(false);
 
   useEffect(() => {
-    if (selectedRes?.status === 'playing') {
-      setIsInCall(true);
-    } else {
-      setIsInCall(false);
-    }
+    if (selectedRes?.status === 'playing') setIsInCall(true);
+    else setIsInCall(false);
   }, [selectedRes?.status]);
 
   const displayAmount = useMemo(() => {
@@ -32,6 +29,7 @@ export default function ReservationModal({
     setTimeout(() => setShowToast(false), 3000);
   };
 
+  // 💡 ロジック修正：過去のメモを取得
   const lastMemoFromHistory = useMemo(() => {
     if (!selectedRes?.customer_no) return "";
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
@@ -46,7 +44,16 @@ export default function ReservationModal({
 
   const currentCastMemo = (selectedRes.cast_memo || "").toString().trim();
 
+  // 💡 ロジック修正：表示用テキストの整形
+  // 今回のメモがあればそれを表示。なければ引き継ぎを表示。
+  const displayMemoContent = useMemo(() => {
+    if (currentCastMemo !== "") return currentCastMemo;
+    if (lastMemoFromHistory !== "") return `【前回からの引き継ぎ】\n${lastMemoFromHistory}`;
+    return "タップして入力...";
+  }, [currentCastMemo, lastMemoFromHistory]);
+
   const handleEditMemoStart = () => {
+    // 編集開始時は、今回のメモがあればそれを、なければ過去分を初期値にする
     const initialMemo = currentCastMemo !== "" ? currentCastMemo : lastMemoFromHistory;
     if (typeof setMemoDraft === 'function') setMemoDraft(initialMemo);
     if (typeof setIsEditingMemo === 'function') setIsEditingMemo(true);
@@ -94,6 +101,7 @@ export default function ReservationModal({
           </div>
 
           <div className="overflow-y-auto px-2 pt-2 pb-12 space-y-1.5 flex-1 overscroll-contain">
+            {/* ... OP計算ボタン等の既存コード ... */}
             <button onClick={() => setIsOpOpen(true)} className="w-full bg-gray-900 rounded-[20px] p-4 text-left shadow-lg active:scale-[0.98] transition-all relative overflow-hidden group">
               <div className="flex justify-between items-end">
                 <div>
@@ -133,7 +141,7 @@ export default function ReservationModal({
                   <textarea 
                     value={memoDraft || ""} 
                     onChange={(e) => setMemoDraft?.(e.target.value)} 
-                    className="w-full min-h-[120px] p-3 bg-white rounded-xl font-bold focus:outline-none resize-none" 
+                    className="w-full min-h-[160px] p-3 bg-white rounded-xl font-bold focus:outline-none resize-none" 
                     placeholder="メモを入力..." 
                     autoFocus 
                     style={{ fontSize: '16px', lineHeight: '1.5' }}
@@ -149,9 +157,9 @@ export default function ReservationModal({
                     <span className="text-[11px] font-black text-pink-400 italic">Cast Memo</span>
                     <span className="text-[10px] text-gray-300 font-bold">編集 ✎</span>
                   </div>
-                  <div className="text-[13px] font-bold text-gray-300 leading-relaxed italic">
-                    {/* 💡 ロジック修正：通常時は内容を表示せず、ステータスのみ表示 */}
-                    {currentCastMemo !== "" ? "内容が保存されています" : "タップして入力..."}
+                  <div className="text-[13px] font-bold text-gray-400 leading-relaxed italic">
+                    {/* 💡 閉じている時は中身を隠しつつ状態を表示 */}
+                    {currentCastMemo !== "" ? "最新のメモが保存されています" : (lastMemoFromHistory !== "" ? "過去のメモを引き継いでいます" : "タップして入力...")}
                   </div>
                 </button>
               )}
