@@ -21,8 +21,12 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   const dayTotals = useMemo(() => {
     return (reservations || []).reduce((acc: any, res: any) => {
-      // 💡 修正：プレイ終了（status === 'done'）の予約のみをカウント・集計対象にする
-      if (res.status === 'done') {
+      // 💡 修正：ステータスを大文字小文字・空白を無視して判定
+      const currentStatus = String(res.status || '').toLowerCase().trim();
+
+      // ⚠️ ここが 'completed' と一致しないとカウントされません。
+      // もし0のままなら、DBで '終了' や '完了' になっていないか再確認してください。
+      if (currentStatus === 'completed') {
         const isSoe = res.service_type === '添';
         const cat = res.nomination_category;
         const target = isSoe ? acc.soe : acc.ka;
@@ -31,14 +35,15 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
         else if (cat === '初指') target.first++;
         else if (cat === '本指') target.main++;
 
-        // 💡 修正：プレイ終了した予約の金額を合計に加算
-        acc.totalSales += Number(res.total_price || 0);
+        // 💡 修正：実際のカラム名 'actual_total_price' を使用
+        const price = Number(res.actual_total_price) || 0;
+        acc.totalSales += price;
       }
       return acc;
     }, {
       ka: { free: 0, first: 0, main: 0 },
       soe: { free: 0, first: 0, main: 0 },
-      totalSales: 0 // 💡 初期値を追加
+      totalSales: 0 
     });
   }, [reservations]);
 
