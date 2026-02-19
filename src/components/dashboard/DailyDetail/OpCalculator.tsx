@@ -33,7 +33,8 @@ const SOINE_OPS = [
   { label: '120分価格', items: [{ n: '3-1', t: '3点セット 120分1', p: 1000 }, { n: '3-2', t: '3点セット 120分2', p: 1000 }, { n: '3-3', t: '3点セット 120分3', p: 1000 }, { n: '3-4', t: '3点セット 120分4', p: 1000 }, { n: '3-5', t: '3点セット 120分5', p: 1000 }, { n: '1', t: '単品 120分1', p: 500 }, { n: '2', t: '単品 120分2', p: 500 }, { n: '3', t: '単品 120分3', p: 500 }, { n: '4', t: '単品 120分4', p: 500 }, { n: '5', t: '単品 120分5', p: 500 }]},
 ];
 
-export default function OpCalculator({ selectedRes, initialTotal, onToast, onClose, isInCall, setIsInCall }: any) {
+// 💡 修正：onUpdate をプロップスに追加
+export default function OpCalculator({ selectedRes, initialTotal, onToast, onClose, isInCall, setIsInCall, onUpdate }: any) {
   const router = useRouter();
   const [selectedOps, setSelectedOps] = useState<any[]>([]);
   const [isSending, setIsSending] = useState(false);
@@ -42,7 +43,11 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
   const fetchLatest = async () => {
     try {
       const { data } = await supabase.from('reservations').select('*').eq('id', selectedRes.id);
-      if (data && data.length > 0) setDbRes(data[0]);
+      if (data && data.length > 0) {
+        setDbRes(data[0]);
+        // 💡 修正：最新データを取得するたびに親モーダルを更新
+        if (onUpdate) onUpdate(data[0]);
+      }
     } catch (err) { console.error(err); }
   };
 
@@ -141,8 +146,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       if (type === 'START' || type === 'FINISH') {
         const updateData: any = { actual_total_price: displayTotal, op_details: newOpsDetails, updated_at: new Date().toISOString() };
         if (type === 'START') { updateData.status = 'playing'; updateData.in_call_at = new Date().toISOString(); }
-        
-        // 💡 修正：end_time を現在の時刻で上書きしないように変更（予約時の終了時間を維持する）
         if (type === 'FINISH') { updateData.status = 'completed'; }
         
         const { error } = await supabase.from('reservations').update(updateData).eq('id', dbRes.id);
@@ -219,7 +222,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 pt-3 pb-6 space-y-6 scrollbar-hide overscroll-contain min-h-0">
+      <div className="flex-1 overflow-y-auto px-2 pt-3 pb-6 space-y-6 scrollbar-hide overscroll-contain min-h-0 text-gray-100">
         {currentCategories.map((cat: any) => (
           <div key={cat.label} className="space-y-2">
             <h3 className="text-[10px] font-black text-gray-500 px-1 uppercase border-l-2 border-pink-500/50 ml-1 tracking-widest">{cat.label}</h3>
