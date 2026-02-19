@@ -188,30 +188,42 @@ export default function ReservationModal({
                   )}
                 </div>
 
-                {/* 📍 修正：ホテル、割引、OP情報の追加表示 [cite: 2026-01-29] */}
                 <div className="mt-2 space-y-1 border-t border-gray-50 pt-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black text-gray-400 w-10 shrink-0 italic uppercase tracking-tighter">Hotel:</span>
-                    <span className="text-[13px] font-black text-gray-700 truncate">{currentRes?.hotel_name || '---'}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black text-gray-400 w-10 shrink-0 italic uppercase tracking-tighter">Disc:</span>
-                    <span className="text-[13px] font-black text-rose-500 italic">
-                      {currentRes?.discount ? `¥${Number(currentRes.discount).toLocaleString()}` : 'なし'}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    <span className="text-[10px] font-black text-gray-400 w-10 shrink-0 italic uppercase tracking-tighter">Ops:</span>
-                    <div className="flex-1">
-                      {currentRes?.options ? (
+                  {currentRes?.hotel_name && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-black text-gray-400 w-12 shrink-0">＜ホテル＞</span>
+                      <span className="text-[13px] font-black text-gray-700 truncate">{currentRes.hotel_name}</span>
+                    </div>
+                  )}
+                  {currentRes?.discount && Number(currentRes.discount) > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-black text-gray-400 w-12 shrink-0">＜割引＞</span>
+                      <span className="text-[13px] font-black text-rose-500 italic">
+                        ¥{Number(currentRes.discount).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  {currentRes?.options && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      <span className="text-[11px] font-black text-gray-400 w-12 shrink-0">＜ＯＰ＞</span>
+                      <div className="flex-1">
                         <span className="text-[11px] font-black text-gray-600 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100 inline-block">
                           {currentRes.options}
                         </span>
-                      ) : (
-                        <span className="text-[11px] font-bold text-gray-300 italic">No options</span>
-                      )}
+                      </div>
                     </div>
-                  </div>
+                  )}
+                  {/* 📍 修正：＜メモ＞ の追加 [cite: 2026-01-29] */}
+                  {currentRes?.memo && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      <span className="text-[11px] font-black text-gray-400 w-12 shrink-0">＜メモ＞</span>
+                      <div className="flex-1">
+                        <p className="text-[12px] font-bold text-gray-600 leading-relaxed bg-amber-50/50 p-2 rounded-lg border border-amber-100/50">
+                          {currentRes.memo}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
