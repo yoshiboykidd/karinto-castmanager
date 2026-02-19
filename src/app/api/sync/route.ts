@@ -17,7 +17,7 @@ const ALL_SHOPS = [
   { id: '007', name: '五反田', baseUrl: 'https://www.karin-go.com/attend.php' }, 
   { id: '008', name: '大宮', baseUrl: 'https://www.karin10omiya.com/attend.php' }, 
   { id: '009', name: '吉祥寺', baseUrl: 'https://www.kari-kichi.com/attend.php' },
-  { id: '010', name: '大久保', baseUrl: 'https://www.ookubo-karinto.com/ookubo-attend.php' },
+  { id: '010', name: '大久保', baseUrl: 'https://www.ookubo-karinto.com/attend.php' },
   { id: '011', name: '池東', baseUrl: 'https://www.karin10bukuro-3shine.com/attend.php' }, 
   { id: '012', name: '小岩', baseUrl: 'https://www.karin10koiwa.com/attend.php' }, 
 ];
