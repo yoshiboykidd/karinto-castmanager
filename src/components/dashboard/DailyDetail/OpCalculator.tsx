@@ -133,7 +133,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       const timeDisplay = `${startTime}〜${endTime}`;
       const courseInfo = dbRes.course_info || 'コース未設定';
 
-      // OP情報の整理 [cite: 2026-01-29]
       const currentOpNos = [...savedOpsActive, ...selectedOps].map(o => o.no).join('、') || 'なし';
       const addedOpNos = selectedOps.map(o => o.no).join('、');
       const canceledOpNos = allSavedOps.filter((op: any) => op?.status === 'canceled').map((op: any) => op.no).join('、');
@@ -176,7 +175,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       if (type === 'FINISH') setIsInCall(false);
       setSelectedOps([]); 
 
-      // 💡 修正：通知タイプに合わせてトーストの文言を切り替え [cite: 2026-01-29]
       let toastMsg = "送信完了";
       if (type === 'START') {
         toastMsg = "お仕事開始を\nお店に通知しました";
@@ -237,6 +235,30 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
             </div>
           </div>
         ))}
+
+        {/* 💡 修正：値引きセクションを追加 */}
+        <div className="space-y-2 pt-2 border-t border-white/10">
+          <h3 className="text-[10px] font-black text-red-400 px-1 uppercase border-l-2 border-red-500/50 ml-1 tracking-widest">値引き (Discounts)</h3>
+          <div className="grid grid-cols-2 gap-2 pb-10">
+            {[
+              { n: '割', t: 'OP割', p: -500, label: '値引き' },
+              { n: 'CB', t: 'キャッシュバック', p: -1000, label: '値引き' }
+            ].map((item) => {
+              const isSelected = selectedOps.some(op => op.no === item.n);
+              const isSaved = savedOpsActive.some((op: any) => op?.no === item.n);
+              return (
+                <button 
+                  key={item.n} 
+                  onClick={() => toggleOp(item.n, item.t, item.p, item.label)}
+                  className={`min-h-[60px] rounded-[20px] flex flex-col items-center justify-center border transition-all ${isSelected || isSaved ? 'bg-red-600 border-red-400 shadow-[0_0_15px_rgba(220,38,38,0.3)]' : 'bg-white/5 border-white/5 text-gray-400'}`}
+                >
+                  <span className="text-[11px] font-black leading-tight text-center px-1">【{item.t}】</span>
+                  <span className="text-[18px] font-black">{item.p.toLocaleString()}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <div className="shrink-0 p-4 bg-gray-900 border-t border-gray-800 flex gap-2 pb-[calc(env(safe-area-inset-bottom)+24px)] shadow-[0_-10px_40px_rgba(0,0,0,0.8)]">
