@@ -19,8 +19,9 @@ export default function ReservationList({ reservations, onSelect, getBadgeStyle,
     );
   }
 
+  // 💡 修正：フォーマット後の時間でソートすることで、ISO形式とHH:mm形式が混在しても正しく並ぶように
   const sortedReservations = [...reservations].sort((a, b) => 
-    (a.start_time || "").localeCompare(b.start_time || "")
+    formatTime(a.start_time || "").localeCompare(formatTime(b.start_time || ""))
   );
 
   return (
@@ -57,9 +58,13 @@ export default function ReservationList({ reservations, onSelect, getBadgeStyle,
             )}
           </div>
 
-          <div className="flex items-baseline truncate ml-auto font-black">
-            <span className="text-[15px]">{res.customer_name}</span>
-            <span className="text-[8px] font-bold text-gray-400 ml-0.5">様</span>
+          <div className="flex items-center gap-1.5 truncate ml-auto font-black">
+            {/* 💡 修正：予約一覧にも会員番号（customer_no）を表示 */}
+            <span className="text-[9px] font-black text-gray-300 tabular-nums">#{res.customer_no || '---'}</span>
+            <div className="flex items-baseline">
+              <span className="text-[15px]">{res.customer_name}</span>
+              <span className="text-[8px] font-bold text-gray-400 ml-0.5">様</span>
+            </div>
           </div>
         </button>
       ))}
