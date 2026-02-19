@@ -7,14 +7,12 @@ export default function ReservationModal({
   selectedRes, onClose, onDelete, isDeleting, isEditingMemo, setIsEditingMemo, 
   memoDraft, setMemoDraft, onSaveMemo, getBadgeStyle, allPastReservations = []
 }: any) {
-  // 💡 修正：モーダル内で管理する「最新の予約データ」ステート
   const [currentRes, setCurrentRes] = useState(selectedRes);
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
   const [isOpOpen, setIsOpOpen] = useState(false);
   const [isInCall, setIsInCall] = useState(false);
 
-  // 💡 親から渡された selectedRes が変わったら、内部ステートも同期する
   useEffect(() => {
     setCurrentRes(selectedRes);
   }, [selectedRes]);
@@ -24,7 +22,6 @@ export default function ReservationModal({
     else setIsInCall(false);
   }, [currentRes?.status]);
 
-  // 💡 時刻抽出ヘルパー
   const formatTime = (t: any) => {
     const s = String(t || "");
     if (!s || s === "null") return "--:--";
@@ -33,14 +30,12 @@ export default function ReservationModal({
     return s.startsWith('20') ? "--:--" : s.substring(0, 5);
   };
 
-  // 💡 修正：表示金額の計算を currentRes（最新）ベースに変更
   const displayAmount = useMemo(() => {
     const actual = Number(currentRes?.actual_total_price || 0);
     const initial = Number(currentRes?.total_price || 0);
     return actual > 0 ? actual : initial;
   }, [currentRes?.actual_total_price, currentRes?.total_price]);
 
-  // 前回会った日の抽出
   const lastVisitDate = useMemo(() => {
     if (!currentRes?.customer_no || !currentRes?.cast_id) return null;
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
@@ -59,7 +54,6 @@ export default function ReservationModal({
     return null;
   }, [currentRes?.customer_no, currentRes?.cast_id, currentRes?.id, allPastReservations]);
 
-  // 現在のキャストとの来店回数
   const visitCountForThisCast = useMemo(() => {
     if (!currentRes?.customer_no || !currentRes?.cast_id) return 1;
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
@@ -70,7 +64,6 @@ export default function ReservationModal({
     ).length;
   }, [currentRes?.customer_no, currentRes?.cast_id, allPastReservations]);
 
-  // 履歴からの最新メモ
   const lastMemoFromHistory = useMemo(() => {
     if (!currentRes?.customer_no || !currentRes?.cast_id) return "";
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
@@ -129,7 +122,6 @@ export default function ReservationModal({
           onClose={() => setIsOpOpen(false)}
           isInCall={isInCall}
           setIsInCall={setIsInCall}
-          // 💡 修正：OpCalculator からの最新データをステートに反映
           onUpdate={(updated: any) => setCurrentRes(updated)}
         />
       )}
@@ -194,6 +186,32 @@ export default function ReservationModal({
                       前回: {lastVisitDate}
                     </span>
                   )}
+                </div>
+
+                {/* 📍 修正：ホテル、割引、OP情報の追加表示 [cite: 2026-01-29] */}
+                <div className="mt-2 space-y-1 border-t border-gray-50 pt-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-gray-400 w-10 shrink-0 italic uppercase tracking-tighter">Hotel:</span>
+                    <span className="text-[13px] font-black text-gray-700 truncate">{currentRes?.hotel_name || '---'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-gray-400 w-10 shrink-0 italic uppercase tracking-tighter">Disc:</span>
+                    <span className="text-[13px] font-black text-rose-500 italic">
+                      {currentRes?.discount ? `¥${Number(currentRes.discount).toLocaleString()}` : 'なし'}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <span className="text-[10px] font-black text-gray-400 w-10 shrink-0 italic uppercase tracking-tighter">Ops:</span>
+                    <div className="flex-1">
+                      {currentRes?.options ? (
+                        <span className="text-[11px] font-black text-gray-600 bg-gray-50 px-2 py-0.5 rounded-md border border-gray-100 inline-block">
+                          {currentRes.options}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-bold text-gray-300 italic">No options</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
