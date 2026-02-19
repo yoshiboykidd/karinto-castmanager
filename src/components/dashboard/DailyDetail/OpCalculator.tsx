@@ -8,7 +8,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// 💡 修正： shop_master の shop_id（文字列3桁）に完全準拠
+// 💡 shop_master の shop_id（文字列3桁）に完全準拠 [cite: 2026-01-29]
 const SHOP_ID_MAP: { [key: string]: string } = {
   '池袋東口': '011', '池東': '011',
   '池袋西口': '006', '池西': '006',
@@ -122,16 +122,19 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       const shopId = SHOP_ID_MAP[label] || String(dbRes?.shop_id || '000').padStart(3, '0');
       const cName = dbRes.customer_name || '不明';
 
-      // 💡 修正：時刻のみを抜き出す（12:10〜12:40 のように整形）
-      const startTimeRaw = String(dbRes.start_time || "").split(' ')[0] || "";
-      const endTimeRaw = String(dbRes.end_time || "").split(' ')[0] || "";
-      const startTime = startTimeRaw.substring(0, 5);
-      const endTime = endTimeRaw.substring(0, 5);
+      // 💡 修正：正規表現で確実に時刻だけを抜粋 [cite: 2026-01-29]
+      const formatTime = (timeStr: string) => {
+        if (!timeStr) return "--:--";
+        const match = timeStr.match(/\d{2}:\d{2}/);
+        return match ? match[0] : "--:--";
+      };
+
+      const startTime = formatTime(dbRes.start_time);
+      const endTime = formatTime(dbRes.end_time);
       const timeDisplay = `${startTime}〜${endTime}`;
 
       const courseInfo = dbRes.course_info || 'コース未設定';
       
-      // 💡 修正：オプションを「No」の一覧にする
       const combinedOps = [...savedOpsActive, ...selectedOps];
       const opNos = combinedOps.map(o => o.no).join('、') || 'なし';
 
@@ -145,7 +148,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         if (error) throw error;
       }
 
-      // 💡 修正：会計内訳（基本 + Op = 合計）
+      // 会計内訳の表示 [cite: 2026-01-29]
       const basePrice = displayTotal - opsTotal;
       const amountRow = `¥${basePrice.toLocaleString()} + ¥${opsTotal.toLocaleString()} = ¥${displayTotal.toLocaleString()}`;
 
