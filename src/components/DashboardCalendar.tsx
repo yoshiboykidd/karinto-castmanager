@@ -48,9 +48,6 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           <ChevronLeft className="text-slate-400" size={24} />
         </button>
         <div className="flex flex-col items-center">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">
-            {format(month, 'MMMM', { locale: ja })}
-          </span>
           <span className="text-2xl font-black text-slate-800 tracking-tighter italic">
             {format(month, 'yyyy.MM')}
           </span>
@@ -87,8 +84,10 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
           const isOfficial = s?.status === 'official' && !isAbsent;
           const isRequested = s?.status === 'requested';
           const isModified = isRequested && s?.is_official_pre_exist;
-          // 特定日の判定
-          const isSpecialDay = s?.is_special_day === true; 
+          
+          // 📍 修正：特定日の判定ロジック [cite: 2026-01-29]
+          // DBのフラグ(is_special_day) か、固定の記念日(10, 11, 22) のいずれか
+          const isSpecialDay = s?.is_special_day === true || dNum === 10 || dNum === 11 || dNum === 22; 
 
           const refStart = isModified ? s?.hp_start_time : s?.start_time;
           const hasOfficialBase = (isOfficial || isModified) && refStart && refStart !== 'OFF';
@@ -104,7 +103,7 @@ export default function DashboardCalendar({ shifts, selectedDates, onSelect, mon
               className={`relative h-12 w-full flex flex-col items-center justify-center rounded-2xl transition-all active:scale-95 cursor-pointer
               ${isSelected ? 'bg-white shadow-lg ring-2 ' + currentTheme.selected + ' z-10' : ''}
               ${isToday && !isSelected ? currentTheme.today : ''}
-              ${isSpecialDay && !isSelected ? 'bg-blue-100' : ''} // 📍 特定日は背景を薄い青に
+              ${isSpecialDay && !isSelected ? 'bg-blue-100' : ''} 
               `}
             >
               <span className={`z-20 text-[16px] font-black ${textColor}`}>{dNum}</span>
