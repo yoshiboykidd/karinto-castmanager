@@ -8,7 +8,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// 💡 修正： shop_master の shop_id（文字列3桁）と完全に一致させる
+// 💡 修正： shop_master の shop_id（文字列3桁）に完全準拠
 const SHOP_ID_MAP: { [key: string]: string } = {
   '池袋東口': '011', '池東': '011',
   '池袋西口': '006', '池西': '006',
@@ -121,11 +121,17 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       const castId = String(dbRes?.login_id || dbRes?.cast_id || "");
       const shopId = SHOP_ID_MAP[label] || String(dbRes?.shop_id || '000').padStart(3, '0');
       const cName = dbRes.customer_name || '不明';
-      const timeRange = `${String(dbRes.start_time || "").substring(0, 5)}〜${String(dbRes.end_time || "").substring(0, 5)}`;
+
+      // 💡 修正：時刻のみを整形して表示
+      const startTime = String(dbRes.start_time || "").substring(0, 5);
+      const endTime = String(dbRes.end_time || "").substring(0, 5);
+      const timeDisplay = `${startTime}〜${endTime}`;
+
       const courseInfo = dbRes.course_info || 'コース未設定';
       
+      // 💡 修正：オプションを「No」の一覧にする
       const combinedOps = [...savedOpsActive, ...selectedOps];
-      const opNames = combinedOps.map(o => o.name).join('、') || 'なし';
+      const opNos = combinedOps.map(o => o.no).join('、') || 'なし';
 
       const newOpsDetails = [...allSavedOps, ...selectedOps.map(op => ({ ...op, timing: type === 'START' ? 'initial' : 'additional', updatedAt: new Date().toISOString() }))];
 
@@ -137,14 +143,14 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         if (error) throw error;
       }
 
-      // 💡 修正：ご要望のフォーマットに本文を組み立て
+      // 💡 修正：指定の通知フォーマット
       let message = "";
       if (type === 'HELP') {
         message = `🆘 スタッフ至急！\n客名: ${cName}様`;
       } else if (type === 'START') {
-        message = `${castName} 入室完了\n${courseInfo} [${timeRange}]\n${cName}様 [OP: ${opNames}]\nスタート会計: ¥${displayTotal.toLocaleString()}`;
+        message = `${castName} 入室完了 🚀\n${courseInfo} [${timeDisplay}]\n${cName}様 [OP: ${opNos}]\nスタート会計: ¥${displayTotal.toLocaleString()}`;
       } else if (type === 'FINISH') {
-        message = `${castName} 退室完了\n${courseInfo} [${timeRange}]\n${cName}様 [追加OP: ${opNames}]\n最終会計: ¥${displayTotal.toLocaleString()}`;
+        message = `${castName} 退室完了 🏁\n${courseInfo} [${timeDisplay}]\n${cName}様 [追加OP: ${opNos}]\n最終会計: ¥${displayTotal.toLocaleString()}`;
       }
 
       const { error: notifyError } = await supabase.from('notifications').insert({ 
