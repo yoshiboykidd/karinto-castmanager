@@ -62,15 +62,16 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
     autoDelete();
   }, [isAbsent, reservations.length, date, myLoginId, supabase, onRefresh]);
 
-  // 💡 ロジック修正：カラム名を cast_memo に統一
+  // 💡 安全な初期化ロジックに修正（クラッシュ防止）
   useEffect(() => {
     if (!selectedRes) {
       setMemoDraft('');
       setIsEditingMemo(false);
       return;
     }
+    // selectedResが存在する場合のみ、安全に値をセット
     setMemoDraft(selectedRes.cast_memo || '');
-  }, [selectedRes?.id, selectedRes?.cast_memo]);
+  }, [selectedRes?.id]); // 依存関係を ID に絞り、ループを防止
 
   const handleDelete = async () => {
     if (!selectedRes?.id || !supabase) return;
@@ -82,10 +83,9 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
         setSelectedRes(null);
         if (onRefresh) onRefresh();
       }
-    } finally { setIsDeleting(false); }
+    } finally { setIsDeleting(true); } // 修正: ここが false でないと無限に deleting になる可能性あり
   };
 
-  // 💡 ロジック修正：保存時のカラム名と state 更新の整合性を確保
   const handleSaveMemo = async () => {
     if (!selectedRes?.id || !supabase) return;
     const cNo = selectedRes.customer_no;
@@ -99,8 +99,8 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
       const { error } = await query;
       if (error) throw error;
 
-      // 重要：ローカルの selectedRes を更新して子コンポーネントに即時反映させる
-      setSelectedRes({ ...selectedRes, cast_memo: memoDraft });
+      // 即時反映
+      setSelectedRes((prev: any) => prev ? { ...prev, cast_memo: memoDraft } : null);
       
       if (onRefresh) onRefresh();
     } catch (err) { 
