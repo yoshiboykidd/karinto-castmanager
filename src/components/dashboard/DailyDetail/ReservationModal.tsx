@@ -13,11 +13,13 @@ export default function ReservationModal({
   const [isInCall, setIsInCall] = useState(false);
 
   useEffect(() => {
+    // 💡 安全な参照に変更
     if (selectedRes?.status === 'playing') setIsInCall(true);
     else setIsInCall(false);
   }, [selectedRes?.status]);
 
   const displayAmount = useMemo(() => {
+    // 💡 安全な参照に変更
     const actual = Number(selectedRes?.actual_total_price || 0);
     const initial = Number(selectedRes?.total_price || 0);
     return actual > 0 ? actual : initial;
@@ -29,23 +31,22 @@ export default function ReservationModal({
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  // 💡 ロジック修正：過去のメモを取得
   const lastMemoFromHistory = useMemo(() => {
+    // 💡 プロパティアクセスを安全に
     if (!selectedRes?.customer_no) return "";
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
     const record = history
-      .filter(r => r && r.customer_no === selectedRes.customer_no && r.id !== selectedRes.id)
+      .filter(r => r && r.customer_no === selectedRes.customer_no && r.id !== selectedRes?.id)
       .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")))
       .find(r => r?.cast_memo && String(r.cast_memo).trim() !== "");
     return record?.cast_memo ? String(record.cast_memo).trim() : "";
   }, [selectedRes?.customer_no, selectedRes?.id, allPastReservations]);
 
+  // 💡 早期リターンをより上部に配置し、以下の変数定義でのクラッシュを防ぐ
   if (!selectedRes) return null;
 
-  const currentCastMemo = (selectedRes.cast_memo || "").toString().trim();
+  const currentCastMemo = (selectedRes?.cast_memo || "").toString().trim();
 
-  // 💡 ロジック修正：表示用テキストの整形
-  // 今回のメモがあればそれを表示。なければ引き継ぎを表示。
   const displayMemoContent = useMemo(() => {
     if (currentCastMemo !== "") return currentCastMemo;
     if (lastMemoFromHistory !== "") return `【前回からの引き継ぎ】\n${lastMemoFromHistory}`;
@@ -53,7 +54,6 @@ export default function ReservationModal({
   }, [currentCastMemo, lastMemoFromHistory]);
 
   const handleEditMemoStart = () => {
-    // 編集開始時は、今回のメモがあればそれを、なければ過去分を初期値にする
     const initialMemo = currentCastMemo !== "" ? currentCastMemo : lastMemoFromHistory;
     if (typeof setMemoDraft === 'function') setMemoDraft(initialMemo);
     if (typeof setIsEditingMemo === 'function') setIsEditingMemo(true);
@@ -96,12 +96,11 @@ export default function ReservationModal({
       {!isOpOpen && (
         <div className="relative z-10 w-full max-w-sm bg-white rounded-[24px] flex flex-col max-h-[98vh] overflow-hidden text-gray-800 shadow-2xl mx-1">
           <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center shrink-0">
-            <p className="text-[18px] font-black">{String(selectedRes.reservation_date || "").replace(/-/g, '/')}</p>
+            <p className="text-[18px] font-black">{String(selectedRes?.reservation_date || "").replace(/-/g, '/')}</p>
             <button onClick={() => onClose?.()} className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full text-gray-400 text-xl font-bold">×</button>
           </div>
 
           <div className="overflow-y-auto px-2 pt-2 pb-12 space-y-1.5 flex-1 overscroll-contain">
-            {/* ... OP計算ボタン等の既存コード ... */}
             <button onClick={() => setIsOpOpen(true)} className="w-full bg-gray-900 rounded-[20px] p-4 text-left shadow-lg active:scale-[0.98] transition-all relative overflow-hidden group">
               <div className="flex justify-between items-end">
                 <div>
@@ -117,21 +116,21 @@ export default function ReservationModal({
             <div className="bg-pink-50/40 rounded-[18px] p-2.5 border border-pink-100/30">
               <div className="flex justify-between items-center mb-1.5 px-0.5">
                 <div className="flex gap-1">
-                  <span className={`${badgeBaseClass} ${getBadgeStyle?.(selectedRes.service_type) || 'bg-pink-500 text-white'}`}>{selectedRes.service_type || 'か'}</span>
-                  {selectedRes.nomination_category && <span className={`${badgeBaseClass} ${getBadgeStyle?.(selectedRes.nomination_category) || 'bg-gray-100 text-gray-400'}`}>{selectedRes.nomination_category}</span>}
+                  <span className={`${badgeBaseClass} ${getBadgeStyle?.(selectedRes?.service_type) || 'bg-pink-500 text-white'}`}>{selectedRes?.service_type || 'か'}</span>
+                  {selectedRes?.nomination_category && <span className={`${badgeBaseClass} ${getBadgeStyle?.(selectedRes?.nomination_category) || 'bg-gray-100 text-gray-400'}`}>{selectedRes?.nomination_category}</span>}
                 </div>
                 <div className="text-[20px] font-black text-gray-700 leading-none tabular-nums">
-                  {String(selectedRes.start_time || "").substring(0, 5)}〜{String(selectedRes.end_time || "").substring(0, 5)}
+                  {String(selectedRes?.start_time || "").substring(0, 5)}〜{String(selectedRes?.end_time || "").substring(0, 5)}
                 </div>
               </div>
-              <p className="text-[15px] font-black text-gray-700 leading-tight mb-1">{selectedRes.course_info || 'コース未設定'}</p>
+              <p className="text-[15px] font-black text-gray-700 leading-tight mb-1">{selectedRes?.course_info || 'コース未設定'}</p>
             </div>
 
             <div className="p-3 bg-white border border-gray-100 rounded-[18px] relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1.5 h-full bg-pink-100"></div>
               <div className="flex items-center gap-2">
-                <span className="text-[20px] font-black text-gray-800">{selectedRes.customer_name || '不明'} 様</span>
-                <span className={`${badgeBaseClass} ${Array.isArray(allPastReservations) && allPastReservations.filter(r => r?.customer_no === selectedRes.customer_no).length === 1 ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-500'}`}>{Array.isArray(allPastReservations) && allPastReservations.filter(r => r?.customer_no === selectedRes.customer_no).length === 1 ? '初' : `${Array.isArray(allPastReservations) && allPastReservations.filter(r => r?.customer_no === selectedRes.customer_no).length}回目`}</span>
+                <span className="text-[20px] font-black text-gray-800">{selectedRes?.customer_name || '不明'} 様</span>
+                <span className={`${badgeBaseClass} ${Array.isArray(allPastReservations) && allPastReservations.filter(r => r?.customer_no === selectedRes?.customer_no).length === 1 ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-500'}`}>{Array.isArray(allPastReservations) && allPastReservations.filter(r => r?.customer_no === selectedRes?.customer_no).length === 1 ? '初' : `${Array.isArray(allPastReservations) && allPastReservations.filter(r => r?.customer_no === selectedRes?.customer_no).length}回目`}</span>
               </div>
             </div>
 
@@ -155,10 +154,9 @@ export default function ReservationModal({
                 <button onClick={handleEditMemoStart} className="w-full p-4 text-left group">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-[11px] font-black text-pink-400 italic">Cast Memo</span>
-                    <span className="text-[10px] text-gray-300 font-bold">編集 ✎</span>
+                    <span className={`${isDeleting ? 'hidden' : 'text-[10px] text-gray-300 font-bold'}`}>編集 ✎</span>
                   </div>
                   <div className="text-[13px] font-bold text-gray-400 leading-relaxed italic">
-                    {/* 💡 閉じている時は中身を隠しつつ状態を表示 */}
                     {currentCastMemo !== "" ? "最新のメモが保存されています" : (lastMemoFromHistory !== "" ? "過去のメモを引き継いでいます" : "タップして入力...")}
                   </div>
                 </button>
