@@ -17,13 +17,19 @@ export default function ReservationModal({
     else setIsInCall(false);
   }, [selectedRes?.status]);
 
+  // 💡 修正：どんな形式の時刻・日付文字列が来ても "13:30" の形式に抽出するヘルパー
+  const formatTime = (t: string) => {
+    if (!t) return "--:--";
+    const match = t.match(/\d{2}:\d{2}/);
+    return match ? match[0] : t.substring(0, 5);
+  };
+
   const displayAmount = useMemo(() => {
     const actual = Number(selectedRes?.actual_total_price || 0);
     const initial = Number(selectedRes?.total_price || 0);
     return actual > 0 ? actual : initial;
   }, [selectedRes?.actual_total_price, selectedRes?.total_price]);
 
-  // 💡 修正：現在のキャストと前回会った日を抽出
   const lastVisitDate = useMemo(() => {
     if (!selectedRes?.customer_no || !selectedRes?.cast_id) return null;
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
@@ -31,7 +37,7 @@ export default function ReservationModal({
       .filter(r => 
         r && 
         r.customer_no === selectedRes.customer_no && 
-        r.cast_id === selectedRes.cast_id && // 💡 キャストIDを条件に追加
+        r.cast_id === selectedRes.cast_id && 
         r.id !== selectedRes?.id
       )
       .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")));
@@ -42,7 +48,6 @@ export default function ReservationModal({
     return null;
   }, [selectedRes?.customer_no, selectedRes?.cast_id, selectedRes?.id, allPastReservations]);
 
-  // 💡 修正：現在のキャストとの来店回数
   const visitCountForThisCast = useMemo(() => {
     if (!selectedRes?.customer_no || !selectedRes?.cast_id) return 1;
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
@@ -60,7 +65,7 @@ export default function ReservationModal({
       .filter(r => 
         r && 
         r.customer_no === selectedRes.customer_no && 
-        r.cast_id === selectedRes.cast_id && // 💡 キャストIDを条件に追加
+        r.cast_id === selectedRes.cast_id && 
         r.id !== selectedRes?.id
       )
       .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")))
@@ -146,21 +151,20 @@ export default function ReservationModal({
                   <span className={`${badgeBaseClass} ${getBadgeStyle?.(selectedRes?.service_type) || 'bg-pink-500 text-white'}`}>{selectedRes?.service_type || 'か'}</span>
                   {selectedRes?.nomination_category && <span className={`${badgeBaseClass} ${getBadgeStyle?.(selectedRes?.nomination_category) || 'bg-gray-100 text-gray-400'}`}>{selectedRes?.nomination_category}</span>}
                 </div>
+                {/* 💡 修正：formatTime ヘルパーを使用 */}
                 <div className="text-[20px] font-black text-gray-700 leading-none tabular-nums">
-                  {String(selectedRes?.start_time || "").substring(0, 5)}〜{String(selectedRes?.end_time || "").substring(0, 5)}
+                  {formatTime(selectedRes?.start_time)}〜{formatTime(selectedRes?.end_time)}
                 </div>
               </div>
               <p className="text-[15px] font-black text-gray-700 leading-tight mb-1">{selectedRes?.course_info || 'コース未設定'}</p>
             </div>
 
-            {/* 📍 顧客情報セクション */}
             <div className="p-3 bg-white border border-gray-100 rounded-[18px] relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1.5 h-full bg-pink-100"></div>
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[20px] font-black text-gray-800 leading-none">{selectedRes?.customer_name || '不明'} 様</span>
                   
-                  {/* 💡 修正：会員番号（customer_no）を表示。select-all でコピーしやすく */}
                   <div className="bg-gray-50 border border-gray-100 px-2 py-1 rounded-lg select-all active:bg-gray-100 transition-colors">
                     <span className="text-[10px] font-black text-gray-400 mr-1 italic uppercase tracking-tighter">ID:</span>
                     <span className="text-[12px] font-black text-gray-600 tabular-nums">#{selectedRes?.customer_no || '---'}</span>
