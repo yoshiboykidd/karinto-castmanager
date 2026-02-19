@@ -12,7 +12,6 @@ export default function ReservationModal({
   const [isOpOpen, setIsOpOpen] = useState(false);
   const [isInCall, setIsInCall] = useState(false);
 
-  // 1. Hooks 定義 [cite: 2026-01-29]
   useEffect(() => {
     if (selectedRes?.status === 'playing') setIsInCall(true);
     else setIsInCall(false);
@@ -24,21 +23,55 @@ export default function ReservationModal({
     return actual > 0 ? actual : initial;
   }, [selectedRes?.actual_total_price, selectedRes?.total_price]);
 
+  // 💡 修正：現在のキャストと前回会った日を抽出
+  const lastVisitDate = useMemo(() => {
+    if (!selectedRes?.customer_no || !selectedRes?.cast_id) return null;
+    const history = Array.isArray(allPastReservations) ? allPastReservations : [];
+    const pastVisits = history
+      .filter(r => 
+        r && 
+        r.customer_no === selectedRes.customer_no && 
+        r.cast_id === selectedRes.cast_id && // 💡 キャストIDを条件に追加
+        r.id !== selectedRes?.id
+      )
+      .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")));
+    
+    if (pastVisits.length > 0 && pastVisits[0].reservation_date) {
+      return pastVisits[0].reservation_date.replace(/-/g, '/');
+    }
+    return null;
+  }, [selectedRes?.customer_no, selectedRes?.cast_id, selectedRes?.id, allPastReservations]);
+
+  // 💡 修正：現在のキャストとの来店回数
+  const visitCountForThisCast = useMemo(() => {
+    if (!selectedRes?.customer_no || !selectedRes?.cast_id) return 1;
+    const history = Array.isArray(allPastReservations) ? allPastReservations : [];
+    return history.filter(r => 
+      r && 
+      r.customer_no === selectedRes.customer_no && 
+      r.cast_id === selectedRes.cast_id
+    ).length;
+  }, [selectedRes?.customer_no, selectedRes?.cast_id, allPastReservations]);
+
   const lastMemoFromHistory = useMemo(() => {
-    if (!selectedRes?.customer_no) return "";
+    if (!selectedRes?.customer_no || !selectedRes?.cast_id) return "";
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
     const record = history
-      .filter(r => r && r.customer_no === selectedRes.customer_no && r.id !== selectedRes?.id)
+      .filter(r => 
+        r && 
+        r.customer_no === selectedRes.customer_no && 
+        r.cast_id === selectedRes.cast_id && // 💡 キャストIDを条件に追加
+        r.id !== selectedRes?.id
+      )
       .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")))
       .find(r => r?.cast_memo && String(r.cast_memo).trim() !== "");
     return record?.cast_memo ? String(record.cast_memo).trim() : "";
-  }, [selectedRes?.customer_no, selectedRes?.id, allPastReservations]);
+  }, [selectedRes?.customer_no, selectedRes?.cast_id, selectedRes?.id, allPastReservations]);
 
   const currentCastMemo = useMemo(() => {
     return (selectedRes?.cast_memo || "").toString().trim();
   }, [selectedRes?.cast_memo]);
 
-  // 2. 早期リターン [cite: 2026-01-29]
   if (!selectedRes) return null;
 
   const handleToast = (msg: string) => {
@@ -81,7 +114,6 @@ export default function ReservationModal({
         />
       )}
 
-      {/* 💡 修正：トーストの幅と余白を微調整 [cite: 2026-01-29] */}
       {showToast && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100000] bg-pink-600 text-white px-6 py-5 rounded-[24px] shadow-2xl font-black text-center border-2 border-pink-400 animate-bounce whitespace-pre-line min-w-[280px] max-w-[90%]">
           <div className="text-[16px] leading-relaxed">✅ {toastMsg}</div>
@@ -125,7 +157,16 @@ export default function ReservationModal({
               <div className="absolute top-0 left-0 w-1.5 h-full bg-pink-100"></div>
               <div className="flex items-center gap-2">
                 <span className="text-[20px] font-black text-gray-800">{selectedRes?.customer_name || '不明'} 様</span>
-                <span className={`${badgeBaseClass} ${Array.isArray(allPastReservations) && allPastReservations.filter(r => r?.customer_no === selectedRes?.customer_no).length === 1 ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-500'}`}>{Array.isArray(allPastReservations) && allPastReservations.filter(r => r?.customer_no === selectedRes?.customer_no).length === 1 ? '初' : `${Array.isArray(allPastReservations) && allPastReservations.filter(r => r?.customer_no === selectedRes?.customer_no).length}回目`}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`${badgeBaseClass} ${visitCountForThisCast === 1 ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    {visitCountForThisCast === 1 ? '初' : `${visitCountForThisCast}回目`}
+                  </span>
+                  {lastVisitDate && (
+                    <span className="text-[10px] font-bold text-gray-400">
+                      前回: {lastVisitDate}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
