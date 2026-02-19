@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation'; 
-import { format, isValid } from 'date-fns';
+import { format, isValid, startOfMonth, endOfMonth } from 'date-fns'; // 💡 startOfMonth, endOfMonth を追加
 import { useShiftData } from '@/hooks/useShiftData';
 import { useAchievement } from '@/hooks/useAchievement';
 import { useNavigation } from '@/hooks/useNavigation';
@@ -63,11 +63,23 @@ export default function DashboardContent() {
   
   const { selectedShift = null } = achievementData || {};
 
+  // 📍 日別の予約フィルタリング
   const currentReservations = useMemo(() => {
     if (!(nav.selected?.single instanceof Date) || !data?.reservations) return [];
     const selectedDateStr = format(nav.selected.single, 'yyyy-MM-dd');
     return (data.reservations as any[]).filter((res) => res.reservation_date === selectedDateStr);
   }, [data?.reservations, nav.selected?.single]);
+
+  // 💡 修正箇所1: 月間の予約フィルタリングを追加
+  const monthlyReservations = useMemo(() => {
+    if (!data?.reservations || !nav.viewDate) return [];
+    // 表示中の月（yyyy-MM）を取得
+    const targetMonthStr = format(nav.viewDate, 'yyyy-MM');
+    // その月に該当する予約だけを抽出
+    return (data.reservations as any[]).filter((res) => 
+      res.reservation_date && res.reservation_date.startsWith(targetMonthStr)
+    );
+  }, [data?.reservations, nav.viewDate]);
 
   useEffect(() => { 
     setMounted(true);
@@ -80,7 +92,6 @@ export default function DashboardContent() {
 
   const displayMonth = format(nav.viewDate || new Date(), 'M月');
 
-  // 📍 修正箇所: loading中であってもdataが存在すれば描画を継続する（アンロードを防ぐ）
   if (!mounted) return null;
   if (loading && !data) return null;
 
@@ -97,7 +108,6 @@ export default function DashboardContent() {
       
       <main className="px-4 -mt-6 relative z-10 space-y-5">
         
-        {/* 📍 1. カレンダーを一番上に配置 */}
         <section className={`p-4 rounded-[40px] border-2 shadow-xl shadow-pink-100/20 text-center transition-all duration-500 ${currentTheme.calendar}`}>
           <DashboardCalendar 
             shifts={safeShifts as any} 
@@ -110,7 +120,6 @@ export default function DashboardContent() {
           />
         </section>
 
-        {/* 📍 2. 日別詳細エリア（予約詳細）を二番目に配置 */}
         {(nav.selected?.single instanceof Date && isValid(nav.selected.single)) && (
           <DailyDetail 
             date={nav.selected.single}
@@ -125,15 +134,15 @@ export default function DashboardContent() {
           />
         )}
 
-        {/* 📍 3. 月間実績サマリーを三番目に配置 */}
+        {/* 💡 修正箇所2: MonthlySummary に reservations を渡す */}
         <MonthlySummary 
           month={displayMonth} 
           totals={monthlyTotals} 
+          reservations={monthlyReservations} 
           targetAmount={safeProfile.monthly_target_amount || 0} 
           theme={themeKey} 
         />
         
-        {/* お知らせセクション（最下部） */}
         <NewsSection newsList={data?.news || []} />
       </main>
 
