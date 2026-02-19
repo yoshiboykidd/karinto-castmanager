@@ -24,8 +24,6 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
       // 💡 修正：ステータスを大文字小文字・空白を無視して判定
       const currentStatus = String(res.status || '').toLowerCase().trim();
 
-      // ⚠️ ここが 'completed' と一致しないとカウントされません。
-      // もし0のままなら、DBで '終了' や '完了' になっていないか再確認してください。
       if (currentStatus === 'completed') {
         const isSoe = res.service_type === '添';
         const cat = res.nomination_category;
@@ -105,15 +103,14 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   const handleSaveMemo = async () => {
     if (!selectedRes?.id || !supabase) return;
-    const cNo = selectedRes.customer_no;
+    
     try {
-      let query = supabase.from('reservations').update({ cast_memo: memoDraft });
-      if (cNo) {
-        query = query.eq('customer_no', cNo).eq('login_id', myLoginId);
-      } else {
-        query = query.eq('id', selectedRes.id);
-      }
-      const { error } = await query;
+      // 💡 修正：customer_no による一括更新をやめ、予約 ID (selectedRes.id) のみを更新対象にする
+      const { error } = await supabase
+        .from('reservations')
+        .update({ cast_memo: memoDraft })
+        .eq('id', selectedRes.id);
+
       if (error) throw error;
 
       setSelectedRes((prev: any) => prev ? { ...prev, cast_memo: memoDraft } : null);
