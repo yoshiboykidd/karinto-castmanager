@@ -3,14 +3,15 @@
 import React from 'react';
 
 export default function ReservationList({ reservations, onSelect, getBadgeStyle, isAbsent, noMissionMessage }: any) {
-  // 💡 修正：どんな形式の時刻・日付文字列が来ても "13:30" の形式に抽出するヘルパー
-  const formatTime = (t: string) => {
-    if (!t) return "--:--";
-    const match = t.match(/\d{2}:\d{2}/);
-    return match ? match[0] : t.substring(0, 5);
+  // 💡 修正：ISO形式(2026-...)が来ても時刻(HH:mm)だけを確実に抽出するロジック
+  const formatTime = (t: any) => {
+    const s = String(t || "");
+    if (!s || s === "null") return "--:--";
+    const match = s.match(/(\d{2}:\d{2})/);
+    if (match) return match[1]; // 時刻部分が見つかればそれを返す
+    return s.startsWith('20') ? "--:--" : s.substring(0, 5); // 日付なら隠す
   };
 
-  // 📍 予約がない場合の表示（受け取ったメッセージを表示）
   if (reservations.length === 0) {
     return (
       <div className="py-8 px-4 text-center text-gray-300 font-black italic text-[12px] leading-relaxed">
@@ -19,9 +20,9 @@ export default function ReservationList({ reservations, onSelect, getBadgeStyle,
     );
   }
 
-  // 💡 修正：フォーマット後の時間でソートすることで、ISO形式とHH:mm形式が混在しても正しく並ぶように
+  // 表示時刻に基づいてソート
   const sortedReservations = [...reservations].sort((a, b) => 
-    formatTime(a.start_time || "").localeCompare(formatTime(b.start_time || ""))
+    formatTime(a.start_time).localeCompare(formatTime(b.start_time))
   );
 
   return (
@@ -46,7 +47,6 @@ export default function ReservationList({ reservations, onSelect, getBadgeStyle,
 
           <div className="flex flex-col items-start shrink-0 font-black text-gray-700 ml-1">
             <div className="flex items-center tracking-tighter">
-              {/* 💡 修正：formatTime ヘルパーを使用 */}
               <span className="text-[16px]">{formatTime(res.start_time)}</span>
               <span className="text-[9px] mx-0.5 opacity-20">〜</span>
               <span className="text-[16px]">{formatTime(res.end_time)}</span>
@@ -59,7 +59,6 @@ export default function ReservationList({ reservations, onSelect, getBadgeStyle,
           </div>
 
           <div className="flex items-center gap-1.5 truncate ml-auto font-black">
-            {/* 💡 修正：予約一覧にも会員番号（customer_no）を表示 */}
             <span className="text-[9px] font-black text-gray-300 tabular-nums">#{res.customer_no || '---'}</span>
             <div className="flex items-baseline">
               <span className="text-[15px]">{res.customer_name}</span>

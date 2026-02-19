@@ -17,11 +17,15 @@ export default function ReservationModal({
     else setIsInCall(false);
   }, [selectedRes?.status]);
 
-  // 💡 修正：どんな形式の時刻・日付文字列が来ても "13:30" の形式に抽出するヘルパー
-  const formatTime = (t: string) => {
-    if (!t) return "--:--";
-    const match = t.match(/\d{2}:\d{2}/);
-    return match ? match[0] : t.substring(0, 5);
+  // 💡 修正：ISO形式(2026-...)から時刻(HH:mm)を確実に抽出する強力なロジック
+  const formatTime = (t: any) => {
+    const s = String(t || "");
+    if (!s || s === "null") return "--:--";
+    // 文字列の中から "00:00" のパターンを探す
+    const match = s.match(/(\d{2}:\d{2})/);
+    if (match) return match[1];
+    // 万が一マッチしない場合で、日付形式なら隠す。それ以外は5文字切り出し
+    return s.startsWith('20') ? "--:--" : s.substring(0, 5);
   };
 
   const displayAmount = useMemo(() => {
@@ -30,6 +34,7 @@ export default function ReservationModal({
     return actual > 0 ? actual : initial;
   }, [selectedRes?.actual_total_price, selectedRes?.total_price]);
 
+  // 前回会った日の抽出
   const lastVisitDate = useMemo(() => {
     if (!selectedRes?.customer_no || !selectedRes?.cast_id) return null;
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
@@ -48,6 +53,7 @@ export default function ReservationModal({
     return null;
   }, [selectedRes?.customer_no, selectedRes?.cast_id, selectedRes?.id, allPastReservations]);
 
+  // 現在のキャストとの来店回数
   const visitCountForThisCast = useMemo(() => {
     if (!selectedRes?.customer_no || !selectedRes?.cast_id) return 1;
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
@@ -58,6 +64,7 @@ export default function ReservationModal({
     ).length;
   }, [selectedRes?.customer_no, selectedRes?.cast_id, allPastReservations]);
 
+  // 履歴からの最新メモ
   const lastMemoFromHistory = useMemo(() => {
     if (!selectedRes?.customer_no || !selectedRes?.cast_id) return "";
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
@@ -151,7 +158,7 @@ export default function ReservationModal({
                   <span className={`${badgeBaseClass} ${getBadgeStyle?.(selectedRes?.service_type) || 'bg-pink-500 text-white'}`}>{selectedRes?.service_type || 'か'}</span>
                   {selectedRes?.nomination_category && <span className={`${badgeBaseClass} ${getBadgeStyle?.(selectedRes?.nomination_category) || 'bg-gray-100 text-gray-400'}`}>{selectedRes?.nomination_category}</span>}
                 </div>
-                {/* 💡 修正：formatTime ヘルパーを使用 */}
+                {/* 💡 修正：強化した formatTime ヘルパーを使用 */}
                 <div className="text-[20px] font-black text-gray-700 leading-none tabular-nums">
                   {formatTime(selectedRes?.start_time)}〜{formatTime(selectedRes?.end_time)}
                 </div>
@@ -165,6 +172,7 @@ export default function ReservationModal({
                 <div className="flex items-center justify-between">
                   <span className="text-[20px] font-black text-gray-800 leading-none">{selectedRes?.customer_name || '不明'} 様</span>
                   
+                  {/* 💡 会員番号（customer_no）の表示 */}
                   <div className="bg-gray-50 border border-gray-100 px-2 py-1 rounded-lg select-all active:bg-gray-100 transition-colors">
                     <span className="text-[10px] font-black text-gray-400 mr-1 italic uppercase tracking-tighter">ID:</span>
                     <span className="text-[12px] font-black text-gray-600 tabular-nums">#{selectedRes?.customer_no || '---'}</span>
