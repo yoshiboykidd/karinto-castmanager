@@ -8,7 +8,6 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// 💡 shop_master の shop_id（文字列3桁）に完全準拠 [cite: 2026-01-29]
 const SHOP_ID_MAP: { [key: string]: string } = {
   '池袋東口': '011', '池東': '011',
   '池袋西口': '006', '池西': '006',
@@ -142,7 +141,10 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       if (type === 'START' || type === 'FINISH') {
         const updateData: any = { actual_total_price: displayTotal, op_details: newOpsDetails, updated_at: new Date().toISOString() };
         if (type === 'START') { updateData.status = 'playing'; updateData.in_call_at = new Date().toISOString(); }
-        if (type === 'FINISH') { updateData.status = 'completed'; updateData.end_time = new Date().toISOString(); }
+        
+        // 💡 修正：end_time を現在の時刻で上書きしないように変更（予約時の終了時間を維持する）
+        if (type === 'FINISH') { updateData.status = 'completed'; }
+        
         const { error } = await supabase.from('reservations').update(updateData).eq('id', dbRes.id);
         if (error) throw error;
       }
@@ -236,7 +238,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
           </div>
         ))}
 
-        {/* 💡 修正：値引きセクションを追加 */}
         <div className="space-y-2 pt-2 border-t border-white/10">
           <h3 className="text-[10px] font-black text-red-400 px-1 uppercase border-l-2 border-red-500/50 ml-1 tracking-widest">値引き (Discounts)</h3>
           <div className="grid grid-cols-2 gap-2 pb-10">
