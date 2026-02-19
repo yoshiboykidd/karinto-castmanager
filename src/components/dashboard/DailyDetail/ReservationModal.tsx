@@ -12,13 +12,31 @@ export default function ReservationModal({
   const [isOpOpen, setIsOpOpen] = useState(false);
   const [isInCall, setIsInCall] = useState(false);
 
+  // 💡 修正：メモ表示を確実にするためのローカルステート
+  const [displayMemo, setDisplayMemo] = useState('');
+
   useEffect(() => {
     if (selectedRes?.status === 'playing') {
       setIsInCall(true);
     } else {
       setIsInCall(false);
     }
-  }, [selectedRes?.status]);
+
+    // 💡 修正：データが変更されたら即座に表示用テキストを更新
+    const current = String(selectedRes?.cast_mem || "").trim();
+    if (current !== "") {
+      setDisplayMemo(current);
+    } else {
+      const history = Array.isArray(allPastReservations) ? allPastReservations : [];
+      const cNo = selectedRes?.customer_no;
+      const recordWithMemo = history
+        .filter(r => r && r.customer_no === cNo && r.id !== selectedRes?.id)
+        .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")))
+        .find(r => r?.cast_mem && String(r.cast_mem).trim() !== "");
+      
+      setDisplayMemo(recordWithMemo?.cast_mem ? `(引き継ぎ)\n${recordWithMemo.cast_mem}` : "タップして入力...");
+    }
+  }, [selectedRes, allPastReservations]);
 
   const displayAmount = useMemo(() => {
     const actual = Number(selectedRes?.actual_total_price || 0);
@@ -33,33 +51,21 @@ export default function ReservationModal({
   };
 
   const customerContext = useMemo(() => {
-    if (!selectedRes?.customer_no) return { count: 1, lastDate: null, lastMemo: "" };
-    try {
-      const history = Array.isArray(allPastReservations) ? allPastReservations : [];
-      const cNo = selectedRes.customer_no;
-      const myHistory = history
-        .filter(r => r && r.customer_no === cNo && r.id !== selectedRes.id)
-        .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")));
-      const recordWithMemo = myHistory.find(r => r?.cast_mem && String(r.cast_mem).trim() !== "");
-      return { 
-        count: history.filter(r => r?.customer_no === cNo).length || 1, 
-        lastDate: myHistory[0]?.reservation_date || null, 
-        lastMemo: recordWithMemo?.cast_mem || "" 
-      };
-    } catch (e) { return { count: 1, lastDate: null, lastMemo: "" }; }
+    if (!selectedRes?.customer_no) return { count: 1, lastDate: null };
+    const history = Array.isArray(allPastReservations) ? allPastReservations : [];
+    return { 
+      count: history.filter(r => r?.customer_no === selectedRes.customer_no).length || 1, 
+      lastDate: history.find(r => r?.customer_no === selectedRes.customer_no && r.id !== selectedRes.id)?.reservation_date || null
+    };
   }, [selectedRes?.customer_no, selectedRes?.id, allPastReservations]);
 
   if (!selectedRes) return null;
 
-  // 💡 修正：表示するテキストの決定ロジックを単純化
-  const currentMemo = String(selectedRes?.cast_mem || "").trim();
-  const displayMemo = currentMemo !== "" 
-    ? currentMemo 
-    : (customerContext.lastMemo ? `(引き継ぎ)\n${customerContext.lastMemo}` : "タップして入力...");
-
   const handleEditMemoStart = () => {
-    const initialMemo = currentMemo !== "" ? currentMemo : customerContext.lastMemo;
-    setMemoDraft?.(initialMemo);
+    const current = String(selectedRes?.cast_mem || "").trim();
+    // 💡 修正：現在の表示内容から「(引き継ぎ)」を抜いてセット
+    const initialMemo = current !== "" ? current : displayMemo.replace("(引き継ぎ)\n", "");
+    setMemoDraft?.(initialMemo === "タップして入力..." ? "" : initialMemo);
     setIsEditingMemo?.(true);
   };
 
@@ -144,10 +150,10 @@ export default function ReservationModal({
                   <textarea 
                     value={memoDraft || ""} 
                     onChange={(e) => setMemoDraft?.(e.target.value)} 
-                    className="w-full min-h-[120px] p-3 bg-white rounded-xl text-[15px] font-bold focus:outline-none resize-none" 
+                    className="w-full min-h-[120px] p-3 bg-white rounded-xl font-bold focus:outline-none resize-none" 
                     placeholder="メモを入力..." 
                     autoFocus 
-                    style={{ fontSize: '16px' }}
+                    style={{ fontSize: '16px', lineHeight: '1.5' }}
                   />
                   <div className="flex gap-1">
                     <button onClick={() => setIsEditingMemo?.(false)} className="flex-1 py-3 bg-white text-gray-400 rounded-xl font-black text-[13px] border">閉じる</button>
@@ -161,7 +167,6 @@ export default function ReservationModal({
                     <span className="text-[10px] text-gray-300 font-bold">編集 ✎</span>
                   </div>
                   <div className="text-[13px] font-bold text-gray-600 leading-relaxed break-words whitespace-pre-wrap">
-                    {/* 💡 修正：直接変数を表示 */}
                     {displayMemo}
                   </div>
                 </button>
