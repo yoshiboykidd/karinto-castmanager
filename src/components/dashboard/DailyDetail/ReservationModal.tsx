@@ -12,31 +12,13 @@ export default function ReservationModal({
   const [isOpOpen, setIsOpOpen] = useState(false);
   const [isInCall, setIsInCall] = useState(false);
 
-  // 💡 修正：メモ表示を確実にするためのローカルステート
-  const [displayMemo, setDisplayMemo] = useState('');
-
   useEffect(() => {
     if (selectedRes?.status === 'playing') {
       setIsInCall(true);
     } else {
       setIsInCall(false);
     }
-
-    // 💡 修正：データが変更されたら即座に表示用テキストを更新
-    const current = String(selectedRes?.cast_mem || "").trim();
-    if (current !== "") {
-      setDisplayMemo(current);
-    } else {
-      const history = Array.isArray(allPastReservations) ? allPastReservations : [];
-      const cNo = selectedRes?.customer_no;
-      const recordWithMemo = history
-        .filter(r => r && r.customer_no === cNo && r.id !== selectedRes?.id)
-        .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")))
-        .find(r => r?.cast_mem && String(r.cast_mem).trim() !== "");
-      
-      setDisplayMemo(recordWithMemo?.cast_mem ? `(引き継ぎ)\n${recordWithMemo.cast_mem}` : "タップして入力...");
-    }
-  }, [selectedRes, allPastReservations]);
+  }, [selectedRes?.status]);
 
   const displayAmount = useMemo(() => {
     const actual = Number(selectedRes?.actual_total_price || 0);
@@ -50,22 +32,35 @@ export default function ReservationModal({
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  const customerContext = useMemo(() => {
-    if (!selectedRes?.customer_no) return { count: 1, lastDate: null };
+  // 💡 ロジック修正：過去メモ（引き継ぎ）の取得ロジックを独立・安定化
+  const lastMemoFromHistory = useMemo(() => {
+    if (!selectedRes?.customer_no) return "";
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
-    return { 
-      count: history.filter(r => r?.customer_no === selectedRes.customer_no).length || 1, 
-      lastDate: history.find(r => r?.customer_no === selectedRes.customer_no && r.id !== selectedRes.id)?.reservation_date || null
-    };
+    const record = history
+      .filter(r => r && r.customer_no === selectedRes.customer_no && r.id !== selectedRes.id)
+      .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")))
+      .find(r => r?.cast_mem && String(r.cast_mem).trim() !== "");
+    return record?.cast_mem ? String(record.cast_mem).trim() : "";
   }, [selectedRes?.customer_no, selectedRes?.id, allPastReservations]);
+
+  const customerCount = useMemo(() => {
+    if (!selectedRes?.customer_no) return 1;
+    const history = Array.isArray(allPastReservations) ? allPastReservations : [];
+    return history.filter(r => r?.customer_no === selectedRes.customer_no).length || 1;
+  }, [selectedRes?.customer_no, allPastReservations]);
 
   if (!selectedRes) return null;
 
+  // 💡 修正：表示するテキストを「ステート」ではなく「レンダリング時の計算」で確定
+  const currentCastMemo = String(selectedRes?.cast_mem || "").trim();
+  const memoTextToDisplay = currentCastMemo !== "" 
+    ? currentCastMemo 
+    : (lastMemoFromHistory !== "" ? `(引き継ぎ)\n${lastMemoFromHistory}` : "タップして入力...");
+
   const handleEditMemoStart = () => {
-    const current = String(selectedRes?.cast_mem || "").trim();
-    // 💡 修正：現在の表示内容から「(引き継ぎ)」を抜いてセット
-    const initialMemo = current !== "" ? current : displayMemo.replace("(引き継ぎ)\n", "");
-    setMemoDraft?.(initialMemo === "タップして入力..." ? "" : initialMemo);
+    // 編集開始時は、今日のメモがあればそれを、なければ過去メモをドラフトに入れる
+    const draftValue = currentCastMemo !== "" ? currentCastMemo : lastMemoFromHistory;
+    setMemoDraft?.(draftValue);
     setIsEditingMemo?.(true);
   };
 
@@ -140,7 +135,7 @@ export default function ReservationModal({
               <div className="absolute top-0 left-0 w-1.5 h-full bg-pink-100"></div>
               <div className="flex items-center gap-2">
                 <span className="text-[20px] font-black text-gray-800">{selectedRes.customer_name || '不明'} 様</span>
-                <span className={`${badgeBaseClass} ${customerContext.count === 1 ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-500'}`}>{customerContext.count === 1 ? '初' : `${customerContext.count}回目`}</span>
+                <span className={`${badgeBaseClass} ${customerCount === 1 ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-500'}`}>{customerCount === 1 ? '初' : `${customerCount}回目`}</span>
               </div>
             </div>
 
@@ -167,7 +162,8 @@ export default function ReservationModal({
                     <span className="text-[10px] text-gray-300 font-bold">編集 ✎</span>
                   </div>
                   <div className="text-[13px] font-bold text-gray-600 leading-relaxed break-words whitespace-pre-wrap">
-                    {displayMemo}
+                    {/* 💡 修正：計算済みのテキストを直接表示 */}
+                    {memoTextToDisplay}
                   </div>
                 </button>
               )}
