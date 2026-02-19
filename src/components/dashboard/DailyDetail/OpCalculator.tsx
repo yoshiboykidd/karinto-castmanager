@@ -122,7 +122,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       const shopId = SHOP_ID_MAP[label] || String(dbRes?.shop_id || '000').padStart(3, '0');
       const cName = dbRes.customer_name || '不明';
 
-      // 💡 修正：正規表現で確実に時刻だけを抜粋 [cite: 2026-01-29]
       const formatTime = (timeStr: string) => {
         if (!timeStr) return "--:--";
         const match = timeStr.match(/\d{2}:\d{2}/);
@@ -132,11 +131,12 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       const startTime = formatTime(dbRes.start_time);
       const endTime = formatTime(dbRes.end_time);
       const timeDisplay = `${startTime}〜${endTime}`;
-
       const courseInfo = dbRes.course_info || 'コース未設定';
-      
-      const combinedOps = [...savedOpsActive, ...selectedOps];
-      const opNos = combinedOps.map(o => o.no).join('、') || 'なし';
+
+      // OP情報の整理 [cite: 2026-01-29]
+      const currentOpNos = [...savedOpsActive, ...selectedOps].map(o => o.no).join('、') || 'なし';
+      const addedOpNos = selectedOps.map(o => o.no).join('、');
+      const canceledOpNos = allSavedOps.filter((op: any) => op?.status === 'canceled').map((op: any) => op.no).join('、');
 
       const newOpsDetails = [...allSavedOps, ...selectedOps.map(op => ({ ...op, timing: type === 'START' ? 'initial' : 'additional', updatedAt: new Date().toISOString() }))];
 
@@ -148,24 +148,25 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
         if (error) throw error;
       }
 
-      // 会計内訳の表示 [cite: 2026-01-29]
       const basePrice = displayTotal - opsTotal;
       const amountRow = `¥${basePrice.toLocaleString()} + ¥${opsTotal.toLocaleString()} = ¥${displayTotal.toLocaleString()}`;
+      const borderLine = "ー・－・－・－・－・－・－・－・－";
 
       let message = "";
       if (type === 'HELP') {
-        message = `🆘 スタッフ至急！\n客名: ${cName}様`;
+        message = `${borderLine}\n🆘 スタッフ至急！\n客名: ${cName}様\n${borderLine}`;
       } else if (type === 'START') {
-        message = `${castName} 入室完了 🚀\n${courseInfo} [${timeDisplay}]\n${cName}様 [OP: ${opNos}]\nスタート会計: ${amountRow}`;
+        message = `${borderLine}\n${castName} 入室完了 🚀\n${courseInfo} [${timeDisplay}]\n${cName}様\n[OP: ${currentOpNos}]\nスタート会計: ${amountRow}\n${borderLine}`;
       } else if (type === 'FINISH') {
-        message = `${castName} 退室完了 🏁\n${courseInfo} [${timeDisplay}]\n${cName}様 [追加OP: ${opNos}]\n最終会計: ${amountRow}`;
+        const addPart = addedOpNos ? `\n[追加OP: ${addedOpNos}]` : "";
+        const cancelPart = canceledOpNos ? `\n[変更OP: ${canceledOpNos}]` : "";
+        message = `${borderLine}\n${castName} 退出完了 🏁\n${courseInfo} [${timeDisplay}]\n${cName}様${addPart}${cancelPart}\n最終会計: ${amountRow}\n${borderLine}`;
       }
 
       const { error: notifyError } = await supabase.from('notifications').insert({ 
         shop_id: shopId, 
         cast_id: castId, 
         type: type === 'HELP' ? 'help' : 'in_out',
-        title: type === 'START' ? '入室通知' : type === 'FINISH' ? '退室通知' : 'スタッフ呼出',
         content: message, 
         is_read: false 
       });
@@ -174,7 +175,16 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       if (type === 'START') setIsInCall(true);
       if (type === 'FINISH') setIsInCall(false);
       setSelectedOps([]); 
-      onToast("送信完了");
+
+      // 💡 修正：通知タイプに合わせてトーストの文言を切り替え [cite: 2026-01-29]
+      let toastMsg = "送信完了";
+      if (type === 'START') {
+        toastMsg = "お仕事開始を\nお店に通知しました";
+      } else if (type === 'FINISH') {
+        toastMsg = "お仕事終了を\nお店に通知しました\nお電話もお願いします";
+      }
+      onToast(toastMsg);
+
       await fetchLatest();
       router.refresh();
       if (type !== 'HELP') setTimeout(() => onClose(), 500);
