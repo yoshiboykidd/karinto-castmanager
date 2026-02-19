@@ -12,7 +12,7 @@ export default function ReservationModal({
   const [isOpOpen, setIsOpOpen] = useState(false);
   const [isInCall, setIsInCall] = useState(false);
 
-  // 1. Hooks は関数の先頭（早期リターンの前）に定義 [cite: 2026-01-29]
+  // 1. Hooks 定義 [cite: 2026-01-29]
   useEffect(() => {
     if (selectedRes?.status === 'playing') setIsInCall(true);
     else setIsInCall(false);
@@ -38,7 +38,7 @@ export default function ReservationModal({
     return (selectedRes?.cast_memo || "").toString().trim();
   }, [selectedRes?.cast_memo]);
 
-  // 2. すべての Hooks 定義後に早期リターンを行う [cite: 2026-01-29]
+  // 2. 早期リターン [cite: 2026-01-29]
   if (!selectedRes) return null;
 
   const handleToast = (msg: string) => {
@@ -48,7 +48,6 @@ export default function ReservationModal({
   };
 
   const handleEditMemoStart = () => {
-    // タップされた瞬間に、表示用のデータをセットする [cite: 2026-01-29]
     const initialMemo = currentCastMemo !== "" ? currentCastMemo : lastMemoFromHistory;
     if (typeof setMemoDraft === 'function') setMemoDraft(initialMemo);
     if (typeof setIsEditingMemo === 'function') setIsEditingMemo(true);
@@ -82,9 +81,10 @@ export default function ReservationModal({
         />
       )}
 
+      {/* 💡 修正：トーストの幅と余白を微調整 [cite: 2026-01-29] */}
       {showToast && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100000] bg-pink-600 text-white px-8 py-5 rounded-[24px] shadow-2xl font-black text-center border-2 border-pink-400 animate-bounce whitespace-pre-line">
-          <div className="text-[17px]">✅ {toastMsg}</div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100000] bg-pink-600 text-white px-6 py-5 rounded-[24px] shadow-2xl font-black text-center border-2 border-pink-400 animate-bounce whitespace-pre-line min-w-[280px] max-w-[90%]">
+          <div className="text-[16px] leading-relaxed">✅ {toastMsg}</div>
         </div>
       )}
 
@@ -151,7 +151,6 @@ export default function ReservationModal({
                     <span className="text-[11px] font-black text-pink-400 italic">Cast Memo</span>
                     <span className="text-[10px] text-gray-300 font-bold">編集 ✎</span>
                   </div>
-                  {/* 💡 修正：初期状態では本文を隠す [cite: 2026-01-29] */}
                   <div className="text-[14px] font-black text-gray-400 leading-relaxed italic">
                     タップしてメモを確認・入力
                   </div>
