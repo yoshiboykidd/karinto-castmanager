@@ -16,7 +16,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
   const [allPastReservations, setAllPastReservations] = useState<any[]>([]);
 
   const dayTotals = useMemo(() => {
-    return reservations.reduce((acc: any, res: any) => {
+    return (reservations || []).reduce((acc: any, res: any) => {
       const isSoe = res.service_type === '添';
       const cat = res.nomination_category;
       const target = isSoe ? acc.soe : acc.ka;
@@ -48,11 +48,11 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
       if (!error && data) setAllPastReservations(data);
     };
     fetchMyHistory();
-  }, [myLoginId, supabase, date]);
+  }, [myLoginId, supabase]); // 💡 date を除外して安定化
 
   useEffect(() => {
     const autoDelete = async () => {
-      if (isAbsent && reservations.length > 0 && supabase && myLoginId) {
+      if (isAbsent && reservations?.length > 0 && supabase && myLoginId) {
         const dateStr = format(date, 'yyyy-MM-dd');
         const { error } = await supabase.from('reservations').delete()
           .eq('login_id', myLoginId).eq('reservation_date', dateStr);
@@ -60,18 +60,16 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
       }
     };
     autoDelete();
-  }, [isAbsent, reservations.length, date, myLoginId, supabase, onRefresh]);
+  }, [isAbsent, reservations?.length, date, myLoginId, supabase, onRefresh]);
 
-  // 💡 安全な初期化ロジックに修正（クラッシュ防止）
   useEffect(() => {
-    if (!selectedRes) {
+    if (!selectedRes || typeof selectedRes !== 'object') {
       setMemoDraft('');
       setIsEditingMemo(false);
       return;
     }
-    // selectedResが存在する場合のみ、安全に値をセット
     setMemoDraft(selectedRes.cast_memo || '');
-  }, [selectedRes?.id]); // 依存関係を ID に絞り、ループを防止
+  }, [selectedRes?.id]);
 
   const handleDelete = async () => {
     if (!selectedRes?.id || !supabase) return;
@@ -83,7 +81,9 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
         setSelectedRes(null);
         if (onRefresh) onRefresh();
       }
-    } finally { setIsDeleting(true); } // 修正: ここが false でないと無限に deleting になる可能性あり
+    } finally { 
+      setIsDeleting(false); // 💡 重要：ここが true だと操作不能になります
+    }
   };
 
   const handleSaveMemo = async () => {
@@ -99,9 +99,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
       const { error } = await query;
       if (error) throw error;
 
-      // 即時反映
       setSelectedRes((prev: any) => prev ? { ...prev, cast_memo: memoDraft } : null);
-      
       if (onRefresh) onRefresh();
     } catch (err) { 
       console.error(err);
@@ -121,6 +119,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
   };
 
   const eventInfo = useMemo(() => {
+    if (!date) return null;
     const d = date.getDate();
     if (d === 10) return { label: 'かりんとの日', color: 'bg-[#FF9900]', text: 'text-white' };
     if (d === 11 || d === 22) return { label: '添い寝の日', color: 'bg-[#FFD700]', text: 'text-[#5C4033]' };
@@ -182,7 +181,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
           />
         </div>
 
-        {reservations.length > 0 && (
+        {reservations?.length > 0 && (
           <DailyStats 
             dayTotals={dayTotals} 
             rewardAmount={shift?.reward_amount} 
