@@ -14,6 +14,10 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
   const [isEditingMemo, setIsEditingMemo] = useState(false);
   const [memoDraft, setMemoDraft] = useState('');
   const [allPastReservations, setAllPastReservations] = useState<any[]>([]);
+  
+  // 💡 修正：隠し状態のステート [cite: 2026-01-29]
+  const [isCovered, setIsCovered] = useState(true);
+  const imageURL = "https://gstsgybukinlkzdqotyv.supabase.co/storage/v1/object/public/assets/KCMlogo2.png";
 
   const dayTotals = useMemo(() => {
     return (reservations || []).reduce((acc: any, res: any) => {
@@ -48,7 +52,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
       if (!error && data) setAllPastReservations(data);
     };
     fetchMyHistory();
-  }, [myLoginId, supabase]); // 💡 date を除外して安定化
+  }, [myLoginId, supabase]);
 
   useEffect(() => {
     const autoDelete = async () => {
@@ -82,7 +86,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
         if (onRefresh) onRefresh();
       }
     } finally { 
-      setIsDeleting(false); // 💡 重要：ここが true だと操作不能になります
+      setIsDeleting(false);
     }
   };
 
@@ -142,6 +146,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
           </div>
         )}
         
+        {/* 日付ヘッダー（常に表示） */}
         <div className="flex items-center justify-center w-full p-2 border-b border-gray-50">
           <div className="flex items-center gap-2">
             <div className="flex items-baseline font-black tracking-tighter text-gray-800 leading-none">
@@ -171,6 +176,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
           </div>
         </div>
 
+        {/* 予約リスト（常に表示） */}
         <div className="flex-1 min-h-[100px]">
           <ReservationList 
             reservations={reservations} 
@@ -181,12 +187,26 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
           />
         </div>
 
+        {/* 実績エリア（ここだけをマスクする） */}
         {reservations?.length > 0 && (
-          <DailyStats 
-            dayTotals={dayTotals} 
-            rewardAmount={shift?.reward_amount} 
-            theme={theme} 
-          />
+          <div 
+            className="relative cursor-pointer select-none"
+            onClick={() => setIsCovered(!isCovered)}
+          >
+            {isCovered && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/40 backdrop-blur-md transition-all duration-300">
+                <img src={imageURL} alt="KCM Cover" className="w-full h-full object-cover opacity-90" />
+                <div className="absolute bottom-2 px-3 py-1 bg-black/20 backdrop-blur-sm rounded-full">
+                  <p className="text-[9px] font-black text-white uppercase tracking-widest">Tap to reveal rewards</p>
+                </div>
+              </div>
+            )}
+            <DailyStats 
+              dayTotals={dayTotals} 
+              rewardAmount={shift?.reward_amount} 
+              theme={theme} 
+            />
+          </div>
         )}
       </section>
 
