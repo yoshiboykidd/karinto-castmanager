@@ -12,7 +12,7 @@ export default function ReservationModal({
   const [isOpOpen, setIsOpOpen] = useState(false);
   const [isInCall, setIsInCall] = useState(false);
 
-  // 1. Hooks はすべて関数の先頭（return より前）にまとめる
+  // 1. Hooks は関数の先頭（早期リターンの前）に定義 [cite: 2026-01-29]
   useEffect(() => {
     if (selectedRes?.status === 'playing') setIsInCall(true);
     else setIsInCall(false);
@@ -44,10 +44,9 @@ export default function ReservationModal({
     return "タップして入力...";
   }, [currentCastMemo, lastMemoFromHistory]);
 
-  // 2. すべての Hooks の定義が終わった後に return を書く
+  // 2. すべての Hooks 定義後に早期リターンを行う [cite: 2026-01-29]
   if (!selectedRes) return null;
 
-  // --- 以下、レンダリングロジック ---
   const handleToast = (msg: string) => {
     setToastMsg(msg);
     setShowToast(true);
@@ -88,8 +87,9 @@ export default function ReservationModal({
         />
       )}
 
+      {/* 💡 修正：whitespace-pre-line を追加しトースト内の改行を有効化 [cite: 2026-01-29] */}
       {showToast && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100000] bg-pink-600 text-white px-8 py-5 rounded-[24px] shadow-2xl font-black text-center border-2 border-pink-400 animate-bounce">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100000] bg-pink-600 text-white px-8 py-5 rounded-[24px] shadow-2xl font-black text-center border-2 border-pink-400 animate-bounce whitespace-pre-line">
           <div className="text-[17px]">✅ {toastMsg}</div>
         </div>
       )}
@@ -157,7 +157,7 @@ export default function ReservationModal({
                     <span className="text-[11px] font-black text-pink-400 italic">Cast Memo</span>
                     <span className="text-[10px] text-gray-300 font-bold">編集 ✎</span>
                   </div>
-                  <div className="text-[13px] font-bold text-gray-400 leading-relaxed italic">
+                  <div className="text-[13px] font-bold text-gray-400 leading-relaxed italic whitespace-pre-line">
                     {displayMemoContent}
                   </div>
                 </button>
