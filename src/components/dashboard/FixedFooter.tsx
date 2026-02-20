@@ -1,34 +1,30 @@
 'use client';
 
-
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Home, BarChart2, User, LogOut } from 'lucide-react';
-
+// 📍 BarChart2 を削除し、Camera を追加
+import { Home, Camera, User, LogOut } from 'lucide-react';
 
 interface FixedFooterProps {
   pathname: string;
   onLogout?: () => void;
 }
 
-
 export default function FixedFooter({ pathname, onLogout }: FixedFooterProps) {
   const router = useRouter();
   const [pendingPath, setPendingPath] = useState<string | null>(null);
-
 
   // ページ遷移が完了したら「押し中」の状態をリセット
   useEffect(() => {
     setPendingPath(null);
   }, [pathname]);
 
-
+  // 📍 「実績」を「写メ日記」に変更し、パスを /diary に設定
   const menuItems = [
     { label: 'ホーム', icon: Home, path: '/', action: () => { setPendingPath('/'); router.push('/'); } },
-    { label: '実績', icon: BarChart2, path: '/salary', action: () => { setPendingPath('/salary'); router.push('/salary'); } },
+    { label: '写メ日記', icon: Camera, path: '/diary', action: () => { setPendingPath('/diary'); router.push('/diary'); } },
     { label: 'マイページ', icon: User, path: '/mypage', action: () => { setPendingPath('/mypage'); router.push('/mypage'); } },
   ];
-
 
   return (
     <footer className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-8 pt-4 bg-gradient-to-t from-white via-white/95 to-transparent">
@@ -62,7 +58,6 @@ export default function FixedFooter({ pathname, onLogout }: FixedFooterProps) {
               </li>
             );
           })}
-
 
           {/* --- ログアウト（独立したボタンとして定義） --- */}
           <li>
