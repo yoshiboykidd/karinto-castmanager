@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-// 📍 共通クライアントをインポートするように変更
+// 📍 共通クライアントをインポート [cite: 2026-02-04]
 import { createClient } from '@/utils/supabase/client';
 import { createCast } from '@/app/(admin)/admin/members/actions';
 import { UserPlus, RefreshCw, Sparkles, User } from 'lucide-react';
 
 export default function CastRegister({ role, myShopId, targetShopId, onSuccess }: any) {
-  // 📍 修正: 共通クライアントを使用することで多重インスタンス警告を回避
+  // 📍 共通クライアントを使用
   const supabase = createClient();
   const [newCastName, setNewCastName] = useState('');
   const [suggestedId, setSuggestedId] = useState('');
@@ -36,10 +36,9 @@ export default function CastRegister({ role, myShopId, targetShopId, onSuccess }
     formData.append('personal_number', suggestedId);
     formData.append('home_shop_id', activeShopId);
     
-    // Server Actionを実行
     const result = await createCast(formData);
     if (result.success) {
-      // 📍 案内するパスワードも 000000 に修正
+      // 📍 案内するパスワードを 000000 に修正
       alert(`✨ 登録完了: ${newCastName}\nID: ${suggestedId}\nPW: 000000`);
       onSuccess();
     } else { 
