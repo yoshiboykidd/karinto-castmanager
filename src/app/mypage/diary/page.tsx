@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Camera, X, UploadCloud, ChevronLeft } from 'lucide-react';
-import { createClient } from '@/src/utils/supabase/client';
+import { createClient } from '@/utils/supabase/client';
 
 export default function DiaryPostPage() {
   const router = useRouter();

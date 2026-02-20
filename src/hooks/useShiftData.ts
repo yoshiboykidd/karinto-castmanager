@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { format, parseISO, startOfToday, isAfter, isValid } from 'date-fns';
 // 📍 修正箇所：先ほど作った共通クライアントを使用するように変更
-import { createClient } from '@/src/utils/supabase/client';
+import { createClient } from '@/utils/supabase/client';
 
 export function useShiftData() {
   // 📍 修正箇所：useStateでの初期化ではなく、共通クライアントを呼び出す
