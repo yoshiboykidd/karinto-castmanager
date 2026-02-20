@@ -18,8 +18,10 @@
         "name": "next"
       }
     ],
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      // プロジェクトのルートが src じゃない場合はこっちに修正
+      "@/*": ["./*"] 
     }
   },
   "include": [
@@ -30,5 +32,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "supabase"] // 👈 ここに "supabase" を追加しました
+  "exclude": ["node_modules"] // 👈 "supabase" を削除しました
 }
