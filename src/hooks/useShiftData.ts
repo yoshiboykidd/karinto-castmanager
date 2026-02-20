@@ -3,11 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { format, parseISO, startOfToday, isAfter, isValid } from 'date-fns';
-// 📍 修正箇所：先ほど作った共通クライアントを使用するように変更
 import { createClient } from '@/utils/supabase/client';
 
 export function useShiftData() {
-  // 📍 修正箇所：useStateでの初期化ではなく、共通クライアントを呼び出す
   const supabase = createClient();
 
   const [data, setData] = useState<{
@@ -35,7 +33,6 @@ export function useShiftData() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return router.push('/login');
       
-      // 💡 既存のID抽出ロジック（ここは絶対に変えません）
       const rawId = session.user.email?.replace('@karinto-internal.com', '');
       const idList = [rawId];
       if (rawId && !isNaN(Number(rawId))) {
@@ -54,7 +51,6 @@ export function useShiftData() {
       if (profile) {
         const myShopId = profile.home_shop_id || 'main';
         
-        // 💡 既存のデータ取得ロジック（順序・条件も維持）
         const [shopRes, shiftsRes, newsRes, resData, achiRes, syncRes] = await Promise.all([
           supabase.from('shop_master').select('*').eq('shop_id', myShopId).single(),
           supabase.from('shifts')
@@ -77,16 +73,25 @@ export function useShiftData() {
         ]);
         
         const rawRes = resData.data || [];
+        
+        // 📍 予約データの重複判定ロジック
         const enhancedReservations = rawRes.map((res: any) => {
+          // [予約日, 開始時間, 終了時間, お客様番号] がすべて一致するものを探す
           const duplicates = rawRes.filter((other: any) => 
             other.reservation_date === res.reservation_date && 
             other.start_time === res.start_time &&
+            other.end_time === res.end_time &&
+            other.customer_no === res.customer_no &&
             other.id !== res.id
           );
+
           const isDuplicate = duplicates.length > 0;
+          
+          // 一致するものがある場合、作成日時（created_at）が最も新しいものだけを最新とする
           const isLatest = isDuplicate 
             ? !duplicates.some((other: any) => new Date(other.created_at) > new Date(res.created_at))
             : true;
+
           return { ...res, isDuplicate, isLatest };
         });
 
@@ -107,7 +112,6 @@ export function useShiftData() {
     }
   }, [supabase]);
 
-  // 💡 月間実績集計ロジック（当欠優先判定も1文字も変えずに維持）
   const getMonthlyTotals = useCallback((viewDate: Date) => {
     if (!mounted || !viewDate || !data.shifts) return { amount: 0, count: 0, hours: 0, absent: 0, late: 0, ka_f: 0, ka_first: 0, ka_main: 0, soe_f: 0, soe_first: 0, soe_main: 0 };
     
