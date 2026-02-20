@@ -1,17 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
+// 📍 修正：共通クライアントをインポートするように変更 [cite: 2026-02-04, 2026-02-20]
+import { createClient } from '@/utils/supabase/client';
 import { useRouter, usePathname } from 'next/navigation';
 import "./globals.css";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [supabase] = useState(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ));
+  
+  // 📍 修正：共通クライアントを使用。URLやKeyの記述は不要になります [cite: 2026-02-20]
+  const supabase = createClient();
   
   const [isAlertOpen, setIsAlertOpen] = useState(false);
 
@@ -27,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
     const rawId = user.email?.split('@')[0] || '';
     
-    // 【修正箇所】password だけでなく display_name と role も取得する
+    // password だけでなく display_name と role も取得
     const { data } = await supabase
       .from('cast_members')
       .select('password, display_name, role')

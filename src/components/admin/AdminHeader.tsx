@@ -1,8 +1,9 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { createBrowserClient } from '@supabase/ssr';
-import { LogOut, LayoutDashboard } from 'lucide-react'; // 必要なアイコン
+// 📍 修正：共通クライアントをインポートするように変更 [cite: 2026-02-20]
+import { createClient } from '@/utils/supabase/client';
+import { LogOut, LayoutDashboard } from 'lucide-react';
 
 type AdminHeaderProps = {
   title?: string;
@@ -12,20 +13,16 @@ type AdminHeaderProps = {
 export default function AdminHeader({ title = "管理画面", shopName }: AdminHeaderProps) {
   const router = useRouter();
 
-  // Supabaseクライアント作成
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  // 📍 修正：共通クライアントを使用。引数や環境変数の直接参照を削除 [cite: 2026-02-20]
+  const supabase = createClient();
 
   // ログアウト処理
   const handleLogout = async () => {
-    // 確認ダイアログ（誤操作防止）
     const isConfirmed = window.confirm('ログアウトしますか？');
     if (!isConfirmed) return;
 
     await supabase.auth.signOut();
-    router.push('/login'); // ログイン画面へ戻す
+    router.push('/login');
   };
 
   return (

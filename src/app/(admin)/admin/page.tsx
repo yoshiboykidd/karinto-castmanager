@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
+// 📍 修正：共通クライアントをインポートするように変更 [cite: 2026-02-20]
+import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { 
   Users, 
@@ -15,10 +16,9 @@ import {
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [supabase] = useState(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ));
+  
+  // 📍 修正：共通クライアントを使用。引数やuseStateでの保持は不要になります [cite: 2026-02-20]
+  const supabase = createClient();
   
   const [loading, setLoading] = useState(true);
   const [adminProfile, setAdminProfile] = useState<any>(null);
@@ -69,7 +69,7 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-[#F8FAFC] pb-10 font-sans text-slate-800">
       {/* 📍 ヘッダー：店長向けのプロフェッショナルなダークネイビー基調 */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 pt-12 pb-20 px-6 rounded-b-[40px] shadow-2xl relative overflow-hidden">
-        {/* 背景の装飾（backgroundSizeに修正済み） */}
+        {/* 背景の装飾 */}
         <div 
           className="absolute inset-0 opacity-10" 
           style={{ 
@@ -82,7 +82,6 @@ export default function AdminDashboard() {
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Store className="text-indigo-400" size={24} />
-              {/* 📍 ヘッダーに店舗名を表示 */}
               <h2 className="text-indigo-100 text-[18px] font-black tracking-tight">{shopName}</h2>
             </div>
             <h1 className="text-white text-3xl font-black italic tracking-tighter flex items-center gap-2">
@@ -105,7 +104,6 @@ export default function AdminDashboard() {
 
       <main className="px-5 -mt-10 relative z-20 space-y-4 max-w-2xl mx-auto">
         <div className="grid gap-3">
-          {/* 📍 メニュー順序：勤怠管理を最優先に変更 */}
           {[
             { 
               title: '勤怠管理', 
@@ -146,7 +144,6 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {/* 📍 下部のステータスバー */}
         <div className="mt-8 flex items-center justify-between px-6 py-4 bg-slate-800 rounded-[30px] shadow-inner">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-black text-[10px]">

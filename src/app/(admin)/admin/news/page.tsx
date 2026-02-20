@@ -1,17 +1,17 @@
 'use client';
 
-import { createBrowserClient } from '@supabase/ssr';
+// 📍 修正：共通クライアントをインポートするように変更 [cite: 2026-02-20]
+import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { ChevronLeft, LogOut, ShieldAlert } from 'lucide-react';
+import { ChevronLeft, LogOut } from 'lucide-react';
 import NewsManager from '@/components/admin/NewsManager';
 
 export default function NewsPage() {
   const router = useRouter();
-  const [supabase] = useState(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ));
+  
+  // 📍 修正：共通クライアントを使用。useStateでの保持や環境変数の直接参照を削除 [cite: 2026-02-20]
+  const supabase = createClient();
   
   const [myProfile, setMyProfile] = useState<{role: string, shop_id: string | null}>({
     role: 'admin',

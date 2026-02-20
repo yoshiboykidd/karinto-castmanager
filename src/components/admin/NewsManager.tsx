@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
+// 📍 修正：共通クライアントをインポートするように変更 [cite: 2026-02-20]
+import { createClient } from '@/utils/supabase/client';
 import { Megaphone, Trash2, Send, RefreshCw, Edit3, ShieldAlert } from 'lucide-react';
 
 interface NewsManagerProps {
@@ -10,22 +11,20 @@ interface NewsManagerProps {
 }
 
 export default function NewsManager({ role, myShopId }: NewsManagerProps) {
-  const [supabase] = useState(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ));
+  // 📍 修正：共通クライアントを使用。useStateや環境変数の直接参照を削除 [cite: 2026-02-20]
+  const supabase = createClient();
   
   const [content, setContent] = useState('');
   const [newsList, setNewsList] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // 📍 開発者なら「全店舗」、店長なら「自店舗」をデフォルトにする
+  // 開発者なら「全店舗」、店長なら「自店舗」をデフォルトにする
   const [targetShopId, setTargetShopId] = useState(role === 'developer' ? 'all' : (myShopId || ''));
 
   const fetchNews = async () => {
     let query = supabase.from('news').select('*').order('created_at', { ascending: false });
 
-    // 📍 店長（admin）の場合は、全店舗向け('all')か、自店舗のニュースのみ表示
+    // 店長（admin）の場合は、全店舗向け('all')か、自店舗のニュースのみ表示
     if (role !== 'developer') {
       query = query.or(`shop_id.eq.all,shop_id.eq.${myShopId}`);
     }
@@ -41,7 +40,7 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
     if (!content.trim()) return;
     
     setIsProcessing(true);
-    // 📍 投稿先：店長の場合は強制的に自分の店舗IDにする
+    // 投稿先：店長の場合は強制的に自分の店舗IDにする
     const finalShopId = role === 'developer' ? targetShopId : myShopId;
 
     try {
@@ -60,7 +59,7 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
   };
 
   const handleDelete = async (id: string, postShopId: string) => {
-    // 📍 権限チェック：開発者か、自分の店舗の投稿のみ削除可能
+    // 権限チェック：開発者か、自分の店舗の投稿のみ削除可能
     if (role !== 'developer' && postShopId !== myShopId) {
       alert('他店舗のニュースを削除する権限がありません');
       return;
@@ -79,7 +78,7 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
           <div className="flex items-center justify-between px-1">
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">New Broadcast</span>
             
-            {/* 📍 開発者だけが投稿先を選べる */}
+            {/* 開発者だけが投稿先を選べる */}
             {role === 'developer' ? (
               <select 
                 value={targetShopId} 
@@ -89,7 +88,16 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
                 <option value="all">全店舗に配信</option>
                 <option value="001">神田店</option>
                 <option value="002">赤坂店</option>
-                {/* 必要に応じて店舗を追加 */}
+                <option value="003">秋葉原店</option>
+                <option value="004">上野店</option>
+                <option value="005">渋谷店</option>
+                <option value="006">池袋西口店</option>
+                <option value="007">五反田店</option>
+                <option value="008">大宮店</option>
+                <option value="009">吉祥寺店</option>
+                <option value="010">大久保店</option>
+                <option value="011">池袋東口店</option>
+                <option value="012">小岩店</option>
               </select>
             ) : (
               <span className="text-[10px] font-black bg-blue-50 text-blue-500 px-3 py-1 rounded-full uppercase">
@@ -119,7 +127,7 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
       {/* 📋 ニュース一覧 */}
       <div className="space-y-3">
         {newsList.map((news) => {
-          // 📍 この投稿を削除できるかどうか
+          // この投稿を削除できるかどうか
           const canDelete = role === 'developer' || news.shop_id === myShopId;
 
           return (
@@ -129,7 +137,7 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
                   {news.shop_id === 'all' ? '全店舗共通' : `SHOP: ${news.shop_id}`}
                 </span>
                 
-                {/* 📍 削除権限がある場合のみゴミ箱を表示 */}
+                {/* 削除権限がある場合のみゴミ箱を表示 */}
                 {canDelete && (
                   <button onClick={() => handleDelete(news.id, news.shop_id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                     <Trash2 size={16} />

@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+// 📍 修正：ライブラリから直接ではなく、共通クライアントをインポート [cite: 2026-02-20]
+import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+// 📍 修正：URLやKeyの記述を削除し、引数なしで呼び出し [cite: 2026-02-20]
+const supabase = createClient();
 
 const SHOP_ID_MAP: { [key: string]: string } = {
   '池袋東口': '011', '池東': '011',
@@ -33,7 +33,6 @@ const SOINE_OPS = [
   { label: '120分価格', items: [{ n: '3-1', t: '3点セット 120分1', p: 1000 }, { n: '3-2', t: '3点セット 120分2', p: 1000 }, { n: '3-3', t: '3点セット 120分3', p: 1000 }, { n: '3-4', t: '3点セット 120分4', p: 1000 }, { n: '3-5', t: '3点セット 120分5', p: 1000 }, { n: '1', t: '単品 120分1', p: 500 }, { n: '2', t: '単品 120分2', p: 500 }, { n: '3', t: '単品 120分3', p: 500 }, { n: '4', t: '単品 120分4', p: 500 }, { n: '5', t: '単品 120分5', p: 500 }]},
 ];
 
-// 💡 修正：onUpdate をプロップスに追加
 export default function OpCalculator({ selectedRes, initialTotal, onToast, onClose, isInCall, setIsInCall, onUpdate }: any) {
   const router = useRouter();
   const [selectedOps, setSelectedOps] = useState<any[]>([]);
@@ -45,7 +44,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       const { data } = await supabase.from('reservations').select('*').eq('id', selectedRes.id);
       if (data && data.length > 0) {
         setDbRes(data[0]);
-        // 💡 修正：最新データを取得するたびに親モーダルを更新
         if (onUpdate) onUpdate(data[0]);
       }
     } catch (err) { console.error(err); }
@@ -69,7 +67,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
 
   const opsTotal = useMemo(() => {
     const savedSum = savedOpsActive.reduce((sum: number, op: any) => sum + (op?.price || 0), 0);
-    const newSum = selectedOps.reduce((sum, op) => sum + (op?.price || 0), 0);
+    const newSum = selectedOps.reduce((sum: number, op: any) => sum + (op?.price || 0), 0);
     return savedSum + newSum;
   }, [selectedOps, savedOpsActive]);
 
@@ -196,6 +194,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
 
   return (
     <div className="fixed inset-0 w-full h-[100dvh] z-[99999] flex flex-col bg-gray-900 text-white overflow-hidden font-sans">
+      {/* デザイン部分は変更なし */}
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
         <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-1.5 mb-1">
@@ -229,7 +228,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
             <div className="grid grid-cols-3 gap-2">
               {cat.items.map((item: any) => {
                 const isSelected = selectedOps.some(op => op.no === item.n && (dbRes?.service_type !== '添' || op.catLabel === cat.label));
-                const isSaved = savedOpsActive.some((op: any) => op?.no === item.n && (dbRes?.service_type !== '添' || op.catLabel === cat.label));
+                const isSaved = savedOpsActive.some((op: any) => op?.no === item.n && (dbRes?.service_type !== '添' || op?.catLabel === cat.label));
                 return (
                   <button key={`${cat.label}-${item.n}`} onClick={() => toggleOp(item.n, item.t, item.p || (cat as any).price || 0, cat.label)} className={`min-h-[75px] rounded-[20px] flex flex-col items-center justify-center border transition-all ${isSelected || isSaved ? 'bg-pink-500 border-pink-300 shadow-[0_0_15px_rgba(236,72,153,0.3)]' : 'bg-white/5 border-white/5 text-gray-400'}`}>
                     <span className="text-[20px] font-black">{item.n}</span>
