@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
-// 📍 修正：分散させた members フォルダのアクションを読み込むように変更
+// 📍 共通クライアントをインポートするように変更
+import { createClient } from '@/utils/supabase/client';
 import { createCast } from '@/app/(admin)/admin/members/actions';
 import { UserPlus, RefreshCw, Sparkles, User } from 'lucide-react';
 
 export default function CastRegister({ role, myShopId, targetShopId, onSuccess }: any) {
-  const [supabase] = useState(() => createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!));
+  // 📍 修正: 共通クライアントを使用することで多重インスタンス警告を回避
+  const supabase = createClient();
   const [newCastName, setNewCastName] = useState('');
   const [suggestedId, setSuggestedId] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -35,10 +36,11 @@ export default function CastRegister({ role, myShopId, targetShopId, onSuccess }
     formData.append('personal_number', suggestedId);
     formData.append('home_shop_id', activeShopId);
     
-    // 📍 修正された members/actions の createCast が実行されます
+    // Server Actionを実行
     const result = await createCast(formData);
     if (result.success) {
-      alert(`✨ 登録完了: ${newCastName}\nID: ${suggestedId}\nPW: 0000`);
+      // 📍 案内するパスワードも 000000 に修正
+      alert(`✨ 登録完了: ${newCastName}\nID: ${suggestedId}\nPW: 000000`);
       onSuccess();
     } else { 
       alert(result.error || '登録エラーが発生しました'); 
@@ -54,7 +56,6 @@ export default function CastRegister({ role, myShopId, targetShopId, onSuccess }
           <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] block mb-2">Assigning Login ID</label>
           <div className="flex items-baseline gap-1">
             <span className="text-slate-400 text-3xl font-mono font-black">{activeShopId}</span>
-            {/* 📍 修正: デザイン統一のためブルーをピンク系に変更 */}
             <span className="text-pink-300 text-3xl font-mono font-black">0</span>
             <span className="text-pink-500 text-4xl font-mono font-black tracking-widest">{suggestedId.slice(-4) || '....'}</span>
           </div>

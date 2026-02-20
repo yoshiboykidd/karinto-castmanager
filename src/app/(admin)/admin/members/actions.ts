@@ -2,11 +2,11 @@
 
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { createClient } from '@supabase/supabase-js' // 管理者操作に必要
+import { createClient } from '@supabase/supabase-js' 
 import { revalidatePath } from 'next/cache'
 
 /**
- * 権限に基づいたキャスト一覧の取得 (既存)
+ * 権限に基づいたキャスト一覧の取得
  */
 export async function getFilteredMembers(selectedShopId: string = 'all') {
   const cookieStore = await cookies()
@@ -60,13 +60,14 @@ export async function getFilteredMembers(selectedShopId: string = 'all') {
 }
 
 /**
- * 📍 キャストを新規登録する (ID 11桁バグ修正済み)
+ * キャストを新規登録する
+ * 修正点: パスワードを 0000 -> 000000 (6文字) に変更
  */
 export async function createCast(formData: FormData) {
   // 管理者権限を持つクライアントを作成 (Auth操作用)
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!, // .env.local に必須 [cite: 2026-01-29]
+    process.env.SUPABASE_SERVICE_ROLE_KEY!, 
     {
       auth: {
         autoRefreshToken: false,
@@ -77,12 +78,10 @@ export async function createCast(formData: FormData) {
 
   const display_name = formData.get('display_name') as string
   const home_shop_id = formData.get('home_shop_id') as string
-  
-  // 📍 修正: フロントから届く「00600001」等の8桁IDをそのまま使う
   const login_id = formData.get('personal_number') as string
   
-  // 初期パスワードは 0000 固定
-  const default_password = "0000";
+  // 📍 修正: 初期パスワードを 000000 (6文字以上) に設定
+  const default_password = "000000";
 
   if (!display_name || !home_shop_id || !login_id) {
     return { error: '未入力の項目があります' }
@@ -102,7 +101,7 @@ export async function createCast(formData: FormData) {
   }
 
   // 2. Auth (ログインアカウント) 作成
-  // 黄金律: [8桁ID]@karinto-internal.com [cite: 2026-01-29]
+  // 黄金律: [8桁ID]@karinto-internal.com
   const email = `${login_id}@karinto-internal.com`
   
   const { error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -140,7 +139,7 @@ export async function createCast(formData: FormData) {
 }
 
 /**
- * キャストをDBから完全に削除する (既存)
+ * キャストをDBから完全に削除する
  */
 export async function deleteMember(loginId: string) {
   const cookieStore = await cookies()
