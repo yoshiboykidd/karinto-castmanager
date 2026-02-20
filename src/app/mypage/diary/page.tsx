@@ -3,8 +3,7 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Camera, X, UploadCloud, ChevronLeft } from 'lucide-react';
-import { createClient } from '@/utils/supabase/client'; // パスはプロジェクトに合わせて調整してください
-import { v4 as uuidv4 } from 'uuid'; // ファイル名重複防止用
+import { createClient } from '@/src/utils/supabase/client';
 
 export default function DiaryPostPage() {
   const router = useRouter();
@@ -16,6 +15,7 @@ export default function DiaryPostPage() {
   const [content, setContent] = useState('');
   const [isUploading, setIsUploading] = useState(false);
 
+  // 画像選択時の処理
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -24,12 +24,14 @@ export default function DiaryPostPage() {
     }
   };
 
+  // 画像の取り消し
   const clearImage = () => {
     setImage(null);
     setPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // 投稿処理
   const handleSubmit = async () => {
     if (!image || !content.trim()) {
       alert('写真とメッセージを入力してね 🌸');
@@ -38,13 +40,13 @@ export default function DiaryPostPage() {
 
     setIsUploading(true);
     try {
-      // 1. ユーザー情報の取得
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('ログインが必要です');
+      // 1. ログインユーザーの取得
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error('ログインが必要です');
 
-      // 2. Storage に画像をアップロード
+      // 2. Storage への画像アップロード
       const fileExt = image.name.split('.').pop();
-      const fileName = `${user.id}/${uuidv4()}.${fileExt}`; // ユーザーIDごとのフォルダに保存
+      const fileName = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
       const filePath = fileName;
 
       const { error: uploadError } = await supabase.storage
@@ -53,21 +55,25 @@ export default function DiaryPostPage() {
 
       if (uploadError) throw uploadError;
 
-      // 3. Database に保存
+      // 3. Database (diariesテーブル) への保存
       const { error: dbError } = await supabase
         .from('diaries')
         .insert({
           cast_id: user.id,
           content: content,
-          image_path: filePath, // 保存したパスを記録
+          image_path: filePath,
         });
 
       if (dbError) throw dbError;
+      
+      // 💡 外部サイトへのメール送信等は、DBのTriggerやEdge Functionsで組むのが一般的ですが、
+      // プロトタイプとしてはここで成功メッセージを表示します。
 
       alert('日記をアップしました！');
-      router.push('/mypage'); // 投稿後はマイページへ戻る
+      router.push('/mypage'); // 投稿後にマイページへ
+      router.refresh(); // データを最新に更新
     } catch (error: any) {
-      console.error(error);
+      console.error('Error posting diary:', error);
       alert('ごめんね、エラーが出ちゃったみたい：' + error.message);
     } finally {
       setIsUploading(false);
@@ -76,15 +82,18 @@ export default function DiaryPostPage() {
 
   return (
     <div className="min-h-screen bg-white pb-20">
+      {/* ヘッダー */}
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-pink-50 px-4 py-3 flex items-center justify-between">
         <button onClick={() => router.back()} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-400">
           <ChevronLeft size={24} />
         </button>
         <h1 className="text-[18px] font-black text-pink-500 tracking-tighter">写メ日記をかく 🌸</h1>
-        <div className="w-10" />
+        <div className="w-10" /> {/* ダミー */}
       </header>
 
       <main className="p-4 space-y-6 max-w-md mx-auto">
+        
+        {/* 画像アップロードエリア */}
         <section>
           <p className="text-[12px] font-black text-pink-300 mb-2 ml-1 uppercase tracking-widest">Step 1: Photo</p>
           <div 
@@ -120,6 +129,7 @@ export default function DiaryPostPage() {
           </div>
         </section>
 
+        {/* テキスト入力エリア */}
         <section>
           <p className="text-[12px] font-black text-pink-300 mb-2 ml-1 uppercase tracking-widest">Step 2: Message</p>
           <div className="bg-pink-50/30 rounded-[24px] border-2 border-pink-100 p-4 focus-within:border-pink-300 transition-colors">
@@ -132,6 +142,7 @@ export default function DiaryPostPage() {
           </div>
         </section>
 
+        {/* 投稿ボタン */}
         <button
           onClick={handleSubmit}
           disabled={isUploading || !image || !content.trim()}

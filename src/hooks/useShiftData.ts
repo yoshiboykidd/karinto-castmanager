@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
+import { useRouter } from 'next/navigation';
 import { format, parseISO, startOfToday, isAfter, isValid } from 'date-fns';
+// 📍 修正箇所：先ほど作った共通クライアントを使用するように変更
+import { createClient } from '@/src/utils/supabase/client';
 
 export function useShiftData() {
-  const [supabase] = useState(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ));
+  // 📍 修正箇所：useStateでの初期化ではなく、共通クライアントを呼び出す
+  const supabase = createClient();
 
   const [data, setData] = useState<{
     shifts: any[], 
@@ -35,6 +35,7 @@ export function useShiftData() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return router.push('/login');
       
+      // 💡 既存のID抽出ロジック（ここは絶対に変えません）
       const rawId = session.user.email?.replace('@karinto-internal.com', '');
       const idList = [rawId];
       if (rawId && !isNaN(Number(rawId))) {
@@ -53,6 +54,7 @@ export function useShiftData() {
       if (profile) {
         const myShopId = profile.home_shop_id || 'main';
         
+        // 💡 既存のデータ取得ロジック（順序・条件も維持）
         const [shopRes, shiftsRes, newsRes, resData, achiRes, syncRes] = await Promise.all([
           supabase.from('shop_master').select('*').eq('shop_id', myShopId).single(),
           supabase.from('shifts')
@@ -105,10 +107,7 @@ export function useShiftData() {
     }
   }, [supabase]);
 
-  /**
-   * 📍 月間実績集計ロジック
-   * 当欠（absent）を最優先で判定し、集計から確実に除外します。
-   */
+  // 💡 月間実績集計ロジック（当欠優先判定も1文字も変えずに維持）
   const getMonthlyTotals = useCallback((viewDate: Date) => {
     if (!mounted || !viewDate || !data.shifts) return { amount: 0, count: 0, hours: 0, absent: 0, late: 0, ka_f: 0, ka_first: 0, ka_main: 0, soe_f: 0, soe_first: 0, soe_main: 0 };
     
@@ -121,22 +120,18 @@ export function useShiftData() {
       if (!isValid(d) || d.getMonth() !== currentMonth || d.getFullYear() !== currentYear) return acc;
       if (isAfter(d, today)) return acc;
 
-      // 1. まず「当欠」かどうかを最優先でチェック
       if (s.status === 'absent') {
-        acc.absent++; // 当欠数のみ加算し、以降の計算（給与・時間）はスキップする
+        acc.absent++;
       } 
-      // 2. 当欠でない場合のみ、通常出勤として計算
       else if (s.status === 'official' || s.is_official_pre_exist === true) {
-        acc.count++; // 出勤日数としてカウント
-        acc.amount += (Number(s.reward_amount) || 0); // 報酬を加算
-        if (s.is_late) acc.late++; // 遅刻回数
+        acc.count++; 
+        acc.amount += (Number(s.reward_amount) || 0); 
+        if (s.is_late) acc.late++; 
         
-        // 稼働時間の計算
         if (s.start_time && s.end_time && s.start_time !== 'OFF') {
           const [sH, sM] = s.start_time.split(':').map(Number);
           const [eH, eM] = s.end_time.split(':').map(Number);
           if (!isNaN(sH) && !isNaN(eH)) {
-            // 深夜跨ぎ対応（例: 23:00~03:00）
             const endH = eH < sH ? eH + 24 : eH;
             acc.hours += (endH + (eM || 0) / 60 - (sH + (sM || 0) / 60));
           }
@@ -145,7 +140,6 @@ export function useShiftData() {
       return acc;
     }, { amount: 0, count: 0, hours: 0, absent: 0, late: 0 });
 
-    // 指名数などの実績集計（日別実績テーブルから）
     const achievementStats = (data.achievements || []).reduce((acc: any, cur: any) => {
       const d = parseISO(cur.date);
       if (!isValid(d) || d.getMonth() !== currentMonth || d.getFullYear() !== currentYear) return acc;
