@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { createClient } from '@/utils/supabase/client'; // 📍 共通クライアント
+import { createClient } from '@/utils/supabase/client';
 import { ChevronLeft, Camera } from 'lucide-react';
-import DiaryForm from '@/components/diary/DiaryForm';
+import DiaryEditor from '@/components/diary/DiaryEditor';
 import DiaryList from '@/components/diary/DiaryList';
 import FixedFooter from '@/components/dashboard/FixedFooter';
 
@@ -18,7 +18,6 @@ export default function DiaryPage() {
   const [myPosts, setMyPosts] = useState<any[]>([]);
   const [editingPost, setEditingPost] = useState<any>(null);
 
-  // データの取得ロジック
   const fetchData = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -26,12 +25,9 @@ export default function DiaryPage() {
       return;
     }
     const loginId = session.user.email?.split('@')[0];
-    
-    // キャスト情報取得
     const { data: profile } = await supabase.from('cast_members').select('*').eq('login_id', loginId).single();
     setCastProfile(profile);
 
-    // 自分の投稿履歴を取得（最新順）
     const { data: posts } = await supabase
       .from('diary_posts')
       .select('*')
@@ -48,29 +44,20 @@ export default function DiaryPage() {
 
   return (
     <div className="min-h-screen bg-[#FFF5F7] pb-40 font-sans text-slate-800">
-      {/* 🌸 ヘッダー */}
       <header className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-pink-100 px-6 py-4 flex items-center justify-between">
-        <button onClick={() => router.push('/')} className="p-2 -ml-2 text-pink-400 active:scale-90 transition-all">
-          <ChevronLeft size={24} />
-        </button>
-        <h1 className="text-[17px] font-black tracking-tighter flex items-center gap-1.5 text-pink-500">
-          <Camera size={20} />写メ日記
-        </h1>
+        <button onClick={() => router.push('/')} className="p-2 -ml-2 text-pink-400 active:scale-90 transition-all"><ChevronLeft size={24} /></button>
+        <h1 className="text-[17px] font-black tracking-tighter flex items-center gap-1.5 text-pink-500"><Camera size={20} />写メ日記ブログ</h1>
         <div className="w-10" />
       </header>
 
       <main className="p-6 max-w-md mx-auto space-y-10">
-        {/* 📍 投稿・編集フォームセクション */}
-        <DiaryForm 
+        <DiaryEditor 
           castProfile={castProfile} 
           onPostSuccess={() => { fetchData(); setEditingPost(null); }} 
           editingPost={editingPost}
           onCancelEdit={() => setEditingPost(null)}
         />
-        
         <hr className="border-pink-100" />
-
-        {/* 📍 履歴リスト（編集ボタンでページ上部へ） */}
         <DiaryList 
           posts={myPosts} 
           onUpdateSuccess={fetchData} 
@@ -80,7 +67,6 @@ export default function DiaryPage() {
           }} 
         />
       </main>
-
       <FixedFooter pathname={pathname} />
     </div>
   );
