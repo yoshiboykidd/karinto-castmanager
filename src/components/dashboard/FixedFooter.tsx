@@ -22,7 +22,7 @@ export default function FixedFooter({ pathname, onLogout }: FixedFooterProps) {
   // 📍 「実績」を「写メ日記」に変更し、パスを /diary に設定
   const menuItems = [
     { label: 'ホーム', icon: Home, path: '/', action: () => { setPendingPath('/'); router.push('/'); } },
-    { label: '写メ日記', icon: Camera, path: '/diary', action: () => { setPendingPath('/diary'); router.push('/diary'); } },
+    { label: '写メ日記', icon: Camera, path: '/mypage/diary', action: () => { setPendingPath('/mypage/diary'); router.push('/mypage/diary'); } },
     { label: 'マイページ', icon: User, path: '/mypage', action: () => { setPendingPath('/mypage'); router.push('/mypage'); } },
   ];
 
