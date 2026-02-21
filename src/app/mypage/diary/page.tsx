@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-// 📍 共通クライアントを使用
-import { createClient } from '@/utils/supabase/client';
+import { createClient } from '@/utils/supabase/client'; // 📍 共通クライアント
 import { ChevronLeft, Camera } from 'lucide-react';
 import DiaryForm from '@/components/diary/DiaryForm';
 import DiaryList from '@/components/diary/DiaryList';
@@ -17,7 +16,7 @@ export default function DiaryPage() {
   const [loading, setLoading] = useState(true);
   const [castProfile, setCastProfile] = useState<any>(null);
   const [myPosts, setMyPosts] = useState<any[]>([]);
-  const [editingPost, setEditingPost] = useState<any>(null); // 📍 編集モードの管理
+  const [editingPost, setEditingPost] = useState<any>(null);
 
   // データの取得ロジック
   const fetchData = useCallback(async () => {
@@ -49,7 +48,7 @@ export default function DiaryPage() {
 
   return (
     <div className="min-h-screen bg-[#FFF5F7] pb-40 font-sans text-slate-800">
-      {/* 🌸 ヘッダー：サクラピンク基調 */}
+      {/* 🌸 ヘッダー */}
       <header className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-pink-100 px-6 py-4 flex items-center justify-between">
         <button onClick={() => router.push('/')} className="p-2 -ml-2 text-pink-400 active:scale-90 transition-all">
           <ChevronLeft size={24} />
@@ -61,7 +60,7 @@ export default function DiaryPage() {
       </header>
 
       <main className="p-6 max-w-md mx-auto space-y-10">
-        {/* 📍 投稿フォーム：編集モードのデータを受け取れるように設計 */}
+        {/* 📍 投稿・編集フォームセクション */}
         <DiaryForm 
           castProfile={castProfile} 
           onPostSuccess={() => { fetchData(); setEditingPost(null); }} 
@@ -71,18 +70,17 @@ export default function DiaryPage() {
         
         <hr className="border-pink-100" />
 
-        {/* 📍 履歴リスト：編集ボタンが押されたら親の状態を更新する */}
+        {/* 📍 履歴リスト（編集ボタンでページ上部へ） */}
         <DiaryList 
           posts={myPosts} 
           onUpdateSuccess={fetchData} 
           onEdit={(post) => {
             setEditingPost(post);
-            window.scrollTo({ top: 0, behavior: 'smooth' }); // スルスルと上に戻る
+            window.scrollTo({ top: 0, behavior: 'smooth' });
           }} 
         />
       </main>
 
-      {/* 📍 フッター */}
       <FixedFooter pathname={pathname} />
     </div>
   );
