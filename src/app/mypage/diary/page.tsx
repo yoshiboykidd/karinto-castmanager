@@ -1,26 +1,20 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-// 📍 共通クライアントを使用 [cite: 2026-02-20]
 import { createClient } from '@/utils/supabase/client';
-import { Camera, Send, ChevronLeft, X, Loader2, ImagePlus, Trash2, History, Sparkles } from 'lucide-react';
+import { ChevronLeft, Camera } from 'lucide-react';
+import DiaryForm from '@/components/diary/DiaryForm';
+import DiaryList from '@/components/diary/DiaryList';
 
 export default function DiaryPage() {
   const router = useRouter();
   const supabase = createClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  
   const [loading, setLoading] = useState(true);
   const [castProfile, setCastProfile] = useState<any>(null);
-  const [content, setContent] = useState('');
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [myPosts, setMyPosts] = useState<any[]>([]);
 
-  // 1. データ取得（プロフィールと履歴） [cite: 2026-02-21]
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       router.push('/login');
@@ -39,191 +33,28 @@ export default function DiaryPage() {
     
     setMyPosts(posts || []);
     setLoading(false);
-  };
+  }, [supabase, router]);
 
-  useEffect(() => { fetchData(); }, []);
-
-  // 2. 📸 写真選択 ＋ 自動圧縮ロジック [cite: 2026-02-21]
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // 圧縮処理の開始
-    const img = new Image();
-    const reader = new FileReader();
-
-    reader.onload = (event) => {
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-
-        // 長辺を1200pxにリサイズ [cite: 2026-02-21]
-        const maxSide = 1200;
-        if (width > height) {
-          if (width > maxSide) {
-            height *= maxSide / width;
-            width = maxSide;
-          }
-        } else {
-          if (height > maxSide) {
-            width *= maxSide / height;
-            height = maxSide;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-
-        // 画質 0.7 の JPEG に変換して Blob 化 [cite: 2026-02-21]
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const compressedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
-              lastModified: Date.now(),
-            });
-            setImageFile(compressedFile);
-            setPreviewUrl(URL.createObjectURL(compressedFile));
-          }
-        }, 'image/jpeg', 0.7);
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // 3. 投稿処理 [cite: 2026-02-21]
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!content.trim() || !imageFile || !castProfile) return;
-
-    setIsSubmitting(true);
-    try {
-      const fileExt = 'jpg'; // 圧縮時にjpegに変換しているため
-      const fileName = `${castProfile.login_id}_${Date.now()}.${fileExt}`;
-      const filePath = `${castProfile.login_id}/${fileName}`;
-
-      // Storage (diary-photos) へアップロード [cite: 2026-02-21]
-      const { error: uploadError } = await supabase.storage.from('diary-photos').upload(filePath, imageFile);
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage.from('diary-photos').getPublicUrl(filePath);
-
-      // DBへ保存 [cite: 2026-02-21]
-      const { error: dbError } = await supabase.from('diary_posts').insert([{
-        cast_id: castProfile.login_id,
-        cast_name: castProfile.display_name,
-        content: content.trim(),
-        image_url: publicUrl,
-        shop_id: castProfile.home_shop_id,
-        created_at: new Date().toISOString(),
-      }]);
-
-      if (dbError) throw dbError;
-
-      alert('日記をアップしました！✨');
-      setContent('');
-      setImageFile(null);
-      setPreviewUrl(null);
-      fetchData(); 
-    } catch (err: any) {
-      alert('エラーが発生しました: ' + err.message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // 4. 削除処理
-  const handleDelete = async (postId: string) => {
-    if (!confirm('この日記を削除してよろしいですか？')) return;
-    try {
-      const { error } = await supabase.from('diary_posts').delete().eq('id', postId);
-      if (error) throw error;
-      fetchData();
-    } catch (err: any) {
-      alert('削除に失敗しました: ' + err.message);
-    }
-  };
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   if (loading) return null;
 
   return (
     <div className="min-h-screen bg-[#FFF5F7] pb-32 font-sans text-slate-800">
       <header className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-pink-100 px-6 py-4 flex items-center justify-between">
-        <button onClick={() => router.push('/')} className="p-2 -ml-2 text-pink-400 active:scale-90 transition-all">
-          <ChevronLeft size={24} />
-        </button>
-        <h1 className="text-[17px] font-black tracking-tighter flex items-center gap-1.5 text-pink-500">
-          <Camera size={20} />写メ日記
-        </h1>
+        <button onClick={() => router.push('/')} className="p-2 -ml-2 text-pink-400 active:scale-90 transition-all"><ChevronLeft size={24} /></button>
+        <h1 className="text-[17px] font-black tracking-tighter flex items-center gap-1.5 text-pink-500"><Camera size={20} />写メ日記</h1>
         <div className="w-10" />
       </header>
 
       <main className="p-6 max-w-md mx-auto space-y-10">
-        {/* --- 投稿フォームセクション --- */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-2 px-2">
-            <Sparkles size={16} className="text-pink-400" />
-            <h2 className="text-xs font-black text-pink-400 uppercase tracking-[0.2em]">New Post</h2>
-          </div>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="relative group">
-              {previewUrl ? (
-                <div className="relative aspect-[4/5] w-full rounded-[40px] overflow-hidden shadow-xl border-4 border-white animate-in zoom-in duration-300">
-                  <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                  <button type="button" onClick={() => { setImageFile(null); setPreviewUrl(null); }} className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full active:scale-90"><X size={20} /></button>
-                </div>
-              ) : (
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="aspect-[4/5] w-full rounded-[40px] border-4 border-dashed border-pink-200 bg-white flex flex-col items-center justify-center gap-3 text-pink-300 hover:bg-pink-50 transition-all active:scale-[0.98]">
-                  <div className="w-16 h-16 rounded-3xl bg-pink-50 flex items-center justify-center"><ImagePlus size={32} /></div>
-                  <p className="font-black text-sm uppercase tracking-widest">Select Photo</p>
-                </button>
-              )}
-              <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
-            </div>
-
-            <div className="bg-white rounded-[32px] p-6 shadow-lg shadow-pink-200/10 border border-pink-50">
-              <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="今日の一言メッセージを書いてね 🌸" className="w-full h-24 bg-transparent text-gray-700 font-bold leading-relaxed outline-none resize-none placeholder:text-gray-300" maxLength={200} />
-              <div className="flex justify-end text-[10px] font-black text-pink-200 pt-2 border-t border-pink-50">{content.length} / 200</div>
-            </div>
-
-            <button type="submit" disabled={isSubmitting || !content.trim() || !imageFile} className={`w-full py-5 rounded-[24px] font-black text-lg shadow-lg flex items-center justify-center gap-3 transition-all active:scale-95 ${isSubmitting || !content.trim() || !imageFile ? 'bg-gray-100 text-gray-400' : 'bg-gradient-to-r from-rose-400 to-pink-500 text-white shadow-pink-200'}`}>
-              {isSubmitting ? <Loader2 className="animate-spin" size={24} /> : '日記をアップする ✨'}
-            </button>
-          </form>
-        </section>
-
+        {/* 📍 新規投稿フォーム */}
+        <DiaryForm castProfile={castProfile} onPostSuccess={fetchData} />
+        
         <hr className="border-pink-100" />
 
-        {/* --- 履歴セクション --- */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-2 px-2">
-            <History size={16} className="text-gray-400" />
-            <h2 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Your History</h2>
-          </div>
-
-          <div className="grid gap-4">
-            {myPosts.length === 0 ? (
-              <p className="text-center py-10 text-gray-300 font-bold text-sm italic">まだ投稿がありません 🧊</p>
-            ) : (
-              myPosts.map((post) => (
-                <div key={post.id} className="bg-white rounded-[32px] p-4 shadow-sm border border-gray-100 flex gap-4 items-center animate-in fade-in slide-in-from-bottom-2 duration-500">
-                  <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0">
-                    <img src={post.image_url} alt="" className="w-full h-full object-cover" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-400 font-bold mb-1">{new Date(post.created_at).toLocaleDateString()}</p>
-                    <p className="text-[13px] font-bold text-gray-700 truncate">{post.content}</p>
-                  </div>
-                  <button onClick={() => handleDelete(post.id)} className="p-3 text-gray-300 hover:text-red-400 active:scale-90 transition-all"><Trash2 size={18} /></button>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
+        {/* 📍 履歴リスト（編集・削除機能付き） */}
+        <DiaryList posts={myPosts} onUpdateSuccess={fetchData} />
       </main>
     </div>
   );
