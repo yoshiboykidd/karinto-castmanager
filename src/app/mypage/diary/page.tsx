@@ -1,169 +1,182 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Camera, X, UploadCloud, ChevronLeft } from 'lucide-react';
+// 📍 共通クライアントをインポート [cite: 2026-02-20]
 import { createClient } from '@/utils/supabase/client';
+import { Camera, Send, ChevronLeft, X, Loader2, ImagePlus } from 'lucide-react';
 
-export default function DiaryPostPage() {
+export default function DiaryPage() {
   const router = useRouter();
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [image, setImage] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [castProfile, setCastProfile] = useState<any>(null);
   const [content, setContent] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 画像選択時の処理
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ログイン情報の取得
+  useEffect(() => {
+    async function getProfile() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        router.push('/login');
+        return;
+      }
+      const loginId = session.user.email?.split('@')[0];
+      const { data } = await supabase.from('cast_members').select('*').eq('login_id', loginId).single();
+      setCastProfile(data);
+      setLoading(false);
+    }
+    getProfile();
+  }, [supabase, router]);
+
+  // 写真選択時のプレビュー生成
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setImage(file);
-      setPreview(URL.createObjectURL(file));
+      setImageFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
     }
-  };
-
-  // 画像の取り消し
-  const clearImage = () => {
-    setImage(null);
-    setPreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   // 投稿処理
-  const handleSubmit = async () => {
-    if (!image || !content.trim()) {
-      alert('写真とメッセージを入力してね 🌸');
-      return;
-    }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!content.trim() || !imageFile || !castProfile) return;
 
-    setIsUploading(true);
+    setIsSubmitting(true);
     try {
-      // 1. ログインユーザーの取得
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) throw new Error('ログインが必要です');
-
-      // 2. Storage への画像アップロード
-      const fileExt = image.name.split('.').pop();
-      const fileName = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
-      const filePath = fileName;
+      // 1. Supabase Storage (diary-photos) へアップロード [cite: 2026-02-21]
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `${castProfile.login_id}_${Date.now()}.${fileExt}`;
+      const filePath = `${castProfile.login_id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('diary-photos')
-        .upload(filePath, image);
+        .from('diary-photos') // 📍 指定されたバケット名
+        .upload(filePath, imageFile);
 
       if (uploadError) throw uploadError;
 
-      // 3. Database (diariesテーブル) への保存
-      const { error: dbError } = await supabase
-        .from('diaries')
-        .insert({
-          cast_id: user.id,
-          content: content,
-          image_path: filePath,
-        });
+      // 2. 画像の公開URLを取得 [cite: 2026-02-21]
+      const { data: { publicUrl } } = supabase.storage.from('diary-photos').getPublicUrl(filePath);
+
+      // 3. データベース (diary_posts) に保存
+      const { error: dbError } = await supabase.from('diary_posts').insert([
+        {
+          cast_id: castProfile.login_id,
+          cast_name: castProfile.display_name,
+          content: content.trim(),
+          image_url: publicUrl,
+          shop_id: castProfile.home_shop_id,
+          created_at: new Date().toISOString(),
+        }
+      ]);
 
       if (dbError) throw dbError;
-      
-      // 💡 外部サイトへのメール送信等は、DBのTriggerやEdge Functionsで組むのが一般的ですが、
-      // プロトタイプとしてはここで成功メッセージを表示します。
 
-      alert('日記をアップしました！');
-      router.push('/mypage'); // 投稿後にマイページへ
-      router.refresh(); // データを最新に更新
-    } catch (error: any) {
-      console.error('Error posting diary:', error);
-      alert('ごめんね、エラーが出ちゃったみたい：' + error.message);
+      alert('写メ日記をアップロードしました！✨');
+      router.push('/'); // 投稿完了後、ホームへ戻る
+    } catch (err: any) {
+      alert('投稿に失敗しました: ' + err.message);
     } finally {
-      setIsUploading(false);
+      setIsSubmitting(false);
     }
   };
 
+  if (loading) return null;
+
   return (
-    <div className="min-h-screen bg-white pb-20">
-      {/* ヘッダー */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-pink-50 px-4 py-3 flex items-center justify-between">
-        <button onClick={() => router.back()} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-400">
+    <div className="min-h-screen bg-[#FFF5F7] pb-24 font-sans text-slate-800">
+      {/* 🌸 ヘッダー：サクラピンク基調 [cite: 2026-01-29] */}
+      <header className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-pink-100 px-6 py-4 flex items-center justify-between">
+        <button onClick={() => router.back()} className="p-2 -ml-2 text-pink-400 active:scale-90 transition-all">
           <ChevronLeft size={24} />
         </button>
-        <h1 className="text-[18px] font-black text-pink-500 tracking-tighter">写メ日記をかく 🌸</h1>
-        <div className="w-10" /> {/* ダミー */}
+        <h1 className="text-[17px] font-black tracking-tighter flex items-center gap-1.5">
+          <Camera size={18} className="text-pink-500" />
+          写メ日記投稿
+        </h1>
+        <div className="w-10" />
       </header>
 
-      <main className="p-4 space-y-6 max-w-md mx-auto">
-        
-        {/* 画像アップロードエリア */}
-        <section>
-          <p className="text-[12px] font-black text-pink-300 mb-2 ml-1 uppercase tracking-widest">Step 1: Photo</p>
-          <div 
-            onClick={() => !preview && fileInputRef.current?.click()}
-            className={`relative aspect-square rounded-[32px] border-4 border-dashed transition-all duration-300 flex flex-col items-center justify-center overflow-hidden
-              ${preview ? 'border-pink-200' : 'border-pink-100 bg-pink-50/30 hover:bg-pink-50'}`}
-          >
-            {preview ? (
-              <>
-                <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+      <main className="p-6 max-w-md mx-auto space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          
+          {/* 📸 写真選択エリア：アスペクト比 4:5 固定 [cite: 2026-02-21] */}
+          <div className="relative group">
+            {previewUrl ? (
+              <div className="relative aspect-[4/5] w-full rounded-[40px] overflow-hidden shadow-xl border-4 border-white animate-in zoom-in duration-300">
+                <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
                 <button 
-                  onClick={(e) => { e.stopPropagation(); clearImage(); }}
-                  className="absolute top-4 right-4 w-10 h-10 bg-black/50 backdrop-blur-md text-white rounded-full flex items-center justify-center"
+                  type="button" 
+                  onClick={() => { setImageFile(null); setPreviewUrl(null); }}
+                  className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full backdrop-blur-md active:scale-90"
                 >
                   <X size={20} />
                 </button>
-              </>
-            ) : (
-              <div className="text-center space-y-2">
-                <div className="w-16 h-16 bg-pink-400 rounded-full flex items-center justify-center mx-auto shadow-lg shadow-pink-200">
-                  <Camera className="text-white" size={32} />
-                </div>
-                <p className="text-[14px] font-black text-pink-400">写真をえらぶ</p>
               </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="aspect-[4/5] w-full rounded-[40px] border-4 border-dashed border-pink-200 bg-white flex flex-col items-center justify-center gap-3 text-pink-300 hover:bg-pink-50 transition-all active:scale-[0.98]"
+              >
+                <div className="w-16 h-16 rounded-3xl bg-pink-50 flex items-center justify-center">
+                  <ImagePlus size={32} />
+                </div>
+                <p className="font-black text-sm uppercase tracking-widest">Select Photo</p>
+              </button>
             )}
             <input 
               type="file" 
               ref={fileInputRef} 
-              onChange={handleImageChange} 
+              onChange={handleFileChange} 
               accept="image/*" 
               className="hidden" 
             />
           </div>
-        </section>
 
-        {/* テキスト入力エリア */}
-        <section>
-          <p className="text-[12px] font-black text-pink-300 mb-2 ml-1 uppercase tracking-widest">Step 2: Message</p>
-          <div className="bg-pink-50/30 rounded-[24px] border-2 border-pink-100 p-4 focus-within:border-pink-300 transition-colors">
+          {/* 📝 テキスト入力エリア */}
+          <div className="bg-white rounded-[32px] p-6 shadow-lg shadow-pink-200/10 border border-pink-50">
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="今日のお客様とのエピソードや、今の気分を書いてね 🌸"
-              className="w-full min-h-[120px] bg-transparent border-none focus:ring-0 text-[15px] font-bold text-gray-700 placeholder:text-pink-200 resize-none"
+              placeholder="今日の一言メッセージを書いてね 🌸"
+              className="w-full h-32 bg-transparent text-gray-700 font-bold leading-relaxed outline-none resize-none placeholder:text-gray-300"
+              maxLength={200}
             />
+            <div className="flex justify-end text-[10px] font-black text-pink-200 uppercase tracking-widest pt-2 border-t border-pink-50">
+              {content.length} / 200
+            </div>
           </div>
-        </section>
 
-        {/* 投稿ボタン */}
-        <button
-          onClick={handleSubmit}
-          disabled={isUploading || !image || !content.trim()}
-          className={`w-full py-5 rounded-[24px] font-black text-[18px] shadow-xl transition-all active:scale-[0.95] flex items-center justify-center gap-2
-            ${isUploading || !image || !content.trim() 
-              ? 'bg-gray-100 text-gray-300' 
-              : 'bg-gradient-to-r from-pink-400 to-rose-400 text-white shadow-pink-200'}`}
-        >
-          {isUploading ? (
-            <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <>
-              <UploadCloud size={22} />
-              <span>日記を公開する 🌸</span>
-            </>
-          )}
-        </button>
-
-        <p className="text-[10px] text-gray-300 text-center font-bold px-4 leading-relaxed">
-          ※公開すると、公式サイトと外部サイトに<br />同時に投稿されます。
-        </p>
+          {/* 🚀 送信ボタン */}
+          <button
+            type="submit"
+            disabled={isSubmitting || !content.trim() || !imageFile}
+            className={`w-full py-5 rounded-[24px] font-black text-lg shadow-lg flex items-center justify-center gap-3 transition-all active:scale-95 ${
+              isSubmitting || !content.trim() || !imageFile
+                ? 'bg-gray-100 text-gray-400' 
+                : 'bg-gradient-to-r from-rose-400 to-pink-500 text-white shadow-pink-200'
+            }`}
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="animate-spin" size={24} />
+                <span>UPLOADING...</span>
+              </>
+            ) : (
+              <>
+                <span>日記を公開する ✨</span>
+                <Send size={20} />
+              </>
+            )}
+          </button>
+        </form>
       </main>
     </div>
   );
