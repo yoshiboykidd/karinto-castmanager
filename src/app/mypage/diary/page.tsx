@@ -1,10 +1,9 @@
 'use client';
 
-
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/utils/supabase/client'; // 📍 共通クライアント [cite: 2026-02-20]
-// 📍 Sparkles を追加しました
+// 📍 共通クライアントを使用 [cite: 2026-02-20]
+import { createClient } from '@/utils/supabase/client';
 import { Camera, Send, ChevronLeft, X, Loader2, ImagePlus, Trash2, History, Sparkles } from 'lucide-react';
 
 export default function DiaryPage() {
@@ -18,9 +17,9 @@ export default function DiaryPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [myPosts, setMyPosts] = useState<any[]>([]); // 📍 自分の投稿履歴
+  const [myPosts, setMyPosts] = useState<any[]>([]);
 
-  // 1. プロフィールと履歴の取得
+  // 1. データ取得（プロフィールと履歴） [cite: 2026-02-21]
   const fetchData = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -29,11 +28,9 @@ export default function DiaryPage() {
     }
     const loginId = session.user.email?.split('@')[0];
     
-    // キャスト情報取得
     const { data: profile } = await supabase.from('cast_members').select('*').eq('login_id', loginId).single();
     setCastProfile(profile);
 
-    // 自分の投稿履歴を取得（最新順）
     const { data: posts } = await supabase
       .from('diary_posts')
       .select('*')
@@ -46,27 +43,69 @@ export default function DiaryPage() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // 写真選択
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 2. 📸 写真選択 ＋ 自動圧縮ロジック [cite: 2026-02-21]
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-    }
+    if (!file) return;
+
+    // 圧縮処理の開始
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // 長辺を1200pxにリサイズ [cite: 2026-02-21]
+        const maxSide = 1200;
+        if (width > height) {
+          if (width > maxSide) {
+            height *= maxSide / width;
+            width = maxSide;
+          }
+        } else {
+          if (height > maxSide) {
+            width *= maxSide / height;
+            height = maxSide;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // 画質 0.7 の JPEG に変換して Blob 化 [cite: 2026-02-21]
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            setImageFile(compressedFile);
+            setPreviewUrl(URL.createObjectURL(compressedFile));
+          }
+        }, 'image/jpeg', 0.7);
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
   };
 
-  // 投稿処理
+  // 3. 投稿処理 [cite: 2026-02-21]
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim() || !imageFile || !castProfile) return;
 
     setIsSubmitting(true);
     try {
-      const fileExt = imageFile.name.split('.').pop();
+      const fileExt = 'jpg'; // 圧縮時にjpegに変換しているため
       const fileName = `${castProfile.login_id}_${Date.now()}.${fileExt}`;
       const filePath = `${castProfile.login_id}/${fileName}`;
 
-      // Storageへアップロード
+      // Storage (diary-photos) へアップロード [cite: 2026-02-21]
       const { error: uploadError } = await supabase.storage.from('diary-photos').upload(filePath, imageFile);
       if (uploadError) throw uploadError;
 
@@ -84,23 +123,28 @@ export default function DiaryPage() {
 
       if (dbError) throw dbError;
 
-      alert('写メ日記をアップロードしました！✨');
+      alert('日記をアップしました！✨');
       setContent('');
       setImageFile(null);
       setPreviewUrl(null);
-      fetchData(); // 履歴を更新
+      fetchData(); 
     } catch (err: any) {
-      alert('失敗しました: ' + err.message);
+      alert('エラーが発生しました: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // 削除処理（任意で追加）
+  // 4. 削除処理
   const handleDelete = async (postId: string) => {
-    if (!confirm('この日記を削除しますか？')) return;
-    await supabase.from('diary_posts').delete().eq('id', postId);
-    fetchData();
+    if (!confirm('この日記を削除してよろしいですか？')) return;
+    try {
+      const { error } = await supabase.from('diary_posts').delete().eq('id', postId);
+      if (error) throw error;
+      fetchData();
+    } catch (err: any) {
+      alert('削除に失敗しました: ' + err.message);
+    }
   };
 
   if (loading) return null;
@@ -108,13 +152,17 @@ export default function DiaryPage() {
   return (
     <div className="min-h-screen bg-[#FFF5F7] pb-32 font-sans text-slate-800">
       <header className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-pink-100 px-6 py-4 flex items-center justify-between">
-        <button onClick={() => router.push('/')} className="p-2 -ml-2 text-pink-400 active:scale-90 transition-all"><ChevronLeft size={24} /></button>
-        <h1 className="text-[17px] font-black tracking-tighter flex items-center gap-1.5"><Camera size={18} className="text-pink-500" />写メ日記</h1>
+        <button onClick={() => router.push('/')} className="p-2 -ml-2 text-pink-400 active:scale-90 transition-all">
+          <ChevronLeft size={24} />
+        </button>
+        <h1 className="text-[17px] font-black tracking-tighter flex items-center gap-1.5 text-pink-500">
+          <Camera size={20} />写メ日記
+        </h1>
         <div className="w-10" />
       </header>
 
       <main className="p-6 max-w-md mx-auto space-y-10">
-        {/* 📝 新規投稿フォームエリア */}
+        {/* --- 投稿フォームセクション --- */}
         <section className="space-y-4">
           <div className="flex items-center gap-2 px-2">
             <Sparkles size={16} className="text-pink-400" />
@@ -138,19 +186,19 @@ export default function DiaryPage() {
             </div>
 
             <div className="bg-white rounded-[32px] p-6 shadow-lg shadow-pink-200/10 border border-pink-50">
-              <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="メッセージを書いてね 🌸" className="w-full h-24 bg-transparent text-gray-700 font-bold leading-relaxed outline-none resize-none placeholder:text-gray-300" maxLength={200} />
+              <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="今日の一言メッセージを書いてね 🌸" className="w-full h-24 bg-transparent text-gray-700 font-bold leading-relaxed outline-none resize-none placeholder:text-gray-300" maxLength={200} />
               <div className="flex justify-end text-[10px] font-black text-pink-200 pt-2 border-t border-pink-50">{content.length} / 200</div>
             </div>
 
             <button type="submit" disabled={isSubmitting || !content.trim() || !imageFile} className={`w-full py-5 rounded-[24px] font-black text-lg shadow-lg flex items-center justify-center gap-3 transition-all active:scale-95 ${isSubmitting || !content.trim() || !imageFile ? 'bg-gray-100 text-gray-400' : 'bg-gradient-to-r from-rose-400 to-pink-500 text-white shadow-pink-200'}`}>
               {isSubmitting ? <Loader2 className="animate-spin" size={24} /> : '日記をアップする ✨'}
             </button>
-          </form> section
+          </form>
         </section>
 
         <hr className="border-pink-100" />
 
-        {/* 📜 履歴エリア */}
+        {/* --- 履歴セクション --- */}
         <section className="space-y-4">
           <div className="flex items-center gap-2 px-2">
             <History size={16} className="text-gray-400" />
@@ -162,7 +210,7 @@ export default function DiaryPage() {
               <p className="text-center py-10 text-gray-300 font-bold text-sm italic">まだ投稿がありません 🧊</p>
             ) : (
               myPosts.map((post) => (
-                <div key={post.id} className="bg-white rounded-[32px] p-4 shadow-sm border border-gray-100 flex gap-4 items-center">
+                <div key={post.id} className="bg-white rounded-[32px] p-4 shadow-sm border border-gray-100 flex gap-4 items-center animate-in fade-in slide-in-from-bottom-2 duration-500">
                   <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0">
                     <img src={post.image_url} alt="" className="w-full h-full object-cover" />
                   </div>
