@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-// 📍 BarChart2 を削除し、Camera を追加
 import { Home, Camera, User, LogOut } from 'lucide-react';
 
 interface FixedFooterProps {
@@ -14,12 +13,11 @@ export default function FixedFooter({ pathname, onLogout }: FixedFooterProps) {
   const router = useRouter();
   const [pendingPath, setPendingPath] = useState<string | null>(null);
 
-  // ページ遷移が完了したら「押し中」の状態をリセット
   useEffect(() => {
     setPendingPath(null);
   }, [pathname]);
 
-  // 📍 「実績」を「写メ日記」に変更し、パスを /diary に設定
+  // 📍 パスを現在のファイル構成に合わせて /mypage/diary に修正
   const menuItems = [
     { label: 'ホーム', icon: Home, path: '/', action: () => { setPendingPath('/'); router.push('/'); } },
     { label: '写メ日記', icon: Camera, path: '/mypage/diary', action: () => { setPendingPath('/mypage/diary'); router.push('/mypage/diary'); } },
@@ -30,10 +28,8 @@ export default function FixedFooter({ pathname, onLogout }: FixedFooterProps) {
     <footer className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-8 pt-4 bg-gradient-to-t from-white via-white/95 to-transparent">
       <nav className="max-w-md mx-auto bg-white/80 backdrop-blur-xl border border-pink-100 rounded-[32px] shadow-[0_8px_32px_rgba(255,182,193,0.15)] px-6 py-3">
         <ul className="flex justify-between items-center">
-          {/* --- 通常メニュー --- */}
           {menuItems.map((item) => {
             const Icon = item.icon;
-            // ページが一致しているか、または今まさにそのボタンを押した瞬間ならアクティブ
             const isActive = pathname === item.path || pendingPath === item.path;
             
             return (
@@ -59,7 +55,6 @@ export default function FixedFooter({ pathname, onLogout }: FixedFooterProps) {
             );
           })}
 
-          {/* --- ログアウト（独立したボタンとして定義） --- */}
           <li>
             <button
               onClick={onLogout}
