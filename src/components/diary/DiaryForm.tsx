@@ -7,8 +7,8 @@ import { Send, X, Loader2, ImagePlus, Sparkles, RefreshCw } from 'lucide-react';
 interface DiaryFormProps {
   castProfile: any;
   onPostSuccess: () => void;
-  editingPost?: any; // 📍 追加
-  onCancelEdit?: () => void; // 📍 追加
+  editingPost?: any;
+  onCancelEdit?: () => void;
 }
 
 export default function DiaryForm({ castProfile, onPostSuccess, editingPost, onCancelEdit }: DiaryFormProps) {
@@ -20,12 +20,11 @@ export default function DiaryForm({ castProfile, onPostSuccess, editingPost, onC
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 📍 編集モードになったら値をセット
   useEffect(() => {
     if (editingPost) {
       setContent(editingPost.content);
       setPreviewUrl(editingPost.image_url);
-      setImageFile(null); // ファイル選択はリセット（既存画像を使うため）
+      setImageFile(null);
     } else {
       setContent('');
       setPreviewUrl(null);
@@ -37,7 +36,7 @@ export default function DiaryForm({ castProfile, onPostSuccess, editingPost, onC
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // ...（以前の圧縮ロジックはそのまま）...
+    // --- 圧縮ロジック (省略せず記述) ---
     const img = new Image();
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -71,8 +70,15 @@ export default function DiaryForm({ castProfile, onPostSuccess, editingPost, onC
     try {
       let finalImageUrl = editingPost?.image_url || '';
 
-      // 新しい画像が選択されている場合のみアップロード
+      // 📍 写真が新しく選択された場合
       if (imageFile) {
+        // 1. 古い写真がある場合はStorageから削除 [cite: 2026-02-21]
+        if (editingPost?.image_url) {
+          const oldPath = editingPost.image_url.split('diary-photos/')[1];
+          await supabase.storage.from('diary-photos').remove([oldPath]);
+        }
+
+        // 2. 新しい写真をアップロード
         const fileName = `${castProfile.login_id}_${Date.now()}.jpg`;
         const filePath = `${castProfile.login_id}/${fileName}`;
         const { error: uploadError } = await supabase.storage.from('diary-photos').upload(filePath, imageFile);
@@ -82,14 +88,12 @@ export default function DiaryForm({ castProfile, onPostSuccess, editingPost, onC
       }
 
       if (editingPost) {
-        // 📍 編集（UPDATE）
         const { error } = await supabase
           .from('diary_posts')
           .update({ content: content.trim(), image_url: finalImageUrl })
           .eq('id', editingPost.id);
         if (error) throw error;
       } else {
-        // 📍 新規（INSERT）
         const { error } = await supabase.from('diary_posts').insert([{
           cast_id: castProfile.login_id,
           cast_name: castProfile.display_name,
@@ -124,7 +128,7 @@ export default function DiaryForm({ castProfile, onPostSuccess, editingPost, onC
       </div>
       
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="relative group" onClick={() => !previewUrl && fileInputRef.current?.click()}>
+        <div className="relative" onClick={() => !previewUrl && fileInputRef.current?.click()}>
           {previewUrl ? (
             <div className="relative aspect-[4/5] w-full rounded-[40px] overflow-hidden shadow-xl border-4 border-white">
               <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
