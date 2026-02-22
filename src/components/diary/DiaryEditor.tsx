@@ -4,13 +4,13 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TiptapImage from '@tiptap/extension-image';
 import { useState, useEffect } from 'react';
-import { createClient } from '@/utils/supabase/client'; //
+import { createClient } from '@/utils/supabase/client';
 import { ImageIcon, Bold, List, Send, Loader2, Sparkles, Undo, Redo, Eye, X } from 'lucide-react';
 
 export default function DiaryEditor({ castProfile, onPostSuccess, editingPost, onCancelEdit }: any) {
   const supabase = createClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false); // 📍 モーダル開閉用
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewContent, setPreviewContent] = useState('');
 
   const editor = useEditor({
@@ -28,8 +28,8 @@ export default function DiaryEditor({ castProfile, onPostSuccess, editingPost, o
     },
     editorProps: {
       attributes: {
-        //
-        class: 'prose prose-pink focus:outline-none min-h-[400px] p-6 text-[16px] font-bold leading-relaxed [&_p:empty]:before:content-["\\00a0"]',
+        // 📍 エディター上でも空行をしっかり出す
+        class: 'prose prose-pink focus:outline-none min-h-[400px] p-6 text-[16px] font-bold leading-relaxed [&_p]:min-h-[1.5em]',
       },
     },
   });
@@ -41,7 +41,7 @@ export default function DiaryEditor({ castProfile, onPostSuccess, editingPost, o
     }
   }, [editingPost, editor]);
 
-  // 📸 画像圧縮ロジック（変更なし）
+  // --- 画像圧縮ロジック（変更なし） ---
   const addImage = async () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -80,11 +80,9 @@ export default function DiaryEditor({ castProfile, onPostSuccess, editingPost, o
     input.click();
   };
 
-  // 🚀 実際の投稿処理（モーダル内のボタンから呼ばれる）
   const handleFinalSubmit = async () => {
     if (!editor || isSubmitting) return;
     const htmlContent = editor.getHTML();
-
     const match = htmlContent.match(/<img src="([^"]+)"/);
     const firstImageUrl = match ? match[1] : null;
 
@@ -94,48 +92,38 @@ export default function DiaryEditor({ castProfile, onPostSuccess, editingPost, o
         await supabase.from('diary_posts').update({ content: htmlContent, image_url: firstImageUrl }).eq('id', editingPost.id);
       } else {
         await supabase.from('diary_posts').insert([{
-          cast_id: castProfile.login_id,
-          cast_name: castProfile.display_name,
-          content: htmlContent,
-          image_url: firstImageUrl,
-          shop_id: castProfile.home_shop_id,
+          cast_id: castProfile.login_id, cast_name: castProfile.display_name,
+          content: htmlContent, image_url: firstImageUrl, shop_id: castProfile.home_shop_id,
         }]);
       }
       setIsPreviewOpen(false);
       editor.commands.setContent('');
       onPostSuccess();
       alert('日記を公開しました！✨');
-    } catch (err: any) {
-      alert('エラー: ' + err.message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    } catch (err: any) { alert('エラー: ' + err.message); }
+    finally { setIsSubmitting(false); }
   };
 
   return (
     <section className="space-y-4">
-      {/* エディターヘッダー */}
       <div className="flex items-center justify-between px-2 text-pink-400">
         <div className="flex items-center gap-2"><Sparkles size={16} /><h2 className="text-xs font-black uppercase tracking-[0.2em]">Write Blog</h2></div>
-        {editingPost && <button onClick={onCancelEdit} className="text-[10px] font-black underline underline-offset-4">キャンセル</button>}
+        {editingPost && <button onClick={onCancelEdit} className="text-[10px] font-black underline">キャンセル</button>}
       </div>
 
-      {/* ツールバー */}
       <div className="flex flex-wrap gap-1.5 p-2 bg-white/90 backdrop-blur-md rounded-2xl border border-pink-100 shadow-sm sticky top-[72px] z-20">
         <button onClick={() => editor?.chain().focus().toggleBold().run()} className={`p-2.5 rounded-xl transition-all ${editor?.isActive('bold') ? 'bg-pink-500 text-white shadow-md' : 'text-pink-300'}`}><Bold size={18} /></button>
         <button onClick={() => editor?.chain().focus().toggleBulletList().run()} className={`p-2.5 rounded-xl transition-all ${editor?.isActive('bulletList') ? 'bg-pink-500 text-white shadow-md' : 'text-pink-300'}`}><List size={18} /></button>
-        <button onClick={addImage} className="p-2.5 rounded-xl text-pink-400 bg-pink-50 hover:bg-pink-100 active:scale-90 transition-all"><ImageIcon size={18} /></button>
+        <button onClick={addImage} className="p-2.5 rounded-xl text-pink-400 bg-pink-50 hover:bg-pink-100"><ImageIcon size={18} /></button>
         <div className="flex-1" />
         <button onClick={() => editor?.chain().focus().undo().run()} className="p-2.5 text-gray-300"><Undo size={18} /></button>
         <button onClick={() => editor?.chain().focus().redo().run()} className="p-2.5 text-gray-300"><Redo size={18} /></button>
       </div>
 
-      {/* 入力欄 */}
       <div className="bg-white rounded-[32px] shadow-xl shadow-pink-200/10 border border-pink-50 overflow-hidden">
         <EditorContent editor={editor} />
       </div>
 
-      {/* 📍 プレビュー確認ボタン */}
       <button
         onClick={() => setIsPreviewOpen(true)}
         disabled={editor?.isEmpty}
@@ -145,39 +133,43 @@ export default function DiaryEditor({ castProfile, onPostSuccess, editingPost, o
         <span>プレビューで確認する ✨</span>
       </button>
 
-      {/* 🌸 確認用モーダル (Karinto Cast Manager デザイン) */}
+      {/* 🌸 確認用モーダル（修正版） */}
       {isPreviewOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-[#FFF5F7] w-full max-w-md max-h-[90vh] rounded-[40px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
-            {/* モーダルヘッダー */}
             <div className="bg-white px-6 py-4 border-b border-pink-100 flex items-center justify-between">
               <h3 className="font-black text-pink-500 flex items-center gap-2"><Eye size={18} /> お客さんへの見え方</h3>
-              <button onClick={() => setIsPreviewOpen(false)} className="p-2 text-gray-400 hover:text-pink-500"><X size={24} /></button>
+              <button onClick={() => setIsPreviewOpen(false)} className="p-2 text-gray-400"><X size={24} /></button>
             </div>
 
-            {/* モーダル本文 (店舗サイト再現エリア) */}
             <div className="flex-1 overflow-y-auto p-6 bg-white mx-4 my-4 rounded-[32px] shadow-inner border border-pink-50">
               <article 
-                className="prose prose-pink max-w-none font-bold text-slate-700 prose-img:rounded-3xl prose-img:shadow-lg prose-img:mx-auto [&_p:empty]:before:content-['\\00a0'] [&_p]:min-h-[1rem]"
+                className="
+                  prose 
+                  prose-pink 
+                  max-w-none 
+                  font-bold 
+                  text-slate-700 
+                  prose-img:rounded-3xl 
+                  prose-img:shadow-lg 
+                  prose-img:mx-auto
+                  
+                  /* 📍 修正箇所: 文字を出さずに高さを確保する [cite: 2026-02-21] */
+                  [&_p]:min-h-[1.5em]
+                "
                 dangerouslySetInnerHTML={{ __html: previewContent }} 
               />
             </div>
 
-            {/* モーダルフッター (投稿ボタン) */}
             <div className="p-6 bg-white border-t border-pink-100">
               <button
                 onClick={handleFinalSubmit}
                 disabled={isSubmitting}
-                className="w-full py-5 rounded-[24px] bg-gradient-to-r from-rose-400 to-pink-500 text-white font-black text-xl shadow-lg flex items-center justify-center gap-3 active:scale-95 transition-all shadow-pink-200 disabled:opacity-50"
+                className="w-full py-5 rounded-[24px] bg-gradient-to-r from-rose-400 to-pink-500 text-white font-black text-xl shadow-lg flex items-center justify-center gap-3 active:scale-95 transition-all shadow-pink-200"
               >
                 {isSubmitting ? <Loader2 className="animate-spin" size={24} /> : <><span>この内容で日記を出す ✨</span><Send size={20} /></>}
               </button>
-              <button 
-                onClick={() => setIsPreviewOpen(false)}
-                className="w-full mt-3 py-2 text-[13px] font-black text-gray-400 hover:text-pink-400 transition-colors"
-              >
-                まだ修正する
-              </button>
+              <button onClick={() => setIsPreviewOpen(false)} className="w-full mt-3 py-2 text-[13px] font-black text-gray-400">まだ修正する</button>
             </div>
           </div>
         </div>
