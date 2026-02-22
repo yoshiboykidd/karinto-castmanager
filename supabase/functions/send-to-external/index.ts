@@ -1,60 +1,66 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+
+const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
 serve(async (req) => {
+  console.log("--- [送信プロセス開始] ---")
   try {
-    const { record } = await req.json() // 📍 DBに挿入された日記データ [cite: 2026-02-21]
+    const payload = await req.json()
+    const record = payload.record
+    if (!record) throw new Error("レコードが見つかりません")
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const searchId = String(record.cast_id).trim()
+    console.log(`🔍 検索開始: login_id = [${searchId}]`)
 
-    // 1. キャストの「外部サイト用アドレス」をDBから取得 [cite: 2026-02-21]
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!)
+
+    // 診断用ログ：テーブル内のIDをサンプル抽出
+    const { data: allCasts } = await supabase.from('cast_members').select('login_id').limit(5)
+    console.log("📂 DB内のlogin_idサンプル:", JSON.stringify(allCasts))
+
     const { data: cast, error: castError } = await supabase
       .from('cast_members')
-      .select('submission_email, display_name')
-      .eq('login_id', record.cast_id)
-      .single()
+      .select('display_name, submission_email')
+      .eq('login_id', searchId)
+      .maybeSingle()
 
-    if (castError || !cast?.submission_email) {
-      return new Response("送信先アドレスが未設定のキャストです。")
+    if (castError) {
+      console.error("❌ DBエラー:", castError.message)
+      throw castError
     }
 
-    // 2. 画像をバイナリデータとして取得し、添付用に加工 [cite: 2026-02-21]
-    let attachments = []
-    if (record.image_url) {
-      const imgRes = await fetch(record.image_url)
-      const arrayBuffer = await imgRes.arrayBuffer()
-      // Deno環境でバイナリをBase64文字列に変換 [cite: 2026-02-21]
-      const base64Content = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
-      
-      attachments.push({
-        filename: 'diary_photo.jpg',
-        content: base64Content,
-      })
+    if (!cast) {
+      console.error(`❌ 不一致: "${searchId}" が見つかりません。`)
+      return new Response(JSON.stringify({ error: `Not found: ${searchId}` }), { status: 404 })
     }
 
-    // 3. Resend API で送信 [cite: 2026-02-21]
+    console.log(`✅ 発見: ${cast.display_name}`)
+
+    // Resend送信ロジック
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get('RESEND_API_KEY')}`,
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: 'Karinto Manager <system@karinto-internal.com>', // 📍Resendで認証したドメイン
-        to: [cast.submission_email],
-        subject: `【写メ日記】${cast.display_name}`,
-        html: record.content, // [cite: 2026-02-21]
-        attachments: attachments,
+        from: 'Karinto Manager <system@karinto-internal.com>',
+        to: cast.submission_email,
+        subject: `【写メ日記】${cast.display_name}様より投稿`,
+        html: `<p>${(record.content || "").replace(/\n/g, '<br>')}</p>`,
       }),
     })
+    
+    const resData = await res.json()
+    console.log("📧 Resend API Response:", JSON.stringify(resData))
+    
+    return new Response(JSON.stringify(resData), { status: 200 })
 
-    const result = await res.json()
-    return new Response(JSON.stringify(result), { status: 200 })
-
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 })
+  } catch (error) {
+    console.error("🔥 エラー:", error.message)
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 })
   }
 })
