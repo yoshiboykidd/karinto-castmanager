@@ -15,13 +15,13 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
   const [memoDraft, setMemoDraft] = useState('');
   const [allPastReservations, setAllPastReservations] = useState<any[]>([]);
   
-  // 💡 隠し状態のステート [cite: 2026-01-29]
   const [isCovered, setIsCovered] = useState(true);
   const imageURL = "https://gstsgybukinlkzdqotyv.supabase.co/storage/v1/object/public/assets/KCMlogo2.png";
 
+  // 1. 📍 実績集計ロジック
+  // 'completed'（完了）ステータスのものだけを売上・本数として集計します。
   const dayTotals = useMemo(() => {
     return (reservations || []).reduce((acc: any, res: any) => {
-      // 💡 修正：ステータスを大文字小文字・空白を無視して判定
       const currentStatus = String(res.status || '').toLowerCase().trim();
 
       if (currentStatus === 'completed') {
@@ -33,8 +33,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
         else if (cat === '初指') target.first++;
         else if (cat === '本指') target.main++;
 
-        // 💡 修正：実際のカラム名 'actual_total_price' を使用
-        const price = Number(res.actual_total_price) || 0;
+        const price = Number(res.actual_total_price || res.total_price || 0);
         acc.totalSales += price;
       }
       return acc;
@@ -56,6 +55,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
       : 'お休みです。ゆっくり過ごされてください';
   }, [isAbsent, hasShift]);
 
+  // 過去履歴の取得（来店回数計算用）
   useEffect(() => {
     const fetchMyHistory = async () => {
       if (!myLoginId || !supabase) return;
@@ -65,6 +65,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
     fetchMyHistory();
   }, [myLoginId, supabase]);
 
+  // 当欠時の自動物理削除
   useEffect(() => {
     const autoDelete = async () => {
       if (isAbsent && reservations?.length > 0 && supabase && myLoginId) {
@@ -86,6 +87,8 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
     setMemoDraft(selectedRes.cast_memo || '');
   }, [selectedRes?.id]);
 
+  // 2. 📍 物理削除ロジック
+  // キャストが削除したものは、ステータス変更ではなくDBから物理的に削除します。
   const handleDelete = async () => {
     if (!selectedRes?.id || !supabase) return;
     if (!window.confirm("この予約を完全に削除しますか？")) return;
@@ -103,9 +106,7 @@ export default function DailyDetail({ date, dayNum, shift, allShifts = [], reser
 
   const handleSaveMemo = async () => {
     if (!selectedRes?.id || !supabase) return;
-    
     try {
-      // 💡 修正：customer_no による一括更新をやめ、予約 ID (selectedRes.id) のみを更新対象にする
       const { error } = await supabase
         .from('reservations')
         .update({ cast_memo: memoDraft })

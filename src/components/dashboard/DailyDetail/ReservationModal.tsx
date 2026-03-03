@@ -17,6 +17,7 @@ export default function ReservationModal({
     setCurrentRes(selectedRes);
   }, [selectedRes]);
 
+  // 📍 ステータスが playing の場合は「プレイ中」として扱う
   useEffect(() => {
     if (currentRes?.status === 'playing') setIsInCall(true);
     else setIsInCall(false);
@@ -36,6 +37,7 @@ export default function ReservationModal({
     return actual > 0 ? actual : initial;
   }, [currentRes?.actual_total_price, currentRes?.total_price]);
 
+  // 📍 修正：実績として計算される 'completed' のものだけを来店履歴として扱う
   const lastVisitDate = useMemo(() => {
     if (!currentRes?.customer_no || !currentRes?.cast_id) return null;
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
@@ -44,7 +46,8 @@ export default function ReservationModal({
         r && 
         r.customer_no === currentRes.customer_no && 
         r.cast_id === currentRes.cast_id && 
-        r.id !== currentRes?.id
+        r.id !== currentRes?.id &&
+        r.status === 'completed' // 📍 追加：完了したものだけ
       )
       .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")));
     
@@ -54,15 +57,17 @@ export default function ReservationModal({
     return null;
   }, [currentRes?.customer_no, currentRes?.cast_id, currentRes?.id, allPastReservations]);
 
+  // 📍 修正：来店回数も 'completed' のみでカウント
   const visitCountForThisCast = useMemo(() => {
     if (!currentRes?.customer_no || !currentRes?.cast_id) return 1;
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
     return history.filter(r => 
       r && 
       r.customer_no === currentRes.customer_no && 
-      r.cast_id === currentRes.cast_id
+      r.cast_id === currentRes.cast_id &&
+      (r.status === 'completed' || r.id === currentRes?.id) // 今回の予約 + 過去の完了分
     ).length;
-  }, [currentRes?.customer_no, currentRes?.cast_id, allPastReservations]);
+  }, [currentRes?.customer_no, currentRes?.cast_id, allPastReservations, currentRes?.id]);
 
   const lastMemoFromHistory = useMemo(() => {
     if (!currentRes?.customer_no || !currentRes?.cast_id) return "";
@@ -72,7 +77,8 @@ export default function ReservationModal({
         r && 
         r.customer_no === currentRes.customer_no && 
         r.cast_id === currentRes.cast_id && 
-        r.id !== currentRes?.id
+        r.id !== currentRes?.id &&
+        r.status === 'completed' // 📍 完了した過去ログからメモを引用
       )
       .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")))
       .find(r => r?.cast_memo && String(r.cast_memo).trim() !== "");
@@ -170,8 +176,6 @@ export default function ReservationModal({
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[20px] font-black text-gray-800 leading-none">{currentRes?.customer_name || '不明'} 様</span>
-                  
-                  {/* 📍 修正：会員Noを大きく強調 [cite: 2026-01-29] */}
                   <div className="bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-xl select-all active:bg-gray-100 transition-colors">
                     <span className="text-[11px] font-black text-gray-400 mr-1.5 italic uppercase tracking-tighter">会員No:</span>
                     <span className="text-[18px] font-black text-gray-800 tabular-nums">#{currentRes?.customer_no || '---'}</span>
@@ -189,7 +193,6 @@ export default function ReservationModal({
                   )}
                 </div>
 
-                {/* 📍 修正：ラベル崩れ防止と指定項目表示 [cite: 2026-01-29] */}
                 <div className="mt-2 space-y-1.5 border-t border-gray-50 pt-2">
                   {currentRes?.hotel_name && (
                     <div className="flex items-start gap-1">
@@ -258,6 +261,7 @@ export default function ReservationModal({
               )}
             </div>
 
+            {/* 📍 このボタンが削除を実行する */}
             <button onClick={() => onDelete?.()} className="w-full py-2 text-gray-300 font-bold text-[10px]">
               {isDeleting ? '削除中...' : '🗑️ 予約を取り消す'}
             </button>
