@@ -36,48 +36,50 @@ export default function ReservationModal({
     return actual > 0 ? actual : initial;
   }, [currentRes?.actual_total_price, currentRes?.total_price]);
 
+  // 1. 📍 修正：login_id と status='completed' で過去の来店日を特定
   const lastVisitDate = useMemo(() => {
-    if (!currentRes?.customer_no || !currentRes?.cast_id) return null;
+    if (!currentRes?.customer_no || !currentRes?.login_id) return null;
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
-    const pastVisits = history
-      .filter(r => 
-        r && 
-        r.customer_no === currentRes.customer_no && 
-        r.cast_id === currentRes.cast_id && 
-        r.id !== currentRes?.id
-      )
-      .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")));
+    const pastVisits = history.filter(r => 
+      r && r.customer_no === currentRes.customer_no && 
+      r.login_id === currentRes.login_id && 
+      r.id !== currentRes?.id &&
+      r.status === 'completed'
+    ).sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")));
     
     if (pastVisits.length > 0 && pastVisits[0].reservation_date) {
       return pastVisits[0].reservation_date.replace(/-/g, '/');
     }
     return null;
-  }, [currentRes?.customer_no, currentRes?.cast_id, currentRes?.id, allPastReservations]);
+  }, [currentRes?.customer_no, currentRes?.login_id, currentRes?.id, allPastReservations]);
 
+  // 2. 📍 修正：login_id と status='completed' で来店回数を計算
   const visitCountForThisCast = useMemo(() => {
-    if (!currentRes?.customer_no || !currentRes?.cast_id) return 1;
+    if (!currentRes?.customer_no || !currentRes?.login_id) return 1;
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
     return history.filter(r => 
-      r && 
-      r.customer_no === currentRes.customer_no && 
-      r.cast_id === currentRes.cast_id
+      r && r.customer_no === currentRes.customer_no && 
+      r.login_id === currentRes.login_id &&
+      (r.status === 'completed' || r.id === currentRes?.id)
     ).length;
-  }, [currentRes?.customer_no, currentRes?.cast_id, allPastReservations]);
+  }, [currentRes?.customer_no, currentRes?.login_id, allPastReservations, currentRes?.id]);
 
+  // 3. 📍 修正：実績(completed)データから最新のキャストメモを抽出
   const lastMemoFromHistory = useMemo(() => {
-    if (!currentRes?.customer_no || !currentRes?.cast_id) return "";
+    if (!currentRes?.customer_no || !currentRes?.login_id) return "";
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
     const record = history
       .filter(r => 
         r && 
         r.customer_no === currentRes.customer_no && 
-        r.cast_id === currentRes.cast_id && 
-        r.id !== currentRes?.id
+        r.login_id === currentRes.login_id && 
+        r.id !== currentRes?.id &&
+        r.status === 'completed'
       )
       .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")))
       .find(r => r?.cast_memo && String(r.cast_memo).trim() !== "");
     return record?.cast_memo ? String(record.cast_memo).trim() : "";
-  }, [currentRes?.customer_no, currentRes?.cast_id, currentRes?.id, allPastReservations]);
+  }, [currentRes?.customer_no, currentRes?.login_id, currentRes?.id, allPastReservations]);
 
   const currentCastMemo = useMemo(() => {
     return (currentRes?.cast_memo || "").toString().trim();
@@ -92,6 +94,7 @@ export default function ReservationModal({
   };
 
   const handleEditMemoStart = () => {
+    // 💡 今回のメモが空なら、過去の実績から引き継いだメモを下書きにする
     const initialMemo = currentCastMemo !== "" ? currentCastMemo : lastMemoFromHistory;
     if (typeof setMemoDraft === 'function') setMemoDraft(initialMemo);
     if (typeof setIsEditingMemo === 'function') setIsEditingMemo(true);
@@ -170,8 +173,6 @@ export default function ReservationModal({
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[20px] font-black text-gray-800 leading-none">{currentRes?.customer_name || '不明'} 様</span>
-                  
-                  {/* 📍 修正：会員Noを大きく強調 [cite: 2026-01-29] */}
                   <div className="bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-xl select-all active:bg-gray-100 transition-colors">
                     <span className="text-[11px] font-black text-gray-400 mr-1.5 italic uppercase tracking-tighter">会員No:</span>
                     <span className="text-[18px] font-black text-gray-800 tabular-nums">#{currentRes?.customer_no || '---'}</span>
@@ -189,7 +190,6 @@ export default function ReservationModal({
                   )}
                 </div>
 
-                {/* 📍 修正：ラベル崩れ防止と指定項目表示 [cite: 2026-01-29] */}
                 <div className="mt-2 space-y-1.5 border-t border-gray-50 pt-2">
                   {currentRes?.hotel_name && (
                     <div className="flex items-start gap-1">
