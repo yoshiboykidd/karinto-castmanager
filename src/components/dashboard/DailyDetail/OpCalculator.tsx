@@ -19,7 +19,7 @@ const SHOP_ID_MAP: { [key: string]: string } = {
 const KARINTO_OPS = [
   { label: '¥500 Op', price: 500, items: [{ n: '10', t: '上ラン' }, { n: '11', t: '抱きつき' }, { n: '12', t: '足なで' }, { n: '13', t: 'つば垂らし' }, { n: '14', t: '匂い嗅ぎ' }, { n: '15', t: '踏付け' }, { n: '16', t: '足こき' }, { n: '17', t: 'チラっとパンツ見せ' }, { n: '18', t: '拘束テープ' }, { n: '19', t: '+500' }]},
   { label: '¥1,000 Op', price: 1000, items: [{ n: '20', t: '乳もみ' }, { n: '21', t: 'お尻触り' }, { n: '22', t: '下ラン' }, { n: '23', t: 'スク水' }, { n: '24', t: '指アナル' }, { n: '25', t: 'ストッキング責め' }, { n: '26', t: '+1000' }, { n: '27', t: '+1000' }]},
-  { label: '¥1,500 Op', price: 1500, items: [{ n: '30', t: '乳舐め' }, { n: '31', t: 'オーラン' }, { n: '32', t: 'ハッピーセット' }, { n: '33', t: 'いやら尻触り' }, { n: '34', t: '美脚三昧' }, { n: '35', t: 'ノーブラTシャツ' }, { n: '36', t: '顔面騎乗' }, { n: '37', t: '+1500' }]},
+  { label: '¥1,500 Op', price: 1500, items: [{ n: '30', t: '乳舐め' }, { n: '31', t: 'オーラン' }, { n: '32', t: 'ハッピーセット' }, { n: '33', t: 'いやら尻触り' }, { n: '34', t: '美脚三昧' }, { n: '35', t: 'ノーブラTシャツ' }, { n: '36', t: '顔面騎乗' }, { n: '37', t: 'Mセット' }, { n: '38', t: '+1500' }]},
   { label: '¥2,000 Op', price: 2000, items: [{ n: '40', t: 'ノーブラTシャツ乳もみ' }, { n: '41', t: '+2000' }, { n: '42', t: '+2000' }]},
   { label: '¥2,500 Op', price: 2500, items: [{ n: '50', t: '上ラン生乳もみ' }, { n: '51', t: '+2500' }, { n: '52', t: '+2500' }]},
   { label: '¥3,000 Op', price: 3000, items: [{ n: '60', t: 'トップレス' }, { n: '61', t: 'バリューセット' }, { n: '62', t: 'ノーブラ生乳もみ' }, { n: '63', t: '+3000' }, { n: '64', t: '+3000' }]},
@@ -194,7 +194,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
 
   return (
     <div className="fixed inset-0 w-full h-[100dvh] z-[99999] flex flex-col bg-gray-900 text-white overflow-hidden font-sans">
-      {/* デザイン部分は変更なし */}
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
         <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-1.5 mb-1">
