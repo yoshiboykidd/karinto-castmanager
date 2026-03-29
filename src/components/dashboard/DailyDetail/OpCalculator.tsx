@@ -62,6 +62,17 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
   const isCompleted = useMemo(() => dbRes?.status === 'completed', [dbRes?.status]);
   const currentCategories = useMemo(() => dbRes?.service_type === '添' ? SOINE_OPS : KARINTO_OPS, [dbRes?.service_type]);
 
+  // 📍 追加：延長オプションの定義
+  const extensionOps = useMemo(() => {
+    if (dbRes?.service_type === '添') {
+      return [{ n: '延30', t: '延長30分', p: 6000, label: '延長' }];
+    }
+    return [
+      { n: '延15', t: '延長15分', p: 3000, label: '延長' },
+      { n: '延30', t: '延長30分', p: 5000, label: '延長' }
+    ];
+  }, [dbRes?.service_type]);
+
   const allSavedOps = useMemo(() => Array.isArray(dbRes?.op_details) ? dbRes.op_details : [], [dbRes?.op_details]);
   const savedOpsActive = useMemo(() => allSavedOps.filter((op: any) => op?.status !== 'canceled'), [allSavedOps]);
 
@@ -238,6 +249,27 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
             </div>
           </div>
         ))}
+
+        {/* 📍 追加：延長セクション */}
+        <div className="space-y-2 pt-2 border-t border-white/10">
+          <h3 className="text-[10px] font-black text-green-400 px-1 uppercase border-l-2 border-green-500/50 ml-1 tracking-widest">延長 (Extensions)</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {extensionOps.map((item) => {
+              const isSelected = selectedOps.some(op => op.no === item.n && op.name === item.t);
+              const isSaved = savedOpsActive.some((op: any) => op?.no === item.n && op?.name === item.t);
+              return (
+                <button 
+                  key={item.t} 
+                  onClick={() => toggleOp(item.n, item.t, item.p, item.label)}
+                  className={`min-h-[60px] rounded-[20px] flex flex-col items-center justify-center border transition-all ${isSelected || isSaved ? 'bg-green-600 border-green-400 shadow-[0_0_15px_rgba(22,163,74,0.3)]' : 'bg-white/5 border-white/5 text-gray-400'}`}
+                >
+                  <span className="text-[11px] font-black leading-tight text-center px-1">【{item.t}】</span>
+                  <span className="text-[18px] font-black">+{item.p.toLocaleString()}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <div className="space-y-2 pt-2 border-t border-white/10">
           <h3 className="text-[10px] font-black text-red-400 px-1 uppercase border-l-2 border-red-500/50 ml-1 tracking-widest">値引き (Discounts)</h3>
