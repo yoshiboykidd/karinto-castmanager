@@ -15,10 +15,7 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  
-  // 📍 追記：編集状態の管理
   const [editingId, setEditingId] = useState<string | null>(null);
-  
   const [newsList, setNewsList] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -35,18 +32,15 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
 
   useEffect(() => { fetchNews(); }, [role, myShopId]);
 
-  // 📍 追記：編集を開始するロジック
   const startEdit = (news: any) => {
     setEditingId(news.id);
     setTitle(news.title || '');
     setBody(news.body || '');
     setImageUrl(news.image_url || '');
     setTargetShopId(news.shop_id);
-    // 入力フォームまでスクロール
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // 📍 追記：編集をキャンセルするロジック
   const cancelEdit = () => {
     setEditingId(null);
     setTitle('');
@@ -82,7 +76,6 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
 
     try {
       if (editingId) {
-        // 📍 修正：編集時は UPDATE を実行
         await supabase.from('news').update({
           title: title.trim(),
           body: body.trim(),
@@ -91,7 +84,6 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
           shop_id: finalShopId,
         }).eq('id', editingId);
       } else {
-        // 新規投稿時は INSERT
         await supabase.from('news').insert([{
           title: title.trim(),
           body: body.trim(),
@@ -101,8 +93,7 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
           display_date: new Date().toISOString().split('T')[0]
         }]);
       }
-      
-      cancelEdit(); // フォームリセット
+      cancelEdit();
       fetchNews();
     } catch (err) {
       alert('処理に失敗しました');
@@ -113,7 +104,7 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
 
   const handleDelete = async (id: string, postShopId: string) => {
     if (role !== 'developer' && postShopId !== myShopId) {
-      alert('他店舗のニュースを削除する権限がありません');
+      alert('権限がありません');
       return;
     }
     if (!confirm('このお知らせを削除しますか？')) return;
@@ -123,7 +114,6 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
 
   return (
     <div className="space-y-4">
-      {/* 📝 投稿フォーム */}
       <section className="p-6 rounded-[32px] shadow-xl border border-gray-100 bg-white">
         <form onSubmit={handleNewsSubmit} className="space-y-4">
           <div className="flex items-center justify-between px-1">
@@ -131,62 +121,34 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
               {editingId ? 'Edit Broadcast' : 'New Broadcast'}
             </span>
             {editingId && (
-              <button 
-                type="button" 
-                onClick={cancelEdit}
-                className="text-[10px] font-black text-rose-400 flex items-center gap-1 uppercase tracking-widest hover:opacity-70"
-              >
+              <button type="button" onClick={cancelEdit} className="text-[10px] font-black text-rose-400 flex items-center gap-1 uppercase">
                 <X size={12} /> Cancel Edit
               </button>
             )}
           </div>
 
-          <input 
-            type="text"
-            className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-black text-gray-700 outline-none focus:bg-white transition-all"
-            placeholder="タイトル（一覧に表示）"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
+          <input type="text" className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-black text-gray-700 outline-none focus:bg-white transition-all" placeholder="タイトル" value={title} onChange={(e) => setTitle(e.target.value)} />
 
           <div className="space-y-2">
             <div className="relative">
-              <input 
-                type="text"
-                className="w-full p-4 pl-12 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-gray-500 text-xs outline-none focus:bg-white transition-all"
-                placeholder="画像URL（アップロードで自動入力）"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-              />
+              <input type="text" className="w-full p-4 pl-12 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-gray-500 text-xs outline-none focus:bg-white transition-all" placeholder="画像URL" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} />
               <ImageIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
             </div>
             <label className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl cursor-pointer transition-colors">
               <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
-              <span className="text-[10px] font-black text-gray-600 uppercase">
-                {isUploading ? 'Uploading...' : '📸 写真を選択してアップ'}
-              </span>
+              <span className="text-[10px] font-black text-gray-600 uppercase">{isUploading ? 'Uploading...' : '📸 写真を選択'}</span>
             </label>
           </div>
 
-          <textarea 
-            className="w-full h-32 p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-gray-700 outline-none focus:bg-white transition-all" 
-            placeholder="本文（タップすると表示されます）" 
-            value={body} 
-            onChange={(e) => setBody(e.target.value)} 
-          />
+          <textarea className="w-full h-32 p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-gray-700 outline-none focus:bg-white transition-all" placeholder="本文" value={body} onChange={(e) => setBody(e.target.value)} />
 
-          <button 
-            type="submit" 
-            disabled={isProcessing} 
-            className={`w-full font-black py-4 rounded-2xl text-white shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${editingId ? 'bg-rose-500' : 'bg-gray-900'}`}
-          >
+          <button type="submit" disabled={isProcessing} className={`w-full font-black py-4 rounded-2xl text-white shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${editingId ? 'bg-rose-500' : 'bg-gray-900'}`}>
             {isProcessing ? <RefreshCw className="animate-spin" size={18} /> : <Send size={18} />}
             {editingId ? 'ニュースを更新する' : 'ニュースを配信する'}
           </button>
         </form>
       </section>
 
-      {/* 📋 ニュース一覧（プレビュー） */}
       <div className="space-y-3">
         {newsList.map((news) => {
           const canManage = role === 'developer' || news.shop_id === myShopId;
@@ -196,14 +158,9 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
                 <span className={`text-[9px] font-black px-3 py-1 rounded-full uppercase ${news.shop_id === 'all' ? 'bg-pink-100 text-pink-500' : 'bg-blue-100 text-blue-500'}`}>
                   {news.shop_id === 'all' ? '全店舗共通' : `SHOP: ${news.shop_id}`}
                 </span>
-                
                 <div className="flex gap-1">
-                  {/* 📍 追記：編集ボタン */}
                   {canManage && (
-                    <button 
-                      onClick={() => startEdit(news)} 
-                      className="p-2 text-gray-400 hover:bg-gray-50 rounded-lg transition-colors"
-                    >
+                    <button onClick={() => startEdit(news)} className="p-2 text-gray-400 hover:bg-gray-50 rounded-lg transition-colors">
                       <Edit3 size={16} />
                     </button>
                   )}
@@ -216,11 +173,21 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
               </div>
               <div className="space-y-2">
                 <p className="font-black text-gray-800 text-[15px]">{news.title || news.content}</p>
+                
+                {/* 📍 追記：一覧での画像プレビュー表示 */}
                 {news.image_url && (
-                  <div className="text-[10px] text-blue-400 font-bold flex items-center gap-1">
-                    <ImageIcon size={12} /> 画像あり
+                  <div className="mt-3 relative w-32 group">
+                    <img 
+                      src={news.image_url} 
+                      alt="preview" 
+                      className="w-full h-auto rounded-xl border border-gray-100 shadow-sm object-cover" 
+                    />
+                    <div className="text-[8px] text-blue-400 font-black mt-1 flex items-center gap-1 uppercase tracking-widest">
+                      <ImageIcon size={10} /> Image Attached
+                    </div>
                   </div>
                 )}
+
                 {news.body && (
                   <p className="text-[11px] text-gray-400 line-clamp-1">{news.body}</p>
                 )}
