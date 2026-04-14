@@ -154,7 +154,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
 
       let message = "";
       if (type === 'HELP') {
-        message = `${borderLine}\n🆘 スタッフ至急！\n客名: ${cName}様\n${borderLine}`;
+        message = `${borderLine}\n🆘 スタッフ至急！\n【${castName}】さんからの呼出\n客名: ${cName}様\n${borderLine}`;
       } else if (type === 'START') {
         message = `${borderLine}\n${castName} 入室完了 🚀\n${courseInfo} [${timeDisplay}]\n${cName}様\n[OP: ${currentOpNos}]\nスタート会計: ${amountRow}\n${borderLine}`;
       } else if (type === 'FINISH') {
