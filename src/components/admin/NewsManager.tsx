@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { Megaphone, Trash2, Send, RefreshCw, Edit3, ShieldAlert, Image as ImageIcon } from 'lucide-react';
+import { Trash2, Send, RefreshCw, Image as ImageIcon } from 'lucide-react';
 
 interface NewsManagerProps {
   role: string;
@@ -12,15 +12,17 @@ interface NewsManagerProps {
 export default function NewsManager({ role, myShopId }: NewsManagerProps) {
   const supabase = createClient();
   
-  // 📍 修正：入力項目を拡張
+  // 📍 状態管理：新しい項目を追加
   const [title, setTitle] = useState('');     // 件名
   const [body, setBody] = useState('');       // 本文
   const [imageUrl, setImageUrl] = useState(''); // 画像URL
   
   const [newsList, setNewsList] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false); // アップロード中フラグ
   const [targetShopId, setTargetShopId] = useState(role === 'developer' ? 'all' : (myShopId || ''));
 
+  // ニュース取得
   const fetchNews = async () => {
     let query = supabase.from('news').select('*').order('created_at', { ascending: false });
     if (role !== 'developer') {
@@ -32,9 +34,40 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
 
   useEffect(() => { fetchNews(); }, [role, myShopId]);
 
+  // 📍 修正：Storageへの画像アップロードロジック
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).slice(2)}_${Date.now()}.${fileExt}`;
+      const filePath = `public/${fileName}`;
+
+      // 作成した「news-images」バケットへアップロード
+      const { error: uploadError } = await supabase.storage
+        .from('news-images')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // 公開URLを取得して入力欄へ反映
+      const { data: { publicUrl } } = supabase.storage
+        .from('news-images')
+        .getPublicUrl(filePath);
+
+      setImageUrl(publicUrl);
+    } catch (err: any) {
+      alert('アップロードに失敗しました: ' + err.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // 配信ロジック（DB保存）
   const handleNewsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // タイトルか本文のどちらかは必須にする
     if (!title.trim() && !body.trim()) return;
     
     setIsProcessing(true);
@@ -42,17 +75,15 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
 
     try {
       // 📍 修正：新しいカラム（title, body, image_url）を含めて保存
-      // content には互換性のためにタイトルを入れておきます
       await supabase.from('news').insert([{
         title: title.trim(),
         body: body.trim(),
         image_url: imageUrl.trim(),
-        content: title.trim() || body.trim().substring(0, 20), // 既存用
+        content: title.trim() || body.trim().substring(0, 20), // 既存互換用
         shop_id: finalShopId,
         display_date: new Date().toISOString().split('T')[0]
       }]);
       
-      // フォームリセット
       setTitle('');
       setBody('');
       setImageUrl('');
@@ -76,6 +107,7 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
 
   return (
     <div className="space-y-4">
+      {/* 📝 投稿フォーム */}
       <section className="p-6 rounded-[32px] shadow-xl border border-gray-100 bg-white">
         <form onSubmit={handleNewsSubmit} className="space-y-4">
           <div className="flex items-center justify-between px-1">
@@ -107,25 +139,33 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
             )}
           </div>
 
-          {/* 📍 追記：タイトル入力 */}
+          {/* タイトル入力 */}
           <input 
             type="text"
             className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl font-black text-gray-700 outline-none focus:bg-white transition-all"
-            placeholder="タイトル（一覧に表示されます）"
+            placeholder="タイトル（一覧に表示）"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
 
-          {/* 📍 追記：画像URL入力 */}
-          <div className="relative">
-            <input 
-              type="text"
-              className="w-full p-4 pl-12 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-gray-500 text-xs outline-none focus:bg-white transition-all"
-              placeholder="画像URL（任意）"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-            />
-            <ImageIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+          {/* 画像URL入力 & ファイルアップロード */}
+          <div className="space-y-2">
+            <div className="relative">
+              <input 
+                type="text"
+                className="w-full p-4 pl-12 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-gray-500 text-xs outline-none focus:bg-white transition-all"
+                placeholder="画像URL（アップロードで自動入力）"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+              />
+              <ImageIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+            </div>
+            <label className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl cursor-pointer transition-colors">
+              <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
+              <span className="text-[10px] font-black text-gray-600 uppercase">
+                {isUploading ? 'Uploading...' : '📸 写真を選択してアップ'}
+              </span>
+            </label>
           </div>
 
           {/* 本文入力 */}
@@ -147,6 +187,7 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
         </form>
       </section>
 
+      {/* 📋 ニュース一覧（プレビュー） */}
       <div className="space-y-3">
         {newsList.map((news) => {
           const canDelete = role === 'developer' || news.shop_id === myShopId;
@@ -162,8 +203,6 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
                   </button>
                 )}
               </div>
-              
-              {/* 📍 修正：一覧での表示内容もリッチに */}
               <div className="space-y-2">
                 <p className="font-black text-gray-800 text-[15px]">{news.title || news.content}</p>
                 {news.image_url && (
@@ -175,7 +214,6 @@ export default function NewsManager({ role, myShopId }: NewsManagerProps) {
                   <p className="text-[11px] text-gray-400 line-clamp-1">{news.body}</p>
                 )}
               </div>
-
               <div className="mt-2 text-[8px] text-gray-300 font-bold uppercase tracking-widest">
                 {new Date(news.created_at).toLocaleString('ja-JP')}
               </div>
