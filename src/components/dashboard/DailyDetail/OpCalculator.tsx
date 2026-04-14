@@ -1,11 +1,9 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-// 📍 修正：ライブラリから直接ではなく、共通クライアントをインポート [cite: 2026-02-20]
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 
-// 📍 修正：URLやKeyの記述を削除し、引数なしで呼び出し [cite: 2026-02-20]
 const supabase = createClient();
 
 const SHOP_ID_MAP: { [key: string]: string } = {
@@ -194,7 +192,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
 
   return (
     <div className="fixed inset-0 w-full h-[100dvh] z-[99999] flex flex-col bg-gray-900 text-white overflow-hidden font-sans">
-      {/* デザイン部分は変更なし */}
       <div className="px-5 py-3 border-b border-gray-800 flex justify-between items-center bg-gray-900 shrink-0">
         <div className="flex-1 min-w-0 pr-2">
           <div className="flex items-center gap-1.5 mb-1">
@@ -239,6 +236,29 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
             </div>
           </div>
         ))}
+
+        {/* 📍 復元：延長セクション（本番同期済み） */}
+        <div className="space-y-2 pt-2 border-t border-white/10">
+          <h3 className="text-[10px] font-black text-blue-400 px-1 uppercase border-l-2 border-blue-500/50 ml-1 tracking-widest">延長 (Extensions)</h3>
+          <div className={`grid ${dbRes?.service_type === '添' ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
+            {dbRes?.service_type !== '添' && (
+              <button
+                onClick={() => toggleOp('延15', '延長15分', 3000, '延長')}
+                className={`min-h-[60px] rounded-[20px] flex flex-col items-center justify-center border transition-all ${selectedOps.some(op => op.no === '延15') || savedOpsActive.some((op: any) => op.no === '延15') ? 'bg-blue-600 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.3)]' : 'bg-white/5 border-white/5 text-gray-400'}`}
+              >
+                <span className="text-[11px] font-black leading-tight text-center px-1">延長15分</span>
+                <span className="text-[18px] font-black">¥3,000</span>
+              </button>
+            )}
+            <button
+              onClick={() => toggleOp('延30', '延長30分', dbRes?.service_type === '添' ? 4000 : 6000, '延長')}
+              className={`min-h-[60px] rounded-[20px] flex flex-col items-center justify-center border transition-all ${selectedOps.some(op => op.no === '延30') || savedOpsActive.some((op: any) => op.no === '延30') ? 'bg-blue-600 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.3)]' : 'bg-white/5 border-white/5 text-gray-400'}`}
+            >
+              <span className="text-[11px] font-black leading-tight text-center px-1">延長30分</span>
+              <span className="text-[18px] font-black">¥{dbRes?.service_type === '添' ? '4,000' : '6,000'}</span>
+            </button>
+          </div>
+        </div>
 
         <div className="space-y-2 pt-2 border-t border-white/10">
           <h3 className="text-[10px] font-black text-red-400 px-1 uppercase border-l-2 border-red-500/50 ml-1 tracking-widest">値引き (Discounts)</h3>
