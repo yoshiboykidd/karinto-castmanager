@@ -17,7 +17,6 @@ export default function ReservationModal({
     setCurrentRes(selectedRes);
   }, [selectedRes]);
 
-  // 📍 ステータスが playing の場合は「プレイ中」として扱う
   useEffect(() => {
     if (currentRes?.status === 'playing') setIsInCall(true);
     else setIsInCall(false);
@@ -37,53 +36,69 @@ export default function ReservationModal({
     return actual > 0 ? actual : initial;
   }, [currentRes?.actual_total_price, currentRes?.total_price]);
 
-  // 📍 修正：実績として計算される 'completed' のものだけを来店履歴として扱う
+  // 📍 修正：前回会った日付のロジック（型の違いとカラム名の揺れを吸収）
   const lastVisitDate = useMemo(() => {
-    if (!currentRes?.customer_no || !currentRes?.cast_id) return null;
+    if (!currentRes?.customer_no) return null;
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
+    
     const pastVisits = history
-      .filter(r => 
-        r && 
-        r.customer_no === currentRes.customer_no && 
-        r.cast_id === currentRes.cast_id && 
-        r.id !== currentRes?.id &&
-        r.status === 'completed' // 📍 追加：完了したものだけ
-      )
+      .filter(r => {
+        if (!r || r.id === currentRes?.id) return false;
+        
+        // 文字列にして比較することで型の不一致（数値 vs 文字列）を防ぐ
+        const isSameCustomer = String(r.customer_no) === String(currentRes.customer_no);
+        
+        // cast_id または login_id のどちらでも一致を確認
+        const rCastId = String(r.cast_id || r.login_id || "");
+        const curCastId = String(currentRes.cast_id || currentRes.login_id || "");
+        const isSameCast = rCastId === curCastId;
+
+        return isSameCustomer && isSameCast && r.status === 'completed';
+      })
       .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")));
     
     if (pastVisits.length > 0 && pastVisits[0].reservation_date) {
       return pastVisits[0].reservation_date.replace(/-/g, '/');
     }
     return null;
-  }, [currentRes?.customer_no, currentRes?.cast_id, currentRes?.id, allPastReservations]);
+  }, [currentRes, allPastReservations]);
 
-  // 📍 修正：来店回数も 'completed' のみでカウント
+  // 📍 修正：来店回数の計算ロジック（型の違いとカラム名の揺れを吸収）
   const visitCountForThisCast = useMemo(() => {
-    if (!currentRes?.customer_no || !currentRes?.cast_id) return 1;
+    if (!currentRes?.customer_no) return 1;
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
-    return history.filter(r => 
-      r && 
-      r.customer_no === currentRes.customer_no && 
-      r.cast_id === currentRes.cast_id &&
-      (r.status === 'completed' || r.id === currentRes?.id) // 今回の予約 + 過去の完了分
-    ).length;
-  }, [currentRes?.customer_no, currentRes?.cast_id, allPastReservations, currentRes?.id]);
+    
+    const count = history.filter(r => {
+      if (!r) return false;
+
+      const isSameCustomer = String(r.customer_no) === String(currentRes.customer_no);
+      const rCastId = String(r.cast_id || r.login_id || "");
+      const curCastId = String(currentRes.cast_id || currentRes.login_id || "");
+      const isSameCast = rCastId === curCastId;
+
+      // 完了した過去分、または「今まさに開いている予約」そのもの
+      return isSameCustomer && isSameCast && (r.status === 'completed' || r.id === currentRes?.id);
+    }).length;
+
+    return count > 0 ? count : 1;
+  }, [currentRes, allPastReservations]);
 
   const lastMemoFromHistory = useMemo(() => {
-    if (!currentRes?.customer_no || !currentRes?.cast_id) return "";
+    if (!currentRes?.customer_no) return "";
     const history = Array.isArray(allPastReservations) ? allPastReservations : [];
     const record = history
-      .filter(r => 
-        r && 
-        r.customer_no === currentRes.customer_no && 
-        r.cast_id === currentRes.cast_id && 
-        r.id !== currentRes?.id &&
-        r.status === 'completed' // 📍 完了した過去ログからメモを引用
-      )
+      .filter(r => {
+        if (!r || r.id === currentRes?.id) return false;
+        const isSameCustomer = String(r.customer_no) === String(currentRes.customer_no);
+        const rCastId = String(r.cast_id || r.login_id || "");
+        const curCastId = String(currentRes.cast_id || currentRes.login_id || "");
+        const isSameCast = rCastId === curCastId;
+        return isSameCustomer && isSameCast && r.status === 'completed';
+      })
       .sort((a, b) => String(b.reservation_date || "").localeCompare(String(a.reservation_date || "")))
       .find(r => r?.cast_memo && String(r.cast_memo).trim() !== "");
     return record?.cast_memo ? String(record.cast_memo).trim() : "";
-  }, [currentRes?.customer_no, currentRes?.cast_id, currentRes?.id, allPastReservations]);
+  }, [currentRes, allPastReservations]);
 
   const currentCastMemo = useMemo(() => {
     return (currentRes?.cast_memo || "").toString().trim();
@@ -261,7 +276,6 @@ export default function ReservationModal({
               )}
             </div>
 
-            {/* 📍 このボタンが削除を実行する */}
             <button onClick={() => onDelete?.()} className="w-full py-2 text-gray-300 font-bold text-[10px]">
               {isDeleting ? '削除中...' : '🗑️ 予約を取り消す'}
             </button>
