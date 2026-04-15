@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { Heart, Clock, MapPin, LogOut, Bell, User, Home, Search, Star, ChevronDown, ChevronUp } from 'lucide-react';
 
+// 📍 正解：管理画面 (admin/page.tsx) と同一のマップを使用
 const shopMap: Record<string, string> = {
   '001': '神田', '002': '赤坂', '003': '秋葉原', '004': '上野',
   '005': '渋谷', '006': '池袋西口', '007': '五反田', '008': '大宮',
@@ -23,6 +24,7 @@ function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [isNewsExpanded, setIsNewsExpanded] = useState(false);
 
+  // 📍 タブ一覧
   const stores = ['神田', '赤坂', '秋葉原', '上野', '渋谷', '池袋西口', '五反田', '大宮', '吉祥寺', '大久保', '池袋東口', '小岩'];
 
   useEffect(() => {
@@ -40,12 +42,11 @@ function DashboardContent() {
 
     const fetchData = async () => {
       setLoading(true);
-      
       const now = new Date();
       const today = now.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
       
       try {
-        // 📍 修正1：リレーション(Join)を使わず、shifts単体で取得（PGRST200を物理的に回避）
+        // 📍 修正1：存在しない store_name カラムの指定を削除
         const { data: shiftData, error: shiftError } = await supabase
           .from('shifts')
           .select('*')
@@ -56,19 +57,21 @@ function DashboardContent() {
         if (shiftError) throw shiftError;
 
         if (shiftData && shiftData.length > 0) {
-          // 📍 修正2：URL制限(400 Bad Request)を避けるため、キャスト情報を「全件取得」してメモリで結合
-          // login_idのリストを個別に送るのをやめ、シンプルに全キャストの情報を当てる方式に変更
+          // 📍 修正2：cast_members からも store_name を除外
           const { data: castData, error: castError } = await supabase
             .from('cast_members')
-            .select('login_id, store_name, profile_image_url');
+            .select('login_id, profile_image_url');
 
           if (castError) throw castError;
 
+          // 📍 修正3：login_id の頭3桁から店名を判定するロジック（管理画面準拠）
           const mergedShifts = shiftData.map(s => {
             const cast = castData?.find(c => String(c.login_id) === String(s.login_id));
+            const prefix = String(s.login_id || "").substring(0, 3);
             return {
               ...s,
-              cast_members: cast || null
+              computed_store_name: shopMap[prefix] || '未設定',
+              profile_image_url: cast?.profile_image_url || null
             };
           });
 
@@ -100,7 +103,8 @@ function DashboardContent() {
     router.push('/user/login');
   };
 
-  const filteredShifts = shifts.filter(s => s.cast_members?.store_name === activeStore);
+  // 📍 修正4：判定した店名(computed_store_name)でフィルタリング
+  const filteredShifts = shifts.filter(s => s.computed_store_name === activeStore);
 
   return (
     <div className="min-h-screen bg-slate-50 pb-24 text-slate-800">
@@ -111,15 +115,13 @@ function DashboardContent() {
           </div>
           <h1 className="text-xl font-black tracking-tighter text-slate-800">Member Portal</h1>
         </div>
-        <div className="flex items-center space-x-4 text-slate-400 text-sm font-bold">
-          <button onClick={handleLogout} className="flex items-center gap-1 hover:text-rose-500 transition-colors">
-            <LogOut size={18} />
-          </button>
+        <div className="flex items-center space-x-4 text-slate-400">
+          <button onClick={handleLogout} className="hover:text-rose-500 transition-colors"><LogOut size={20} /></button>
         </div>
       </header>
 
       <main className="px-6 pt-6 space-y-6">
-        {/* 会員カード */}
+        {/* カード、News部分は維持 */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-400 rounded-[32px] p-6 text-white shadow-lg shadow-blue-100 relative overflow-hidden">
           <div className="relative z-10">
             <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest mb-1">Membership</p>
@@ -135,7 +137,6 @@ function DashboardContent() {
           <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
         </div>
 
-        {/* ニュース開閉 */}
         {latestNews && (
           <div onClick={() => setIsNewsExpanded(!isNewsExpanded)} className="bg-white p-5 rounded-[32px] border border-blue-100 shadow-sm cursor-pointer transition-all active:scale-[0.98]">
             <div className="flex items-center justify-between gap-3">
@@ -155,7 +156,6 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* 店舗タブ */}
         <section>
           <div className="flex items-center justify-between mb-4 px-1">
             <h3 className="font-black text-lg flex items-center"><MapPin size={18} className="mr-2 text-blue-500" />本日の出勤表</h3>
@@ -169,7 +169,6 @@ function DashboardContent() {
           </div>
         </section>
 
-        {/* シフトリスト */}
         <section className="space-y-3">
           {loading ? (
             <div className="flex flex-col items-center py-20 space-y-4">
@@ -178,16 +177,14 @@ function DashboardContent() {
             </div>
           ) : filteredShifts.length > 0 ? (
             filteredShifts.map((shift, idx) => (
-              <div key={idx} className="bg-white rounded-[28px] p-4 flex items-center space-x-4 border border-slate-100 shadow-sm hover:border-blue-200 transition-all">
+              <div key={idx} className="bg-white rounded-[28px] p-4 flex items-center space-x-4 border border-slate-100 shadow-sm">
                 <div className="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden flex-shrink-0 border border-slate-50">
-                  <img src={shift.cast_members?.profile_image_url || 'https://placehold.jp/150x150.png?text=No%20Image'} alt={shift.hp_display_name} className="w-full h-full object-cover" />
+                  <img src={shift.profile_image_url || 'https://placehold.jp/150x150.png?text=No%20Image'} alt={shift.hp_display_name} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1 text-left">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-[9px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full uppercase">{shift.cast_members?.store_name || 'SHOP'}</span>
-                      <h4 className="text-lg font-black text-slate-800 mt-1">{shift.hp_display_name}</h4>
-                    </div>
+                  <div>
+                    <span className="text-[9px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full uppercase">{shift.computed_store_name}</span>
+                    <h4 className="text-lg font-black text-slate-800 mt-1">{shift.hp_display_name}</h4>
                   </div>
                   <div className="flex items-center text-slate-400 mt-2">
                     <Clock size={14} className="mr-1 text-blue-300" />
@@ -204,6 +201,7 @@ function DashboardContent() {
         </section>
       </main>
 
+      {/* フッター省略（既存通り） */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-8 py-4 flex justify-between items-center z-20">
         <button className="flex flex-col items-center text-blue-500"><Home size={24} /><span className="text-[10px] font-black mt-1">Home</span></button>
         <button className="flex flex-col items-center text-slate-300"><Search size={24} /><span className="text-[10px] font-black mt-1">Search</span></button>
@@ -216,8 +214,6 @@ function DashboardContent() {
 
 export default function UserDashboard() {
   return (
-    <Suspense fallback={null}>
-      <DashboardContent />
-    </Suspense>
+    <Suspense fallback={null}><DashboardContent /></Suspense>
   );
 }
