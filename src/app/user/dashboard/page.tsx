@@ -17,14 +17,12 @@ function DashboardContent() {
 
   const [userName, setUserName] = useState('ゲスト');
   const [showPasswordAlert, setShowPasswordAlert] = useState(false);
-  // 📍 修正1：初期タブを「神田」に設定
   const [activeStore, setActiveStore] = useState('神田');
   const [shifts, setShifts] = useState<any[]>([]);
   const [latestNews, setLatestNews] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isNewsExpanded, setIsNewsExpanded] = useState(false);
 
-  // 📍 修正2：「すべて」を削除
   const stores = ['神田', '赤坂', '秋葉原', '上野', '渋谷', '池袋西口', '五反田', '大宮', '吉祥寺', '大久保', '池袋東口', '小岩'];
 
   useEffect(() => {
@@ -47,23 +45,35 @@ function DashboardContent() {
       const today = now.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
       
       try {
-        // 📍 修正3：400エラー対策
-        // 長いIDリストを送るのではなく、shiftsテーブルと正しく紐付いたcast_membersを取得するクエリ
+        // 📍 修正1：リレーション(Join)を使わず、shifts単体で取得（PGRST200を物理的に回避）
         const { data: shiftData, error: shiftError } = await supabase
           .from('shifts')
-          .select(`
-            *,
-            cast_members!shifts_login_id_fkey (
-              store_name,
-              profile_image_url
-            )
-          `)
+          .select('*')
           .eq('shift_date', today)
           .eq('status', 'official')
           .order('start_time', { ascending: true });
 
         if (shiftError) throw shiftError;
-        if (shiftData) setShifts(shiftData);
+
+        if (shiftData && shiftData.length > 0) {
+          // 📍 修正2：URL制限(400 Bad Request)を避けるため、キャスト情報を「全件取得」してメモリで結合
+          // login_idのリストを個別に送るのをやめ、シンプルに全キャストの情報を当てる方式に変更
+          const { data: castData, error: castError } = await supabase
+            .from('cast_members')
+            .select('login_id, store_name, profile_image_url');
+
+          if (castError) throw castError;
+
+          const mergedShifts = shiftData.map(s => {
+            const cast = castData?.find(c => String(c.login_id) === String(s.login_id));
+            return {
+              ...s,
+              cast_members: cast || null
+            };
+          });
+
+          setShifts(mergedShifts);
+        }
 
         const { data: newsData } = await supabase
           .from('user_news')
@@ -75,7 +85,7 @@ function DashboardContent() {
           setLatestNews(newsData[0]);
         }
       } catch (err) {
-        console.error('FETCH_ERROR:', err);
+        console.error('FINAL_FETCH_ERROR:', err);
       } finally {
         setLoading(false);
       }
@@ -90,7 +100,6 @@ function DashboardContent() {
     router.push('/user/login');
   };
 
-  // 📍 修正4：フィルタリングロジック（常にactiveStoreで絞り込み）
   const filteredShifts = shifts.filter(s => s.cast_members?.store_name === activeStore);
 
   return (
@@ -102,15 +111,15 @@ function DashboardContent() {
           </div>
           <h1 className="text-xl font-black tracking-tighter text-slate-800">Member Portal</h1>
         </div>
-        <div className="flex items-center space-x-4 text-slate-400">
-          <Bell size={20} />
-          <button onClick={handleLogout} className="hover:text-rose-500 transition-colors">
-            <LogOut size={20} />
+        <div className="flex items-center space-x-4 text-slate-400 text-sm font-bold">
+          <button onClick={handleLogout} className="flex items-center gap-1 hover:text-rose-500 transition-colors">
+            <LogOut size={18} />
           </button>
         </div>
       </header>
 
       <main className="px-6 pt-6 space-y-6">
+        {/* 会員カード */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-400 rounded-[32px] p-6 text-white shadow-lg shadow-blue-100 relative overflow-hidden">
           <div className="relative z-10">
             <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest mb-1">Membership</p>
@@ -126,16 +135,7 @@ function DashboardContent() {
           <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
         </div>
 
-        {showPasswordAlert && (
-          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex items-start space-x-3 animate-pulse">
-            <div className="p-2 bg-amber-200 rounded-xl shrink-0"><Star size={16} className="text-amber-700 fill-amber-700" /></div>
-            <div>
-              <p className="text-sm font-black text-amber-900">セキュリティ警告</p>
-              <p className="text-[11px] font-bold text-amber-700 leading-relaxed mt-0.5">初期パスワードを変更してください。</p>
-            </div>
-          </div>
-        )}
-
+        {/* ニュース開閉 */}
         {latestNews && (
           <div onClick={() => setIsNewsExpanded(!isNewsExpanded)} className="bg-white p-5 rounded-[32px] border border-blue-100 shadow-sm cursor-pointer transition-all active:scale-[0.98]">
             <div className="flex items-center justify-between gap-3">
@@ -155,6 +155,7 @@ function DashboardContent() {
           </div>
         )}
 
+        {/* 店舗タブ */}
         <section>
           <div className="flex items-center justify-between mb-4 px-1">
             <h3 className="font-black text-lg flex items-center"><MapPin size={18} className="mr-2 text-blue-500" />本日の出勤表</h3>
@@ -168,6 +169,7 @@ function DashboardContent() {
           </div>
         </section>
 
+        {/* シフトリスト */}
         <section className="space-y-3">
           {loading ? (
             <div className="flex flex-col items-center py-20 space-y-4">
@@ -178,21 +180,14 @@ function DashboardContent() {
             filteredShifts.map((shift, idx) => (
               <div key={idx} className="bg-white rounded-[28px] p-4 flex items-center space-x-4 border border-slate-100 shadow-sm hover:border-blue-200 transition-all">
                 <div className="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden flex-shrink-0 border border-slate-50">
-                  <img 
-                    src={shift.cast_members?.profile_image_url || 'https://placehold.jp/150x150.png?text=No%20Image'} 
-                    alt={shift.hp_display_name} 
-                    className="w-full h-full object-cover" 
-                  />
+                  <img src={shift.cast_members?.profile_image_url || 'https://placehold.jp/150x150.png?text=No%20Image'} alt={shift.hp_display_name} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1 text-left">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-[9px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full uppercase">
-                        {shift.cast_members?.store_name || 'SHOP'}
-                      </span>
-                      <h4 className="text-lg font-black text-slate-800 mt-1">{shift.hp_display_name || 'Name'}</h4>
+                      <span className="text-[9px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full uppercase">{shift.cast_members?.store_name || 'SHOP'}</span>
+                      <h4 className="text-lg font-black text-slate-800 mt-1">{shift.hp_display_name}</h4>
                     </div>
-                    <button className="text-slate-200 hover:text-blue-400 transition-colors"><Heart size={20} /></button>
                   </div>
                   <div className="flex items-center text-slate-400 mt-2">
                     <Clock size={14} className="mr-1 text-blue-300" />
