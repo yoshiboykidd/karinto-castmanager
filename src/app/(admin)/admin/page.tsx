@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-// 📍 修正：共通クライアントをインポートするように変更 [cite: 2026-02-20]
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 import { 
@@ -11,19 +10,17 @@ import {
   ChevronRight, 
   LogOut,
   Store,
-  ShieldCheck
+  ShieldCheck,
+  Send // 📍 ニュース配信用のアイコンを追加
 } from 'lucide-react';
 
 export default function AdminDashboard() {
   const router = useRouter();
-  
-  // 📍 修正：共通クライアントを使用。引数やuseStateでの保持は不要になります [cite: 2026-02-20]
   const supabase = createClient();
   
   const [loading, setLoading] = useState(true);
   const [adminProfile, setAdminProfile] = useState<any>(null);
 
-  // 📍 店舗名の判別ロジック（ログインIDの先頭3桁から判定）
   const shopName = useMemo(() => {
     if (!adminProfile) return '';
     const loginId = String(adminProfile.login_id || "");
@@ -52,7 +49,6 @@ export default function AdminDashboard() {
       const loginId = session.user.email?.split('@')[0];
       const { data } = await supabase.from('cast_members').select('*').eq('login_id', loginId).single();
       
-      // 管理者またはデベロッパー権限チェック
       if (data?.role !== 'admin' && data?.role !== 'developer') {
         router.push('/');
         return;
@@ -67,9 +63,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-10 font-sans text-slate-800">
-      {/* 📍 ヘッダー：店長向けのプロフェッショナルなダークネイビー基調 */}
       <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 pt-12 pb-20 px-6 rounded-b-[40px] shadow-2xl relative overflow-hidden">
-        {/* 背景の装飾 */}
         <div 
           className="absolute inset-0 opacity-10" 
           style={{ 
@@ -114,10 +108,17 @@ export default function AdminDashboard() {
             },
             { 
               title: 'ニュース配信', 
-              desc: 'お店からのお知らせ掲示板管理', 
-              path: '/admin/news', 
-              icon: <Megaphone className="text-slate-600" />, 
-              border: 'border-slate-200' 
+              desc: 'お客様向けの店舗News・イベント情報', 
+              path: '/admin/news?target=user', // 📍 ターゲット指定
+              icon: <Send className="text-blue-600" />, 
+              border: 'border-blue-200' 
+            },
+            { 
+              title: 'お知らせ配信(キャスト)', 
+              desc: 'キャスト専用の運営連絡・周知事項', 
+              path: '/admin/news?target=cast', // 📍 ターゲット指定
+              icon: <Megaphone className="text-pink-600" />, 
+              border: 'border-pink-200' 
             },
             { 
               title: 'キャスト管理', 
