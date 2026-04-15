@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react'; // 📍 Suspenseを追加
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { Heart, Clock, MapPin, LogOut, Bell, User, Home, Search, Star } from 'lucide-react';
 
-// 📍 実際のコンテンツを別コンポーネントに切り出し
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -14,9 +13,10 @@ function DashboardContent() {
 
   const [userName, setUserName] = useState('ゲスト');
   const [activeStore, setActiveStore] = useState('すべて');
-  const [casts, setCasts] = useState<any[]>([]);
+  const [shifts, setShifts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // 店舗リスト
   const stores = ['すべて', '池袋', '赤坂', '五反田', '小岩', '新宿', '渋谷'];
 
   useEffect(() => {
@@ -32,14 +32,22 @@ function DashboardContent() {
       setLoading(true);
       const today = new Date().toISOString().split('T')[0];
       
+      // 📍 修正：カラム名を shift_date に変更
+      // また、店舗名や画像を取得するために cast_members テーブルと結合します
       const { data, error } = await supabase
         .from('shifts')
-        .select('*')
-        .eq('date', today)
+        .select(`
+          *,
+          cast_members (
+            store_name,
+            profile_image_url
+          )
+        `)
+        .eq('shift_date', today)
         .order('start_time', { ascending: true });
 
       if (!error && data) {
-        setCasts(data);
+        setShifts(data);
       }
       setLoading(false);
     };
@@ -52,9 +60,10 @@ function DashboardContent() {
     router.push('/user/login');
   };
 
-  const filteredCasts = activeStore === 'すべて' 
-    ? casts 
-    : casts.filter(c => c.store_name?.includes(activeStore));
+  // 📍 修正：フィルタリング条件を cast_members の store_name に合わせる
+  const filteredShifts = activeStore === 'すべて' 
+    ? shifts 
+    : shifts.filter(s => s.cast_members?.store_name?.includes(activeStore));
 
   return (
     <div className="min-h-screen bg-slate-50 pb-24 text-slate-800">
@@ -132,30 +141,32 @@ function DashboardContent() {
         <section className="space-y-3">
           {loading ? (
             <p className="text-center py-10 text-slate-400 font-bold">読み込み中...</p>
-          ) : filteredCasts.length > 0 ? (
-            filteredCasts.map((cast, idx) => (
+          ) : filteredShifts.length > 0 ? (
+            filteredShifts.map((shift, idx) => (
               <div key={idx} className="bg-white rounded-[24px] p-4 flex items-center space-x-4 border border-slate-100 shadow-sm">
                 <div className="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden flex-shrink-0">
+                  {/* 📍 修正：cast_members から画像を取得 */}
                   <img 
-                    src={cast.image_url || 'https://via.placeholder.com/150'} 
-                    alt={cast.name}
+                    src={shift.cast_members?.profile_image_url || 'https://via.placeholder.com/150'} 
+                    alt={shift.hp_display_name}
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <div className="flex-1">
                   <div className="flex justify-between items-start">
                     <div>
+                      {/* 📍 修正：cast_members から店舗名を取得 */}
                       <span className="text-[10px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full uppercase">
-                        {cast.store_name || '店舗情報なし'}
+                        {shift.cast_members?.store_name || '店舗情報なし'}
                       </span>
-                      <h4 className="text-lg font-black text-slate-800 mt-0.5">{cast.name}</h4>
+                      <h4 className="text-lg font-black text-slate-800 mt-0.5">{shift.hp_display_name}</h4>
                     </div>
                     <Heart size={20} className="text-slate-200 hover:text-blue-400 cursor-pointer transition-colors" />
                   </div>
                   <div className="flex items-center text-slate-400 mt-2">
                     <Clock size={14} className="mr-1" />
                     <span className="text-sm font-bold tracking-tighter">
-                      {cast.start_time} — {cast.end_time}
+                      {shift.start_time} — {shift.end_time}
                     </span>
                   </div>
                 </div>
@@ -191,7 +202,6 @@ function DashboardContent() {
   );
 }
 
-// 📍 エクスポート部分で Suspense で包む（これでビルドエラーが消えます）
 export default function UserDashboard() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center font-bold text-slate-400">Loading...</div>}>
