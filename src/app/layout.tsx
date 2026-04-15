@@ -2,10 +2,10 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import RootLayoutClient from "./RootLayoutClient";
 
-// 📍 アイコンとタイトルの設定（ここでホーム画面のアイコンを指定）
+// 📍 titleを「KCM」のみに統一
 export const metadata: Metadata = {
-  title: "Karinto Cast Manager",
-  description: "かりんとキャスト専用アプリ",
+  title: "KCM", 
+  description: "KCM Portal Site", // 万が一検索に引っかかっても分からないように
   icons: {
     icon: "/icon.png",
     apple: "/apple-icon.png",
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ffc0cb", // サクラピンク
+  themeColor: "#ffc0cb", 
 };
 
 export default function RootLayout({
@@ -24,7 +24,6 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body className="antialiased">
-        {/* ロジック部分はクライアントコンポーネントに任せる */}
         <RootLayoutClient>{children}</RootLayoutClient>
       </body>
     </html>
