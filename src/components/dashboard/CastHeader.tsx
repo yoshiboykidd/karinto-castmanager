@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut } from 'lucide-react';
+import { LogOut, RefreshCw } from 'lucide-react';
 import { format, isValid, parseISO, isToday } from 'date-fns';
 
 type CastHeaderProps = {
@@ -17,6 +17,7 @@ export default function CastHeader({
   shopName, 
   syncTime, 
   displayName, 
+  version, // 📍 ここに追加して波線を解消しました
   bgColor 
 }: CastHeaderProps) {
   const router = useRouter();
@@ -43,84 +44,78 @@ export default function CastHeader({
     else setSeasonalEmoji('☃️');
   }, []);
 
-  const isThemed = !!bgColor && !bgColor.includes('white');
+  const isThemed = !!bgColor;
 
   return (
-    <>
-      {isPanicMode && (
-        <div 
-          className="fixed inset-0 bg-white z-[9999] flex flex-col items-center justify-center cursor-pointer"
-          onDoubleClick={() => setIsPanicMode(false)}
-        >
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-300 mb-4"></div>
-          <p className="text-gray-400 font-bold text-sm tracking-widest animate-pulse">CONNECTING...</p>
-          <p className="absolute bottom-10 text-[10px] text-gray-300">Double tap to resume</p>
-        </div>
-      )}
-
-      {/* 📍 pt-5 pb-12 に調整してヘッダー内の重心を上へ、背景の余裕を確保 */}
-      <header className={`px-5 pt-5 pb-12 rounded-b-[40px] shadow-sm relative transition-colors duration-500
-        ${isThemed 
-          ? `${bgColor} text-white border-b border-white/10` 
-          : 'bg-white text-gray-800 border-b border-pink-50' 
-        }
-      `}>
-        <div className="flex justify-between items-center">
+    <header className={`sticky top-0 z-50 w-full backdrop-blur-xl border-b transition-colors duration-300
+      ${isThemed ? 'border-white/10' : 'bg-white/80 border-slate-100 shadow-sm'}
+    `}
+    style={isThemed ? { backgroundColor: bgColor } : {}}
+    >
+      <div className="px-5 py-3 max-w-md mx-auto relative overflow-hidden">
+        {isThemed && (
+          <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent pointer-events-none" />
+        )}
+        
+        <div className="flex justify-between items-center relative z-10">
           
-          <div 
-            onClick={() => router.push('/mypage')}
-            className="flex flex-col space-y-0.5 cursor-pointer active:opacity-70 transition-opacity"
-          >
-            <p className={`text-[10px] font-black uppercase tracking-[0.2em] leading-none mb-1
-              ${isThemed ? 'text-white/70' : 'text-pink-300/80'}
-            `}>
-              - CastManager -
-            </p>
-            <p className={`text-[12px] font-bold pl-0.5
-              ${isThemed ? 'text-white/80' : 'text-gray-400'}
-            `}>
-              {shopName || '店舗未設定'}
-            </p>
-
-            <div className="pt-0.5">
-              <h1 className="font-black leading-tight flex items-baseline">
-                <span className="text-[26px]">{displayName || 'キャスト'}</span>
-                <span className={`text-[13px] ml-1 font-bold
-                  ${isThemed ? 'text-white/80' : 'text-gray-400'}
-                `}>さん</span>
-                <span className="text-[24px] ml-1 filter drop-shadow-sm -translate-y-0.5">{seasonalEmoji}</span>
-              </h1>
-              <p className={`text-[11px] font-bold flex items-center gap-1 pl-0.5 mt-0.5
-                ${isThemed ? 'text-white/90' : 'text-gray-400'}
+          <div className="flex flex-col">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase bg-slate-100 px-2 py-0.5 rounded-full">
+                {shopName || 'SHOP'}
+              </span>
+              <span className={`text-[10px] font-black uppercase tracking-widest
+                ${isThemed ? 'text-white/60' : 'text-slate-300'}
               `}>
-                お疲れ様です <span className="text-[14px]">♨️</span>
-              </p>
+                Ver {version || '1.0'}
+              </span>
             </div>
+            <h1 className={`text-xl font-black tracking-tight flex items-center gap-2
+              ${isThemed ? 'text-white' : 'text-slate-800'}
+            `}>
+              {displayName || 'Cast Portal'} 
+              <span className="text-sm animate-bounce-slow">{seasonalEmoji}</span>
+            </h1>
           </div>
 
           <div className="flex flex-col items-end space-y-1.5">
-            <div className={`w-[128px] h-[42px] rounded-xl border flex items-center justify-center gap-2 shadow-sm transition-colors
-              ${isThemed 
-                ? 'bg-white/20 border-white/20 text-white' 
-                : 'bg-green-50/80 border-green-100'
-              }
-            `}>
-              <span className="relative flex h-2.5 w-2.5 shrink-0">
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75
-                  ${isThemed ? 'bg-white' : 'bg-green-400'}
-                `}></span>
-                <span className={`relative inline-flex rounded-full h-2.5 w-2.5
-                  ${isThemed ? 'bg-white' : 'bg-green-500'}
-                `}></span>
-              </span>
-              <div className="flex flex-col leading-none items-center">
-                <span className={`text-[8px] font-black uppercase tracking-tighter mb-0.5
-                  ${isThemed ? 'text-white/70' : 'text-green-600/50'}
-                `}>HP SYNC</span>
-                <span className={`font-black tracking-tight whitespace-nowrap
-                  ${formattedTime.length > 5 ? 'text-[11px]' : 'text-[13px]'}
-                  ${isThemed ? 'text-white' : 'text-green-600'}
-                `}>{formattedTime}</span>
+            
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => window.location.reload()}
+                className={`w-[42px] h-[42px] rounded-xl border flex items-center justify-center shadow-sm transition-all active:scale-95 cursor-pointer
+                  ${isThemed 
+                    ? 'bg-white/20 border-white/20 text-white hover:bg-white/30' 
+                    : 'bg-white border-pink-50 text-gray-400 hover:bg-gray-50'
+                  }
+                `}
+              >
+                <RefreshCw size={18} />
+              </button>
+
+              <div className={`w-[128px] h-[42px] rounded-xl border flex items-center justify-center gap-2 shadow-sm transition-colors
+                ${isThemed 
+                  ? 'bg-white/20 border-white/20 text-white' 
+                  : 'bg-green-50/80 border-green-100'
+                }
+              `}>
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75
+                    ${isThemed ? 'bg-white' : 'bg-green-400'}
+                  `}></span>
+                  <span className={`relative inline-flex rounded-full h-2.5 w-2.5
+                    ${isThemed ? 'bg-white' : 'bg-green-500'}
+                  `}></span>
+                </span>
+                <div className="flex flex-col leading-none items-center">
+                  <span className={`text-[8px] font-black uppercase tracking-tighter mb-0.5
+                    ${isThemed ? 'text-white/70' : 'text-green-600/50'}
+                  `}>HP SYNC</span>
+                  <span className={`font-black tracking-tight whitespace-nowrap
+                    ${formattedTime.length > 5 ? 'text-[11px]' : 'text-[13px]'}
+                    ${isThemed ? 'text-white' : 'text-green-600'}
+                  `}>{formattedTime}</span>
+                </div>
               </div>
             </div>
 
@@ -143,14 +138,15 @@ export default function CastHeader({
                 <span className={`text-[8px] font-black uppercase tracking-tighter mb-0.5
                   ${isThemed ? 'text-white/70' : 'text-rose-400/50'}
                 `}>SECRET</span>
-                <span className={`text-[13px] font-black tracking-widest
+                <span className={`text-[13px] font-black tracking-tight
                   ${isThemed ? 'text-white' : 'text-rose-500'}
                 `}>ESCAPE</span>
               </div>
             </button>
+            
           </div>
         </div>
-      </header>
-    </>
+      </div>
+    </header>
   );
 }
