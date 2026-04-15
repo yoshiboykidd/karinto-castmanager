@@ -17,13 +17,15 @@ function DashboardContent() {
 
   const [userName, setUserName] = useState('ゲスト');
   const [showPasswordAlert, setShowPasswordAlert] = useState(false);
-  const [activeStore, setActiveStore] = useState('神田');
+  const [activeStore, setActiveStore] = useState(''); // 📍 初期値は後ほど設定
   const [shifts, setShifts] = useState<any[]>([]);
   const [latestNews, setLatestNews] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isNewsExpanded, setIsNewsExpanded] = useState(false);
 
-  const stores = ['神田', '赤坂', '秋葉原', '上野', '渋谷', '池袋西口', '五反田', '大宮', '吉祥寺', '大久保', '池袋東口', '小岩'];
+  // 📍 修正1：デフォルトの店舗リスト（マイページ未設定時用）
+  const defaultStores = ['神田', '赤坂', '秋葉原', '上野', '渋谷', '池袋西口', '五反田', '大宮', '吉祥寺', '大久保', '池袋東口', '小岩'];
+  const [stores, setStores] = useState<string[]>(defaultStores);
 
   useEffect(() => {
     const sessionData = localStorage.getItem('user_session');
@@ -38,13 +40,22 @@ function DashboardContent() {
       setShowPasswordAlert(true);
     }
 
+    // 📍 修正2：マイページで保存した並び順を読み込む
+    const savedOrder = localStorage.getItem('user_favorite_shops');
+    if (savedOrder) {
+      const parsedOrder = JSON.parse(savedOrder);
+      setStores(parsedOrder);
+      setActiveStore(parsedOrder[0]); // 一番左（お気に入り1位）を初期選択にする
+    } else {
+      setActiveStore('神田');
+    }
+
     const fetchData = async () => {
       setLoading(true);
       const now = new Date();
       const today = now.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
       
       try {
-        // 📍 修正1: shiftsテーブルだけをまず確実に取得（ここが全ての基本）
         const { data: shiftData, error: shiftError } = await supabase
           .from('shifts')
           .select('*')
@@ -55,35 +66,22 @@ function DashboardContent() {
         if (shiftError) throw shiftError;
 
         if (shiftData && shiftData.length > 0) {
-          // 📍 修正2: エラーの原因となる特定のカラム指定をやめ、全取得後にマージ
-          // カラム名が profile_image_url でない可能性が高いため
-          const { data: castData } = await supabase
-            .from('cast_members')
-            .select('*');
+          const { data: castData } = await supabase.from('cast_members').select('*');
 
           const mergedShifts = shiftData.map(s => {
             const cast = castData?.find(c => String(c.login_id) === String(s.login_id));
             const prefix = String(s.login_id || "").substring(0, 3);
-            
-            // 📍 修正3: 画像URLのカラム名が不明なため、複数の候補から自動取得を試みる
             const imageUrl = cast?.profile_image_url || cast?.image_url || cast?.photo_url || cast?.profile_image || null;
-
             return {
               ...s,
               computed_store_name: shopMap[prefix] || '未設定',
               profile_image_url: imageUrl
             };
           });
-
           setShifts(mergedShifts);
         }
 
-        const { data: newsData } = await supabase
-          .from('user_news')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(1);
-
+        const { data: newsData } = await supabase.from('user_news').select('*').order('created_at', { ascending: false }).limit(1);
         if (newsData) setLatestNews(newsData[0]);
 
       } catch (err) {
@@ -119,7 +117,6 @@ function DashboardContent() {
       </header>
 
       <main className="px-6 pt-6 space-y-6">
-        {/* 会員カードエリア */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-400 rounded-[32px] p-6 text-white shadow-lg shadow-blue-100 relative overflow-hidden">
           <div className="relative z-10">
             <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest mb-1">Membership</p>
@@ -135,7 +132,6 @@ function DashboardContent() {
           <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
         </div>
 
-        {/* ニュース表示エリア */}
         {latestNews && (
           <div onClick={() => setIsNewsExpanded(!isNewsExpanded)} className="bg-white p-5 rounded-[32px] border border-blue-100 shadow-sm cursor-pointer transition-all active:scale-[0.98]">
             <div className="flex items-center justify-between gap-3">
@@ -155,7 +151,6 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* 店舗切り替えタブ */}
         <section>
           <div className="flex items-center justify-between mb-4 px-1">
             <h3 className="font-black text-lg flex items-center"><MapPin size={18} className="mr-2 text-blue-500" />本日の出勤表</h3>
@@ -169,7 +164,6 @@ function DashboardContent() {
           </div>
         </section>
 
-        {/* 出勤リスト表示部分 */}
         <section className="space-y-3">
           {loading ? (
             <div className="flex flex-col items-center py-20 space-y-4">
@@ -180,11 +174,7 @@ function DashboardContent() {
             filteredShifts.map((shift, idx) => (
               <div key={idx} className="bg-white rounded-[28px] p-4 flex items-center space-x-4 border border-slate-100 shadow-sm">
                 <div className="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden flex-shrink-0 border border-slate-50">
-                  <img 
-                    src={shift.profile_image_url || 'https://placehold.jp/150x150.png?text=No%20Image'} 
-                    alt={shift.hp_display_name} 
-                    className="w-full h-full object-cover" 
-                  />
+                  <img src={shift.profile_image_url || 'https://placehold.jp/150x150.png?text=No%20Image'} alt={shift.hp_display_name} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1 text-left">
                   <div>
@@ -206,9 +196,8 @@ function DashboardContent() {
         </section>
       </main>
 
-      {/* ナビゲーション */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-8 py-4 flex justify-between items-center z-20">
-        <button className="flex flex-col items-center text-blue-500"><Home size={24} /><span className="text-[10px] font-black mt-1">Home</span></button>
+        <button onClick={() => router.push('/user/dashboard')} className="flex flex-col items-center text-blue-500"><Home size={24} /><span className="text-[10px] font-black mt-1">Home</span></button>
         <button className="flex flex-col items-center text-slate-300"><Search size={24} /><span className="text-[10px] font-black mt-1">Search</span></button>
         <button className="flex flex-col items-center text-slate-300"><Heart size={24} /><span className="text-[10px] font-black mt-1">Favorite</span></button>
         <button onClick={() => router.push('/user/profile')} className="flex flex-col items-center text-slate-300"><User size={24} /><span className="text-[10px] font-black mt-1">Mypage</span></button>
