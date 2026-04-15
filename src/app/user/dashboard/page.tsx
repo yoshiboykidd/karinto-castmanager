@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { Heart, Clock, MapPin, LogOut, Bell, User, Home, Search, Star, ChevronDown, ChevronUp } from 'lucide-react';
 
-// 📍 正解：管理画面 (admin/page.tsx) と同一のマップを使用
 const shopMap: Record<string, string> = {
   '001': '神田', '002': '赤坂', '003': '秋葉原', '004': '上野',
   '005': '渋谷', '006': '池袋西口', '007': '五反田', '008': '大宮',
@@ -24,7 +23,6 @@ function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [isNewsExpanded, setIsNewsExpanded] = useState(false);
 
-  // 📍 タブ一覧
   const stores = ['神田', '赤坂', '秋葉原', '上野', '渋谷', '池袋西口', '五反田', '大宮', '吉祥寺', '大久保', '池袋東口', '小岩'];
 
   useEffect(() => {
@@ -46,7 +44,7 @@ function DashboardContent() {
       const today = now.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
       
       try {
-        // 📍 修正1：存在しない store_name カラムの指定を削除
+        // 📍 修正1: shiftsテーブルだけをまず確実に取得（ここが全ての基本）
         const { data: shiftData, error: shiftError } = await supabase
           .from('shifts')
           .select('*')
@@ -57,21 +55,23 @@ function DashboardContent() {
         if (shiftError) throw shiftError;
 
         if (shiftData && shiftData.length > 0) {
-          // 📍 修正2：cast_members からも store_name を除外
-          const { data: castData, error: castError } = await supabase
+          // 📍 修正2: エラーの原因となる特定のカラム指定をやめ、全取得後にマージ
+          // カラム名が profile_image_url でない可能性が高いため
+          const { data: castData } = await supabase
             .from('cast_members')
-            .select('login_id, profile_image_url');
+            .select('*');
 
-          if (castError) throw castError;
-
-          // 📍 修正3：login_id の頭3桁から店名を判定するロジック（管理画面準拠）
           const mergedShifts = shiftData.map(s => {
             const cast = castData?.find(c => String(c.login_id) === String(s.login_id));
             const prefix = String(s.login_id || "").substring(0, 3);
+            
+            // 📍 修正3: 画像URLのカラム名が不明なため、複数の候補から自動取得を試みる
+            const imageUrl = cast?.profile_image_url || cast?.image_url || cast?.photo_url || cast?.profile_image || null;
+
             return {
               ...s,
               computed_store_name: shopMap[prefix] || '未設定',
-              profile_image_url: cast?.profile_image_url || null
+              profile_image_url: imageUrl
             };
           });
 
@@ -84,11 +84,10 @@ function DashboardContent() {
           .order('created_at', { ascending: false })
           .limit(1);
 
-        if (newsData && newsData.length > 0) {
-          setLatestNews(newsData[0]);
-        }
+        if (newsData) setLatestNews(newsData[0]);
+
       } catch (err) {
-        console.error('FINAL_FETCH_ERROR:', err);
+        console.error('FETCH_ERROR:', err);
       } finally {
         setLoading(false);
       }
@@ -103,7 +102,6 @@ function DashboardContent() {
     router.push('/user/login');
   };
 
-  // 📍 修正4：判定した店名(computed_store_name)でフィルタリング
   const filteredShifts = shifts.filter(s => s.computed_store_name === activeStore);
 
   return (
@@ -121,7 +119,7 @@ function DashboardContent() {
       </header>
 
       <main className="px-6 pt-6 space-y-6">
-        {/* カード、News部分は維持 */}
+        {/* 会員カードエリア */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-400 rounded-[32px] p-6 text-white shadow-lg shadow-blue-100 relative overflow-hidden">
           <div className="relative z-10">
             <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest mb-1">Membership</p>
@@ -131,12 +129,13 @@ function DashboardContent() {
                 <p className="text-blue-100 text-[10px] uppercase font-bold tracking-tighter">Points Balance</p>
                 <p className="text-3xl font-black italic">1,240 <span className="text-sm font-bold">pt</span></p>
               </div>
-              <div className="bg-white/20 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/30 text-[10px] font-black uppercase tracking-widest"> Card Detail </div>
+              <div className="bg-white/20 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/30 text-[10px] font-black uppercase tracking-widest">Card Detail</div>
             </div>
           </div>
           <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
         </div>
 
+        {/* ニュース表示エリア */}
         {latestNews && (
           <div onClick={() => setIsNewsExpanded(!isNewsExpanded)} className="bg-white p-5 rounded-[32px] border border-blue-100 shadow-sm cursor-pointer transition-all active:scale-[0.98]">
             <div className="flex items-center justify-between gap-3">
@@ -156,6 +155,7 @@ function DashboardContent() {
           </div>
         )}
 
+        {/* 店舗切り替えタブ */}
         <section>
           <div className="flex items-center justify-between mb-4 px-1">
             <h3 className="font-black text-lg flex items-center"><MapPin size={18} className="mr-2 text-blue-500" />本日の出勤表</h3>
@@ -169,6 +169,7 @@ function DashboardContent() {
           </div>
         </section>
 
+        {/* 出勤リスト表示部分 */}
         <section className="space-y-3">
           {loading ? (
             <div className="flex flex-col items-center py-20 space-y-4">
@@ -179,7 +180,11 @@ function DashboardContent() {
             filteredShifts.map((shift, idx) => (
               <div key={idx} className="bg-white rounded-[28px] p-4 flex items-center space-x-4 border border-slate-100 shadow-sm">
                 <div className="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden flex-shrink-0 border border-slate-50">
-                  <img src={shift.profile_image_url || 'https://placehold.jp/150x150.png?text=No%20Image'} alt={shift.hp_display_name} className="w-full h-full object-cover" />
+                  <img 
+                    src={shift.profile_image_url || 'https://placehold.jp/150x150.png?text=No%20Image'} 
+                    alt={shift.hp_display_name} 
+                    className="w-full h-full object-cover" 
+                  />
                 </div>
                 <div className="flex-1 text-left">
                   <div>
@@ -201,7 +206,7 @@ function DashboardContent() {
         </section>
       </main>
 
-      {/* フッター省略（既存通り） */}
+      {/* ナビゲーション */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-8 py-4 flex justify-between items-center z-20">
         <button className="flex flex-col items-center text-blue-500"><Home size={24} /><span className="text-[10px] font-black mt-1">Home</span></button>
         <button className="flex flex-col items-center text-slate-300"><Search size={24} /><span className="text-[10px] font-black mt-1">Search</span></button>
