@@ -6,7 +6,7 @@ import { createClient } from '@/utils/supabase/client';
 import { Heart, Clock, MapPin, LogOut, Bell, User, Home, Search, Star, ChevronDown, ChevronUp } from 'lucide-react';
 
 const shopMap: Record<string, string> = {
-  'all': '全店舗', '001': '神田', '002': '赤坂', '003': '秋葉原', '004': '上野',
+  '001': '神田', '002': '赤坂', '003': '秋葉原', '004': '上野',
   '005': '渋谷', '006': '池袋西口', '007': '五反田', '008': '大宮',
   '009': '吉祥寺', '010': '大久保', '011': '池袋東口', '012': '小岩'
 };
@@ -17,13 +17,15 @@ function DashboardContent() {
 
   const [userName, setUserName] = useState('ゲスト');
   const [showPasswordAlert, setShowPasswordAlert] = useState(false);
-  const [activeStore, setActiveStore] = useState('すべて');
+  // 📍 修正1：初期タブを「神田」に設定
+  const [activeStore, setActiveStore] = useState('神田');
   const [shifts, setShifts] = useState<any[]>([]);
   const [latestNews, setLatestNews] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isNewsExpanded, setIsNewsExpanded] = useState(false);
 
-  const stores = ['すべて', '神田', '赤坂', '秋葉原', '上野', '渋谷', '池袋西口', '五反田', '大宮', '吉祥寺', '大久保', '池袋東口', '小岩'];
+  // 📍 修正2：「すべて」を削除
+  const stores = ['神田', '赤坂', '秋葉原', '上野', '渋谷', '池袋西口', '五反田', '大宮', '吉祥寺', '大久保', '池袋東口', '小岩'];
 
   useEffect(() => {
     const sessionData = localStorage.getItem('user_session');
@@ -45,41 +47,24 @@ function DashboardContent() {
       const today = now.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
       
       try {
-        // 📍 修正：エラーの出やすい結合(Join)を避け、まずはシフトのみを確実に取得
+        // 📍 修正3：400エラー対策
+        // 長いIDリストを送るのではなく、shiftsテーブルと正しく紐付いたcast_membersを取得するクエリ
         const { data: shiftData, error: shiftError } = await supabase
           .from('shifts')
-          .select('*')
+          .select(`
+            *,
+            cast_members!shifts_login_id_fkey (
+              store_name,
+              profile_image_url
+            )
+          `)
           .eq('shift_date', today)
           .eq('status', 'official')
           .order('start_time', { ascending: true });
 
         if (shiftError) throw shiftError;
+        if (shiftData) setShifts(shiftData);
 
-        if (shiftData && shiftData.length > 0) {
-          // シフトにある全キャストのID（login_id）を抽出
-          const castIds = Array.from(new Set(shiftData.map(s => s.login_id)));
-
-          // キャスト情報を別途取得（一括取得してメモリ上でマージする方式が最も安全）
-          const { data: castData } = await supabase
-            .from('cast_members')
-            .select('login_id, store_name, profile_image_url')
-            .in('login_id', castIds);
-
-          // シフトデータにキャスト情報を紐付け
-          const mergedShifts = shiftData.map(s => {
-            const cast = castData?.find(c => String(c.login_id) === String(s.login_id));
-            return {
-              ...s,
-              cast_members: cast || null
-            };
-          });
-
-          setShifts(mergedShifts);
-        } else {
-          setShifts([]);
-        }
-
-        // ニュース取得
         const { data: newsData } = await supabase
           .from('user_news')
           .select('*')
@@ -105,9 +90,8 @@ function DashboardContent() {
     router.push('/user/login');
   };
 
-  const filteredShifts = activeStore === 'すべて' 
-    ? shifts 
-    : shifts.filter(s => s.cast_members?.store_name === activeStore);
+  // 📍 修正4：フィルタリングロジック（常にactiveStoreで絞り込み）
+  const filteredShifts = shifts.filter(s => s.cast_members?.store_name === activeStore);
 
   return (
     <div className="min-h-screen bg-slate-50 pb-24 text-slate-800">
@@ -195,7 +179,7 @@ function DashboardContent() {
               <div key={idx} className="bg-white rounded-[28px] p-4 flex items-center space-x-4 border border-slate-100 shadow-sm hover:border-blue-200 transition-all">
                 <div className="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden flex-shrink-0 border border-slate-50">
                   <img 
-                    src={shift.cast_members?.profile_image_url || 'https://via.placeholder.com/150'} 
+                    src={shift.cast_members?.profile_image_url || 'https://placehold.jp/150x150.png?text=No%20Image'} 
                     alt={shift.hp_display_name} 
                     className="w-full h-full object-cover" 
                   />
