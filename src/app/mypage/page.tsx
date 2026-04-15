@@ -97,7 +97,7 @@ export default function MyPage() {
 
   if (loading || !profile) return (
     <div className="min-h-screen flex items-center justify-center bg-[#FFFDFE]">
-      <div className="font-black text-pink-300 animate-pulse text-4xl italic tracking-tighter">KARINTO...</div>
+      <div className="font-black text-pink-300 animate-pulse text-4xl italic tracking-tighter">KCM...</div>
     </div>
   );
 

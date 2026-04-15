@@ -9,7 +9,7 @@ const DashboardContent = dynamic(() => import('@/components/DashboardContent'), 
   ssr: false,
   loading: () => (
     <div className="min-h-screen flex items-center justify-center bg-[#FFFDFE]">
-      <div className="font-black text-pink-200 animate-pulse text-4xl italic tracking-tighter">KARINTO...</div>
+      <div className="font-black text-pink-200 animate-pulse text-4xl italic tracking-tighter">KCM...</div>
     </div>
   )
 });

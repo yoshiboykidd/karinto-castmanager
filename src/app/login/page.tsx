@@ -52,7 +52,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm bg-white rounded-[40px] p-10 shadow-xl border border-pink-50">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-black italic tracking-tighter uppercase mb-2">Login</h1>
-          <p className="text-pink-300 text-[10px] font-bold tracking-widest uppercase text-center">Karinto Management</p>
+          <p className="text-pink-300 text-[10px] font-bold tracking-widest uppercase text-center">KCM Management</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
