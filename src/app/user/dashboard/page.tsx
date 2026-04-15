@@ -41,43 +41,59 @@ function DashboardContent() {
     const fetchData = async () => {
       setLoading(true);
       
-      // 📍 修正1：日付の取得を最も確実な「サーバー時間ベース」に
       const now = new Date();
       const today = now.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
       
-      // 📍 修正2：結合を「左外部結合」にし、エラーをコンソールに出力
-      const { data: shiftData, error: shiftError } = await supabase
-        .from('shifts')
-        .select(`
-          *,
-          cast_members (
-            store_name,
-            profile_image_url
-          )
-        `)
-        .eq('shift_date', today)
-        .eq('status', 'official')
-        .order('start_time', { ascending: true });
+      try {
+        // 📍 修正：エラーの出やすい結合(Join)を避け、まずはシフトのみを確実に取得
+        const { data: shiftData, error: shiftError } = await supabase
+          .from('shifts')
+          .select('*')
+          .eq('shift_date', today)
+          .eq('status', 'official')
+          .order('start_time', { ascending: true });
 
-      if (shiftError) {
-        console.error('SHIFT_FETCH_ERROR:', shiftError);
+        if (shiftError) throw shiftError;
+
+        if (shiftData && shiftData.length > 0) {
+          // シフトにある全キャストのID（login_id）を抽出
+          const castIds = Array.from(new Set(shiftData.map(s => s.login_id)));
+
+          // キャスト情報を別途取得（一括取得してメモリ上でマージする方式が最も安全）
+          const { data: castData } = await supabase
+            .from('cast_members')
+            .select('login_id, store_name, profile_image_url')
+            .in('login_id', castIds);
+
+          // シフトデータにキャスト情報を紐付け
+          const mergedShifts = shiftData.map(s => {
+            const cast = castData?.find(c => String(c.login_id) === String(s.login_id));
+            return {
+              ...s,
+              cast_members: cast || null
+            };
+          });
+
+          setShifts(mergedShifts);
+        } else {
+          setShifts([]);
+        }
+
+        // ニュース取得
+        const { data: newsData } = await supabase
+          .from('user_news')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (newsData && newsData.length > 0) {
+          setLatestNews(newsData[0]);
+        }
+      } catch (err) {
+        console.error('FETCH_ERROR:', err);
+      } finally {
+        setLoading(false);
       }
-
-      if (shiftData) {
-        setShifts(shiftData);
-      }
-
-      const { data: newsData } = await supabase
-        .from('user_news')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (newsData && newsData.length > 0) {
-        setLatestNews(newsData[0]);
-      }
-
-      setLoading(false);
     };
 
     fetchData();
@@ -111,7 +127,6 @@ function DashboardContent() {
       </header>
 
       <main className="px-6 pt-6 space-y-6">
-        {/* 会員カード、警告バナー、Newsセクションは既存通り */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-400 rounded-[32px] p-6 text-white shadow-lg shadow-blue-100 relative overflow-hidden">
           <div className="relative z-10">
             <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest mb-1">Membership</p>
@@ -121,9 +136,7 @@ function DashboardContent() {
                 <p className="text-blue-100 text-[10px] uppercase font-bold tracking-tighter">Points Balance</p>
                 <p className="text-3xl font-black italic">1,240 <span className="text-sm font-bold">pt</span></p>
               </div>
-              <div className="bg-white/20 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/30 text-[10px] font-black uppercase tracking-widest">
-                Card Detail
-              </div>
+              <div className="bg-white/20 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/30 text-[10px] font-black uppercase tracking-widest"> Card Detail </div>
             </div>
           </div>
           <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
