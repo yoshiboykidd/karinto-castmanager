@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { Heart, Clock, MapPin, LogOut, Bell, User, Home, Search, Star, ChevronDown, ChevronUp } from 'lucide-react';
 
+// 📍 正解：管理画面（admin/page.tsx）の定義を完全コピー
 const shopMap: Record<string, string> = {
   'all': '全店舗', '001': '神田', '002': '赤坂', '003': '秋葉原', '004': '上野',
   '005': '渋谷', '006': '池袋西口', '007': '五反田', '008': '大宮',
@@ -23,6 +24,7 @@ function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [isNewsExpanded, setIsNewsExpanded] = useState(false);
 
+  // 📍 正解：001-012の店舗リスト
   const stores = ['すべて', '神田', '赤坂', '秋葉原', '上野', '渋谷', '池袋西口', '五反田', '大宮', '吉祥寺', '大久保', '池袋東口', '小岩'];
 
   useEffect(() => {
@@ -41,28 +43,16 @@ function DashboardContent() {
     const fetchData = async () => {
       setLoading(true);
       
-      // 📍 管理画面と同一の日付取得ロジック (JST固定)
-      const now = new Date();
-      const jstOffset = 9 * 60 * 60 * 1000;
-      const jstDate = new Date(now.getTime() + jstOffset);
-      const today = jstDate.toISOString().split('T')[0];
+      // 📍 正解：useShiftData.ts と同じ日付形式を取得
+      const today = new Date().toLocaleDateString('sv-SE'); // yyyy-MM-dd 形式
       
-      // 📍 管理画面で稼働しているクエリを流用
-      // cast_members の店舗名や画像、シフトの開始・終了時間を取得
-      const { data: shiftData, error: shiftError } = await supabase
+      // 📍 正解：useShiftData.ts のカラム構成を元にしたクエリ
+      // 外部結合が不安定な場合を考慮し、最も標準的な結合方法に変更
+      const { data: shiftData } = await supabase
         .from('shifts')
-        .select(`
-          id,
-          shift_date,
-          start_time,
-          end_time,
-          hp_display_name,
-          cast_members (
-            store_name,
-            profile_image_url
-          )
-        `)
+        .select('*, cast_members(store_name, profile_image_url)')
         .eq('shift_date', today)
+        .eq('status', 'official') // 📍 重要：確定済みシフトのみ表示（稼働中ロジック準拠）
         .order('start_time', { ascending: true });
 
       if (shiftData) setShifts(shiftData);
@@ -135,18 +125,13 @@ function DashboardContent() {
             </div>
             <div>
               <p className="text-sm font-black text-amber-900">セキュリティ警告</p>
-              <p className="text-[11px] font-bold text-amber-700 leading-relaxed mt-0.5">
-                初期パスワード（0000）が設定されています。マイページより変更してください。
-              </p>
+              <p className="text-[11px] font-bold text-amber-700 leading-relaxed mt-0.5">初期パスワード（0000）が設定されています。変更してください。</p>
             </div>
           </div>
         )}
 
         {latestNews && (
-          <div 
-            onClick={() => setIsNewsExpanded(!isNewsExpanded)}
-            className="bg-white p-5 rounded-[32px] border border-blue-100 shadow-sm cursor-pointer transition-all active:scale-[0.98]"
-          >
+          <div onClick={() => setIsNewsExpanded(!isNewsExpanded)} className="bg-white p-5 rounded-[32px] border border-blue-100 shadow-sm cursor-pointer transition-all active:scale-[0.98]">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="bg-blue-500 text-white text-[9px] font-black px-2 py-1 rounded-lg uppercase shrink-0">News</div>
@@ -155,20 +140,12 @@ function DashboardContent() {
                 </div>
                 <h3 className="text-[14px] font-black text-slate-800 truncate">{latestNews.title}</h3>
               </div>
-              <div className="text-slate-300 shrink-0">
-                {isNewsExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-              </div>
+              <div className="text-slate-300 shrink-0">{isNewsExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}</div>
             </div>
             {isNewsExpanded && (
               <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                {latestNews.image_url && (
-                  <img src={latestNews.image_url} className="w-full h-auto rounded-2xl border border-slate-50 shadow-sm" alt="News" />
-                )}
-                {latestNews.body && (
-                  <p className="text-[12px] text-slate-500 font-bold leading-relaxed whitespace-pre-wrap px-1">
-                    {latestNews.body}
-                  </p>
-                )}
+                {latestNews.image_url && <img src={latestNews.image_url} className="w-full h-auto rounded-2xl border border-slate-50 shadow-sm" alt="News" />}
+                {latestNews.body && <p className="text-[12px] text-slate-500 font-bold leading-relaxed whitespace-pre-wrap px-1">{latestNews.body}</p>}
               </div>
             )}
           </div>
@@ -176,22 +153,11 @@ function DashboardContent() {
 
         <section>
           <div className="flex items-center justify-between mb-4 px-1">
-            <h3 className="font-black text-lg flex items-center">
-              <MapPin size={18} className="mr-2 text-blue-500" />
-              本日の出勤表
-            </h3>
+            <h3 className="font-black text-lg flex items-center"><MapPin size={18} className="mr-2 text-blue-500" />本日の出勤表</h3>
           </div>
           <div className="flex space-x-2 overflow-x-auto pb-2 no-scrollbar">
             {stores.map((store) => (
-              <button
-                key={store}
-                onClick={() => setActiveStore(store)}
-                className={`px-5 py-2.5 rounded-2xl font-black text-sm transition-all whitespace-nowrap ${
-                  activeStore === store 
-                  ? 'bg-blue-500 text-white shadow-md shadow-blue-100' 
-                  : 'bg-white text-slate-400 border border-slate-100'
-                }`}
-              >
+              <button key={store} onClick={() => setActiveStore(store)} className={`px-5 py-2.5 rounded-2xl font-black text-sm transition-all whitespace-nowrap ${activeStore === store ? 'bg-blue-500 text-white shadow-md shadow-blue-100' : 'bg-white text-slate-400 border border-slate-100'}`}>
                 {store}
               </button>
             ))}
@@ -208,29 +174,19 @@ function DashboardContent() {
             filteredShifts.map((shift, idx) => (
               <div key={idx} className="bg-white rounded-[28px] p-4 flex items-center space-x-4 border border-slate-100 shadow-sm hover:border-blue-200 transition-all">
                 <div className="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden flex-shrink-0 border border-slate-50">
-                  <img 
-                    src={shift.cast_members?.profile_image_url || 'https://via.placeholder.com/150'} 
-                    alt={shift.hp_display_name}
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={shift.cast_members?.profile_image_url || 'https://via.placeholder.com/150'} alt={shift.hp_display_name} className="w-full h-full object-cover" />
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 text-left">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-[9px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full uppercase">
-                        {shift.cast_members?.store_name || 'SHOP'}
-                      </span>
-                      <h4 className="text-lg font-black text-slate-800 mt-1">{shift.hp_display_name}</h4>
+                      <span className="text-[9px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full uppercase">{shift.cast_members?.store_name || 'SHOP'}</span>
+                      <h4 className="text-lg font-black text-slate-800 mt-1">{shift.hp_display_name || 'Name'}</h4>
                     </div>
-                    <button className="text-slate-200 hover:text-blue-400 transition-colors">
-                      <Heart size={20} />
-                    </button>
+                    <button className="text-slate-200 hover:text-blue-400 transition-colors"><Heart size={20} /></button>
                   </div>
                   <div className="flex items-center text-slate-400 mt-2">
                     <Clock size={14} className="mr-1 text-blue-300" />
-                    <span className="text-sm font-black tracking-tighter">
-                      {shift.start_time} — {shift.end_time}
-                    </span>
+                    <span className="text-sm font-black tracking-tighter">{shift.start_time} — {shift.end_time}</span>
                   </div>
                 </div>
               </div>
