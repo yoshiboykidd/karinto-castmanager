@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react'; // 📍 Suspenseを追加
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { Heart, Clock, MapPin, LogOut, Bell, User, Home, Search, Star } from 'lucide-react';
 
-export default function UserDashboard() {
+// 📍 実際のコンテンツを別コンポーネントに切り出し
+function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -16,11 +17,9 @@ export default function UserDashboard() {
   const [casts, setCasts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 店舗リスト（12サイト分を想定）
   const stores = ['すべて', '池袋', '赤坂', '五反田', '小岩', '新宿', '渋谷'];
 
   useEffect(() => {
-    // 1. セッション確認
     const sessionData = localStorage.getItem('user_session');
     if (!sessionData) {
       router.push('/user/login');
@@ -29,13 +28,12 @@ export default function UserDashboard() {
     const user = JSON.parse(sessionData);
     setUserName(user.name || 'お客様');
 
-    // 2. 出勤データの取得 (仮: 本日の日付分)
     const fetchShifts = async () => {
       setLoading(true);
       const today = new Date().toISOString().split('T')[0];
       
       const { data, error } = await supabase
-        .from('shifts') // スクレイピングデータが格納されているテーブル名
+        .from('shifts')
         .select('*')
         .eq('date', today)
         .order('start_time', { ascending: true });
@@ -49,20 +47,17 @@ export default function UserDashboard() {
     fetchShifts();
   }, [router, supabase]);
 
-  // ログアウト処理
   const handleLogout = () => {
     localStorage.removeItem('user_session');
     router.push('/user/login');
   };
 
-  // 店舗フィルタリング
   const filteredCasts = activeStore === 'すべて' 
     ? casts 
     : casts.filter(c => c.store_name?.includes(activeStore));
 
   return (
     <div className="min-h-screen bg-slate-50 pb-24 text-slate-800">
-      {/* --- ヘッダー --- */}
       <header className="bg-white px-6 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -79,7 +74,6 @@ export default function UserDashboard() {
       </header>
 
       <main className="px-6 pt-6 space-y-6">
-        {/* --- 会員ステータスカード --- */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-400 rounded-[32px] p-6 text-white shadow-lg shadow-blue-100 relative overflow-hidden">
           <div className="relative z-10">
             <p className="text-blue-100 text-xs font-bold uppercase tracking-widest mb-1">Welcome back</p>
@@ -94,11 +88,9 @@ export default function UserDashboard() {
               </div>
             </div>
           </div>
-          {/* 装飾用の円 */}
           <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
         </div>
 
-        {/* --- 初期パスワード警告バナー --- */}
         {alertPassword === 'true' && (
           <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex items-start space-x-3">
             <div className="p-2 bg-amber-200 rounded-xl">
@@ -113,7 +105,6 @@ export default function UserDashboard() {
           </div>
         )}
 
-        {/* --- 店舗切り替えタブ --- */}
         <section>
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-black text-lg flex items-center">
@@ -138,14 +129,12 @@ export default function UserDashboard() {
           </div>
         </section>
 
-        {/* --- キャストリスト --- */}
         <section className="space-y-3">
           {loading ? (
             <p className="text-center py-10 text-slate-400 font-bold">読み込み中...</p>
           ) : filteredCasts.length > 0 ? (
             filteredCasts.map((cast, idx) => (
-              <div key={idx} className="bg-white rounded-[24px] p-4 flex items-center space-x-4 border border-slate-100 hover:border-blue-200 transition-all shadow-sm">
-                {/* 写真 */}
+              <div key={idx} className="bg-white rounded-[24px] p-4 flex items-center space-x-4 border border-slate-100 shadow-sm">
                 <div className="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden flex-shrink-0">
                   <img 
                     src={cast.image_url || 'https://via.placeholder.com/150'} 
@@ -153,7 +142,6 @@ export default function UserDashboard() {
                     className="w-full h-full object-cover"
                   />
                 </div>
-                {/* 詳細 */}
                 <div className="flex-1">
                   <div className="flex justify-between items-start">
                     <div>
@@ -181,7 +169,6 @@ export default function UserDashboard() {
         </section>
       </main>
 
-      {/* --- フッターナビ --- */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-8 py-4 flex justify-between items-center z-20">
         <button className="flex flex-col items-center text-blue-500">
           <Home size={24} />
@@ -201,5 +188,14 @@ export default function UserDashboard() {
         </button>
       </nav>
     </div>
+  );
+}
+
+// 📍 エクスポート部分で Suspense で包む（これでビルドエラーが消えます）
+export default function UserDashboard() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center font-bold text-slate-400">Loading...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 }
