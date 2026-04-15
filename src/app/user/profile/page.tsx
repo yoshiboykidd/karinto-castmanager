@@ -1,158 +1,187 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { Heart, Clock, MapPin, LogOut, User, Home, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronLeft, Lock, CheckCircle2, AlertCircle, Home, Search, Heart, User, LogOut, GripVertical, Eye, EyeOff } from 'lucide-react';
 
-const shopMap: Record<string, string> = {
-  '001': '神田', '002': '赤坂', '003': '秋葉原', '004': '上野',
-  '005': '渋谷', '006': '池袋西口', '007': '五反田', '008': '大宮',
-  '009': '吉祥寺', '010': '大久保', '011': '池袋東口', '012': '小岩'
-};
+const DEFAULT_STORES = [
+  { id: '001', name: '神田', visible: true }, { id: '002', name: '赤坂', visible: true },
+  { id: '003', name: '秋葉原', visible: true }, { id: '004', name: '上野', visible: true },
+  { id: '005', name: '渋谷', visible: true }, { id: '006', name: '池袋西口', visible: true },
+  { id: '007', name: '五反田', visible: true }, { id: '008', name: '大宮', visible: true },
+  { id: '009', name: '吉祥寺', visible: true }, { id: '010', name: '大久保', visible: true },
+  { id: '011', name: '池袋東口', visible: true }, { id: '012', name: '小岩', visible: true }
+];
 
-function DashboardContent() {
+export default function UserProfilePage() {
   const router = useRouter();
   const supabase = createClient();
 
-  const [userName, setUserName] = useState('ゲスト');
-  const [activeStore, setActiveStore] = useState('');
-  const [shifts, setShifts] = useState<any[]>([]);
-  const [latestNews, setLatestNews] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [isNewsExpanded, setIsNewsExpanded] = useState(false);
-  const [displayStores, setDisplayStores] = useState<string[]>([]);
+  const [user, setUser] = useState<any>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [stores, setStores] = useState<any[]>(DEFAULT_STORES);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
+  
+  // 📍 並び替え管理用
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const sessionData = localStorage.getItem('user_session');
     if (!sessionData) { router.push('/user/login'); return; }
-    const user = JSON.parse(sessionData);
-    setUserName(user.name || 'お客様');
+    setUser(JSON.parse(sessionData));
 
-    // 📍 修正：非表示(visible: false)の店舗を完全に除外してタブを生成
-    const savedV2 = localStorage.getItem('user_favorite_shops_v2');
-    let targetStores: string[] = [];
-
-    if (savedV2) {
-      const parsed = JSON.parse(savedV2);
-      targetStores = parsed
-        .filter((s: any) => s.visible !== false)
-        .map((s: any) => s.name);
-    }
-
-    if (targetStores.length === 0) {
-      targetStores = ['神田', '赤坂', '秋葉原', '上野', '渋谷', '池袋西口', '五反田', '大宮', '吉祥寺', '大久保', '池袋東口', '小岩'];
-    }
-
-    setDisplayStores(targetStores);
-    setActiveStore(targetStores[0]);
-
-    const fetchData = async () => {
-      setLoading(true);
-      const now = new Date();
-      const today = now.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
+    const saved = localStorage.getItem('user_favorite_shops_v2');
+    if (saved) {
       try {
-        const { data: shiftData } = await supabase.from('shifts').select('*').eq('shift_date', today).eq('status', 'official');
-        if (shiftData) {
-          const { data: castData } = await supabase.from('cast_members').select('*');
-          const merged = shiftData.map(s => {
-            const cast = castData?.find(c => String(c.login_id) === String(s.login_id));
-            const prefix = String(s.login_id || "").substring(0, 3);
-            return {
-              ...s,
-              computed_store_name: shopMap[prefix] || '未設定',
-              profile_image_url: cast?.profile_image_url || cast?.image_url || null
-            };
-          });
-          setShifts(merged);
-        }
-        const { data: newsData } = await supabase.from('user_news').select('*').order('created_at', { ascending: false }).limit(1);
-        if (newsData) setLatestNews(newsData[0]);
-      } catch (err) { console.error(err); } finally { setLoading(false); }
-    };
-    fetchData();
-  }, [router, supabase]);
+        setStores(JSON.parse(saved));
+      } catch (e) {
+        setStores(DEFAULT_STORES);
+      }
+    }
+  }, [router]);
 
-  const filteredShifts = shifts.filter(s => s.computed_store_name === activeStore);
+  // 📍 保存処理
+  const saveToLocal = (updatedStores: any[]) => {
+    localStorage.setItem('user_favorite_shops_v2', JSON.stringify(updatedStores));
+  };
+
+  // 📍 ドラッグ&ドロップ (PC/マウス用)
+  const onDragStart = (index: number) => setDraggedIndex(index);
+  const onDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    const newStores = [...stores];
+    const item = newStores.splice(draggedIndex, 1)[0];
+    newStores.splice(index, 0, item);
+    setDraggedIndex(index);
+    setStores(newStores);
+    saveToLocal(newStores);
+  };
+
+  // 📍 表示・非表示切り替え
+  const toggleVisibility = (index: number) => {
+    const newStores = [...stores];
+    newStores[index].visible = !newStores[index].visible;
+    setStores(newStores);
+    saveToLocal(newStores);
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword) return;
+    setLoading(true);
+    try {
+      if (newPassword !== confirmPassword) throw new Error('パスワード不一致');
+      const { error } = await supabase.from('customer_logins').update({ password_hash: newPassword }).eq('user_id', user.id);
+      if (error) throw error;
+      setMessage({ type: 'success', text: 'パスワードを更新しました' });
+      setNewPassword(''); setConfirmPassword('');
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message });
+    } finally { setLoading(false); }
+  };
+
+  if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24 text-slate-800 font-sans">
-      <header className="bg-white px-6 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
-        <h1 className="text-xl font-black tracking-tighter italic uppercase">Portal</h1>
-        <button onClick={() => { localStorage.removeItem('user_session'); router.push('/user/login'); }}><LogOut size={20} className="text-slate-400" /></button>
+    <div className="min-h-screen bg-slate-50 pb-24 text-slate-800 font-sans select-none">
+      <header className="bg-white px-6 py-4 flex items-center sticky top-0 z-10 shadow-sm">
+        <button onClick={() => router.back()} className="text-slate-400 p-1"><ChevronLeft size={24} /></button>
+        <h1 className="flex-1 text-center text-lg font-black pr-8 italic uppercase tracking-tighter">Setting</h1>
       </header>
 
-      <main className="px-6 pt-6 space-y-6">
-        {/* News配信 */}
-        {latestNews && (
-          <div onClick={() => setIsNewsExpanded(!isNewsExpanded)} className="bg-white p-5 rounded-[32px] border border-blue-100 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="bg-blue-500 text-white text-[9px] font-black px-2 py-1 rounded-lg uppercase">News</div>
-                <div className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-1 rounded-lg border border-slate-200 uppercase">{shopMap[latestNews.shop_id] || '全店舗'}</div>
-                <h3 className="text-[14px] font-black text-slate-800 truncate">{latestNews.title}</h3>
-              </div>
-              <div className="text-slate-300">{isNewsExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}</div>
-            </div>
-            {isNewsExpanded && (
-              <div className="mt-4 space-y-4">
-                {latestNews.image_url && <img src={latestNews.image_url} className="w-full h-auto rounded-2xl border border-slate-50 shadow-sm" alt="News" />}
-                {latestNews.body && <p className="text-[12px] text-slate-500 font-bold leading-relaxed whitespace-pre-wrap px-1">{latestNews.body}</p>}
-              </div>
-            )}
+      <main className="px-6 pt-8 space-y-6 max-w-md mx-auto">
+        {/* 店舗設定セクション */}
+        <section className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-100">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 bg-rose-50 rounded-xl flex items-center justify-center text-rose-500"><Heart size={18} /></div>
+            <h3 className="font-black text-lg tracking-tight">店舗並び替え・表示</h3>
           </div>
-        )}
-
-        {/* 出勤表タブ：非表示の店は出ない */}
-        <section>
-          <div className="flex space-x-2 overflow-x-auto pb-2 no-scrollbar">
-            {displayStores.map((store) => (
-              <button key={store} onClick={() => setActiveStore(store)} className={`px-5 py-2.5 rounded-2xl font-black text-sm transition-all whitespace-nowrap ${activeStore === store ? 'bg-blue-500 text-white shadow-lg shadow-blue-100' : 'bg-white text-slate-400 border border-slate-100'}`}>
-                {store}
-              </button>
+          <p className="text-[10px] text-slate-400 font-black mb-4 px-1 italic">※枠を掴んで上下にスライドして並び替え（即時保存）</p>
+          
+          <div className="space-y-2">
+            {stores.map((store, index) => (
+              <div 
+                key={store.id}
+                draggable
+                onDragStart={() => onDragStart(index)}
+                onDragOver={(e) => onDragOver(e, index)}
+                onDragEnd={() => setDraggedIndex(null)}
+                className={`flex items-center justify-between p-4 rounded-2xl border transition-all duration-200 touch-none ${
+                  store.visible ? 'bg-white border-slate-100 shadow-sm' : 'bg-slate-50 border-transparent opacity-40 grayscale'
+                } ${draggedIndex === index ? 'opacity-50 scale-95 border-blue-200 bg-blue-50' : ''}`}
+              >
+                <div className="flex items-center gap-3 flex-1 h-full">
+                  <GripVertical size={20} className="text-slate-300 shrink-0" />
+                  <span className="font-black text-sm text-slate-700">{store.name}</span>
+                </div>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleVisibility(index);
+                  }}
+                  className={`p-2 rounded-xl transition-all active:scale-90 ${
+                    store.visible ? 'bg-blue-500 text-white shadow-md shadow-blue-100' : 'bg-slate-200 text-slate-400'
+                  }`}
+                >
+                  {store.visible ? <Eye size={18} /> : <EyeOff size={18} />}
+                </button>
+              </div>
             ))}
           </div>
         </section>
 
-        {/* リスト */}
-        <section className="space-y-3">
-          {loading ? (
-            <div className="text-center py-20 text-slate-300 font-black text-xs uppercase tracking-widest">Loading...</div>
-          ) : filteredShifts.length > 0 ? (
-            filteredShifts.map((shift, idx) => (
-              <div key={idx} className="bg-white rounded-[28px] p-4 flex items-center space-x-4 border border-slate-100 shadow-sm">
-                <div className="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden shrink-0">
-                  <img src={shift.profile_image_url || 'https://placehold.jp/150x150.png?text=No%20Image'} className="w-full h-full object-cover" />
-                </div>
-                <div className="flex-1">
-                  <span className="text-[9px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full uppercase">{shift.computed_store_name}</span>
-                  <h4 className="text-lg font-black text-slate-800 mt-1">{shift.hp_display_name}</h4>
-                  <div className="flex items-center text-slate-400 mt-2 text-sm font-black italic">
-                    <Clock size={14} className="mr-1 text-blue-300" /> {shift.start_time} — {shift.end_time}
-                  </div>
-                </div>
+        {/* パスワード設定セクション */}
+        <section className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-100">
+          <form onSubmit={handlePasswordChange} className="space-y-4">
+            <h3 className="font-black text-xs text-slate-400 ml-2 italic uppercase tracking-widest">Security Update</h3>
+            <input
+              type="password"
+              placeholder="新しいパスワード"
+              className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-6 py-4 font-bold outline-none focus:border-blue-100 focus:bg-white transition-all text-sm"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+            <input
+              type="password"
+              placeholder="確認用再入力"
+              className="w-full bg-slate-50 border-2 border-transparent rounded-2xl px-6 py-4 font-bold outline-none focus:border-blue-100 focus:bg-white transition-all text-sm"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+            {message.text && (
+              <div className={`text-center font-black text-[11px] animate-in fade-in zoom-in-95 ${message.type === 'success' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                {message.text}
               </div>
-            ))
-          ) : (
-            <div className="text-center py-20 bg-white rounded-[32px] border border-dashed border-slate-200">
-              <p className="text-slate-300 font-bold text-sm">出勤データはありません</p>
-            </div>
-          )}
+            )}
+            <button 
+              disabled={loading || !newPassword} 
+              className="w-full bg-blue-500 text-white rounded-2xl py-5 font-black text-lg shadow-xl shadow-blue-100 active:scale-95 transition-all disabled:opacity-30"
+            >
+              {loading ? "更新中..." : 'パスワードを更新する'}
+            </button>
+          </form>
         </section>
+
+        <button 
+          onClick={() => { localStorage.removeItem('user_session'); router.push('/user/login'); }}
+          className="w-full py-4 flex items-center justify-center gap-2 text-slate-300 font-bold text-xs hover:text-rose-400 transition-colors"
+        >
+          <LogOut size={16} />
+          <span>ログアウトする</span>
+        </button>
       </main>
 
+      {/* フッターナビ */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-8 py-4 flex justify-between items-center z-20">
-        <button onClick={() => router.push('/user/dashboard')} className="flex flex-col items-center text-blue-500"><Home size={24} /><span className="text-[10px] font-black mt-1">Home</span></button>
-        <button className="flex flex-col items-center text-slate-300"><Search size={24} /><span className="text-[10px] font-black mt-1">Search</span></button>
-        <button className="flex flex-col items-center text-slate-300"><Heart size={24} /><span className="text-[10px] font-black mt-1">Favorite</span></button>
-        <button onClick={() => router.push('/user/profile')} className="flex flex-col items-center text-slate-300"><User size={24} /><span className="text-[10px] font-black mt-1">Mypage</span></button>
+        <button onClick={() => router.push('/user/dashboard')} className="flex flex-col items-center text-slate-300"><Home size={24} /><span className="text-[10px] font-black mt-1 uppercase">Home</span></button>
+        <button className="flex flex-col items-center text-slate-300"><Search size={24} /><span className="text-[10px] font-black mt-1 uppercase">Search</span></button>
+        <button className="flex flex-col items-center text-slate-300"><Heart size={24} /><span className="text-[10px] font-black mt-1 uppercase">Favorite</span></button>
+        <button className="flex flex-col items-center text-blue-500"><User size={24} /><span className="text-[10px] font-black mt-1 uppercase">Mypage</span></button>
       </nav>
     </div>
-  );
-}
-
-export default function UserDashboard() {
-  return (
-    <Suspense fallback={null}><DashboardContent /></Suspense>
   );
 }
