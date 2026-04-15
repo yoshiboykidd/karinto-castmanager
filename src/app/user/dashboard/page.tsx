@@ -53,11 +53,10 @@ function DashboardContent() {
 
       if (shiftData) setShifts(shiftData);
 
-      // ユーザー向けNewsの取得
+      // 📍 修正箇所: 取得先を 'user_news' に変更し、古い 'target' フィルタを削除
       const { data: newsData } = await supabase
-        .from('news')
+        .from('user_news') // 📍 物理的に分かれたテーブルを参照
         .select('*')
-        .eq('target', 'user')
         .order('created_at', { ascending: false })
         .limit(1);
 
