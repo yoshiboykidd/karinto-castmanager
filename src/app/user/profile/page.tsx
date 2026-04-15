@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { ChevronLeft, Lock, CheckCircle2, AlertCircle, Home, Search, Heart, User, LogOut, GripVertical, Eye, EyeOff } from 'lucide-react';
+import { ChevronLeft, Lock, Home, Search, Heart, User, LogOut, GripVertical, Eye, EyeOff } from 'lucide-react';
 
 const DEFAULT_STORES = [
   { id: '001', name: '神田', visible: true }, { id: '002', name: '赤坂', visible: true },
@@ -25,7 +25,6 @@ export default function UserProfilePage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
-  // 📍 並び替え（ドラッグ＆タッチ）管理用
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
   const storesRef = useRef(stores);
 
@@ -40,7 +39,6 @@ export default function UserProfilePage() {
     }
   }, [router]);
 
-  // 最新の店舗リストを常にRefに保持（TouchEnd時に保存するため）
   useEffect(() => {
     storesRef.current = stores;
   }, [stores]);
@@ -49,21 +47,15 @@ export default function UserProfilePage() {
     localStorage.setItem('user_favorite_shops_v2', JSON.stringify(storesRef.current));
   };
 
-  // ----------------------------------------------------
-  // 📱 スマホ用タッチイベント（指でスライド）
-  // ----------------------------------------------------
   const handleTouchMove = (e: React.TouchEvent) => {
     if (draggingIdx === null) return;
     const touch = e.touches[0];
-    
-    // 指の下にある要素を特定し、そのindexを取得
     const elem = document.elementFromPoint(touch.clientX, touch.clientY);
     const targetItem = elem?.closest('[data-sort-index]');
     
     if (targetItem) {
       const hoverIdx = Number(targetItem.getAttribute('data-sort-index'));
       if (hoverIdx !== draggingIdx && !isNaN(hoverIdx)) {
-        // リアルタイムで配列を入れ替え
         setStores(prev => {
           const newStores = [...prev];
           const item = newStores.splice(draggingIdx, 1)[0];
@@ -82,9 +74,6 @@ export default function UserProfilePage() {
     }
   };
 
-  // ----------------------------------------------------
-  // 💻 PC用ドラッグイベント（マウスでスライド）
-  // ----------------------------------------------------
   const handleDragStart = (e: React.DragEvent, index: number) => {
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
     setDraggingIdx(index);
@@ -110,14 +99,10 @@ export default function UserProfilePage() {
     }
   };
 
-  // ----------------------------------------------------
-  // 👁️ 表示・非表示の切り替え（即時保存）
-  // ----------------------------------------------------
   const toggleVisibility = (index: number) => {
     setStores(prev => {
       const newStores = [...prev];
       newStores[index].visible = !newStores[index].visible;
-      // この関数内では最新のstateが確定しているので、ここで直接保存
       localStorage.setItem('user_favorite_shops_v2', JSON.stringify(newStores));
       return newStores;
     });
@@ -155,7 +140,7 @@ export default function UserProfilePage() {
             <h3 className="font-black text-lg tracking-tight">店舗並び替え・表示</h3>
           </div>
           <p className="text-[10px] text-slate-400 font-black mb-4 px-1 italic">
-            ※左のアイコンを掴んでスライドすると並び替わります
+            ※左のアイコンを掴んで上下にスライド
           </p>
           
           <div className="space-y-3">
@@ -168,14 +153,18 @@ export default function UserProfilePage() {
                 onDragEnter={(e) => handleDragEnter(e, index)}
                 onDragEnd={handleDragEnd}
                 onDragOver={(e) => e.preventDefault()}
-                className={`flex items-center justify-between p-4 rounded-2xl border transition-all duration-200 ${
-                  store.visible ? 'bg-white border-slate-100 shadow-sm' : 'bg-slate-50 border-transparent opacity-50 grayscale'
-                } ${draggingIdx === index ? 'opacity-40 scale-95 border-blue-300 shadow-none' : ''}`}
+                className={`flex items-center justify-between p-3 rounded-2xl border transition-all duration-200 ${
+                  store.visible ? 'bg-white border-slate-100 shadow-sm' : 'bg-slate-50 border-transparent opacity-60 grayscale'
+                } ${draggingIdx === index ? 'opacity-90 scale-105 border-blue-300 shadow-xl z-50 relative' : ''}`}
               >
-                <div className="flex items-center gap-3 flex-1 h-full">
-                  {/* 📍 ドラッグ用のハンドル（スマホではここを触るとスクロールが止まり、スライド可能に） */}
+                <div className="flex items-center gap-4 flex-1">
+                  {/* 📍 デザイン変更：操作する領域を独立したブロック（ボタン風）に */}
                   <div
-                    className="p-2 -ml-2 touch-none cursor-grab active:cursor-grabbing text-slate-300"
+                    className={`flex items-center justify-center w-12 h-12 rounded-xl touch-none cursor-grab active:cursor-grabbing transition-colors ${
+                      draggingIdx === index 
+                        ? 'bg-blue-500 text-white shadow-md' 
+                        : 'bg-slate-100 text-slate-400'
+                    }`}
                     onTouchStart={() => setDraggingIdx(index)}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
@@ -183,15 +172,15 @@ export default function UserProfilePage() {
                   >
                     <GripVertical size={20} />
                   </div>
-                  <span className="font-black text-sm text-slate-700 tracking-tight">{store.name}</span>
+                  <span className="font-black text-base text-slate-700 tracking-tight">{store.name}</span>
                 </div>
                 <button 
                   onClick={() => toggleVisibility(index)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-[10px] transition-all shadow-sm active:scale-95 ${
-                    store.visible ? 'bg-blue-500 text-white shadow-blue-200' : 'bg-slate-200 text-slate-400'
+                  className={`flex items-center gap-2 px-4 py-3 rounded-xl font-black text-xs transition-all shadow-sm active:scale-95 ${
+                    store.visible ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-slate-200 text-slate-400'
                   }`}
                 >
-                  {store.visible ? <><Eye size={14} /> 表示</> : <><EyeOff size={14} /> 非表示</>}
+                  {store.visible ? <Eye size={16} /> : <EyeOff size={16} />}
                 </button>
               </div>
             ))}
