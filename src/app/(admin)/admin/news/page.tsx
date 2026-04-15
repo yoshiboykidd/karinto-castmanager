@@ -1,16 +1,13 @@
 'use client';
 
-// 📍 修正：共通クライアントをインポートするように変更 [cite: 2026-02-20]
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react'; // 📍 Suspense を追加
 import { ChevronLeft, LogOut } from 'lucide-react';
 import NewsManager from '@/components/admin/NewsManager';
 
 export default function NewsPage() {
   const router = useRouter();
-  
-  // 📍 修正：共通クライアントを使用。useStateでの保持や環境変数の直接参照を削除 [cite: 2026-02-20]
   const supabase = createClient();
   
   const [myProfile, setMyProfile] = useState<{role: string, shop_id: string | null}>({
@@ -27,7 +24,6 @@ export default function NewsPage() {
         return;
       }
 
-      // ログインユーザーの権限と所属店舗を取得
       const { data } = await supabase
         .from('cast_members')
         .select('role, home_shop_id')
@@ -36,7 +32,7 @@ export default function NewsPage() {
 
       if (data) {
         setMyProfile({
-          role: data.role, // 'developer' か 'admin' (店長)
+          role: data.role,
           shop_id: data.home_shop_id
         });
       }
@@ -75,11 +71,13 @@ export default function NewsPage() {
       </div>
 
       <main className="max-w-2xl mx-auto px-5 -mt-8 relative z-20">
-        {/* 📍 権限情報をコンポーネントに渡す */}
-        <NewsManager 
-          role={myProfile.role} 
-          myShopId={myProfile.shop_id} 
-        />
+        {/* 📍 useSearchParams を使うために Suspense で囲む */}
+        <Suspense fallback={<div className="text-center p-10 font-bold text-gray-400">Loading Manager...</div>}>
+          <NewsManager 
+            role={myProfile.role} 
+            myShopId={myProfile.shop_id} 
+          />
+        </Suspense>
       </main>
     </div>
   );
