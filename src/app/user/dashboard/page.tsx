@@ -19,7 +19,6 @@ function DashboardContent() {
   const stores = ['すべて', '池袋', '赤坂', '五反田', '小岩', '新宿', '渋谷'];
 
   useEffect(() => {
-    // 1. セッション確認と警告判定
     const sessionData = localStorage.getItem('user_session');
     if (!sessionData) {
       router.push('/user/login');
@@ -28,17 +27,14 @@ function DashboardContent() {
     const user = JSON.parse(sessionData);
     setUserName(user.name || 'お客様');
 
-    // パスワードが初期値のままなら警告フラグを立てる
     if (user.password_hash === '0000') {
       setShowPasswordAlert(true);
     }
 
-    // 2. データの取得
     const fetchData = async () => {
       setLoading(true);
       const today = new Date().toISOString().split('T')[0];
       
-      // 出勤情報の取得（テーブル結合）
       const { data: shiftData } = await supabase
         .from('shifts')
         .select(`
@@ -53,9 +49,9 @@ function DashboardContent() {
 
       if (shiftData) setShifts(shiftData);
 
-      // 📍 修正箇所: 取得先を 'user_news' に変更し、古い 'target' フィルタを削除
+      // 📍 user_newsテーブルから最新の1件を取得
       const { data: newsData } = await supabase
-        .from('user_news') // 📍 物理的に分かれたテーブルを参照
+        .from('user_news')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(1);
@@ -82,7 +78,6 @@ function DashboardContent() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-24 text-slate-800">
-      {/* ヘッダー */}
       <header className="bg-white px-6 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shadow-lg shadow-blue-100">
@@ -99,7 +94,6 @@ function DashboardContent() {
       </header>
 
       <main className="px-6 pt-6 space-y-6">
-        {/* 会員カード */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-400 rounded-[32px] p-6 text-white shadow-lg shadow-blue-100 relative overflow-hidden">
           <div className="relative z-10">
             <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest mb-1">Membership</p>
@@ -117,7 +111,6 @@ function DashboardContent() {
           <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
         </div>
 
-        {/* 🚨 初期パスワード警告バナー */}
         {showPasswordAlert && (
           <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex items-start space-x-3 animate-pulse">
             <div className="p-2 bg-amber-200 rounded-xl shrink-0">
@@ -132,15 +125,30 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* 💎 ユーザー向け最新News */}
+        {/* 💎 ユーザー向け最新News - 修正: タイトルに加えて本文と画像も表示 */}
         {latestNews && (
-          <div className="bg-white p-4 rounded-3xl border border-blue-100 shadow-sm flex items-center gap-3">
-            <div className="bg-blue-500 text-white text-[9px] font-black px-2 py-1 rounded-lg uppercase shrink-0">News</div>
-            <p className="text-xs font-black text-slate-700 truncate">{latestNews.title}</p>
+          <div className="bg-white p-5 rounded-[32px] border border-blue-100 shadow-sm space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-500 text-white text-[9px] font-black px-2 py-1 rounded-lg uppercase shrink-0">News</div>
+              <h3 className="text-[14px] font-black text-slate-800">{latestNews.title}</h3>
+            </div>
+            
+            {latestNews.image_url && (
+              <img 
+                src={latestNews.image_url} 
+                className="w-full h-auto rounded-2xl border border-slate-50 shadow-sm" 
+                alt="News" 
+              />
+            )}
+            
+            {latestNews.body && (
+              <p className="text-[11px] text-slate-500 font-bold leading-relaxed whitespace-pre-wrap">
+                {latestNews.body}
+              </p>
+            )}
           </div>
         )}
 
-        {/* 店舗切り替えタブ */}
         <section>
           <div className="flex items-center justify-between mb-4 px-1">
             <h3 className="font-black text-lg flex items-center">
@@ -165,7 +173,6 @@ function DashboardContent() {
           </div>
         </section>
 
-        {/* キャストリスト */}
         <section className="space-y-3">
           {loading ? (
             <div className="flex flex-col items-center py-20 space-y-4">
@@ -211,7 +218,6 @@ function DashboardContent() {
         </section>
       </main>
 
-      {/* フッターナビ */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-8 py-4 flex justify-between items-center z-20">
         <button className="flex flex-col items-center text-blue-500">
           <Home size={24} />
