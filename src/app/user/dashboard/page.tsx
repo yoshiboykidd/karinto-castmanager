@@ -5,21 +5,10 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { Heart, Clock, MapPin, LogOut, Bell, User, Home, Search, Star, ChevronDown, ChevronUp } from 'lucide-react';
 
-// 📍 001-012までの完全な店名マップ
 const shopMap: Record<string, string> = {
-  'all': '全店舗',
-  '001': '神田',
-  '002': '赤坂',
-  '003': '秋葉原',
-  '004': '上野',
-  '005': '渋谷',
-  '006': '池袋西口',
-  '007': '五反田',
-  '008': '大宮',
-  '009': '吉祥寺',
-  '010': '大久保',
-  '011': '池袋東口',
-  '012': '小岩'
+  'all': '全店舗', '001': '神田', '002': '赤坂', '003': '秋葉原', '004': '上野',
+  '005': '渋谷', '006': '池袋西口', '007': '五反田', '008': '大宮',
+  '009': '吉祥寺', '010': '大久保', '011': '池袋東口', '012': '小岩'
 };
 
 function DashboardContent() {
@@ -34,7 +23,6 @@ function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [isNewsExpanded, setIsNewsExpanded] = useState(false);
 
-  // 📍 確定した12店舗リスト
   const stores = ['すべて', '神田', '赤坂', '秋葉原', '上野', '渋谷', '池袋西口', '五反田', '大宮', '吉祥寺', '大久保', '池袋東口', '小岩'];
 
   useEffect(() => {
@@ -53,17 +41,23 @@ function DashboardContent() {
     const fetchData = async () => {
       setLoading(true);
       
-      // 📍 修正1: 日本時間の今日を確実に取得（UTCのズレを解消）
-      const today = new Intl.DateTimeFormat('ja-JP', { 
-        year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo' 
-      }).format(new Date()).replace(/\//g, '-');
+      // 📍 管理画面と同一の日付取得ロジック (JST固定)
+      const now = new Date();
+      const jstOffset = 9 * 60 * 60 * 1000;
+      const jstDate = new Date(now.getTime() + jstOffset);
+      const today = jstDate.toISOString().split('T')[0];
       
-      // 📍 修正2: cast_membersとの外部結合を確実に実行
-      const { data: shiftData } = await supabase
+      // 📍 管理画面で稼働しているクエリを流用
+      // cast_members の店舗名や画像、シフトの開始・終了時間を取得
+      const { data: shiftData, error: shiftError } = await supabase
         .from('shifts')
         .select(`
-          *,
-          cast_members!inner (
+          id,
+          shift_date,
+          start_time,
+          end_time,
+          hp_display_name,
+          cast_members (
             store_name,
             profile_image_url
           )
@@ -95,7 +89,6 @@ function DashboardContent() {
     router.push('/user/login');
   };
 
-  // 📍 修正3: 店名の完全一致（===）でフィルタリング
   const filteredShifts = activeStore === 'すべて' 
     ? shifts 
     : shifts.filter(s => s.cast_members?.store_name === activeStore);
@@ -166,7 +159,6 @@ function DashboardContent() {
                 {isNewsExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
               </div>
             </div>
-            
             {isNewsExpanded && (
               <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                 {latestNews.image_url && (
@@ -252,22 +244,10 @@ function DashboardContent() {
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-slate-100 px-8 py-4 flex justify-between items-center z-20">
-        <button className="flex flex-col items-center text-blue-500">
-          <Home size={24} />
-          <span className="text-[10px] font-black mt-1">Home</span>
-        </button>
-        <button className="flex flex-col items-center text-slate-300">
-          <Search size={24} />
-          <span className="text-[10px] font-black mt-1">Search</span>
-        </button>
-        <button className="flex flex-col items-center text-slate-300">
-          <Heart size={24} />
-          <span className="text-[10px] font-black mt-1">Favorite</span>
-        </button>
-        <button onClick={() => router.push('/user/profile')} className="flex flex-col items-center text-slate-300">
-          <User size={24} />
-          <span className="text-[10px] font-black mt-1">Mypage</span>
-        </button>
+        <button className="flex flex-col items-center text-blue-500"><Home size={24} /><span className="text-[10px] font-black mt-1">Home</span></button>
+        <button className="flex flex-col items-center text-slate-300"><Search size={24} /><span className="text-[10px] font-black mt-1">Search</span></button>
+        <button className="flex flex-col items-center text-slate-300"><Heart size={24} /><span className="text-[10px] font-black mt-1">Favorite</span></button>
+        <button onClick={() => router.push('/user/profile')} className="flex flex-col items-center text-slate-300"><User size={24} /><span className="text-[10px] font-black mt-1">Mypage</span></button>
       </nav>
     </div>
   );
@@ -275,7 +255,7 @@ function DashboardContent() {
 
 export default function UserDashboard() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center font-bold text-slate-300 uppercase tracking-widest text-xs">Loading Dashboard...</div>}>
+    <Suspense fallback={null}>
       <DashboardContent />
     </Suspense>
   );
