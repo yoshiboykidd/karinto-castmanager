@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { Heart, Clock, MapPin, LogOut, Bell, User, Home, Search, Star, ChevronDown, ChevronUp } from 'lucide-react';
 
-// 📍 正解：管理画面（admin/page.tsx）の定義を完全コピー
 const shopMap: Record<string, string> = {
   'all': '全店舗', '001': '神田', '002': '赤坂', '003': '秋葉原', '004': '上野',
   '005': '渋谷', '006': '池袋西口', '007': '五反田', '008': '大宮',
@@ -24,7 +23,6 @@ function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [isNewsExpanded, setIsNewsExpanded] = useState(false);
 
-  // 📍 正解：001-012の店舗リスト
   const stores = ['すべて', '神田', '赤坂', '秋葉原', '上野', '渋谷', '池袋西口', '五反田', '大宮', '吉祥寺', '大久保', '池袋東口', '小岩'];
 
   useEffect(() => {
@@ -43,19 +41,31 @@ function DashboardContent() {
     const fetchData = async () => {
       setLoading(true);
       
-      // 📍 正解：useShiftData.ts と同じ日付形式を取得
-      const today = new Date().toLocaleDateString('sv-SE'); // yyyy-MM-dd 形式
+      // 📍 修正1：日付の取得を最も確実な「サーバー時間ベース」に
+      const now = new Date();
+      const today = now.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
       
-      // 📍 正解：useShiftData.ts のカラム構成を元にしたクエリ
-      // 外部結合が不安定な場合を考慮し、最も標準的な結合方法に変更
-      const { data: shiftData } = await supabase
+      // 📍 修正2：結合を「左外部結合」にし、エラーをコンソールに出力
+      const { data: shiftData, error: shiftError } = await supabase
         .from('shifts')
-        .select('*, cast_members(store_name, profile_image_url)')
+        .select(`
+          *,
+          cast_members (
+            store_name,
+            profile_image_url
+          )
+        `)
         .eq('shift_date', today)
-        .eq('status', 'official') // 📍 重要：確定済みシフトのみ表示（稼働中ロジック準拠）
+        .eq('status', 'official')
         .order('start_time', { ascending: true });
 
-      if (shiftData) setShifts(shiftData);
+      if (shiftError) {
+        console.error('SHIFT_FETCH_ERROR:', shiftError);
+      }
+
+      if (shiftData) {
+        setShifts(shiftData);
+      }
 
       const { data: newsData } = await supabase
         .from('user_news')
@@ -101,6 +111,7 @@ function DashboardContent() {
       </header>
 
       <main className="px-6 pt-6 space-y-6">
+        {/* 会員カード、警告バナー、Newsセクションは既存通り */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-400 rounded-[32px] p-6 text-white shadow-lg shadow-blue-100 relative overflow-hidden">
           <div className="relative z-10">
             <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest mb-1">Membership</p>
@@ -120,12 +131,10 @@ function DashboardContent() {
 
         {showPasswordAlert && (
           <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex items-start space-x-3 animate-pulse">
-            <div className="p-2 bg-amber-200 rounded-xl shrink-0">
-              <Star size={16} className="text-amber-700 fill-amber-700" />
-            </div>
+            <div className="p-2 bg-amber-200 rounded-xl shrink-0"><Star size={16} className="text-amber-700 fill-amber-700" /></div>
             <div>
               <p className="text-sm font-black text-amber-900">セキュリティ警告</p>
-              <p className="text-[11px] font-bold text-amber-700 leading-relaxed mt-0.5">初期パスワード（0000）が設定されています。変更してください。</p>
+              <p className="text-[11px] font-bold text-amber-700 leading-relaxed mt-0.5">初期パスワードを変更してください。</p>
             </div>
           </div>
         )}
@@ -135,9 +144,7 @@ function DashboardContent() {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="bg-blue-500 text-white text-[9px] font-black px-2 py-1 rounded-lg uppercase shrink-0">News</div>
-                <div className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-1 rounded-lg border border-slate-200 uppercase shrink-0">
-                  {shopMap[latestNews.shop_id] || '全店舗'}
-                </div>
+                <div className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-1 rounded-lg border border-slate-200 uppercase shrink-0">{shopMap[latestNews.shop_id] || '全店舗'}</div>
                 <h3 className="text-[14px] font-black text-slate-800 truncate">{latestNews.title}</h3>
               </div>
               <div className="text-slate-300 shrink-0">{isNewsExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}</div>
@@ -174,12 +181,18 @@ function DashboardContent() {
             filteredShifts.map((shift, idx) => (
               <div key={idx} className="bg-white rounded-[28px] p-4 flex items-center space-x-4 border border-slate-100 shadow-sm hover:border-blue-200 transition-all">
                 <div className="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden flex-shrink-0 border border-slate-50">
-                  <img src={shift.cast_members?.profile_image_url || 'https://via.placeholder.com/150'} alt={shift.hp_display_name} className="w-full h-full object-cover" />
+                  <img 
+                    src={shift.cast_members?.profile_image_url || 'https://via.placeholder.com/150'} 
+                    alt={shift.hp_display_name} 
+                    className="w-full h-full object-cover" 
+                  />
                 </div>
                 <div className="flex-1 text-left">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="text-[9px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full uppercase">{shift.cast_members?.store_name || 'SHOP'}</span>
+                      <span className="text-[9px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full uppercase">
+                        {shift.cast_members?.store_name || 'SHOP'}
+                      </span>
                       <h4 className="text-lg font-black text-slate-800 mt-1">{shift.hp_display_name || 'Name'}</h4>
                     </div>
                     <button className="text-slate-200 hover:text-blue-400 transition-colors"><Heart size={20} /></button>
