@@ -47,15 +47,17 @@ export default function UserLoginPage() {
   return (
     <div className="min-h-screen bg-white flex flex-col justify-center px-8">
       <div className="mb-10 text-center">
+        {/* メインロゴ */}
         <h1 className="text-3xl font-black text-gray-800 tracking-tighter">KCM</h1>
-        <p className="text-[12px] font-bold text-pink-400">Karinto Customer Manager</p>
+        {/* 📍 サブタイトルを青に変更 & Karintoを排除 */}
+        <p className="text-[12px] font-bold text-blue-400">KCM Member</p>
       </div>
 
       <form onSubmit={handleLogin} className="space-y-4">
         <input
           type="tel"
           placeholder="電話番号を入力"
-          className="w-full bg-gray-50 border-none rounded-2xl px-6 py-4 font-bold text-gray-700"
+          className="w-full bg-gray-50 border-none rounded-2xl px-6 py-4 font-bold text-gray-700 focus:ring-2 focus:ring-blue-100 outline-none"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           required
@@ -63,15 +65,18 @@ export default function UserLoginPage() {
         <input
           type="password"
           placeholder="パスワード (初期: 0000)"
-          className="w-full bg-gray-50 border-none rounded-2xl px-6 py-4 font-bold text-gray-700"
+          className="w-full bg-gray-50 border-none rounded-2xl px-6 py-4 font-bold text-gray-700 focus:ring-2 focus:ring-blue-100 outline-none"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
         />
+        
         {error && <p className="text-rose-500 text-xs font-bold text-center">{error}</p>}
+        
+        {/* 📍 ログインボタンを青に変更 */}
         <button
           disabled={loading}
-          className="w-full bg-pink-500 text-white rounded-2xl py-5 font-black text-lg shadow-lg shadow-pink-100 active:scale-95 transition-all"
+          className="w-full bg-blue-500 text-white rounded-2xl py-5 font-black text-lg shadow-lg shadow-blue-100 active:scale-95 transition-all disabled:bg-gray-300"
         >
           {loading ? '認証中...' : 'ログイン'}
         </button>
