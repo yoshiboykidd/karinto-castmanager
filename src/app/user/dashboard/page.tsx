@@ -3,7 +3,24 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { Heart, Clock, MapPin, LogOut, Bell, User, Home, Search, Star } from 'lucide-react';
+import { Heart, Clock, MapPin, LogOut, Bell, User, Home, Search, Star, ChevronDown, ChevronUp } from 'lucide-react';
+
+// 📍 001-012までの完全な店名マップ
+const shopMap: Record<string, string> = {
+  'all': '全店舗',
+  '001': '神田',
+  '002': '赤坂',
+  '003': '秋葉原',
+  '004': '上野',
+  '005': '渋谷',
+  '006': '池袋西口',
+  '007': '五反田',
+  '008': '大宮',
+  '009': '吉祥寺',
+  '010': '大久保',
+  '011': '池袋東口',
+  '012': '小岩'
+};
 
 function DashboardContent() {
   const router = useRouter();
@@ -16,7 +33,10 @@ function DashboardContent() {
   const [latestNews, setLatestNews] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const stores = ['すべて', '池袋', '赤坂', '五反田', '小岩', '新宿', '渋谷'];
+  const [isNewsExpanded, setIsNewsExpanded] = useState(false);
+
+  // 📍 修正：管理画面と一致する12店舗リスト
+  const stores = ['すべて', '神田', '赤坂', '秋葉原', '上野', '渋谷', '池袋西口', '五反田', '大宮', '吉祥寺', '大久保', '池袋東口', '小岩'];
 
   useEffect(() => {
     const sessionData = localStorage.getItem('user_session');
@@ -49,7 +69,6 @@ function DashboardContent() {
 
       if (shiftData) setShifts(shiftData);
 
-      // 📍 user_newsテーブルから最新の1件を取得
       const { data: newsData } = await supabase
         .from('user_news')
         .select('*')
@@ -72,9 +91,10 @@ function DashboardContent() {
     router.push('/user/login');
   };
 
+  // 📍 修正：店舗名が厳密に分かれたため、完全一致(===)でフィルタリング
   const filteredShifts = activeStore === 'すべて' 
     ? shifts 
-    : shifts.filter(s => s.cast_members?.store_name?.includes(activeStore));
+    : shifts.filter(s => s.cast_members?.store_name === activeStore);
 
   return (
     <div className="min-h-screen bg-slate-50 pb-24 text-slate-800">
@@ -125,26 +145,41 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* 💎 ユーザー向け最新News - 修正: タイトルに加えて本文と画像も表示 */}
         {latestNews && (
-          <div className="bg-white p-5 rounded-[32px] border border-blue-100 shadow-sm space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="bg-blue-500 text-white text-[9px] font-black px-2 py-1 rounded-lg uppercase shrink-0">News</div>
-              <h3 className="text-[14px] font-black text-slate-800">{latestNews.title}</h3>
+          <div 
+            onClick={() => setIsNewsExpanded(!isNewsExpanded)}
+            className="bg-white p-5 rounded-[32px] border border-blue-100 shadow-sm cursor-pointer transition-all active:scale-[0.98]"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="bg-blue-500 text-white text-[9px] font-black px-2 py-1 rounded-lg uppercase shrink-0">News</div>
+                
+                <div className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-1 rounded-lg border border-slate-200 uppercase shrink-0">
+                  {shopMap[latestNews.shop_id] || '全店舗'}
+                </div>
+
+                <h3 className="text-[14px] font-black text-slate-800 truncate">{latestNews.title}</h3>
+              </div>
+              <div className="text-slate-300 shrink-0">
+                {isNewsExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+              </div>
             </div>
             
-            {latestNews.image_url && (
-              <img 
-                src={latestNews.image_url} 
-                className="w-full h-auto rounded-2xl border border-slate-50 shadow-sm" 
-                alt="News" 
-              />
-            )}
-            
-            {latestNews.body && (
-              <p className="text-[11px] text-slate-500 font-bold leading-relaxed whitespace-pre-wrap">
-                {latestNews.body}
-              </p>
+            {isNewsExpanded && (
+              <div className="mt-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                {latestNews.image_url && (
+                  <img 
+                    src={latestNews.image_url} 
+                    className="w-full h-auto rounded-2xl border border-slate-50 shadow-sm" 
+                    alt="News" 
+                  />
+                )}
+                {latestNews.body && (
+                  <p className="text-[12px] text-slate-500 font-bold leading-relaxed whitespace-pre-wrap px-1">
+                    {latestNews.body}
+                  </p>
+                )}
+              </div>
             )}
           </div>
         )}
