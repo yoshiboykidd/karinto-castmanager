@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+// 📍 RefreshCw（更新アイコン）を追加
 import { LogOut, RefreshCw } from 'lucide-react';
 import { format, isValid, parseISO, isToday } from 'date-fns';
 
@@ -17,7 +18,7 @@ export default function CastHeader({
   shopName, 
   syncTime, 
   displayName, 
-  version, // 📍 ここに追加して波線を解消しました
+  version, // 📍 引数に version を追加し、波線エラーを解消しました
   bgColor 
 }: CastHeaderProps) {
   const router = useRouter();
@@ -80,6 +81,7 @@ export default function CastHeader({
 
           <div className="flex flex-col items-end space-y-1.5">
             
+            {/* 📍 HP SYNCの横にリロードボタンを配置 */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => window.location.reload()}
