@@ -17,15 +17,15 @@ function DashboardContent() {
 
   const [userName, setUserName] = useState('ゲスト');
   const [showPasswordAlert, setShowPasswordAlert] = useState(false);
-  const [activeStore, setActiveStore] = useState(''); // 📍 初期値は後ほど設定
+  const [activeStore, setActiveStore] = useState('');
   const [shifts, setShifts] = useState<any[]>([]);
   const [latestNews, setLatestNews] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isNewsExpanded, setIsNewsExpanded] = useState(false);
 
-  // 📍 修正1：デフォルトの店舗リスト（マイページ未設定時用）
+  // 📍 デフォルト店舗リスト
   const defaultStores = ['神田', '赤坂', '秋葉原', '上野', '渋谷', '池袋西口', '五反田', '大宮', '吉祥寺', '大久保', '池袋東口', '小岩'];
-  const [stores, setStores] = useState<string[]>(defaultStores);
+  const [displayStores, setDisplayStores] = useState<string[]>([]);
 
   useEffect(() => {
     const sessionData = localStorage.getItem('user_session');
@@ -40,15 +40,25 @@ function DashboardContent() {
       setShowPasswordAlert(true);
     }
 
-    // 📍 修正2：マイページで保存した並び順を読み込む
-    const savedOrder = localStorage.getItem('user_favorite_shops');
-    if (savedOrder) {
-      const parsedOrder = JSON.parse(savedOrder);
-      setStores(parsedOrder);
-      setActiveStore(parsedOrder[0]); // 一番左（お気に入り1位）を初期選択にする
-    } else {
-      setActiveStore('神田');
+    // 📍 修正1：マイページの設定（V2）を読み込み、表示順とフィルタリングを適用
+    const savedV2 = localStorage.getItem('user_favorite_shops_v2');
+    let targetStores: string[] = [];
+
+    if (savedV2) {
+      const parsed = JSON.parse(savedV2);
+      // 表示(visible)設定がONの店舗名のみを、保存された順序で抽出
+      targetStores = parsed
+        .filter((s: any) => s.visible !== false) // 明示的にfalseでない限り表示
+        .map((s: any) => s.name);
     }
+
+    // 設定がない、または表示対象がゼロの場合はデフォルトを使用
+    if (targetStores.length === 0) {
+      targetStores = defaultStores;
+    }
+
+    setDisplayStores(targetStores);
+    setActiveStore(targetStores[0]);
 
     const fetchData = async () => {
       setLoading(true);
@@ -72,18 +82,26 @@ function DashboardContent() {
             const cast = castData?.find(c => String(c.login_id) === String(s.login_id));
             const prefix = String(s.login_id || "").substring(0, 3);
             const imageUrl = cast?.profile_image_url || cast?.image_url || cast?.photo_url || cast?.profile_image || null;
+            
             return {
               ...s,
               computed_store_name: shopMap[prefix] || '未設定',
               profile_image_url: imageUrl
             };
           });
+
           setShifts(mergedShifts);
         }
 
-        const { data: newsData } = await supabase.from('user_news').select('*').order('created_at', { ascending: false }).limit(1);
-        if (newsData) setLatestNews(newsData[0]);
+        const { data: newsData } = await supabase
+          .from('user_news')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1);
 
+        if (newsData && newsData.length > 0) {
+          setLatestNews(newsData[0]);
+        }
       } catch (err) {
         console.error('FETCH_ERROR:', err);
       } finally {
@@ -103,13 +121,13 @@ function DashboardContent() {
   const filteredShifts = shifts.filter(s => s.computed_store_name === activeStore);
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24 text-slate-800">
+    <div className="min-h-screen bg-slate-50 pb-24 text-slate-800 font-sans">
       <header className="bg-white px-6 py-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shadow-lg shadow-blue-100">
             <span className="text-white font-black text-xs">KCM</span>
           </div>
-          <h1 className="text-xl font-black tracking-tighter text-slate-800">Member Portal</h1>
+          <h1 className="text-xl font-black tracking-tighter text-slate-800 uppercase italic">Member Portal</h1>
         </div>
         <div className="flex items-center space-x-4 text-slate-400">
           <button onClick={handleLogout} className="hover:text-rose-500 transition-colors"><LogOut size={20} /></button>
@@ -117,14 +135,15 @@ function DashboardContent() {
       </header>
 
       <main className="px-6 pt-6 space-y-6">
+        {/* ポイントカード */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-400 rounded-[32px] p-6 text-white shadow-lg shadow-blue-100 relative overflow-hidden">
           <div className="relative z-10">
-            <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest mb-1">Membership</p>
-            <h2 className="text-2xl font-black mb-4">{userName} 様</h2>
+            <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest mb-1">Membership Status</p>
+            <h2 className="text-2xl font-black mb-4 tracking-tight">{userName} 様</h2>
             <div className="flex justify-between items-end">
               <div>
                 <p className="text-blue-100 text-[10px] uppercase font-bold tracking-tighter">Points Balance</p>
-                <p className="text-3xl font-black italic">1,240 <span className="text-sm font-bold">pt</span></p>
+                <p className="text-3xl font-black italic">1,240 <span className="text-sm font-bold opacity-80 not-italic ml-1">PT</span></p>
               </div>
               <div className="bg-white/20 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/30 text-[10px] font-black uppercase tracking-widest">Card Detail</div>
             </div>
@@ -132,13 +151,14 @@ function DashboardContent() {
           <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
         </div>
 
+        {/* ニュース配信 */}
         {latestNews && (
           <div onClick={() => setIsNewsExpanded(!isNewsExpanded)} className="bg-white p-5 rounded-[32px] border border-blue-100 shadow-sm cursor-pointer transition-all active:scale-[0.98]">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="bg-blue-500 text-white text-[9px] font-black px-2 py-1 rounded-lg uppercase shrink-0">News</div>
                 <div className="bg-slate-100 text-slate-500 text-[9px] font-black px-2 py-1 rounded-lg border border-slate-200 uppercase shrink-0">{shopMap[latestNews.shop_id] || '全店舗'}</div>
-                <h3 className="text-[14px] font-black text-slate-800 truncate">{latestNews.title}</h3>
+                <h3 className="text-[14px] font-black text-slate-800 truncate tracking-tight">{latestNews.title}</h3>
               </div>
               <div className="text-slate-300 shrink-0">{isNewsExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}</div>
             </div>
@@ -151,24 +171,32 @@ function DashboardContent() {
           </div>
         )}
 
+        {/* 出勤表タブ */}
         <section>
           <div className="flex items-center justify-between mb-4 px-1">
-            <h3 className="font-black text-lg flex items-center"><MapPin size={18} className="mr-2 text-blue-500" />本日の出勤表</h3>
+            <h3 className="font-black text-lg flex items-center tracking-tight"><MapPin size={18} className="mr-2 text-blue-500" />本日の出勤表</h3>
           </div>
           <div className="flex space-x-2 overflow-x-auto pb-2 no-scrollbar">
-            {stores.map((store) => (
-              <button key={store} onClick={() => setActiveStore(store)} className={`px-5 py-2.5 rounded-2xl font-black text-sm transition-all whitespace-nowrap ${activeStore === store ? 'bg-blue-500 text-white shadow-md shadow-blue-100' : 'bg-white text-slate-400 border border-slate-100'}`}>
+            {displayStores.map((store) => (
+              <button 
+                key={store} 
+                onClick={() => setActiveStore(store)} 
+                className={`px-5 py-2.5 rounded-2xl font-black text-sm transition-all whitespace-nowrap ${
+                  activeStore === store ? 'bg-blue-500 text-white shadow-md shadow-blue-100' : 'bg-white text-slate-400 border border-slate-100'
+                }`}
+              >
                 {store}
               </button>
             ))}
           </div>
         </section>
 
+        {/* 出勤リスト */}
         <section className="space-y-3">
           {loading ? (
             <div className="flex flex-col items-center py-20 space-y-4">
               <div className="w-8 h-8 border-4 border-blue-100 border-t-blue-500 rounded-full animate-spin"></div>
-              <p className="text-slate-300 font-black text-xs uppercase tracking-widest">Loading...</p>
+              <p className="text-slate-300 font-black text-[10px] uppercase tracking-widest">Loading Shifts...</p>
             </div>
           ) : filteredShifts.length > 0 ? (
             filteredShifts.map((shift, idx) => (
@@ -177,11 +205,11 @@ function DashboardContent() {
                   <img src={shift.profile_image_url || 'https://placehold.jp/150x150.png?text=No%20Image'} alt={shift.hp_display_name} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1 text-left">
-                  <div>
-                    <span className="text-[9px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full uppercase">{shift.computed_store_name}</span>
-                    <h4 className="text-lg font-black text-slate-800 mt-1">{shift.hp_display_name}</h4>
+                  <div className="mb-2">
+                    <span className="text-[9px] font-black text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full uppercase tracking-tighter">{shift.computed_store_name}</span>
+                    <h4 className="text-lg font-black text-slate-800 mt-1 leading-none">{shift.hp_display_name}</h4>
                   </div>
-                  <div className="flex items-center text-slate-400 mt-2">
+                  <div className="flex items-center text-slate-400">
                     <Clock size={14} className="mr-1 text-blue-300" />
                     <span className="text-sm font-black tracking-tighter">{shift.start_time} — {shift.end_time}</span>
                   </div>
@@ -190,7 +218,7 @@ function DashboardContent() {
             ))
           ) : (
             <div className="text-center py-20 bg-white rounded-[32px] border border-dashed border-slate-200">
-              <p className="text-slate-300 font-bold text-sm">本日の出勤データはありません</p>
+              <p className="text-slate-300 font-bold text-sm">出勤データはありません</p>
             </div>
           )}
         </section>
