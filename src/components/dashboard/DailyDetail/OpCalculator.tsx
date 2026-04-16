@@ -1,11 +1,9 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-// 📍 修正：ライブラリから直接ではなく、共通クライアントをインポート [cite: 2026-02-20]
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 
-// 📍 修正：URLやKeyの記述を削除し、引数なしで呼び出し [cite: 2026-02-20]
 const supabase = createClient();
 
 const SHOP_ID_MAP: { [key: string]: string } = {
@@ -61,17 +59,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
   const isActuallyPlaying = useMemo(() => isInCall || dbRes?.status === 'playing', [isInCall, dbRes?.status]);
   const isCompleted = useMemo(() => dbRes?.status === 'completed', [dbRes?.status]);
   const currentCategories = useMemo(() => dbRes?.service_type === '添' ? SOINE_OPS : KARINTO_OPS, [dbRes?.service_type]);
-
-  // 📍 追加：延長オプションの定義
-  const extensionOps = useMemo(() => {
-    if (dbRes?.service_type === '添') {
-      return [{ n: '延30', t: '延長30分', p: 6000, label: '延長' }];
-    }
-    return [
-      { n: '延15', t: '延長15分', p: 3000, label: '延長' },
-      { n: '延30', t: '延長30分', p: 5000, label: '延長' }
-    ];
-  }, [dbRes?.service_type]);
 
   const allSavedOps = useMemo(() => Array.isArray(dbRes?.op_details) ? dbRes.op_details : [], [dbRes?.op_details]);
   const savedOpsActive = useMemo(() => allSavedOps.filter((op: any) => op?.status !== 'canceled'), [allSavedOps]);
@@ -167,7 +154,7 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
 
       let message = "";
       if (type === 'HELP') {
-        message = `${borderLine}\n🆘 スタッフ至急！\n客名: ${cName}様\n${borderLine}`;
+        message = `${borderLine}\n🆘 スタッフ至急！\n【${castName}】さんからの呼出\n客名: ${cName}様\n${borderLine}`;
       } else if (type === 'START') {
         message = `${borderLine}\n${castName} 入室完了 🚀\n${courseInfo} [${timeDisplay}]\n${cName}様\n[OP: ${currentOpNos}]\nスタート会計: ${amountRow}\n${borderLine}`;
       } else if (type === 'FINISH') {
@@ -250,24 +237,26 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
           </div>
         ))}
 
-        {/* 📍 追加：延長セクション */}
+        {/* 📍 復元：延長セクション（本番同期済み） */}
         <div className="space-y-2 pt-2 border-t border-white/10">
-          <h3 className="text-[10px] font-black text-green-400 px-1 uppercase border-l-2 border-green-500/50 ml-1 tracking-widest">延長 (Extensions)</h3>
-          <div className="grid grid-cols-2 gap-2">
-            {extensionOps.map((item) => {
-              const isSelected = selectedOps.some(op => op.no === item.n && op.name === item.t);
-              const isSaved = savedOpsActive.some((op: any) => op?.no === item.n && op?.name === item.t);
-              return (
-                <button 
-                  key={item.t} 
-                  onClick={() => toggleOp(item.n, item.t, item.p, item.label)}
-                  className={`min-h-[60px] rounded-[20px] flex flex-col items-center justify-center border transition-all ${isSelected || isSaved ? 'bg-green-600 border-green-400 shadow-[0_0_15px_rgba(22,163,74,0.3)]' : 'bg-white/5 border-white/5 text-gray-400'}`}
-                >
-                  <span className="text-[11px] font-black leading-tight text-center px-1">【{item.t}】</span>
-                  <span className="text-[18px] font-black">+{item.p.toLocaleString()}</span>
-                </button>
-              );
-            })}
+          <h3 className="text-[10px] font-black text-blue-400 px-1 uppercase border-l-2 border-blue-500/50 ml-1 tracking-widest">延長 (Extensions)</h3>
+          <div className={`grid ${dbRes?.service_type === '添' ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
+            {dbRes?.service_type !== '添' && (
+              <button
+                onClick={() => toggleOp('延15', '延長15分', 3000, '延長')}
+                className={`min-h-[60px] rounded-[20px] flex flex-col items-center justify-center border transition-all ${selectedOps.some(op => op.no === '延15') || savedOpsActive.some((op: any) => op.no === '延15') ? 'bg-blue-600 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.3)]' : 'bg-white/5 border-white/5 text-gray-400'}`}
+              >
+                <span className="text-[11px] font-black leading-tight text-center px-1">延長15分</span>
+                <span className="text-[18px] font-black">¥3,000</span>
+              </button>
+            )}
+            <button
+              onClick={() => toggleOp('延30', '延長30分', dbRes?.service_type === '添' ? 4000 : 6000, '延長')}
+              className={`min-h-[60px] rounded-[20px] flex flex-col items-center justify-center border transition-all ${selectedOps.some(op => op.no === '延30') || savedOpsActive.some((op: any) => op.no === '延30') ? 'bg-blue-600 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.3)]' : 'bg-white/5 border-white/5 text-gray-400'}`}
+            >
+              <span className="text-[11px] font-black leading-tight text-center px-1">延長30分</span>
+              <span className="text-[18px] font-black">¥{dbRes?.service_type === '添' ? '4,000' : '6,000'}</span>
+            </button>
           </div>
         </div>
 

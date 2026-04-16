@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut } from 'lucide-react';
+// 📍 更新アイコン(RefreshCw)を追加
+import { LogOut, RefreshCw } from 'lucide-react';
 import { format, isValid, parseISO, isToday } from 'date-fns';
 
 type CastHeaderProps = {
@@ -99,28 +100,45 @@ export default function CastHeader({
           </div>
 
           <div className="flex flex-col items-end space-y-1.5">
-            <div className={`w-[128px] h-[42px] rounded-xl border flex items-center justify-center gap-2 shadow-sm transition-colors
-              ${isThemed 
-                ? 'bg-white/20 border-white/20 text-white' 
-                : 'bg-green-50/80 border-green-100'
-              }
-            `}>
-              <span className="relative flex h-2.5 w-2.5 shrink-0">
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75
-                  ${isThemed ? 'bg-white' : 'bg-green-400'}
-                `}></span>
-                <span className={`relative inline-flex rounded-full h-2.5 w-2.5
-                  ${isThemed ? 'bg-white' : 'bg-green-500'}
-                `}></span>
-              </span>
-              <div className="flex flex-col leading-none items-center">
-                <span className={`text-[8px] font-black uppercase tracking-tighter mb-0.5
-                  ${isThemed ? 'text-white/70' : 'text-green-600/50'}
-                `}>HP SYNC</span>
-                <span className={`font-black tracking-tight whitespace-nowrap
-                  ${formattedTime.length > 5 ? 'text-[11px]' : 'text-[13px]'}
-                  ${isThemed ? 'text-white' : 'text-green-600'}
-                `}>{formattedTime}</span>
+            
+            {/* 📍 追加：更新ボタンと既存のSYNC表示を横並びに配置 */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => window.location.reload()}
+                className={`w-[42px] h-[42px] rounded-xl border flex items-center justify-center shadow-sm transition-all active:scale-95 cursor-pointer
+                  ${isThemed 
+                    ? 'bg-white/20 border-white/20 text-white hover:bg-white/30' 
+                    : 'bg-white border-pink-50 text-gray-400 hover:bg-gray-50'
+                  }
+                `}
+              >
+                <RefreshCw size={18} />
+              </button>
+
+              {/* ↓ここは既存のコードのままです */}
+              <div className={`w-[128px] h-[42px] rounded-xl border flex items-center justify-center gap-2 shadow-sm transition-colors
+                ${isThemed 
+                  ? 'bg-white/20 border-white/20 text-white' 
+                  : 'bg-green-50/80 border-green-100'
+                }
+              `}>
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75
+                    ${isThemed ? 'bg-white' : 'bg-green-400'}
+                  `}></span>
+                  <span className={`relative inline-flex rounded-full h-2.5 w-2.5
+                    ${isThemed ? 'bg-white' : 'bg-green-500'}
+                  `}></span>
+                </span>
+                <div className="flex flex-col leading-none items-center">
+                  <span className={`text-[8px] font-black uppercase tracking-tighter mb-0.5
+                    ${isThemed ? 'text-white/70' : 'text-green-600/50'}
+                  `}>HP SYNC</span>
+                  <span className={`font-black tracking-tight whitespace-nowrap
+                    ${formattedTime.length > 5 ? 'text-[11px]' : 'text-[13px]'}
+                    ${isThemed ? 'text-white' : 'text-green-600'}
+                  `}>{formattedTime}</span>
+                </div>
               </div>
             </div>
 

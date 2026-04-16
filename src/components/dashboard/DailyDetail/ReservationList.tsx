@@ -12,10 +12,14 @@ export default function ReservationList({ reservations, onSelect, getBadgeStyle,
     return s.startsWith('20') ? "--:--" : s.substring(0, 5);
   };
 
-  // 1. 📍 ハイブリッド・フィルタリング
-  // [予約日・開始・終了・客番号]が完全に一致する重複がある場合、最新(isLatest)のみを表示
-  // 内容が少しでも違う修正メールは、両方とも isLatest: true になるため自動的に並んで表示されます
-  const displayReservations = (reservations || []).filter((res: any) => res.isLatest);
+  // 1. 📍 ステータスベースのフィルタリング
+  // 存在しない isLatest ではなく、実在する status カラムで判定します。
+  // 実績計算に必要な 'completed' および、新着 'waiting'、進行中 'playing' を表示対象とします。
+  const displayReservations = (reservations || []).filter((res: any) => 
+    res.status === 'waiting' || 
+    res.status === 'playing' || 
+    res.status === 'completed'
+  );
 
   if (displayReservations.length === 0) {
     return (
@@ -36,7 +40,6 @@ export default function ReservationList({ reservations, onSelect, getBadgeStyle,
         <button 
           key={idx} 
           onClick={() => onSelect(res)} 
-          // 💡 画面に出るものは全て「最新の情報」なので、透明度などのペナルティは無し
           className="w-full rounded-xl p-1 px-2 border border-gray-100 bg-gray-50/50 flex items-center gap-1 shadow-sm active:bg-gray-100 transition-all text-gray-800"
         >
           {/* サービスバッジ（か、など） */}
@@ -56,7 +59,7 @@ export default function ReservationList({ reservations, onSelect, getBadgeStyle,
               <span className="text-[9px] mx-0.5 opacity-20">〜</span>
               <span className="text-[16px]">{formatTime(res.end_time)}</span>
             </div>
-            {/* 内容が修正された履歴がある場合のみ、控えめに通知 */}
+            {/* 💡 isDuplicate等のフラグがある場合のみ表示（見た目は維持） */}
             {res.isDuplicate && (
               <span className="text-[8px] flex items-center gap-0.5 leading-none mt-0.5 text-amber-600">
                 ✨ 内容更新あり
@@ -67,7 +70,7 @@ export default function ReservationList({ reservations, onSelect, getBadgeStyle,
           {/* 客番号と名前 */}
           <div className="flex items-center gap-1.5 truncate ml-auto font-black">
             <span className="text-[9px] font-black text-gray-300 tabular-nums">#{res.customer_no || '---'}</span>
-            <div className="flex items-baseline">
+            <div className="flex baseline">
               <span className="text-[15px]">{res.customer_name}</span>
               <span className="text-[8px] font-bold text-gray-400 ml-0.5">様</span>
             </div>

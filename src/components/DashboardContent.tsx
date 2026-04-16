@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation'; 
-import { format, isValid, startOfMonth, endOfMonth } from 'date-fns'; // 💡 startOfMonth, endOfMonth を追加
+import { format, isValid, startOfMonth, endOfMonth } from 'date-fns';
 import { useShiftData } from '@/hooks/useShiftData';
 import { useAchievement } from '@/hooks/useAchievement';
 import { useNavigation } from '@/hooks/useNavigation';
@@ -32,11 +32,15 @@ export default function DashboardContent() {
   const { data, loading, fetchInitialData, getMonthlyTotals, supabase } = useShiftData();
   const nav = useNavigation() as any;
 
+  // 📍 お知らせ用ステート
+  const [castNotices, setCastNotices] = useState<any[]>([]);
+
   const safeProfile = useMemo(() => data?.profile || {}, [data]);
   const themeKey = safeProfile.theme_color || 'pink';
   const currentTheme = THEME_CONFIG[themeKey] || THEME_CONFIG.pink;
   const safeShifts = Array.isArray(data?.shifts) ? data.shifts : [];
 
+  // 📍 001-012までの全店対応マップ
   const shopName = useMemo(() => {
     const loginId = String(safeProfile.username || safeProfile.login_id || "");
     const prefix = loginId.substring(0, 3);
@@ -53,6 +57,20 @@ export default function DashboardContent() {
     return d?.last_sync_at || d?.syncAt || safeProfile?.last_sync_at || safeProfile?.sync_at || null;
   }, [data, safeProfile]);
 
+  // 📍 cast_noticesテーブルからお知らせを取得
+  useEffect(() => {
+    async function fetchCastNotices() {
+      if (!supabase || !safeProfile.home_shop_id) return;
+      const { data: notices } = await supabase
+        .from('cast_notices')
+        .select('*')
+        .or(`shop_id.eq.all,shop_id.eq.${safeProfile.home_shop_id}`)
+        .order('created_at', { ascending: false });
+      if (notices) setCastNotices(notices);
+    }
+    fetchCastNotices();
+  }, [supabase, safeProfile.home_shop_id]);
+
   const achievementData: any = useAchievement(
     supabase, 
     safeProfile, 
@@ -63,19 +81,15 @@ export default function DashboardContent() {
   
   const { selectedShift = null } = achievementData || {};
 
-  // 📍 日別の予約フィルタリング
   const currentReservations = useMemo(() => {
     if (!(nav.selected?.single instanceof Date) || !data?.reservations) return [];
     const selectedDateStr = format(nav.selected.single, 'yyyy-MM-dd');
     return (data.reservations as any[]).filter((res) => res.reservation_date === selectedDateStr);
   }, [data?.reservations, nav.selected?.single]);
 
-  // 💡 修正箇所1: 月間の予約フィルタリングを追加
   const monthlyReservations = useMemo(() => {
     if (!data?.reservations || !nav.viewDate) return [];
-    // 表示中の月（yyyy-MM）を取得
     const targetMonthStr = format(nav.viewDate, 'yyyy-MM');
-    // その月に該当する予約だけを抽出
     return (data.reservations as any[]).filter((res) => 
       res.reservation_date && res.reservation_date.startsWith(targetMonthStr)
     );
@@ -107,7 +121,6 @@ export default function DashboardContent() {
       </div>
       
       <main className="px-4 -mt-6 relative z-10 space-y-5">
-        
         <section className={`p-4 rounded-[40px] border-2 shadow-xl shadow-pink-100/20 text-center transition-all duration-500 ${currentTheme.calendar}`}>
           <DashboardCalendar 
             shifts={safeShifts as any} 
@@ -121,20 +134,22 @@ export default function DashboardContent() {
         </section>
 
         {(nav.selected?.single instanceof Date && isValid(nav.selected.single)) && (
+          /* 📍 as any で波線を抑制 */
           <DailyDetail 
-            date={nav.selected.single}
-            dayNum={nav.selected.single.getDate()}
-            shift={selectedShift}
-            allShifts={safeShifts}
-            reservations={currentReservations} 
-            theme={themeKey}
-            supabase={supabase}
-            onRefresh={() => fetchInitialData(router)}
-            myLoginId={safeProfile.username || safeProfile.login_id}
+            {...({
+              date: nav.selected.single,
+              dayNum: nav.selected.single.getDate(),
+              shift: selectedShift,
+              allShifts: safeShifts,
+              reservations: currentReservations, 
+              theme: themeKey,
+              supabase: supabase,
+              onRefresh: () => fetchInitialData(router),
+              myLoginId: safeProfile.username || safeProfile.login_id
+            } as any)}
           />
         )}
 
-        {/* 💡 修正箇所2: MonthlySummary に reservations を渡す */}
         <MonthlySummary 
           month={displayMonth} 
           totals={monthlyTotals} 
@@ -143,12 +158,16 @@ export default function DashboardContent() {
           theme={themeKey} 
         />
         
-        <NewsSection newsList={data?.news || []} />
+        {/* 📍 お知らせデータを castNotices に変更 */}
+        <NewsSection {...({ newsList: castNotices } as any)} />
       </main>
 
       <FixedFooter 
-        pathname={pathname} 
-        onLogout={() => supabase.auth.signOut().then(() => router.push('/login'))} 
+        {...({
+          pathname: pathname,
+          onRefresh: () => fetchInitialData(router),
+          onLogout: () => supabase.auth.signOut().then(() => router.push('/login'))
+        } as any)}
       />
     </div>
   );
