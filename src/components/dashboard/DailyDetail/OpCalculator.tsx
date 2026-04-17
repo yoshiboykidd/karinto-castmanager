@@ -251,11 +251,12 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
               </button>
             )}
             <button
-              onClick={() => toggleOp('延30', '延長30分', dbRes?.service_type === '添' ? 4000 : 6000, '延長')}
+              // 📍 修正：かりんとの延長30分を 6000 → 5000 に変更
+              onClick={() => toggleOp('延30', '延長30分', dbRes?.service_type === '添' ? 4000 : 5000, '延長')}
               className={`min-h-[60px] rounded-[20px] flex flex-col items-center justify-center border transition-all ${selectedOps.some(op => op.no === '延30') || savedOpsActive.some((op: any) => op.no === '延30') ? 'bg-blue-600 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.3)]' : 'bg-white/5 border-white/5 text-gray-400'}`}
             >
               <span className="text-[11px] font-black leading-tight text-center px-1">延長30分</span>
-              <span className="text-[18px] font-black">¥{dbRes?.service_type === '添' ? '4,000' : '6,000'}</span>
+              <span className="text-[18px] font-black">¥{dbRes?.service_type === '添' ? '4,000' : '5,000'}</span>
             </button>
           </div>
         </div>
