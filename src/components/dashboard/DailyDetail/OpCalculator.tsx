@@ -63,11 +63,10 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
   const allSavedOps = useMemo(() => Array.isArray(dbRes?.op_details) ? dbRes.op_details : [], [dbRes?.op_details]);
   const savedOpsActive = useMemo(() => allSavedOps.filter((op: any) => op?.status !== 'canceled'), [allSavedOps]);
 
-  const opsTotal = useMemo(() => {
-    const savedSum = savedOpsActive.reduce((sum: number, op: any) => sum + (op?.price || 0), 0);
-    const newSum = selectedOps.reduce((sum: number, op: any) => sum + (op?.price || 0), 0);
-    return savedSum + newSum;
-  }, [selectedOps, savedOpsActive]);
+  // 📍 修正：計算ロジックを分割して保持
+  const savedSum = useMemo(() => savedOpsActive.reduce((sum: number, op: any) => sum + (op?.price || 0), 0), [savedOpsActive]);
+  const newSum = useMemo(() => selectedOps.reduce((sum: number, op: any) => sum + (op?.price || 0), 0), [selectedOps]);
+  const opsTotal = useMemo(() => savedSum + newSum, [savedSum, newSum]);
 
   const displayTotal = useMemo(() => {
     if (isCompleted && dbRes?.actual_total_price) return Number(dbRes.actual_total_price);
@@ -149,7 +148,12 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
       }
 
       const basePrice = displayTotal - opsTotal;
-      const amountRow = `¥${basePrice.toLocaleString()} + ¥${opsTotal.toLocaleString()} = ¥${displayTotal.toLocaleString()}`;
+      
+      // 📍 修正：通知に送るテキストも「基本 + スタート時OP + 追加OP = 合計」に分割
+      const amountRow = (isActuallyPlaying || savedOpsActive.length > 0) && newSum !== 0
+        ? `¥${basePrice.toLocaleString()} + ¥${savedSum.toLocaleString()} + ¥${newSum.toLocaleString()} = ¥${displayTotal.toLocaleString()}`
+        : `¥${basePrice.toLocaleString()} + ¥${opsTotal.toLocaleString()} = ¥${displayTotal.toLocaleString()}`;
+
       const borderLine = "ー・－・－・－・－・－・－・－・－";
 
       let message = "";
@@ -198,10 +202,29 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
             <span className={`w-5 h-5 flex items-center justify-center rounded text-[10px] font-black shrink-0 ${dbRes?.service_type === '添' ? 'bg-pink-500' : 'bg-blue-500'}`}>{dbRes?.service_type || 'か'}</span>
             <p className="font-black text-[12px] truncate text-gray-100">{courseText}</p>
           </div>
-          <p className="text-[26px] font-black text-green-400 tabular-nums leading-none">
+
+          {/* 📍 修正：計算式のUI表示を条件分岐で３分割に対応（デザインは完全維持） */}
+          <p className="text-[26px] font-black text-green-400 tabular-nums leading-none flex items-center flex-wrap">
             <span className="text-[13px] align-middle opacity-60">¥</span>{initialTotal.toLocaleString()}
-            <span className="text-[15px] mx-1 opacity-40">+</span>
-            <span className="text-[13px] align-middle opacity-60">¥</span>{opsTotal.toLocaleString()}
+            
+            {isActuallyPlaying || savedOpsActive.length > 0 ? (
+              <>
+                <span className="text-[15px] mx-1 opacity-40">+</span>
+                <span className="text-[13px] align-middle opacity-60">¥</span>{savedSum.toLocaleString()}
+                {newSum !== 0 && (
+                  <>
+                    <span className="text-[15px] mx-1 opacity-40">+</span>
+                    <span className="text-[13px] align-middle opacity-60">¥</span>{newSum.toLocaleString()}
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <span className="text-[15px] mx-1 opacity-40">+</span>
+                <span className="text-[13px] align-middle opacity-60">¥</span>{newSum.toLocaleString()}
+              </>
+            )}
+
             <span className="text-[15px] mx-1 opacity-40">=</span>
             <span className="text-[13px] align-middle opacity-60 mr-0.5">¥</span>{displayTotal.toLocaleString()}
           </p>
@@ -237,7 +260,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
           </div>
         ))}
 
-        {/* 📍 復元：延長セクション（本番同期済み） */}
         <div className="space-y-2 pt-2 border-t border-white/10">
           <h3 className="text-[10px] font-black text-blue-400 px-1 uppercase border-l-2 border-blue-500/50 ml-1 tracking-widest">延長 (Extensions)</h3>
           <div className={`grid ${dbRes?.service_type === '添' ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
@@ -251,7 +273,6 @@ export default function OpCalculator({ selectedRes, initialTotal, onToast, onClo
               </button>
             )}
             <button
-              // 📍 修正：かりんとの延長30分を 6000 → 5000 に変更
               onClick={() => toggleOp('延30', '延長30分', dbRes?.service_type === '添' ? 4000 : 5000, '延長')}
               className={`min-h-[60px] rounded-[20px] flex flex-col items-center justify-center border transition-all ${selectedOps.some(op => op.no === '延30') || savedOpsActive.some((op: any) => op.no === '延30') ? 'bg-blue-600 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.3)]' : 'bg-white/5 border-white/5 text-gray-400'}`}
             >
